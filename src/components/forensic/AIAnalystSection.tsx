@@ -1,5 +1,7 @@
 import React from 'react';
 import type { AIAnalystAssessment } from '../../types/forensic';
+import type { ForensicConclusion } from '../../types/confidence';
+import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import {
   Sparkles,
   Target,
@@ -13,9 +15,13 @@ import {
 
 interface AIAnalystSectionProps {
   aiAnalyst?: AIAnalystAssessment;
+  conclusions?: ForensicConclusion[];
 }
 
-export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({ aiAnalyst }) => {
+export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({ aiAnalyst, conclusions = [] }) => {
+  const nlpOrThreatConclusion =
+    conclusions.find((c) => c.type === 'nlp_classification') ||
+    conclusions.find((c) => c.type === 'threat_classification');
   if (!aiAnalyst || !aiAnalyst.available) {
     return (
       <div className="rounded-card border border-border bg-surface p-5 shadow-xs space-y-3">
@@ -86,6 +92,13 @@ export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({ aiAnalyst })
         </div>
 
         <div className="flex items-center space-x-2">
+          {nlpOrThreatConclusion && (
+            <ConfidenceBadge
+              conclusion={nlpOrThreatConclusion}
+              allConclusions={conclusions}
+              size="md"
+            />
+          )}
           <span className={`px-3 py-1 rounded-full text-xs font-mono font-extrabold uppercase tracking-wide border ${
             isHighRisk
               ? 'bg-danger/10 border-danger/30 text-danger'

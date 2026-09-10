@@ -8,6 +8,8 @@ import {
   Info
 } from 'lucide-react';
 import type { EmailAnalysis, URLAnalysisResult } from '../../types/forensic';
+import { resolveConfidenceConclusions } from '../../utils/confidenceResolver';
+import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import { CopyButton } from './CopyButton';
 
 interface URLAnalysisSectionProps {
@@ -17,6 +19,12 @@ interface URLAnalysisSectionProps {
 export const URLAnalysisSection: React.FC<URLAnalysisSectionProps> = ({ email }) => {
   const [filter, setFilter] = useState<'all' | 'suspicious' | 'mismatch' | 'shortener'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const conclusions =
+    email.forensic_conclusions && email.forensic_conclusions.length > 0
+      ? email.forensic_conclusions
+      : resolveConfidenceConclusions(email);
+  const urlConclusion = conclusions.find((c) => c.type === 'malicious_url');
 
   const urlList: URLAnalysisResult[] = email.url_analysis || [];
 
@@ -88,10 +96,19 @@ export const URLAnalysisSection: React.FC<URLAnalysisSectionProps> = ({ email })
           </div>
         </div>
 
-        {/* Safety Note Badge */}
-        <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-surface-secondary border border-border text-[10px] font-mono text-foreground-muted">
-          <span className="w-1.5 h-1.5 rounded-full bg-primary" />
-          <span>No external requests made</span>
+        {/* Confidence & Safety Badges */}
+        <div className="flex items-center space-x-2">
+          {urlConclusion && (
+            <ConfidenceBadge
+              conclusion={urlConclusion}
+              allConclusions={conclusions}
+              size="sm"
+            />
+          )}
+          <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full bg-surface-secondary border border-border text-[10px] font-mono text-foreground-muted">
+            <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+            <span>No external requests made</span>
+          </div>
         </div>
       </div>
 

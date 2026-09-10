@@ -283,6 +283,7 @@ export interface EmailAnalysis {
   ai_analyst?: AIAnalystAssessment;
   investigation_graph?: import('./graph').InvestigationGraphData;
   attribution?: import('./attribution').AttributionResult;
+  forensic_conclusions?: import('./confidence').ForensicConclusion[];
   indicators?: IndicatorsGroup;
   subject?: string;
   from?: string;

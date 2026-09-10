@@ -27,12 +27,14 @@ from backend.services.audit_service import AuditService
 from backend.services.upload_security import UploadSecurityService
 from backend.services.html_sanitizer import HTMLSanitizerService
 from backend.services.attribution_engine import global_attribution_engine
+from backend.services.evidence_confidence_engine import EvidenceConfidenceEngine
 from backend.app.ml.classifier import global_phishing_classifier
 
 global_lookalike_detector = LookalikeDetectorService()
 global_domain_service = DomainIntelligenceService(lookalike_detector=global_lookalike_detector)
 global_url_analyzer = URLAnalyzerService(lookalike_detector=global_lookalike_detector)
 global_threat_scorer = ThreatScorerService()
+global_confidence_engine = EvidenceConfidenceEngine()
 
 router = APIRouter(prefix="/api/emails", tags=["Email Analysis"])
 
@@ -363,6 +365,34 @@ async def analyze_email(
                 )
             except Exception:
                 pass
+
+        # Evidence Confidence Engine Evaluation
+        try:
+            analysis_result.forensic_conclusions = global_confidence_engine.evaluate_email(analysis_result)
+            AuditService.log_audit(
+                db=db,
+                action="CONFIDENCE_EVALUATED",
+                resource_type="confidence",
+                resource_id=f"CONF-{evidence_record.evidence_id}",
+                user=uploader_identity,
+                metadata={
+                    "evidence_id": evidence_record.evidence_id,
+                    "engine_version": global_confidence_engine.engine_version,
+                    "conclusion_count": len(analysis_result.forensic_conclusions),
+                    "conclusions": [
+                        {
+                            "id": c.conclusion_id,
+                            "type": c.type.value,
+                            "score": c.confidence_score,
+                            "level": c.confidence_level
+                        }
+                        for c in analysis_result.forensic_conclusions
+                    ]
+                },
+                details=f"Evaluated {len(analysis_result.forensic_conclusions)} evidence confidence conclusions across forensic domains. Engine version: {global_confidence_engine.engine_version}."
+            )
+        except Exception:
+            pass
 
         # Section 19: Record in email_analyses for Analyst Dashboard
         try:

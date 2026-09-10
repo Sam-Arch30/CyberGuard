@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Globe, Server, Calendar, Shield, Clock, CheckCircle2, XCircle, Info, AlertTriangle, ShieldAlert } from 'lucide-react';
 import type { EmailAnalysis, DomainIntelligence } from '../../types/forensic';
 import { resolveDomainIntelligence } from '../../utils/indicatorHelper';
+import { resolveConfidenceConclusions } from '../../utils/confidenceResolver';
+import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import { CopyButton } from './CopyButton';
 
 interface DomainIntelligenceSectionProps {
@@ -12,6 +14,12 @@ export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps>
   const [activeDnsTab, setActiveDnsTab] = useState<Record<string, 'A' | 'MX' | 'NS' | 'TXT'>>({});
   const [filter, setFilter] = useState<'all' | 'lookalike' | 'new' | 'resolvable'>('all');
   const [liveDomainIntel, setLiveDomainIntel] = useState<Record<string, DomainIntelligence>>({});
+
+  const conclusions =
+    email.forensic_conclusions && email.forensic_conclusions.length > 0
+      ? email.forensic_conclusions
+      : resolveConfidenceConclusions(email);
+  const lookalikeConclusion = conclusions.find((c) => c.type === 'lookalike_determination');
 
   // Gather unique domains
   const domainSet = new Set<string>();
@@ -283,9 +291,18 @@ export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps>
                           Potential {item.lookalike.brand_name} Impersonation
                         </span>
                       </div>
-                      <div className="flex items-center space-x-1.5 text-xs font-mono bg-surface px-2.5 py-1 rounded-lg border border-danger-border">
-                        <span className="text-foreground-muted text-[11px]">Similarity:</span>
-                        <span className="text-danger font-bold">{Math.round(item.lookalike.similarity * 100)}%</span>
+                      <div className="flex items-center space-x-2">
+                        {lookalikeConclusion && (
+                          <ConfidenceBadge
+                            conclusion={lookalikeConclusion}
+                            allConclusions={conclusions}
+                            size="sm"
+                          />
+                        )}
+                        <div className="flex items-center space-x-1.5 text-xs font-mono bg-surface px-2.5 py-1 rounded-lg border border-danger-border">
+                          <span className="text-foreground-muted text-[11px]">Similarity:</span>
+                          <span className="text-danger font-bold">{Math.round(item.lookalike.similarity * 100)}%</span>
+                        </div>
                       </div>
                     </div>
 

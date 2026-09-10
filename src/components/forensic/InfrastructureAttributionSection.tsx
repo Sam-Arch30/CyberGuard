@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import type { AttributionResult, EvidenceItem } from '../../types/attribution';
+import type { ForensicConclusion } from '../../types/confidence';
+import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import {
   Server,
   Globe,
@@ -16,16 +18,19 @@ import {
 
 interface InfrastructureAttributionSectionProps {
   attribution?: AttributionResult;
+  conclusions?: ForensicConclusion[];
   onFocusGraphNode?: (nodeId: string) => void;
 }
 
 export const InfrastructureAttributionSection: React.FC<InfrastructureAttributionSectionProps> = ({
   attribution,
+  conclusions = [],
   onFocusGraphNode
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [showSupporting, setShowSupporting] = useState<boolean>(true);
   const [showConflicting, setShowConflicting] = useState<boolean>(true);
+  const attrConclusion = conclusions.find((c) => c.type === 'infrastructure_attribution');
 
   if (!attribution) return null;
 
@@ -118,17 +123,16 @@ export const InfrastructureAttributionSection: React.FC<InfrastructureAttributio
         {/* Confidence Tier Badge */}
         <div className="flex items-center space-x-3">
           <div className="text-right">
-            <span className="text-[10px] font-mono text-foreground-muted uppercase tracking-wider block">
+            <span className="text-[10px] font-mono text-foreground-muted uppercase tracking-wider block mb-1">
               Attribution Confidence
             </span>
-            <div className="flex items-center space-x-2 justify-end">
-              <span className="text-lg font-bold font-mono text-foreground">
-                {confidence_score.toFixed(0)}%
-              </span>
-              <span className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full border ${levelStyle.badge}`}>
-                {confidence_level}
-              </span>
-            </div>
+            <ConfidenceBadge
+              conclusion={attrConclusion}
+              allConclusions={conclusions}
+              score={confidence_score}
+              level={confidence_level}
+              size="lg"
+            />
           </div>
         </div>
       </div>

@@ -20,6 +20,7 @@ class DomainRegistration(BaseModel):
     expiration_date: Optional[str] = Field(None, description="Expiration timestamp (ISO) if available")
     nameservers: List[str] = Field(default_factory=list, description="Delegated nameservers from registration data")
     status: List[str] = Field(default_factory=list, description="Domain status codes (e.g., clientTransferProhibited)")
+    country: Optional[str] = Field(None, description="Registrant country if available")
     registration_source: str = Field("unavailable", description="Data source: RDAP, WHOIS, or unavailable")
 
 

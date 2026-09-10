@@ -9,20 +9,25 @@ import {
   Activity
 } from 'lucide-react';
 import type { ThreatScoreResult, MLAssessmentResult } from '../../types/forensic';
+import type { ForensicConclusion } from '../../types/confidence';
+import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import { BrainCircuit } from 'lucide-react';
 
 interface GlobalThreatScoreSectionProps {
   threatScore?: ThreatScoreResult;
   mlAssessment?: MLAssessmentResult;
   mlProbability?: number | null;
+  conclusions?: ForensicConclusion[];
 }
 
 export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> = ({
   threatScore,
   mlAssessment,
-  mlProbability
+  mlProbability,
+  conclusions = []
 }) => {
   const [showDetails, setShowDetails] = useState(true);
+  const threatConclusion = conclusions.find((c) => c.type === 'threat_classification');
 
   if (!threatScore) return null;
 
@@ -126,6 +131,22 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
               {style.label}
             </span>
           </div>
+
+          {threatConclusion && (
+            <>
+              <div className="h-10 w-px bg-border" />
+              <div className="space-y-1 text-center">
+                <div className="text-[10px] font-mono uppercase text-foreground-muted tracking-wider">
+                  Evidence Confidence
+                </div>
+                <ConfidenceBadge
+                  conclusion={threatConclusion}
+                  allConclusions={conclusions}
+                  size="md"
+                />
+              </div>
+            </>
+          )}
         </div>
       </div>
 

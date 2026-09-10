@@ -11,6 +11,7 @@ from backend.api.routes.reports import router as reports_router
 from backend.api.routes.audit import router as audit_router, evidence_router
 from backend.api.routes.dashboard import router as dashboard_router
 from backend.api.routes.attribution import router as attribution_router
+from backend.api.routes.confidence import router as confidence_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
 from backend.services.log_sanitizer import install_log_sanitizer
@@ -60,6 +61,7 @@ app.include_router(audit_router)
 app.include_router(evidence_router)
 app.include_router(dashboard_router)
 app.include_router(attribution_router)
+app.include_router(confidence_router)
 
 
 @app.exception_handler(Exception)

@@ -8,6 +8,7 @@ from backend.schemas.threat_score import ThreatScoreResult
 from backend.schemas.ai_analyst import AIAnalystAssessment
 from backend.schemas.graph import InvestigationGraphResponse
 from backend.schemas.attribution import AttributionResult
+from backend.schemas.evidence_confidence import ForensicConclusion
 
 
 class ProtocolResult(BaseModel):
@@ -172,6 +173,7 @@ class EmailAnalysisResponse(BaseModel):
     ai_analyst: Optional[AIAnalystAssessment] = Field(None, description="Structured AI Analyst assessment based on forensic findings")
     investigation_graph: Optional[InvestigationGraphResponse] = Field(None, description="Forensic investigation relationship graph")
     attribution: Optional[AttributionResult] = Field(None, description="Probabilistic infrastructure and campaign attribution assessment")
+    forensic_conclusions: List[ForensicConclusion] = Field(default_factory=list, description="Structured forensic conclusions from the Evidence Confidence Engine")
     indicators: IndicatorsGroup = Field(default_factory=IndicatorsGroup, description="Structured indicators group")
 
     # Top-level flat fields for direct accessibility / backwards compatibility

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Globe, Server, Shield, MapPin, Info, Cloud, Lock, Cpu } from 'lucide-react';
 import type { EmailAnalysis, IPIntelligence } from '../../types/forensic';
 import { resolveIPIntelligence } from '../../utils/indicatorHelper';
+import { resolveConfidenceConclusions } from '../../utils/confidenceResolver';
+import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import { LeafletMap, type MapLocation } from '../common/LeafletMap';
 
 interface IPIntelligenceSectionProps {
@@ -10,6 +12,12 @@ interface IPIntelligenceSectionProps {
 
 export const IPIntelligenceSection: React.FC<IPIntelligenceSectionProps> = ({ email }) => {
   const [selectedIpFilter, setSelectedIpFilter] = useState<'all' | 'public' | 'private'>('all');
+
+  const conclusions =
+    email.forensic_conclusions && email.forensic_conclusions.length > 0
+      ? email.forensic_conclusions
+      : resolveConfidenceConclusions(email);
+  const geoConclusion = conclusions.find((c) => c.type === 'geolocation');
 
   const ipIntelMap: Record<string, IPIntelligence> = email.ip_intelligence || {};
   
@@ -76,13 +84,21 @@ export const IPIntelligenceSection: React.FC<IPIntelligenceSectionProps> = ({ em
             </div>
           </div>
 
-          <div className="flex items-center gap-1 bg-surface-secondary p-1 rounded-control border border-border self-start sm:self-auto text-xs font-mono">
-            <button
-              onClick={() => setSelectedIpFilter('all')}
-              className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
-                selectedIpFilter === 'all' ? 'bg-surface text-foreground font-bold border border-border shadow-xs' : 'text-foreground-muted hover:text-foreground'
-              }`}
-            >
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+            {geoConclusion && (
+              <ConfidenceBadge
+                conclusion={geoConclusion}
+                allConclusions={conclusions}
+                size="sm"
+              />
+            )}
+            <div className="flex items-center gap-1 bg-surface-secondary p-1 rounded-control border border-border text-xs font-mono">
+              <button
+                onClick={() => setSelectedIpFilter('all')}
+                className={`px-3 py-1.5 rounded-lg font-medium transition-colors cursor-pointer ${
+                  selectedIpFilter === 'all' ? 'bg-surface text-foreground font-bold border border-border shadow-xs' : 'text-foreground-muted hover:text-foreground'
+                }`}
+              >
               All ({allIpList.length})
             </button>
             <button
@@ -103,6 +119,7 @@ export const IPIntelligenceSection: React.FC<IPIntelligenceSectionProps> = ({ em
             </button>
           </div>
         </div>
+      </div>
 
         {/* Leaflet Map component */}
         {mapLocations.length > 0 ? (

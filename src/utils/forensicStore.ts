@@ -1,5 +1,6 @@
 import type { EmailAnalysis } from '../types/forensic';
 import { resolveEmailIndicators, resolveAttribution } from './indicatorHelper';
+import { resolveConfidenceConclusions } from './confidenceResolver';
 
 const STORAGE_KEY_PREFIX = 'mailtrace_forensic_';
 const memoryStore = new Map<string, EmailAnalysis>();
@@ -540,6 +541,9 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
     if (!item.attribution || !item.attribution.probable_origin_ip) {
       item.attribution = resolveAttribution(item);
     }
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) {
+      item.forensic_conclusions = resolveConfidenceConclusions(item);
+    }
     return item;
   }
   try {
@@ -549,6 +553,9 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
       const resolved = resolveEmailIndicators(parsed);
       if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
         resolved.attribution = resolveAttribution(resolved);
+      }
+      if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
+        resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
       }
       memoryStore.set(id, resolved);
       return resolved;
@@ -560,6 +567,9 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
   if (id === 'sample-001' || id === 'latest' || id === 'demo') {
     if (!MOCK_SAMPLE_ANALYSIS.attribution || !MOCK_SAMPLE_ANALYSIS.attribution.probable_origin_ip) {
       MOCK_SAMPLE_ANALYSIS.attribution = resolveAttribution(MOCK_SAMPLE_ANALYSIS);
+    }
+    if (!MOCK_SAMPLE_ANALYSIS.forensic_conclusions || MOCK_SAMPLE_ANALYSIS.forensic_conclusions.length === 0) {
+      MOCK_SAMPLE_ANALYSIS.forensic_conclusions = resolveConfidenceConclusions(MOCK_SAMPLE_ANALYSIS);
     }
     return MOCK_SAMPLE_ANALYSIS;
   }

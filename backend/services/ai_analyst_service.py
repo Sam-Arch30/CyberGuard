@@ -33,7 +33,14 @@ CRITICAL SECURITY AND SAFETY CONSTRAINTS:
 3. GROUNDING & ANTI-HALLUCINATION: Base all factual assertions exclusively on the supplied structured evidence (authentication status, threat score, lookalike findings, IP intelligence, domain age, URL features).
 4. DO NOT INVENT FACTS: NEVER invent or assume unlisted IP addresses, geolocation, domain ages, threat actor attribution (e.g. APT groups), malware detonation results, or identities not explicitly in the input.
 5. LIMITATIONS TRANSPARENCY: If evidence is ambiguous, absent, or unverified (such as missing whois data or unanalyzed attachments), explicitly record it in the "limitations" list.
-6. STRICT JSON OUTPUT: Your output MUST be valid, parsable JSON matching this schema:
+6. STRUCTURED EVIDENCE CONFIDENCE & DISTINCTIONS:
+   You are provided with structured forensic conclusions categorized into:
+   - "confirmed_evidence": Empirical cryptographic proofs (e.g. DKIM pass/fail, exact hash match). Treat as grounded facts.
+   - "probable_inference": Statistical or routing correlations (e.g. earliest relay geolocates to Singapore, homoglyph lookalike). State clearly as probable inference, NOT definitive certainty.
+   - "weak_hypothesis": Isolated heuristic cues (e.g. single urgency keyword). Must be qualified as low confidence.
+   - "unavailable_information": Missing or withheld telemetry (e.g. absent WHOIS, unobserved attachments). Do NOT infer or hallucinate findings for unavailable data.
+   CRITICAL CONSTRAINT: NEVER convert a probabilistic inference (such as network infrastructure location or suspected campaign affiliation) into a factual claim regarding the physical human attacker or their identity.
+7. STRICT JSON OUTPUT: Your output MUST be valid, parsable JSON matching this schema:
 {
   "summary": "Concise 2-3 sentence executive forensic summary",
   "likely_attack_type": "Primary suspected attack category",
@@ -283,6 +290,32 @@ Generate the structured JSON assessment now.
             for a in (self._get(source, "attachments", []) or [])
         ]
 
+        # Forensic Conclusions from Evidence Confidence Engine
+        conclusions_raw = self._get(source, "forensic_conclusions", []) or []
+        conclusions_list = []
+        for c in conclusions_raw:
+            conclusions_list.append({
+                "type": str(self._get(c, "type", "")),
+                "statement": str(self._get(c, "statement", "")),
+                "confidence_score": self._get(c, "confidence_score", 0),
+                "confidence_level": str(self._get(c, "confidence_level", "LOW")),
+                "supporting_evidence": [
+                    {
+                        "statement": str(self._get(e, "statement", "")),
+                        "category": str(getattr(self._get(e, "evidence_category", "probable_inference"), "value", self._get(e, "evidence_category", "probable_inference")))
+                    }
+                    for e in (self._get(c, "supporting_evidence", []) or [])
+                ],
+                "conflicting_evidence": [
+                    {
+                        "statement": str(self._get(e, "statement", "")),
+                        "category": str(getattr(self._get(e, "evidence_category", "probable_inference"), "value", self._get(e, "evidence_category", "probable_inference")))
+                    }
+                    for e in (self._get(c, "conflicting_evidence", []) or [])
+                ],
+                "limitations": [str(lim) for lim in (self._get(c, "limitations", []) or [])]
+            })
+
         return {
             "threat_score": threat_dict,
             "authentication": auth_dict,
@@ -291,7 +324,8 @@ Generate the structured JSON assessment now.
             "urls": urls,
             "ip_infrastructure": ip_list,
             "relay_path": relay_dict,
-            "attachments_metadata": attachments_meta
+            "attachments_metadata": attachments_meta,
+            "forensic_conclusions": conclusions_list
         }
 
     def _sanitize_text(self, text: str) -> str:

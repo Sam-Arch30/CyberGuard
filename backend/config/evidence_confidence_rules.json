@@ -1,0 +1,84 @@
+{
+  "engine_version": "1.0.0",
+  "confidence_thresholds": {
+    "low": {
+      "min": 0,
+      "max": 39,
+      "label": "LOW",
+      "description": "Weak hypothesis or sparse telemetry; high likelihood of alternative explanations."
+    },
+    "moderate": {
+      "min": 40,
+      "max": 69,
+      "label": "MODERATE",
+      "description": "Consistent indicative signals present; some gaps, ambiguities, or secondary contradictions remain."
+    },
+    "high": {
+      "min": 70,
+      "max": 84,
+      "label": "HIGH",
+      "description": "Strong corroborating evidence across independent technical sources with minimal contradiction."
+    },
+    "very_high": {
+      "min": 85,
+      "max": 100,
+      "label": "VERY HIGH",
+      "description": "Definitive multi-source corroboration with cryptographic verification or unanimous IoC overlap."
+    }
+  },
+  "dimension_weights": {
+    "reliability": 0.25,
+    "independence": 0.20,
+    "recency": 0.15,
+    "specificity": 0.20,
+    "consistency": 0.20
+  },
+  "source_quality_defaults": {
+    "cryptographic_verification": 1.0,
+    "static_hash_match": 0.95,
+    "authoritative_rdap_whois": 0.85,
+    "reputable_geo_ip": 0.80,
+    "dns_live_query": 0.85,
+    "smtp_observed_first_hop": 0.75,
+    "smtp_upstream_hop": 0.40,
+    "heuristic_lookalike": 0.70,
+    "heuristic_keyword": 0.45,
+    "ml_nlp_model": 0.65
+  },
+  "independence_clusters": {
+    "maxmind_derived_geo": {
+      "sources": ["maxmind", "geolite", "ip_api", "ipinfo"],
+      "diminishing_return_multipliers": [1.0, 0.3, 0.1]
+    },
+    "internal_network_hops": {
+      "sources": ["private_subnet", "localhost", "internal_relay"],
+      "diminishing_return_multipliers": [1.0, 0.2, 0.0]
+    },
+    "single_registrar_whois": {
+      "sources": ["domain_rdap", "whois_cache", "domain_intel"],
+      "diminishing_return_multipliers": [1.0, 0.4, 0.1]
+    }
+  },
+  "recency_decay": {
+    "half_life_days": 180,
+    "stale_threshold_days": 365,
+    "stale_penalty_multiplier": 0.5
+  },
+  "contradiction_penalties": {
+    "cross_jurisdiction_geo_vs_whois": -25,
+    "cross_jurisdiction_geo_vs_timezone": -15,
+    "auth_spf_pass_with_display_spoof": -20,
+    "anonymizer_or_proxy_detected": -20,
+    "clean_reputation_on_bulletproof_asn": -15
+  },
+  "limitations": {
+    "THREAT_CLASSIFICATION": "Deterministic heuristic assessment based on observable indicators; zero-day or clean-reputation staging domains may initially score low.",
+    "INFRASTRUCTURE_ATTRIBUTION": "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor.",
+    "CAMPAIGN_ASSOCIATION": "Campaign clustering reflects observed technical IoC overlap across ingested cases; distinct actors occasionally deploy shared infrastructure.",
+    "GEOLOCATION": "IP geolocation reflects autonomous system routing and data center points of presence, not the physical location of the human operator.",
+    "LOOKALIKE_DOMAIN": "Lexical homoglyph and string-distance algorithm; does not consult official trademark registries or legal corporate entity databases.",
+    "MALICIOUS_URL": "Static non-invasive structural inspection; click-time server-side cloaking or credential redirection chains may alter behavior.",
+    "NLP_CLASSIFICATION": "Syntactic and psychological urgency cues from plain-text content; benign high-priority business emails may trigger urgency flags.",
+    "ATTACHMENT_VERDICT": "Static file header and hash evaluation; encrypted or password-protected archives without supplied credentials cannot be inspected."
+  }
+}
