@@ -558,5 +558,200 @@ class InvestigationGraphService:
             )
         )
 
+    def build_campaign_graph(
+        self,
+        campaign: Dict[str, Any],
+        max_nodes: int = 150
+    ) -> InvestigationGraphResponse:
+        """
+        Builds a dedicated relationship graph for a Campaign cluster where the Campaign
+        is a first-class central node connecting to Emails, Domains, IPs, URLs, and Recipients.
+        """
+        if not campaign:
+            return InvestigationGraphResponse(
+                nodes=[],
+                edges=[],
+                summary=GraphSummary(total_nodes=0, total_edges=0, node_type_counts={})
+            )
+
+        nodes: Dict[str, GraphNode] = {}
+        edges: Dict[str, GraphEdge] = {}
+
+        def add_node(node_id: str, node_type: NodeType, label: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+            if not node_id or not label:
+                return ""
+            meta = metadata or {}
+            if node_id not in nodes:
+                nodes[node_id] = GraphNode(
+                    id=node_id,
+                    type=node_type,
+                    label=label[:80],
+                    metadata=meta
+                )
+            else:
+                nodes[node_id].metadata.update(meta)
+            return node_id
+
+        def add_edge(source: str, target: str, label: str, metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
+            if not source or not target or source == target:
+                return None
+            if source not in nodes or target not in nodes:
+                return None
+            edge_id = f"edge:{source}->{label}->{target}"
+            if edge_id not in edges:
+                edges[edge_id] = GraphEdge(
+                    id=edge_id,
+                    source=source,
+                    target=target,
+                    label=label,
+                    metadata=metadata or {}
+                )
+            return edge_id
+
+        # 1. CAMPAIGN NODE (Central Hub)
+        camp_id = str(campaign.get("campaign_id") or campaign.get("id") or "CAMP-001")
+        camp_name = str(campaign.get("name") or f"Campaign {camp_id}")
+        camp_node_id = f"campaign:{camp_id}"
+
+        add_node(
+            node_id=camp_node_id,
+            node_type=NodeType.CAMPAIGN,
+            label=f"Campaign: {camp_name[:40]}",
+            metadata={
+                "campaign_id": camp_id,
+                "name": camp_name,
+                "overall_confidence": campaign.get("overall_confidence", 0),
+                "dominant_attack_type": campaign.get("dominant_attack_type", "Phishing"),
+                "email_count": campaign.get("email_count", 0),
+                "first_seen": campaign.get("first_seen", ""),
+                "last_seen": campaign.get("last_seen", "")
+            }
+        )
+
+        fp = campaign.get("fingerprint") or {}
+        if hasattr(fp, "model_dump"):
+            fp = fp.model_dump()
+
+        # 2. CAMPAIGN -> EMAIL NODES
+        emails = campaign.get("emails") or []
+        for em in emails[:20]:
+            e_id = str(em.get("id") or em.get("email_id") or em.get("email_sha256") or "eml")
+            e_sub = str(em.get("subject") or "Campaign Email")
+            e_node_id = f"email:{e_id[:16]}"
+            add_node(
+                node_id=e_node_id,
+                node_type=NodeType.EMAIL,
+                label=f"Email: {e_sub[:35]}...",
+                metadata={"subject": e_sub, "email_id": e_id, "from": em.get("from") or em.get("sender")}
+            )
+            add_edge(camp_node_id, e_node_id, "INCLUDES_EMAIL")
+
+        # 3. CAMPAIGN -> DOMAIN NODES
+        domains = set()
+        for d in campaign.get("domains") or []:
+            domains.add(str(d).lower().strip())
+        dom_summary = campaign.get("domain_summary") or {}
+        for d in dom_summary.get("linked_domains") or []:
+            domains.add(str(d).lower().strip())
+        if dom_summary.get("sender_domain"):
+            domains.add(str(dom_summary["sender_domain"]).lower().strip())
+        if dom_summary.get("reply_to_domain"):
+            domains.add(str(dom_summary["reply_to_domain"]).lower().strip())
+
+        for d in list(domains)[:15]:
+            if d:
+                dom_node_id = f"domain:{d}"
+                add_node(dom_node_id, NodeType.DOMAIN, d, {"domain": d})
+                add_edge(camp_node_id, dom_node_id, "UTILIZES_DOMAIN")
+
+        # 4. CAMPAIGN -> IP NODES
+        ips = set()
+        for ip in campaign.get("ips") or []:
+            ips.add(str(ip).strip())
+        infra_summary = campaign.get("infrastructure_summary") or {}
+        if infra_summary.get("origin_ip"):
+            ips.add(str(infra_summary["origin_ip"]).strip())
+        for r_ip in infra_summary.get("relay_ips") or []:
+            ips.add(str(r_ip).strip())
+
+        for ip in list(ips)[:12]:
+            if ip:
+                ip_node_id = f"ip:{ip}"
+                add_node(ip_node_id, NodeType.IP, ip, {"ip": ip})
+                add_edge(camp_node_id, ip_node_id, "HOSTED_ON_IP")
+
+        # 5. CAMPAIGN -> URL NODES
+        urls = set()
+        for u in campaign.get("urls") or []:
+            u_val = u.get("url") if isinstance(u, dict) else str(u)
+            urls.add(u_val.strip())
+        url_summary = campaign.get("url_summary") or {}
+        for u in url_summary.get("normalized_urls") or []:
+            urls.add(str(u).strip())
+
+        for u_str in list(urls)[:12]:
+            if u_str:
+                u_hash = hashlib.sha256(u_str.encode()).hexdigest()[:10]
+                url_node_id = f"url:{u_hash}"
+                display_u = self._defang_url(u_str)
+                add_node(
+                    node_id=url_node_id,
+                    node_type=NodeType.URL,
+                    label=f"URL: {display_u[:32]}...",
+                    metadata={"url": u_str, "defanged_url": display_u}
+                )
+                add_edge(camp_node_id, url_node_id, "DEPLOYS_URL")
+
+                # Cross edge: URL -> Domain
+                try:
+                    parsed = urllib.parse.urlparse(u_str)
+                    host = (parsed.hostname or "").lower().rstrip(".")
+                    if host and f"domain:{host}" in nodes:
+                        add_edge(url_node_id, f"domain:{host}", "RESOLVES_TO_DOMAIN")
+                except Exception:
+                    pass
+
+        # 6. CAMPAIGN -> RECIPIENT NODES
+        recipients = set()
+        rcpt_summary = campaign.get("recipient_summary") or {}
+        for r in rcpt_summary.get("recipients") or []:
+            recipients.add(str(r).lower().strip())
+        for em in emails:
+            rc = em.get("to") or em.get("recipient")
+            if rc:
+                recipients.add(str(rc).lower().strip())
+
+        for rcpt in list(recipients)[:15]:
+            if "@" in rcpt:
+                rcpt_node_id = f"email_addr:{rcpt}"
+                add_node(
+                    node_id=rcpt_node_id,
+                    node_type=NodeType.EMAIL_ADDRESS,
+                    label=rcpt,
+                    metadata={"role": "victim_recipient", "email": rcpt}
+                )
+                add_edge(camp_node_id, rcpt_node_id, "TARGETS_RECIPIENT")
+
+        # 7. CAPPING AND SUMMARY
+        final_nodes = list(nodes.values())[:max_nodes]
+        allowed_ids = {n.id for n in final_nodes}
+        final_edges = [e for e in edges.values() if e.source in allowed_ids and e.target in allowed_ids]
+
+        counts: Dict[str, int] = {}
+        for n in final_nodes:
+            counts[n.type.value] = counts.get(n.type.value, 0) + 1
+
+        return InvestigationGraphResponse(
+            nodes=final_nodes,
+            edges=final_edges,
+            summary=GraphSummary(
+                total_nodes=len(final_nodes),
+                total_edges=len(final_edges),
+                node_type_counts=counts,
+                has_high_risk_entities=True
+            )
+        )
+
 
 global_graph_service = InvestigationGraphService()
+

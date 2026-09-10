@@ -9,6 +9,7 @@ import { EmailForensicView } from './pages/EmailForensicView';
 import { Cases } from './pages/Cases';
 import { CaseDetail } from './pages/CaseDetail';
 import { ThreatIntelligence } from './pages/ThreatIntelligence';
+import { CampaignIntelligence } from './pages/CampaignIntelligence';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 
@@ -41,6 +42,8 @@ function AppContent() {
               <Route path="/analysis/:id" element={<EmailForensicView />} />
               <Route path="/cases" element={<Cases />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
+              <Route path="/campaigns" element={<CampaignIntelligence />} />
+              <Route path="/campaigns/:id" element={<CampaignIntelligence />} />
               <Route path="/intelligence" element={<ThreatIntelligence />} />
               <Route path="/reports" element={<Reports />} />
               <Route path="/settings" element={<Settings />} />

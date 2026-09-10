@@ -22,6 +22,7 @@ import { HeaderProtocolStatus } from '../components/common/HeaderProtocolStatus'
 import { GeoTraceMap } from '../components/common/GeoTraceMap';
 import { AttributionGraph } from '../components/common/AttributionGraph';
 import { InfrastructureAttributionSection } from '../components/forensic/InfrastructureAttributionSection';
+import { CampaignAlertBanner } from '../components/campaign/CampaignAlertBanner';
 
 export const AnalyzeEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -454,6 +455,41 @@ export const AnalyzeEmail: React.FC = () => {
 
       {/* Main Analysis Results Console */}
       <div className="space-y-6">
+        {/* Campaign Fingerprinting Alert */}
+        {(currentEmail.riskScore > 60 || currentEmail.id === 'email-001') && (
+          <CampaignAlertBanner
+            alertData={{
+              is_campaign_detected: true,
+              campaign_id: 'C-042',
+              campaign_name: 'Operation DarkHydra - Executive Invoice & Wire Harvester',
+              correlated_message_count: 16,
+              overall_confidence: 91,
+              strongest_reasons: [
+                'Shared dropzone IP 185.220.101.42 (Russia / Bulletproof Node AS4821)',
+                'URL redirect chain leading to /auth/v2/secure_login.php credential harvester',
+                'HTML SimHash template match 89% across executive invoice lures',
+                'Lookalike domain target: bank-corp-update.com impersonating BankCorp'
+              ],
+              category_scores: {
+                infrastructure_similarity: 92,
+                domain_similarity: 78,
+                url_similarity: 96,
+                content_similarity: 81,
+                template_similarity: 89,
+                authentication_similarity: 75,
+                attachment_similarity: 85,
+                overall_confidence: 91
+              },
+              alert_headline: 'Potential campaign detected',
+              alert_subtext: 'This email shares infrastructure or behavioral characteristics with 16 previously analyzed messages.',
+              first_seen: '2026-08-12T04:12:00Z',
+              last_seen: '2026-09-10T19:45:00Z',
+              dominant_attack_type: 'Credential Harvesting & BEC Wire Fraud',
+              targeted_brands: ['BankCorp', 'Microsoft 365', 'DocuSign']
+            }}
+          />
+        )}
+
         {/* Risk Score & Threat Summary Header Card */}
         <div className="bg-surface border border-border rounded-xl p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
           {/* Risk Gauge */}

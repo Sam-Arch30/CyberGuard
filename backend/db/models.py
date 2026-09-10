@@ -176,3 +176,56 @@ class EmailAnalysisModel(Base):
     analyzed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
 
 
+class CampaignModel(Base):
+    __tablename__ = "campaigns"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    campaign_id = Column(String(32), unique=True, nullable=False, index=True)  # e.g., C-042
+    name = Column(String(255), nullable=False)
+    first_seen = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen = Column(DateTime, default=get_utc_now, nullable=False)
+    email_count = Column(Integer, default=0, nullable=False)
+    recipient_count = Column(Integer, default=0, nullable=False)
+    sender_count = Column(Integer, default=0, nullable=False)
+    domain_count = Column(Integer, default=0, nullable=False)
+    ip_count = Column(Integer, default=0, nullable=False)
+    asn_count = Column(Integer, default=0, nullable=False)
+    overall_confidence = Column(Float, default=0.0, nullable=False)
+    dominant_attack_type = Column(String(100), default="Phishing / Fraud", nullable=False)
+    targeted_brands_json = Column(Text, default="[]", nullable=False)
+    targeted_organizations_json = Column(Text, default="[]", nullable=False)
+    fingerprint_json = Column(Text, default="{}", nullable=False)
+    associated_iocs_json = Column(Text, default="[]", nullable=False)
+    timeline_events_json = Column(Text, default="[]", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    emails = relationship("CampaignEmailModel", back_populates="campaign", cascade="all, delete-orphan", lazy="selectin")
+
+
+class CampaignEmailModel(Base):
+    __tablename__ = "campaign_emails"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True)
+    email_id = Column(String(128), nullable=False)
+    email_sha256 = Column(String(64), nullable=True)
+    subject = Column(String(255), nullable=True, default="Untitled Email")
+    sender = Column(String(255), nullable=True, default="unknown")
+    recipient = Column(String(255), nullable=True)
+    sent_at = Column(DateTime, default=get_utc_now, nullable=False)
+    similarity_to_campaign = Column(Float, default=0.0, nullable=False)
+    category_scores_json = Column(Text, default="{}", nullable=False)
+    correlation_reasons_json = Column(Text, default="[]", nullable=False)
+    added_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    # Relationships
+    campaign = relationship("CampaignModel", back_populates="emails")
+
+    __table_args__ = (
+        Index("ix_campaign_emails_camp_email", "campaign_id", "email_id", unique=True),
+    )
+
+
+

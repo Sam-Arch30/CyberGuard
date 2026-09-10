@@ -12,7 +12,8 @@ import {
   ShieldCheck,
   Radio,
   Zap,
-  Palette
+  Palette,
+  Network
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -55,6 +56,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/cases',
       icon: FolderLock,
       badge: '3 Active'
+    },
+    {
+      name: 'Campaign Intelligence',
+      path: '/campaigns',
+      icon: Network,
+      badge: 'CLUSTERS'
     },
     {
       name: 'Threat Intelligence',
