@@ -348,7 +348,23 @@ class InvestigationGraphService:
         if earliest_ip and f"ip:{earliest_ip}" in nodes:
             add_edge(email_node_id, f"ip:{earliest_ip}", "ROUTED_THROUGH", {"hop_role": "earliest_observable_sender"})
 
-        # Link IPs to ASN nodes
+        # Attribution Integration: Email -> Probable Origin IP
+        attribution = self._get(email_analysis, "attribution", None)
+        origin_ip = self._get(attribution, "probable_origin_ip", None) if attribution else earliest_ip
+        if origin_ip:
+            origin_ip_clean = origin_ip.strip()
+            origin_node_id = f"ip:{origin_ip_clean}"
+            if origin_node_id not in nodes:
+                add_node(origin_node_id, NodeType.IP, origin_ip_clean, {
+                    "ip": origin_ip_clean,
+                    "role": "probable_origin_infrastructure"
+                })
+            add_edge(email_node_id, origin_node_id, "ORIGIN_INFRASTRUCTURE", {
+                "confidence": self._get(attribution, "confidence_score", None) if attribution else None,
+                "role": "probable_origin_infrastructure"
+            })
+
+        # Link IPs to ASN nodes and Country nodes
         for ip_id, node in list(nodes.items()):
             if node.type == NodeType.IP:
                 asn_val = node.metadata.get("asn")
@@ -365,6 +381,23 @@ class InvestigationGraphService:
                         metadata={"asn": asn_clean, "org": asn_org, "country": node.metadata.get("country")}
                     )
                     add_edge(ip_id, asn_node_id, "BELONGS_TO_ASN")
+
+                # Link IP -> Country node
+                country_val = node.metadata.get("country")
+                if country_val and str(country_val).strip().upper() not in ("UNKNOWN", "NONE", ""):
+                    country_clean = str(country_val).strip()
+                    country_slug = re.sub(r'[^a-zA-Z0-9]+', '_', country_clean.lower()).strip('_')
+                    country_node_id = f"country:{country_slug}"
+                    add_node(
+                        node_id=country_node_id,
+                        node_type=NodeType.COUNTRY,
+                        label=country_clean,
+                        metadata={
+                            "country": country_clean,
+                            "disclaimer": "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor."
+                        }
+                    )
+                    add_edge(ip_id, country_node_id, "HOSTED_IN_COUNTRY")
 
         # -----------------------------------------------------------------
         # 6. ATTACHMENT NODES
@@ -397,7 +430,7 @@ class InvestigationGraphService:
             add_edge(email_node_id, att_node_id, "HAS_ATTACHMENT")
 
         # -----------------------------------------------------------------
-        # 7. CASE NODE (If supplied)
+        # 7. CASE & CAMPAIGN NODES (Attribution & Infrastructure Linkage)
         # -----------------------------------------------------------------
         if case_id:
             case_node_id = f"case:{case_id}"
@@ -408,6 +441,35 @@ class InvestigationGraphService:
                 metadata={"case_id": case_id}
             )
             add_edge(email_node_id, case_node_id, "ASSOCIATED_WITH_CASE")
+
+        # Campaign -> Infrastructure Linkage
+        camp_list: List[str] = []
+        if attribution:
+            cid = self._get(attribution, "campaign_id", None)
+            if cid:
+                camp_list.append(str(cid))
+            for rc in (self._get(attribution, "related_campaigns", []) or []):
+                if rc and str(rc) not in camp_list:
+                    camp_list.append(str(rc))
+
+        for camp in camp_list:
+            camp_clean = camp.strip()
+            camp_slug = re.sub(r'[^a-zA-Z0-9]+', '_', camp_clean.lower()).strip('_')
+            camp_node_id = f"campaign:{camp_slug}"
+            add_node(
+                node_id=camp_node_id,
+                node_type=NodeType.CAMPAIGN,
+                label=f"Campaign: {camp_clean}",
+                metadata={"campaign_id": camp_clean}
+            )
+            add_edge(email_node_id, camp_node_id, "ASSOCIATED_WITH_CAMPAIGN")
+            if origin_ip and f"ip:{origin_ip}" in nodes:
+                add_edge(camp_node_id, f"ip:{origin_ip}", "UTILIZES_INFRASTRUCTURE")
+            origin_asn = self._get(attribution, "probable_origin_asn", None) if attribution else None
+            if origin_asn:
+                clean_asn_tag = origin_asn.upper() if origin_asn.upper().startswith("AS") else f"AS{origin_asn.upper()}"
+                if f"asn:{clean_asn_tag}" in nodes:
+                    add_edge(camp_node_id, f"asn:{clean_asn_tag}", "UTILIZES_INFRASTRUCTURE")
 
         # -----------------------------------------------------------------
         # 8. OVERLOAD PREVENTION / NODE CAPPING
@@ -424,9 +486,10 @@ class InvestigationGraphService:
                 NodeType.ASN: 5,
                 NodeType.EMAIL_ADDRESS: 6,
                 NodeType.CASE: 7,
-                NodeType.CAMPAIGN: 8
+                NodeType.CAMPAIGN: 8,
+                NodeType.COUNTRY: 9
             }
-            final_nodes.sort(key=lambda n: priority_order.get(n.type, 9))
+            final_nodes.sort(key=lambda n: priority_order.get(n.type, 10))
             final_nodes = final_nodes[:max_nodes]
             allowed_ids = {n.id for n in final_nodes}
             final_edges = [e for e in edges.values() if e.source in allowed_ids and e.target in allowed_ids]

@@ -282,6 +282,7 @@ export interface EmailAnalysis {
   ml_assessment?: MLAssessmentResult;
   ai_analyst?: AIAnalystAssessment;
   investigation_graph?: import('./graph').InvestigationGraphData;
+  attribution?: import('./attribution').AttributionResult;
   indicators?: IndicatorsGroup;
   subject?: string;
   from?: string;

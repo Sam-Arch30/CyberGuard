@@ -30,6 +30,7 @@ import {
 
 interface InvestigationGraphTabProps {
   email: EmailAnalysis;
+  focusNodeId?: string | null;
 }
 
 const NODE_TYPE_COLORS: Record<NodeType, { bg: string; border: string; text: string; lightBg: string }> = {
@@ -42,6 +43,7 @@ const NODE_TYPE_COLORS: Record<NodeType, { bg: string; border: string; text: str
   'Attachment': { bg: '#ea580c', border: '#f97316', text: '#ffedd5', lightBg: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30' },
   'Case': { bg: '#4f46e5', border: '#6366f1', text: '#e0e7ff', lightBg: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30' },
   'Campaign': { bg: '#db2777', border: '#ec4899', text: '#fce7f3', lightBg: 'bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30' },
+  'Country': { bg: '#0d9488', border: '#14b8a6', text: '#ccfbf1', lightBg: 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30' },
 };
 
 const getNodeIcon = (type: NodeType) => {
@@ -55,11 +57,12 @@ const getNodeIcon = (type: NodeType) => {
     case 'Attachment': return <Paperclip className="w-3.5 h-3.5" />;
     case 'Case': return <Briefcase className="w-3.5 h-3.5" />;
     case 'Campaign': return <Flag className="w-3.5 h-3.5" />;
+    case 'Country': return <Globe className="w-3.5 h-3.5" />;
     default: return <Share2 className="w-3.5 h-3.5" />;
   }
 };
 
-export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ email }) => {
+export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ email, focusNodeId }) => {
   const { isDark } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
@@ -70,7 +73,7 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
 
   // Filter State
   const ALL_NODE_TYPES: NodeType[] = [
-    'Email', 'Email Address', 'Domain', 'URL', 'IP', 'ASN', 'Attachment', 'Case'
+    'Email', 'Email Address', 'Domain', 'URL', 'IP', 'ASN', 'Attachment', 'Case', 'Campaign', 'Country'
   ];
   const [selectedTypes, setSelectedTypes] = useState<Set<NodeType>>(new Set(ALL_NODE_TYPES));
 
@@ -358,6 +361,30 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
       cyRef.current = null;
     };
   }, [filteredData, layoutName, isDark]);
+
+  // Focus specific node from Attribution or navigation
+  useEffect(() => {
+    if (!cyRef.current || !focusNodeId) return;
+    const cy = cyRef.current;
+    const targetNode = cy.$id(focusNodeId);
+    if (targetNode && targetNode.length > 0) {
+      targetNode.select();
+      const raw = targetNode.data('rawNode') as GraphNode;
+      if (raw) setSelectedNode(raw);
+
+      cy.elements().removeClass('highlighted-node highlighted-edge dimmed');
+      const neighborhood = targetNode.neighborhood().add(targetNode);
+      cy.elements().not(neighborhood).addClass('dimmed');
+      targetNode.addClass('highlighted-node');
+      targetNode.connectedEdges().addClass('highlighted-edge');
+
+      cy.animate({
+        center: { eles: targetNode },
+        zoom: 1.4,
+        duration: 400
+      });
+    }
+  }, [focusNodeId, filteredData]);
 
   function getLayoutConfig(name: string) {
     switch (name) {

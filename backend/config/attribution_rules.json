@@ -1,0 +1,25 @@
+{
+  "version": "1.0",
+  "confidence_thresholds": {
+    "low": { "min": 0, "max": 39, "label": "LOW" },
+    "moderate": { "min": 40, "max": 69, "label": "MODERATE" },
+    "high": { "min": 70, "max": 84, "label": "HIGH" },
+    "very_high": { "min": 85, "max": 100, "label": "VERY HIGH" }
+  },
+  "signal_weights": {
+    "earliest_untrusted_relay": 20.0,
+    "asn_consistency": 15.0,
+    "hosting_provider_consistency": 10.0,
+    "domain_hosting_relationship": 15.0,
+    "url_infrastructure_alignment": 15.0,
+    "dns_relationship": 10.0,
+    "repeated_infrastructure_campaign": 20.0,
+    "authentication_failure_alignment": 10.0,
+    "lookalike_domain_hosting": 10.0,
+    "anonymization_proxy_penalty": -20.0,
+    "contradictory_geolocations_penalty": -15.0,
+    "legitimate_provider_penalty": -25.0,
+    "missing_public_relay_penalty": -30.0
+  },
+  "disclaimer": "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor."
+}

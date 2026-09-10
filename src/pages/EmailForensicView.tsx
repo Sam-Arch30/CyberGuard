@@ -23,6 +23,12 @@ export const EmailForensicView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ForensicTabType>('overview');
+  const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
+
+  const handleFocusGraphNode = (nodeId: string) => {
+    setFocusedGraphNodeId(nodeId);
+    setActiveTab('graph');
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -84,6 +90,30 @@ export const EmailForensicView: React.FC = () => {
                 const updated: EmailAnalysis = {
                   ...prev,
                   ai_analyst: aiData
+                };
+                saveAnalysisResult(targetId, updated);
+                return updated;
+              });
+            }
+          })
+          .catch(() => {});
+      }
+
+      // Dynamically fetch Attribution if not already cached
+      if (!resolved.attribution) {
+        fetch('http://localhost:8000/api/emails/attribution', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resolved)
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(attrData => {
+            if (attrData) {
+              setAnalysis(prev => {
+                if (!prev) return prev;
+                const updated: EmailAnalysis = {
+                  ...prev,
+                  attribution: attrData
                 };
                 saveAnalysisResult(targetId, updated);
                 return updated;
@@ -179,8 +209,12 @@ export const EmailForensicView: React.FC = () => {
 
       {/* TAB CONTENT VIEWS */}
       <div key={activeTab} className="page-enter">
-        {activeTab === 'overview' && <OverviewTab email={analysis} />}
-        {activeTab === 'graph' && <InvestigationGraphTab email={analysis} />}
+        {activeTab === 'overview' && (
+          <OverviewTab email={analysis} onFocusGraphNode={handleFocusGraphNode} />
+        )}
+        {activeTab === 'graph' && (
+          <InvestigationGraphTab email={analysis} focusNodeId={focusedGraphNodeId} />
+        )}
         {activeTab === 'map' && <InvestigationMapTab email={analysis} />}
         {activeTab === 'headers' && <HeadersTab email={analysis} />}
         {activeTab === 'content' && <ContentTab email={analysis} />}

@@ -26,6 +26,7 @@ from backend.services.ioc_extractor import IOCExtractorService
 from backend.services.audit_service import AuditService
 from backend.services.upload_security import UploadSecurityService
 from backend.services.html_sanitizer import HTMLSanitizerService
+from backend.services.attribution_engine import global_attribution_engine
 from backend.app.ml.classifier import global_phishing_classifier
 
 global_lookalike_detector = LookalikeDetectorService()
@@ -295,7 +296,13 @@ async def analyze_email(
         except Exception:
             analysis_result.ai_analyst = None
 
-        # Section 13: Investigation Relationship Graph
+        # Section 21: Probabilistic Threat Attribution Engine
+        try:
+            analysis_result.attribution = global_attribution_engine.attribute_email(analysis_result, db=db)
+        except Exception:
+            analysis_result.attribution = None
+
+        # Section 13: Investigation Relationship Graph (includes Attribution linkages)
         try:
             analysis_result.investigation_graph = global_graph_service.build_graph(analysis_result)
         except Exception:
@@ -328,6 +335,34 @@ async def analyze_email(
             },
             details=f"Analysis completed for evidence {evidence_record.evidence_id}. Threat score: {score_val} ({sev_val.upper()})."
         )
+
+        # Log ATTRIBUTION_GENERATED audit event if attribution produced
+        if analysis_result.attribution:
+            try:
+                attr_obj = analysis_result.attribution
+                AuditService.log_audit(
+                    db=db,
+                    action="ATTRIBUTION_GENERATED",
+                    resource_type="attribution",
+                    resource_id=attr_obj.attribution_id,
+                    user=uploader_identity,
+                    metadata={
+                        "attribution_id": attr_obj.attribution_id,
+                        "evidence_id": evidence_record.evidence_id,
+                        "confidence_score": attr_obj.confidence_score,
+                        "confidence_level": attr_obj.confidence_level,
+                        "probable_origin_ip": attr_obj.probable_origin_ip,
+                        "probable_origin_asn": attr_obj.probable_origin_asn,
+                        "probable_infrastructure_country": attr_obj.probable_infrastructure_country,
+                        "supporting_count": len(attr_obj.supporting_evidence),
+                        "conflicting_count": len(attr_obj.conflicting_evidence)
+                    },
+                    details=f"Infrastructure attribution generated: {attr_obj.probable_origin_ip or 'Unknown'} "
+                            f"({attr_obj.probable_origin_provider or 'Unknown Provider'}), "
+                            f"Confidence: {attr_obj.confidence_score}% ({attr_obj.confidence_level})."
+                )
+            except Exception:
+                pass
 
         # Section 19: Record in email_analyses for Analyst Dashboard
         try:

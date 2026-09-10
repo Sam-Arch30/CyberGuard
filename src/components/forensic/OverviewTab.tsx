@@ -6,6 +6,7 @@ import { TransmissionPathSection } from './TransmissionPathSection';
 import { IPIntelligenceSection } from './IPIntelligenceSection';
 import { GlobalThreatScoreSection } from './GlobalThreatScoreSection';
 import { AIAnalystSection } from './AIAnalystSection';
+import { InfrastructureAttributionSection } from './InfrastructureAttributionSection';
 import { EvidenceIntegritySection } from './EvidenceIntegritySection';
 import { RelatedInvestigationsCard } from '../correlation/RelatedInvestigationsCard';
 import type { CampaignCorrelationResponse } from '../../types/correlation';
@@ -13,9 +14,10 @@ import { User, Info, Layers, Activity } from 'lucide-react';
 
 interface OverviewTabProps {
   email: EmailAnalysis;
+  onFocusGraphNode?: (nodeId: string) => void;
 }
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ email }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNode }) => {
   const [correlations, setCorrelations] = useState<CampaignCorrelationResponse | null>(null);
   const [loadingCorrelations, setLoadingCorrelations] = useState<boolean>(false);
 
@@ -56,6 +58,14 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email }) => {
 
       {/* Section 12: AI Analyst Assistant Assessment */}
       <AIAnalystSection aiAnalyst={email.ai_analyst} />
+
+      {/* Section 21: Probabilistic Threat Attribution Engine */}
+      {email.attribution && (
+        <InfrastructureAttributionSection
+          attribution={email.attribution}
+          onFocusGraphNode={onFocusGraphNode}
+        />
+      )}
 
       {/* Section 15: Campaign Correlation & Related Investigations */}
       <RelatedInvestigationsCard

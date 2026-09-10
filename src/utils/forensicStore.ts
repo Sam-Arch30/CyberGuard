@@ -317,6 +317,67 @@ Content-Disposition: attachment; filename="invoice.pdf"
     provider: "local-mock",
     available: true
   },
+  attribution: {
+    attribution_id: 'ATTR-97D4B2E8',
+    email_id: 'sample-001',
+    probable_origin_ip: '203.0.113.25',
+    probable_origin_asn: 'AS64512',
+    probable_origin_provider: 'Threat Hosting Corp',
+    probable_infrastructure_country: 'United States',
+    confidence_score: 78.0,
+    confidence_level: 'HIGH',
+    supporting_evidence: [
+      {
+        evidence_type: 'EARLIEST_UNTRUSTED_RELAY',
+        observation: 'Earliest untrusted public sending infrastructure identified at IP 203.0.113.25 (mail.example.net).',
+        contribution: 20.0,
+        source: 'SMTP Relay Path Analysis',
+        timestamp: '2026-09-07T05:12:01Z'
+      },
+      {
+        evidence_type: 'DOMAIN_HOSTING_RELATIONSHIP',
+        observation: "Suspicious domain 'micros0ft-example.com' directly resolves (A record) to probable sending IP 203.0.113.25.",
+        contribution: 15.0,
+        source: 'DNS Resolution Engine',
+        timestamp: '2026-09-07T05:12:01Z'
+      },
+      {
+        evidence_type: 'AUTHENTICATION_FAILURE_ALIGNMENT',
+        observation: "SPF/DMARC authentication failed for sender 'micros0ft-example.com' from IP 203.0.113.25, indicating unauthorized sending infrastructure.",
+        contribution: 10.0,
+        source: 'Email Authentication Subsystem',
+        timestamp: '2026-09-07T05:12:01Z'
+      },
+      {
+        evidence_type: 'LOOKALIKE_INFRASTRUCTURE_OVERLAP',
+        observation: "Brand lookalike domain 'micros0ft-example.com' shares hosting infrastructure (AS64512) with observed sending system.",
+        contribution: 10.0,
+        source: 'Lookalike Detection Engine',
+        timestamp: '2026-09-07T05:12:01Z'
+      },
+      {
+        evidence_type: 'HOSTING_PROVIDER_CONSISTENCY',
+        observation: 'Probable origin IP 203.0.113.25 operates within cloud/datacenter hosting infrastructure (Threat Hosting Corp).',
+        contribution: 10.0,
+        source: 'IP Intelligence Infrastructure Classification',
+        timestamp: '2026-09-07T05:12:01Z'
+      }
+    ],
+    conflicting_evidence: [
+      {
+        evidence_type: 'ANONYMIZATION_INFRASTRUCTURE_DETECTED',
+        observation: 'Sending infrastructure IP 203.0.113.25 is an identified anonymization proxy, VPN, or Tor exit node. Attribution points to proxy egress infrastructure rather than threat actor origin.',
+        contribution: -20.0,
+        source: 'IP Threat Intelligence',
+        timestamp: '2026-09-07T05:12:01Z'
+      }
+    ],
+    related_domains: ['micros0ft-example.com', 'example.net'],
+    related_ips: ['203.0.113.25', '198.51.100.12'],
+    related_campaigns: ['CASE-2026-000031'],
+    analysis_timestamp: '2026-09-07T05:12:00Z',
+    disclaimer: 'Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor.'
+  },
   investigation_graph: {
     nodes: [
       {
@@ -420,9 +481,17 @@ Content-Disposition: attachment; filename="invoice.pdf"
         type: 'Attachment',
         label: 'invoice.pdf',
         metadata: { filename: 'invoice.pdf', mime_type: 'application/pdf', size_bytes: 241000, sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' }
+      },
+      {
+        id: 'country:united_states',
+        type: 'Country',
+        label: 'United States',
+        metadata: { country: 'United States', disclaimer: 'Location refers to observed network infrastructure' }
       }
     ],
     edges: [
+      { id: 'edge:email:sample-001->ORIGIN_INFRASTRUCTURE->ip:203.0.113.25', source: 'email:sample-001', target: 'ip:203.0.113.25', label: 'ORIGIN_INFRASTRUCTURE' },
+      { id: 'edge:ip:203.0.113.25->HOSTED_IN_COUNTRY->country:united_states', source: 'ip:203.0.113.25', target: 'country:united_states', label: 'HOSTED_IN_COUNTRY' },
       { id: 'edge:email:sample-001->SENT_FROM->email_addr:security@micros0ft-example.com', source: 'email:sample-001', target: 'email_addr:security@micros0ft-example.com', label: 'SENT_FROM' },
       { id: 'edge:email:sample-001->SENT_TO->email_addr:employee@company.com', source: 'email:sample-001', target: 'email_addr:employee@company.com', label: 'SENT_TO' },
       { id: 'edge:email_addr:security@micros0ft-example.com->BELONGS_TO_DOMAIN->domain:micros0ft-example.com', source: 'email_addr:security@micros0ft-example.com', target: 'domain:micros0ft-example.com', label: 'BELONGS_TO_DOMAIN' },

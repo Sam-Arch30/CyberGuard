@@ -7,6 +7,7 @@ from backend.schemas.url_analysis import URLAnalysisResult
 from backend.schemas.threat_score import ThreatScoreResult
 from backend.schemas.ai_analyst import AIAnalystAssessment
 from backend.schemas.graph import InvestigationGraphResponse
+from backend.schemas.attribution import AttributionResult
 
 
 class ProtocolResult(BaseModel):
@@ -170,6 +171,7 @@ class EmailAnalysisResponse(BaseModel):
     ml_assessment: Optional[MLAssessmentResult] = Field(None, description="Detailed ML NLP text classification assessment")
     ai_analyst: Optional[AIAnalystAssessment] = Field(None, description="Structured AI Analyst assessment based on forensic findings")
     investigation_graph: Optional[InvestigationGraphResponse] = Field(None, description="Forensic investigation relationship graph")
+    attribution: Optional[AttributionResult] = Field(None, description="Probabilistic infrastructure and campaign attribution assessment")
     indicators: IndicatorsGroup = Field(default_factory=IndicatorsGroup, description="Structured indicators group")
 
     # Top-level flat fields for direct accessibility / backwards compatibility

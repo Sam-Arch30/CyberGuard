@@ -13,6 +13,7 @@ class NodeType(str, Enum):
     ATTACHMENT = "Attachment"
     CASE = "Case"
     CAMPAIGN = "Campaign"
+    COUNTRY = "Country"
 
 
 class GraphNode(BaseModel):

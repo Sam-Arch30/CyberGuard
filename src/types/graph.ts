@@ -7,7 +7,8 @@ export type NodeType =
   | 'ASN'
   | 'Attachment'
   | 'Case'
-  | 'Campaign';
+  | 'Campaign'
+  | 'Country';
 
 export interface GraphNode {
   id: string;
