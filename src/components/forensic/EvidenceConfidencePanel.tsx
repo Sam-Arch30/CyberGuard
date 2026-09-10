@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Info,
   CheckCircle2,
+  Check,
   Layers,
   Sparkles,
   ExternalLink,
@@ -26,14 +27,14 @@ interface EvidenceConfidencePanelProps {
 }
 
 const TYPE_ICONS: Record<string, React.ReactNode> = {
-  threat_classification: <ShieldCheck className="w-4 h-4 text-rose-400" />,
-  infrastructure_attribution: <Crosshair className="w-4 h-4 text-cyan-400" />,
-  geolocation: <MapPin className="w-4 h-4 text-emerald-400" />,
-  campaign_association: <Layers className="w-4 h-4 text-purple-400" />,
-  lookalike_determination: <Globe className="w-4 h-4 text-amber-400" />,
-  malicious_url: <ExternalLink className="w-4 h-4 text-red-400" />,
-  nlp_classification: <Sparkles className="w-4 h-4 text-blue-400" />,
-  attachment_risk: <FileText className="w-4 h-4 text-orange-400" />
+  threat_classification: <ShieldCheck className="w-3.5 h-3.5 text-rose-400 shrink-0" />,
+  infrastructure_attribution: <Crosshair className="w-3.5 h-3.5 text-cyan-400 shrink-0" />,
+  geolocation: <MapPin className="w-3.5 h-3.5 text-emerald-400 shrink-0" />,
+  campaign_association: <Layers className="w-3.5 h-3.5 text-purple-400 shrink-0" />,
+  lookalike_determination: <Globe className="w-3.5 h-3.5 text-amber-400 shrink-0" />,
+  malicious_url: <ExternalLink className="w-3.5 h-3.5 text-red-400 shrink-0" />,
+  nlp_classification: <Sparkles className="w-3.5 h-3.5 text-blue-400 shrink-0" />,
+  attachment_risk: <FileText className="w-3.5 h-3.5 text-orange-400 shrink-0" />
 };
 
 const TYPE_LABELS: Record<string, string> = {
@@ -250,7 +251,7 @@ export const EvidenceConfidencePanel: React.FC<EvidenceConfidencePanelProps> = (
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start space-x-2">
-                          <span className="text-emerald-400 font-bold mt-0.5">✓</span>
+                          <Check className="w-3.5 h-3.5 text-emerald-400 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-foreground font-medium leading-snug">
                               {ev.statement}
@@ -316,7 +317,7 @@ export const EvidenceConfidencePanel: React.FC<EvidenceConfidencePanelProps> = (
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start space-x-2">
-                          <span className="text-amber-400 font-bold mt-0.5">⚠</span>
+                          <AlertTriangle className="w-3.5 h-3.5 text-amber-400 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-foreground font-medium leading-snug">
                               {ev.statement}

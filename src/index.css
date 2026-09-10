@@ -501,6 +501,14 @@
   box-shadow: var(--shadow-md);
 }
 
+/* Ensure SVG icons inside dimensioned wrappers scale to their container */
+span[class*="w-"] > svg,
+span[class*="h-"] > svg,
+div[class*="w-"] > svg:only-child {
+  width: 100%;
+  height: 100%;
+}
+
 /* Page fade transition */
 .page-enter {
   animation: pageFadeIn var(--duration-slow) var(--ease-default) forwards;

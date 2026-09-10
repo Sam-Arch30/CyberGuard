@@ -67,27 +67,23 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
       case 'VERY HIGH':
         return {
           pill: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25',
-          outline: 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10',
-          icon: <CheckCircle2 className="shrink-0" />
+          outline: 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10'
         };
       case 'HIGH':
         return {
           pill: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25',
-          outline: 'border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10',
-          icon: <ShieldCheck className="shrink-0" />
+          outline: 'border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10'
         };
       case 'MODERATE':
         return {
           pill: 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25',
-          outline: 'border-amber-500/50 text-amber-400 hover:bg-amber-500/10',
-          icon: <AlertTriangle className="shrink-0" />
+          outline: 'border-amber-500/50 text-amber-400 hover:bg-amber-500/10'
         };
       case 'LOW':
       default:
         return {
           pill: 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25',
-          outline: 'border-rose-500/50 text-rose-400 hover:bg-rose-500/10',
-          icon: <Info className="shrink-0" />
+          outline: 'border-rose-500/50 text-rose-400 hover:bg-rose-500/10'
         };
     }
   };
@@ -105,6 +101,21 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
     md: 'w-3.5 h-3.5',
     lg: 'w-4 h-4'
   }[size];
+
+  const renderIcon = () => {
+    const cls = `${iconSizes} shrink-0`;
+    switch (level) {
+      case 'VERY HIGH':
+        return <CheckCircle2 className={cls} />;
+      case 'HIGH':
+        return <ShieldCheck className={cls} />;
+      case 'MODERATE':
+        return <AlertTriangle className={cls} />;
+      case 'LOW':
+      default:
+        return <Info className={cls} />;
+    }
+  };
 
   const handleClick = (e: React.MouseEvent) => {
     if (!interactive) return;
@@ -142,7 +153,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
             : 'cursor-default'
         } ${className}`}
       >
-        <span className={iconSizes}>{theme.icon}</span>
+        {renderIcon()}
         <span className="font-semibold tracking-tight">{displayLabel()}</span>
         {showScore && formattedScore !== undefined && variant !== 'compact' && (
           <span className="ml-0.5 text-[10px] opacity-80 font-normal">
