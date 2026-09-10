@@ -821,15 +821,20 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
     const raw = sessionStorage.getItem(STORAGE_KEY_PREFIX + id);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const resolved = resolveEmailIndicators(parsed);
-      if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
-        resolved.attribution = resolveAttribution(resolved);
+      // Invalidate stale cache for sample-001 if explainable audit metadata is missing
+      if (id === 'sample-001' && (!parsed.threat_score?.scoring_version || !parsed.threat_score?.audit_metadata)) {
+        sessionStorage.removeItem(STORAGE_KEY_PREFIX + id);
+      } else {
+        const resolved = resolveEmailIndicators(parsed);
+        if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
+          resolved.attribution = resolveAttribution(resolved);
+        }
+        if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
+          resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
+        }
+        memoryStore.set(id, resolved);
+        return resolved;
       }
-      if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
-        resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
-      }
-      memoryStore.set(id, resolved);
-      return resolved;
     }
   } catch (e) {
     console.warn('Error reading analysis from sessionStorage', e);

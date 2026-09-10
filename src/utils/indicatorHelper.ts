@@ -15,7 +15,9 @@ import type {
   URLAnalysisResult,
   ThreatScoreContribution,
   PositiveEvidence,
-  ThreatScoreResult
+  ThreatScoreResult,
+  ThreatSignalContribution,
+  CategoryScoreBreakdown
 } from '../types/forensic';
 import type { AttributionResult, EvidenceItem } from '../types/attribution';
 
@@ -496,16 +498,18 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
     return resolveURLAnalysis(u, existing, visText);
   });
 
-  const threatScoreResult = email.threat_score || calculateThreatScore({
-    authentication: authAnalysis,
-    lookalike_domains: lookalikeList,
-    url_analysis: urlAnalysisList,
-    domain_intelligence: domainIntelMap,
-    subject,
-    plain_text_body: email.plain_text_body,
-    html_body: email.html_body,
-    attachments: attachmentsList
-  });
+  const threatScoreResult = (email.threat_score?.scoring_version && email.threat_score?.audit_metadata)
+    ? email.threat_score
+    : calculateThreatScore({
+        authentication: authAnalysis,
+        lookalike_domains: lookalikeList,
+        url_analysis: urlAnalysisList,
+        domain_intelligence: domainIntelMap,
+        subject,
+        plain_text_body: email.plain_text_body,
+        html_body: email.html_body,
+        attachments: attachmentsList
+      });
 
   return {
     ...email,
@@ -1251,6 +1255,157 @@ export const calculateThreatScore = (email: Partial<EmailAnalysis>): ThreatScore
   else if (score >= 60) severity = 'high';
   else if (score >= 30) severity = 'suspicious';
 
+  let risk_level: 'CRITICAL' | 'HIGH' | 'SUSPICIOUS' | 'LOW' = 'LOW';
+  if (score >= 75) risk_level = 'CRITICAL';
+  else if (score >= 50) risk_level = 'HIGH';
+  else if (score >= 25) risk_level = 'SUSPICIOUS';
+
+  const WEIGHTS_MAP: Record<string, number> = {
+    brand_impersonation: 18,
+    html_link_mismatch: 15,
+    url_high_risk: 15,
+    url_suspicious: 8,
+    dmarc_fail: 12,
+    credential_request: 12,
+    newly_registered_domain: 10,
+    financial_language: 10,
+    spf_fail: 8,
+    dkim_fail: 8,
+    reply_to_mismatch: 8,
+    return_path_mismatch: 6,
+    suspicious_attachment_extension: 15,
+    trusted_sender_history: -5
+  };
+
+  const positive_contributions: ThreatSignalContribution[] = reasons.map((r, idx) => {
+    let cat = 'email_content';
+    let src = 'Forensic Content Parser';
+    let why = 'Contributes directly to aggregated email threat score.';
+    if (r.signal.includes('spf') || r.signal.includes('dkim') || r.signal.includes('dmarc')) {
+      cat = 'authentication';
+      src = 'Email Authentication Subsystem';
+      why = 'Indicates mail transfer agent lacks authorized sender verification or cryptographic signature.';
+    } else if (r.signal.includes('reply_to') || r.signal.includes('return_path') || r.signal.includes('display_name')) {
+      cat = 'sender_identity';
+      src = 'Sender Identity Subsystem';
+      why = 'Mismatches in envelope and header identity indicate deceptive sender spoofing.';
+    } else if (r.signal.includes('brand') || r.signal.includes('lookalike')) {
+      cat = 'lookalike_detection';
+      src = 'Lookalike Domain Detector';
+      why = 'Adversaries deploy visual lookalike domains to mislead recipients into believing the email originates from a trusted enterprise service provider.';
+    } else if (r.signal.includes('url') || r.signal.includes('link')) {
+      cat = 'url_intelligence';
+      src = 'URL Intelligence Subsystem';
+      why = 'Deceptive hyperlinks conceal the real destination server, leading victims to phishing landing sites.';
+    } else if (r.signal.includes('domain')) {
+      cat = 'domain_intelligence';
+      src = 'Domain Intelligence Subsystem';
+      why = 'Young domains lack established reputation and are frequently provisioned for short-lived phishing campaigns.';
+    } else if (r.signal.includes('attachment')) {
+      cat = 'attachments';
+      src = 'Attachment Risk Inspector';
+      why = 'Executable or script payloads pose immediate endpoint compromise hazards.';
+    }
+
+    return {
+      signal_id: `SIG-${cat.toUpperCase().substring(0, 4)}-${String(idx + 1).padStart(3, '0')}`,
+      category: cat,
+      name: r.label,
+      description: r.evidence,
+      why_it_matters: why,
+      raw_value: r.evidence,
+      normalized_value: 1.0,
+      weight: r.points,
+      contribution: r.points,
+      direction: 'increase_risk',
+      confidence: 0.95,
+      evidence_reference: r.evidence,
+      source: src
+    };
+  });
+
+  const negative_contributions: ThreatSignalContribution[] = positive_evidence.map((p, idx) => {
+    const cat = p.signal.includes('domain') ? 'domain_intelligence' : p.signal.includes('attachment') ? 'attachments' : 'authentication';
+    return {
+      signal_id: `SIG-MIT-${String(idx + 1).padStart(3, '0')}`,
+      category: cat,
+      name: p.label,
+      description: p.evidence,
+      why_it_matters: 'Verified security control mitigating baseline email risk.',
+      raw_value: p.evidence,
+      normalized_value: 0.0,
+      weight: p.signal === 'trusted_sender_history' ? -5 : 0,
+      contribution: p.signal === 'trusted_sender_history' ? -5 : 0,
+      direction: 'decrease_risk',
+      confidence: 0.95,
+      evidence_reference: p.evidence,
+      source: 'Security Controls Verifier'
+    };
+  });
+
+  const activeCategories = new Set(positive_contributions.map(c => c.category));
+  const confidence: 'VERY HIGH' | 'HIGH' | 'MODERATE' | 'LOW' =
+    activeCategories.size >= 4 || score >= 75
+      ? 'VERY HIGH'
+      : activeCategories.size >= 2 || score >= 45
+      ? 'HIGH'
+      : activeCategories.size === 1
+      ? 'MODERATE'
+      : 'LOW';
+
+  const CATEGORY_DISPLAY_MAP: Record<string, string> = {
+    authentication: 'Authentication Risk',
+    sender_identity: 'Sender Identity Risk',
+    domain_intelligence: 'Domain Risk',
+    lookalike_detection: 'Lookalike Risk',
+    url_intelligence: 'URL Risk',
+    infrastructure: 'Infrastructure Risk',
+    email_content: 'Content Risk',
+    campaign_intelligence: 'Campaign Risk',
+    attachments: 'Attachment Risk'
+  };
+
+  const category_breakdowns: Record<string, CategoryScoreBreakdown> = {};
+  Object.entries(CATEGORY_DISPLAY_MAP).forEach(([cKey, cName]) => {
+    const catSignals = [...positive_contributions, ...negative_contributions].filter(s => s.category === cKey);
+    const catScore = catSignals.reduce((acc, s) => acc + s.contribution, 0);
+    const posCount = catSignals.filter(s => s.direction === 'increase_risk').length;
+    const mitCount = catSignals.filter(s => s.direction === 'decrease_risk').length;
+    category_breakdowns[cKey] = {
+      category: cKey,
+      display_name: cName,
+      risk_score: catScore,
+      positive_signals_count: posCount,
+      mitigating_signals_count: mitCount,
+      signals: catSignals
+    };
+  });
+
+  const top_reasons = positive_contributions
+    .slice()
+    .sort((a, b) => b.contribution - a.contribution)
+    .slice(0, 4)
+    .map(c => `${c.name} (+${c.contribution} pts)`);
+
+  const driversStr = top_reasons.join('; ');
+  const why_flagged = score === 0
+    ? 'All inspected forensic layers (SPF/DKIM/DMARC authentication, URL features, sender identity, and attachments) conform to legitimate baselines without risk anomalies.'
+    : `This email was flagged with a Threat Score of ${score}/100 (${risk_level}) because it triggered ${positive_contributions.length} positive threat signal(s) across ${activeCategories.size} analytical category(ies). Key forensic drivers: ${driversStr}.`;
+
+  const audit_metadata = {
+    scoring_version: '2.0.0-explainable',
+    weights_snapshot: WEIGHTS_MAP,
+    thresholds_snapshot: {
+      low: { min: 0, max: 24 },
+      suspicious: { min: 25, max: 49 },
+      high: { min: 50, max: 74 },
+      critical: { min: 75, max: 100 }
+    },
+    timestamp: new Date().toISOString(),
+    evidence_ids: [...positive_contributions, ...negative_contributions].map(c => c.signal_id),
+    model_version: 'v1.0-tfidf-logistic'
+  };
+
   const summary = score === 0
     ? 'No anomalous forensic indicators detected. Email exhibits normal baseline characteristics.'
     : `Email risk assessed as ${severity.toUpperCase()} (${score}/100) driven by ${reasons.length} forensic signal(s).`;
@@ -1258,9 +1413,19 @@ export const calculateThreatScore = (email: Partial<EmailAnalysis>): ThreatScore
   return {
     score,
     severity,
+    risk_level,
+    confidence,
+    positive_contributions,
+    negative_contributions,
+    top_reasons,
     reasons,
     positive_evidence,
-    summary
+    summary,
+    why_flagged,
+    category_breakdowns,
+    model_version: 'v1.0-tfidf-logistic',
+    scoring_version: '2.0.0-explainable',
+    audit_metadata
   };
 };
 

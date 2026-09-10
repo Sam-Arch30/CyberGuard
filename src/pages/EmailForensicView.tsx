@@ -147,6 +147,30 @@ export const EmailForensicView: React.FC = () => {
           })
           .catch(() => {});
       }
+
+      // Dynamically fetch Explainable Threat Score if not already cached with audit metadata
+      if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
+        fetch('http://localhost:8000/api/emails/calculate-threat-score', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(resolved)
+        })
+          .then(res => (res.ok ? res.json() : null))
+          .then(scoreData => {
+            if (scoreData) {
+              setAnalysis(prev => {
+                if (!prev) return prev;
+                const updated: EmailAnalysis = {
+                  ...prev,
+                  threat_score: scoreData
+                };
+                saveAnalysisResult(targetId, updated);
+                return updated;
+              });
+            }
+          })
+          .catch(() => {});
+      }
     } else {
       setError('Unable to load the forensic analysis for this email.');
     }

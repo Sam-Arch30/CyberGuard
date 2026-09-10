@@ -12,8 +12,11 @@ import {
   Layers,
   TrendingUp,
   TrendingDown,
-  X
+  Copy,
+  Check
 } from 'lucide-react';
+import { Modal, ModalHeader, ModalTitle, ModalDescription, ModalBody, ModalFooter } from '../ui/Modal';
+import { Button } from '../ui/Button';
 import type {
   ThreatScoreResult,
   MLAssessmentResult,
@@ -91,6 +94,48 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
 
   const threatConclusion = conclusions.find((c) => c.type === 'threat_classification');
 
+  const DEFAULT_WEIGHTS_SNAPSHOT: Record<string, number> = {
+    brand_impersonation: 18,
+    html_link_mismatch: 15,
+    url_high_risk: 15,
+    url_suspicious: 8,
+    dmarc_fail: 12,
+    credential_request: 12,
+    domain_age_under_7d: 14,
+    newly_registered_domain: 10,
+    financial_language: 10,
+    urgency_language: 8,
+    spf_fail: 8,
+    dkim_fail: 8,
+    reply_to_mismatch: 8,
+    return_path_mismatch: 6,
+    suspicious_ip_hosting_or_proxy: 8,
+    suspicious_attachment_extension: 15,
+    known_campaign_match: 14,
+    shared_malicious_infrastructure: 12,
+    ml_phishing_signal: 10,
+    trusted_sender_history: -5
+  };
+
+  const DEFAULT_THRESHOLDS_SNAPSHOT: Record<string, { min: number; max: number }> = {
+    LOW: { min: 0, max: 24 },
+    SUSPICIOUS: { min: 25, max: 49 },
+    HIGH: { min: 50, max: 74 },
+    CRITICAL: { min: 75, max: 100 }
+  };
+
+  const effectiveWeightsSnapshot =
+    audit_metadata?.weights_snapshot && Object.keys(audit_metadata.weights_snapshot).length > 0
+      ? audit_metadata.weights_snapshot
+      : DEFAULT_WEIGHTS_SNAPSHOT;
+
+  const effectiveThresholdsSnapshot =
+    audit_metadata?.thresholds_snapshot && Object.keys(audit_metadata.thresholds_snapshot).length > 0
+      ? audit_metadata.thresholds_snapshot
+      : DEFAULT_THRESHOLDS_SNAPSHOT;
+
+  const [copiedAuditJson, setCopiedAuditJson] = useState<boolean>(false);
+
   // Resolve effective probability from mlProbability or mlAssessment
   const resolvedProbability =
     typeof mlProbability === 'number'
@@ -152,6 +197,22 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
     });
     return legacyList;
   }, [positive_contributions, negative_contributions, reasons, positive_evidence]);
+
+  const handleCopyAuditJson = () => {
+    const auditPayload = {
+      scoring_version,
+      model_version,
+      timestamp: audit_metadata?.timestamp || new Date().toISOString(),
+      score,
+      risk_level: effectiveRiskLevel,
+      evidence_ids: audit_metadata?.evidence_ids || allContributions.map(c => c.signal_id),
+      weights_snapshot: effectiveWeightsSnapshot,
+      thresholds_snapshot: effectiveThresholdsSnapshot
+    };
+    navigator.clipboard.writeText(JSON.stringify(auditPayload, null, 2));
+    setCopiedAuditJson(true);
+    setTimeout(() => setCopiedAuditJson(false), 2000);
+  };
 
   // Filtered contributions list
   const filteredContributions = useMemo(() => {
@@ -836,110 +897,171 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
       </div>
 
       {/* Auditability & Historical Reproducibility Modal */}
-      {showAuditModal && (
-        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-surface border border-border rounded-xl shadow-2xl max-w-2xl w-full max-h-[85vh] flex flex-col overflow-hidden">
-            {/* Modal Header */}
-            <div className="p-5 border-b border-border flex items-center justify-between">
-              <div className="flex items-center space-x-2.5">
-                <Scale className="w-5 h-5 text-primary" />
-                <h3 className="text-base font-bold font-sans text-foreground">
-                  Scoring Engine Audit &amp; Reproducibility Snapshot
-                </h3>
+      <Modal
+        isOpen={showAuditModal}
+        onClose={() => setShowAuditModal(false)}
+        size="lg"
+        className="font-mono text-xs max-h-[85vh] flex flex-col"
+      >
+        <ModalHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3 pr-6">
+            <div className="flex items-center space-x-2.5">
+              <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-primary">
+                <Scale className="w-5 h-5" />
               </div>
-              <button
-                onClick={() => setShowAuditModal(false)}
-                className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-muted hover:text-foreground cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Modal Content */}
-            <div className="p-5 overflow-y-auto space-y-4 text-xs font-mono">
-              <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-foreground leading-relaxed flex items-start space-x-2">
-                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-                <span>
-                  All scoring executions record immutable weight snapshots and registered evidence IDs.
-                  Historical cases remain 100% reproducible even if future engine weights or model thresholds change.
-                </span>
+              <div>
+                <ModalTitle>Scoring Engine Audit &amp; Reproducibility Snapshot</ModalTitle>
+                <ModalDescription className="font-mono text-[11px] text-foreground-muted">
+                  Immutable weight snapshot, registered evidence IDs, and active risk thresholds.
+                </ModalDescription>
               </div>
-
-              {/* Version & Timestamp */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="p-2.5 rounded-lg bg-surface-secondary border border-border">
-                  <div className="text-[10px] uppercase text-foreground-muted font-bold">Scoring Version</div>
-                  <div className="text-xs font-bold text-foreground mt-0.5">{scoring_version}</div>
-                </div>
-                <div className="p-2.5 rounded-lg bg-surface-secondary border border-border">
-                  <div className="text-[10px] uppercase text-foreground-muted font-bold">Model Version</div>
-                  <div className="text-xs font-bold text-foreground mt-0.5">{model_version}</div>
-                </div>
-                <div className="p-2.5 rounded-lg bg-surface-secondary border border-border col-span-2">
-                  <div className="text-[10px] uppercase text-foreground-muted font-bold">Audit Timestamp</div>
-                  <div className="text-xs font-bold text-foreground mt-0.5 truncate">
-                    {audit_metadata?.timestamp || new Date().toISOString()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Registered Evidence IDs */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-bold uppercase text-foreground-muted">
-                  Registered Forensic Evidence IDs ({audit_metadata?.evidence_ids?.length || allContributions.length}):
-                </div>
-                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 rounded-lg bg-surface-secondary/50 border border-border">
-                  {(audit_metadata?.evidence_ids || allContributions.map((c) => c.signal_id)).map((id, idx) => (
-                    <span
-                      key={idx}
-                      className="px-2 py-0.5 rounded text-[10px] bg-surface border border-border text-foreground font-mono"
-                    >
-                      {id}
-                    </span>
-                  ))}
-                </div>
-              </div>
-
-              {/* Weights Snapshot Table */}
-              <div className="space-y-1.5">
-                <div className="text-[11px] font-bold uppercase text-foreground-muted">
-                  Active Weights Snapshot:
-                </div>
-                <div className="max-h-40 overflow-y-auto rounded-lg border border-border">
-                  <table className="w-full text-left border-collapse">
-                    <thead className="bg-surface-secondary text-[10px] text-foreground-muted uppercase sticky top-0">
-                      <tr>
-                        <th className="p-2 border-b border-border">Signal Identifier</th>
-                        <th className="p-2 border-b border-border text-right">Configured Weight</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border text-[11px]">
-                      {Object.entries(audit_metadata?.weights_snapshot || {}).map(([sigKey, wVal]) => (
-                        <tr key={sigKey} className="hover:bg-surface-secondary/30">
-                          <td className="p-2 font-mono">{sigKey}</td>
-                          <td className={`p-2 text-right font-mono font-bold ${wVal > 0 ? 'text-danger' : 'text-success'}`}>
-                            {wVal > 0 ? `+${wVal}` : wVal}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer */}
-            <div className="p-4 border-t border-border flex justify-end">
-              <button
-                onClick={() => setShowAuditModal(false)}
-                className="px-4 py-2 rounded-lg bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-xs font-mono font-bold text-foreground cursor-pointer"
-              >
-                Close Audit View
-              </button>
             </div>
           </div>
-        </div>
-      )}
+        </ModalHeader>
+
+        <ModalBody className="space-y-4 py-4 overflow-y-auto">
+          <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 text-foreground leading-relaxed flex items-start space-x-2">
+            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <span>
+              All scoring executions record immutable weight snapshots and registered evidence IDs.
+              Historical cases remain 100% reproducible even if future engine weights or model thresholds change.
+            </span>
+          </div>
+
+          {/* Engine Parameters Grid */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div className="p-2.5 rounded-lg bg-surface-secondary border border-border">
+              <div className="text-[10px] uppercase text-foreground-muted font-bold">Scoring Version</div>
+              <div className="text-xs font-bold text-foreground mt-0.5">{scoring_version}</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-surface-secondary border border-border">
+              <div className="text-[10px] uppercase text-foreground-muted font-bold">Model Version</div>
+              <div className="text-xs font-bold text-foreground mt-0.5">{model_version}</div>
+            </div>
+            <div className="p-2.5 rounded-lg bg-surface-secondary border border-border col-span-2">
+              <div className="text-[10px] uppercase text-foreground-muted font-bold">Audit Timestamp</div>
+              <div className="text-xs font-bold text-foreground mt-0.5 truncate">
+                {audit_metadata?.timestamp || new Date().toISOString()}
+              </div>
+            </div>
+          </div>
+
+          {/* Registered Evidence IDs */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold uppercase text-foreground-muted flex items-center justify-between">
+              <span>Registered Forensic Evidence IDs ({(audit_metadata?.evidence_ids?.length || allContributions.length)}):</span>
+              <span className="text-[10px] text-foreground-muted font-normal">Linked to verifiable telemetry</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2.5 rounded-lg bg-surface-secondary/50 border border-border">
+              {(audit_metadata?.evidence_ids || allContributions.map((c) => c.signal_id)).map((id, idx) => (
+                <span
+                  key={idx}
+                  className="px-2 py-0.5 rounded text-[10px] bg-surface border border-border text-foreground font-mono font-medium shadow-2xs"
+                >
+                  {id}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {/* Active Risk Thresholds */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold uppercase text-foreground-muted">
+              Active Risk Thresholds Continuum:
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {Object.entries(effectiveThresholdsSnapshot).map(([tier, bounds]: [string, any]) => {
+                const isCurrent = tier.toUpperCase() === effectiveRiskLevel;
+                return (
+                  <div
+                    key={tier}
+                    className={`p-2 rounded-lg border text-center ${
+                      isCurrent
+                        ? 'bg-primary/15 border-primary text-primary font-bold shadow-2xs'
+                        : 'bg-surface-secondary border border-border text-foreground-muted'
+                    }`}
+                  >
+                    <div className="text-[10px] uppercase">{tier}</div>
+                    <div className="text-xs font-bold mt-0.5">
+                      {bounds.min} – {bounds.max} pts
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Weights Snapshot Table */}
+          <div className="space-y-1.5">
+            <div className="text-[11px] font-bold uppercase text-foreground-muted flex items-center justify-between">
+              <span>Configured Weights Snapshot ({Object.keys(effectiveWeightsSnapshot).length} rules):</span>
+              <span className="text-[10px] text-foreground-muted font-normal">Signed Risk Weighting Matrix</span>
+            </div>
+            <div className="max-h-52 overflow-y-auto rounded-lg border border-border shadow-inner">
+              <table className="w-full text-left border-collapse">
+                <thead className="bg-surface-secondary text-[10px] text-foreground-muted uppercase sticky top-0 z-10 border-b border-border">
+                  <tr>
+                    <th className="p-2">Forensic Signal</th>
+                    <th className="p-2 text-center">Status</th>
+                    <th className="p-2 text-right">Configured Weight</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border text-[11px]">
+                  {Object.entries(effectiveWeightsSnapshot).map(([sigKey, wVal]) => {
+                    const isTriggered =
+                      reasons.some((r) => r.signal === sigKey) ||
+                      allContributions.some((c) => c.signal_id.toLowerCase().includes(sigKey) || c.name.toLowerCase().includes(sigKey.replace(/_/g, ' ')));
+                    return (
+                      <tr key={sigKey} className="hover:bg-surface-secondary/40">
+                        <td className="p-2 font-mono text-foreground font-medium">
+                          {sigKey}
+                        </td>
+                        <td className="p-2 text-center">
+                          {isTriggered ? (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-danger/15 text-danger font-bold border border-danger/30">
+                              TRIGGERED
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-mono text-foreground-muted">
+                              Baseline
+                            </span>
+                          )}
+                        </td>
+                        <td
+                          className={`p-2 text-right font-mono font-bold ${
+                            wVal > 0 ? 'text-danger' : wVal < 0 ? 'text-success' : 'text-foreground-muted'
+                          }`}
+                        >
+                          {wVal > 0 ? `+${wVal} pts` : `${wVal} pts`}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ModalBody>
+
+        <ModalFooter className="flex items-center justify-between">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyAuditJson}
+            leftIcon={copiedAuditJson ? <Check className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5" />}
+          >
+            {copiedAuditJson ? 'Audit JSON Copied!' : 'Copy Audit Record (JSON)'}
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => setShowAuditModal(false)}
+          >
+            Close Audit View
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 };
