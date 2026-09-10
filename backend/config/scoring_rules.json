@@ -1,22 +1,33 @@
 {
-  "version": "1.0",
+  "version": "2.0.0-explainable",
+  "scoring_version": "2.0.0-explainable",
   "weights": {
     "spf_fail": 8,
     "spf_softfail": 4,
     "dkim_fail": 8,
     "dmarc_fail": 12,
+    "display_name_spoof": 14,
     "reply_to_mismatch": 8,
     "return_path_mismatch": 6,
     "brand_impersonation": 18,
     "url_high_risk": 15,
     "url_suspicious": 8,
     "html_link_mismatch": 15,
+    "domain_age_under_7d": 14,
     "newly_registered_domain": 10,
+    "suspicious_tld": 8,
+    "dns_anomaly": 10,
     "credential_request": 12,
     "financial_language": 10,
+    "urgency_language": 8,
     "suspicious_attachment_extension": 15,
+    "attachment_macro_payload": 18,
     "suspicious_ip_hosting_or_proxy": 8,
-    "ml_phishing_signal": 10
+    "known_campaign_match": 14,
+    "shared_malicious_infrastructure": 12,
+    "ml_phishing_signal": 10,
+
+    "trusted_sender_history": -5
   },
   "ml_scoring": {
     "enabled": true,
@@ -30,6 +41,15 @@
     "high": { "min": 60, "max": 79 },
     "critical": { "min": 80, "max": 100 }
   },
+  "risk_thresholds": {
+    "LOW": { "min": 0, "max": 24 },
+    "SUSPICIOUS": { "min": 25, "max": 49 },
+    "HIGH": { "min": 50, "max": 74 },
+    "CRITICAL": { "min": 75, "max": 100 }
+  },
+  "suspicious_tlds": [
+    ".xyz", ".top", ".work", ".click", ".buzz", ".cam", ".rest", ".fit", ".gq", ".tk", ".ml", ".cf", ".ga"
+  ],
   "suspicious_extensions": [
     ".exe", ".scr", ".bat", ".cmd", ".vbs", ".js", ".jse",
     ".wsf", ".iso", ".img", ".hta", ".cpl", ".ps1", ".jar",
@@ -39,12 +59,242 @@
     "password", "login credentials", "verify your account", "verify password",
     "reset your password", "security alert", "account suspended", "sign-in attempt",
     "validate credentials", "confirm your identity", "immediate verification",
-    "update your password", "unlock account", "unauthorized login"
+    "update your password", "unlock account", "unauthorized login", "re-authenticate"
   ],
   "financial_keywords": [
     "wire transfer", "bank account", "invoice payment", "remittance",
     "urgent payment", "gift card", "routing number", "swift code",
     "overdue invoice", "cryptocurrency", "bitcoin wallet", "payroll update",
-    "payment confirmation", "billing statement"
-  ]
+    "payment confirmation", "billing statement", "direct deposit"
+  ],
+  "urgency_keywords": [
+    "immediate action required", "urgent notice", "within 24 hours", "account will be closed",
+    "critical warning", "expires today", "immediate suspension", "respond immediately"
+  ],
+  "signal_metadata": {
+    "spf_fail": {
+      "category": "authentication",
+      "name": "SPF Authentication Failure",
+      "description": "Originating sending IP is not authorized in sender domain's SPF DNS record.",
+      "why_it_matters": "Enables malicious actors to forge sender envelope domains and bypass standard server identity checks.",
+      "source": "Email Authentication Subsystem"
+    },
+    "spf_softfail": {
+      "category": "authentication",
+      "name": "SPF Policy Softfail",
+      "description": "Originating sending IP is discouraged by sender domain's SPF policy.",
+      "why_it_matters": "Indicates questionable relay path or misconfigured forwarding; frequently weaponized for spoofing.",
+      "source": "Email Authentication Subsystem"
+    },
+    "dkim_fail": {
+      "category": "authentication",
+      "name": "DKIM Signature Verification Failed",
+      "description": "Cryptographic signature failed mathematical verification or email body was modified in transit.",
+      "why_it_matters": "Email contents may have been tampered with by an intermediate relay or sent from unauthorized systems.",
+      "source": "Cryptographic Signature Validator"
+    },
+    "dmarc_fail": {
+      "category": "authentication",
+      "name": "DMARC Policy Alignment Failed",
+      "description": "Sender header domain is unaligned with both verified SPF and DKIM identifiers.",
+      "why_it_matters": "Primary mechanism for executive display and organization domain impersonation.",
+      "source": "DMARC Alignment Engine"
+    },
+    "display_name_spoof": {
+      "category": "sender_identity",
+      "name": "Display Name Spoofing Detected",
+      "description": "Human-facing display name claims identity of a known brand or VIP, but sending domain is unrelated.",
+      "why_it_matters": "Deceives human recipients into trusting malicious instructions by mimicking legitimate contacts.",
+      "source": "Sender Identity Analyzer"
+    },
+    "reply_to_mismatch": {
+      "category": "sender_identity",
+      "name": "Reply-To Destination Mismatch",
+      "description": "Reply-To header routes responses to an entirely distinct domain from the apparent From sender.",
+      "why_it_matters": "Redirects victim replies to adversary-controlled inboxes during BEC and credential collection attacks.",
+      "source": "Header Alignment Subsystem"
+    },
+    "return_path_mismatch": {
+      "category": "sender_identity",
+      "name": "Return-Path Envelope Mismatch",
+      "description": "SMTP envelope bounce return path does not match From header domain.",
+      "why_it_matters": "Frequently indicates spam relaying, hijacked accounts, or unaligned bulk mail infrastructure.",
+      "source": "Header Alignment Subsystem"
+    },
+    "brand_impersonation": {
+      "category": "lookalike_detection",
+      "name": "Brand Lookalike Domain Impersonation",
+      "description": "Domain mimics a protected brand using homoglyphs, typosquatting, or character substitution.",
+      "why_it_matters": "Designed to establish visual deception so users fail to notice subtle spelling differences.",
+      "source": "Lookalike Detection Engine"
+    },
+    "url_high_risk": {
+      "category": "url_intelligence",
+      "name": "High-Risk Malicious URL Structure",
+      "description": "URL exhibits multiple suspicious static signals (IP host, punycode, deep subdomains, credential targets).",
+      "why_it_matters": "Directs victims to credential harvesting landing pages or malware drops.",
+      "source": "Static URL Analyzer"
+    },
+    "url_suspicious": {
+      "category": "url_intelligence",
+      "name": "Suspicious URL Observed",
+      "description": "Extracted hyperlink exhibits abnormal length, token obfuscation, or unusual character density.",
+      "why_it_matters": "Commonly used in phased redirect chains to evade signature-based URL scanners.",
+      "source": "Static URL Analyzer"
+    },
+    "html_link_mismatch": {
+      "category": "url_intelligence",
+      "name": "HTML Display Link Mismatch",
+      "description": "Visible text inside anchor tag displays one domain while href directs user to a different destination.",
+      "why_it_matters": "Classical phishing tactic to visually reassure victim while surreptitiously redirecting them.",
+      "source": "HTML Body Parser"
+    },
+    "domain_age_under_7d": {
+      "category": "domain_intelligence",
+      "name": "Domain Registered Under 7 Days Ago",
+      "description": "Domain was newly registered within the past week.",
+      "why_it_matters": "Adversaries regularly register throwaway domains immediately before executing phishing campaigns.",
+      "source": "Domain Intelligence Subsystem"
+    },
+    "newly_registered_domain": {
+      "category": "domain_intelligence",
+      "name": "Newly Registered Domain (<30 Days)",
+      "description": "Domain was registered within the past 30 days.",
+      "why_it_matters": "New domains lack historical reputation and are statistical outliers for legitimate corporate correspondence.",
+      "source": "Domain Intelligence Subsystem"
+    },
+    "suspicious_tld": {
+      "category": "domain_intelligence",
+      "name": "High-Risk / Low-Cost TLD",
+      "description": "Domain utilizes top-level domain frequently associated with automated abuse and disposable spam.",
+      "why_it_matters": "Low registration cost and weak registrar verification make these TLDs attractive for mass phishing.",
+      "source": "Domain Intelligence Subsystem"
+    },
+    "dns_anomaly": {
+      "category": "domain_intelligence",
+      "name": "DNS Architecture Anomaly",
+      "description": "Domain lacks standard MX records, proper nameservers, or exhibits unresolvable DNS configuration.",
+      "why_it_matters": "Indicates ephemeral infrastructure or non-standard routing setup common in disposable attack campaigns.",
+      "source": "DNS Resolver Subsystem"
+    },
+    "credential_request": {
+      "category": "email_content",
+      "name": "Credential Harvesting Language",
+      "description": "Email body contains urgent phrases instructing recipient to verify, reset, or submit login credentials.",
+      "why_it_matters": "Primary behavioral indicator of account takeover and credential theft campaigns.",
+      "source": "Content Intent Analyzer"
+    },
+    "financial_language": {
+      "category": "email_content",
+      "name": "Urgent Financial / Wire Request",
+      "description": "Email body solicits wire transfers, invoice adjustments, gift cards, or cryptocurrency payments.",
+      "why_it_matters": "Primary behavioral vector for Business Email Compromise (BEC) and payroll diversion fraud.",
+      "source": "Content Intent Analyzer"
+    },
+    "urgency_language": {
+      "category": "email_content",
+      "name": "Artificial Urgency & Coercion Phrasing",
+      "description": "Email creates psychological pressure with immediate deadlines (e.g. 'account closed in 24 hours').",
+      "why_it_matters": "Short-circuits victim skepticism and prevents recipient from seeking out-of-band verification.",
+      "source": "Content Intent Analyzer"
+    },
+    "suspicious_attachment_extension": {
+      "category": "attachments",
+      "name": "Dangerous Executable or Script Attachment",
+      "description": "Email carries attachment with dangerous extension (.exe, .iso, .vbs, .bat, .hta, etc.).",
+      "why_it_matters": "Direct vehicle for initial access, loader execution, and ransomware payload staging.",
+      "source": "Attachment Risk Inspector"
+    },
+    "attachment_macro_payload": {
+      "category": "attachments",
+      "name": "Macro-Enabled Office Document",
+      "description": "Attachment contains VBA macros (.docm, .xlsm) capable of remote process execution.",
+      "why_it_matters": "Used to drop remote access trojans (RATs) and stage living-off-the-land attacks.",
+      "source": "Attachment Risk Inspector"
+    },
+    "suspicious_ip_hosting_or_proxy": {
+      "category": "infrastructure",
+      "name": "Anonymization Relay (Proxy/VPN/Tor/Datacenter)",
+      "description": "Sending relay IP is a classified commercial proxy, Tor exit node, or unassigned hosting space.",
+      "why_it_matters": "Obfuscates true adversary origin and evades geographic blocking policies.",
+      "source": "IP Intelligence Engine"
+    },
+    "known_campaign_match": {
+      "category": "campaign_intelligence",
+      "name": "Correlated Campaign Infrastructure",
+      "description": "Email shares IOCs, sending IP subnets, or brand targeting with cataloged attack campaigns.",
+      "why_it_matters": "Links isolated email events to coordinated multi-target adversary campaigns.",
+      "source": "Campaign Correlation Engine"
+    },
+    "shared_malicious_infrastructure": {
+      "category": "campaign_intelligence",
+      "name": "Shared Malicious ASN / Hosting Provider",
+      "description": "Hosting ASN matches known bulletproof hosting providers repeatedly observed in malicious campaigns.",
+      "why_it_matters": "Indicates deliberate selection of hosting providers that ignore abuse complaints.",
+      "source": "Threat Attribution Engine"
+    },
+    "ml_phishing_signal": {
+      "category": "email_content",
+      "name": "NLP Model Phishing Risk Assessment",
+      "description": "Machine learning text model classified body semantics as high phishing probability (>=75%).",
+      "why_it_matters": "Provides statistical corroboration of social engineering rhetoric.",
+      "source": "ML Text Classifier"
+    },
+    "spf_pass": {
+      "category": "authentication",
+      "name": "Verified SPF Authorization",
+      "description": "Originating sending IP is explicitly authorized in domain's published SPF policy.",
+      "why_it_matters": "Confirms sender server identity authorization.",
+      "source": "Email Authentication Subsystem"
+    },
+    "dkim_pass": {
+      "category": "authentication",
+      "name": "Valid Cryptographic DKIM Signature",
+      "description": "Email contains valid cryptographic signature proving sender authenticity and body integrity.",
+      "why_it_matters": "Proves message was not altered in transit and originated from signing domain.",
+      "source": "Cryptographic Signature Validator"
+    },
+    "dmarc_pass": {
+      "category": "authentication",
+      "name": "DMARC Policy Alignment Verified",
+      "description": "From header domain aligns with verified SPF and/or DKIM authentication results.",
+      "why_it_matters": "Provides highest degree of domain ownership confidence against spoofing.",
+      "source": "DMARC Alignment Engine"
+    },
+    "established_domain": {
+      "category": "domain_intelligence",
+      "name": "Well-Established Domain History",
+      "description": "Sender domain has been registered for over 1 year with continuous operational reputation.",
+      "why_it_matters": "Significantly decreases probability of disposable phishing infrastructure.",
+      "source": "Domain Intelligence Subsystem"
+    },
+    "clean_urls": {
+      "category": "url_intelligence",
+      "name": "Extracted URLs Exhibit Normal Baseline",
+      "description": "All inspected hyperlinks conform to legitimate structure without obfuscation or redirection.",
+      "why_it_matters": "Absence of suspicious link structures reduces likelihood of credential harvesting destination.",
+      "source": "Static URL Analyzer"
+    },
+    "safe_attachments": {
+      "category": "attachments",
+      "name": "Attachments Free of Executables/Macros",
+      "description": "Inspected attachments are standard non-executable document types without embedded macros.",
+      "why_it_matters": "Reduces immediate malicious payload execution risk.",
+      "source": "Attachment Risk Inspector"
+    },
+    "trusted_sender_history": {
+      "category": "sender_identity",
+      "name": "Consistent Sender Identity",
+      "description": "Sender headers (From, Reply-To, Return-Path) are perfectly aligned without spoofing markers.",
+      "why_it_matters": "Absence of identity mismatch indicators supports legitimate communication.",
+      "source": "Header Alignment Subsystem"
+    },
+    "ml_low_risk_content": {
+      "category": "email_content",
+      "name": "NLP Content Assessment Indicates Benign Text",
+      "description": "Machine learning model evaluated textual phrasing as low phishing risk (<=15%).",
+      "why_it_matters": "Supports benign intent of written communication.",
+      "source": "ML Text Classifier"
+    }
+  }
 }

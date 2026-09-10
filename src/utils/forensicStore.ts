@@ -240,7 +240,244 @@ Content-Disposition: attachment; filename="invoice.pdf"
   threat_score: {
     score: 82,
     severity: 'critical',
-    summary: 'Email risk assessed as Critical (82/100) driven by 5 forensic signal(s): Brand impersonation (+18), Credential harvesting (+12), DMARC failure (+12), Link mismatch (+15), NLP phishing classifier (+10).',
+    risk_level: 'CRITICAL',
+    confidence: 'VERY HIGH',
+    summary: 'Email risk assessed as Critical (82/100) driven by 8 forensic signal(s): Brand impersonation (+18), Credential harvesting (+12), DMARC failure (+12), Link mismatch (+15), NLP phishing classifier (+10).',
+    why_flagged: "This email was flagged with a Threat Score of 82/100 (CRITICAL) because it triggered 8 positive threat signal(s) across 6 analytical categories. Key forensic drivers: Potential brand impersonation (+18 pts); HTML link text and destination domain mismatch (+15 pts); DMARC authentication failed (+12 pts); Credential harvesting or urgent security language (+12 pts).",
+    top_reasons: [
+      'Potential brand impersonation detected (+18 pts)',
+      'HTML link text and destination domain mismatch (+15 pts)',
+      'DMARC authentication failed (+12 pts)',
+      'Credential harvesting or urgent security language (+12 pts)'
+    ],
+    positive_contributions: [
+      {
+        signal_id: 'SIG-LOOK-001',
+        category: 'lookalike_detection',
+        name: 'Potential brand impersonation detected',
+        description: "Substitutes '0' for 'o' targeting Microsoft brand keyword (micros0ft-example.com)",
+        why_it_matters: 'Adversaries deploy visual lookalike domains to mislead recipients into believing the email originates from a trusted enterprise service provider.',
+        raw_value: 'micros0ft-example.com',
+        normalized_value: 0.94,
+        weight: 18,
+        contribution: 18,
+        direction: 'increase_risk',
+        confidence: 0.95,
+        evidence_reference: 'micros0ft-example.com',
+        source: 'Lookalike Domain Detector'
+      },
+      {
+        signal_id: 'SIG-URLI-002',
+        category: 'url_intelligence',
+        name: 'HTML link text and destination domain mismatch',
+        description: 'Anchor text displays microsoft.com but hyperlinks to evil-tracker.example',
+        why_it_matters: 'Deceptive hyperlinks conceal the real destination server, bypassing human visual inspection and leading victims to phishing landing sites.',
+        raw_value: 'evil-tracker.example',
+        normalized_value: 1.0,
+        weight: 15,
+        contribution: 15,
+        direction: 'increase_risk',
+        confidence: 0.98,
+        evidence_reference: 'evil-tracker.example',
+        source: 'HTML Body Parser'
+      },
+      {
+        signal_id: 'SIG-AUTH-003',
+        category: 'authentication',
+        name: 'DMARC authentication failed',
+        description: 'DMARC policy evaluation failed: p=reject dis=none',
+        why_it_matters: 'Indicates the sending IP lacks cryptographic or envelope authorization from the originating domain owner, a hallmark of sender spoofing.',
+        raw_value: 'fail',
+        normalized_value: 1.0,
+        weight: 12,
+        contribution: 12,
+        direction: 'increase_risk',
+        confidence: 1.0,
+        evidence_reference: 'dmarc=fail (p=reject dis=none)',
+        source: 'DMARC Alignment Engine'
+      },
+      {
+        signal_id: 'SIG-EMAI-004',
+        category: 'email_content',
+        name: 'Credential harvesting or urgent security language',
+        description: "Detected call-to-action pattern: 'update your login credentials'",
+        why_it_matters: 'Social engineering prompts targeting account credentials create artificial urgency to induce hurried compliance before IT verification.',
+        raw_value: 'update your login credentials',
+        normalized_value: 0.9,
+        weight: 12,
+        contribution: 12,
+        direction: 'increase_risk',
+        confidence: 0.88,
+        evidence_reference: 'update your login credentials',
+        source: 'Content Keyword Risk Scanner'
+      },
+      {
+        signal_id: 'SIG-EMAI-005',
+        category: 'email_content',
+        name: 'NLP phishing classifier flagged high suspicion',
+        description: 'ML text classifier estimated 89% phishing probability based on language and phrasing patterns',
+        why_it_matters: 'Statistical text classification corroborates psychological manipulation, deception, and phishing intent across the entire email body.',
+        raw_value: 0.89,
+        normalized_value: 0.89,
+        weight: 10,
+        contribution: 10,
+        direction: 'increase_risk',
+        confidence: 0.89,
+        evidence_reference: 'TF-IDF Logistic Regression: 0.89 probability',
+        source: 'Content ML Phishing Classifier'
+      },
+      {
+        signal_id: 'SIG-DOMA-006',
+        category: 'domain_intelligence',
+        name: 'Newly registered domain (< 30 days old)',
+        description: 'Domain micros0ft-example.com was registered 18 days ago',
+        why_it_matters: 'Young domains lack established reputation and are frequently provisioned exclusively for short-lived phishing and malware campaigns.',
+        raw_value: 18,
+        normalized_value: 0.4,
+        weight: 10,
+        contribution: 10,
+        direction: 'increase_risk',
+        confidence: 0.92,
+        evidence_reference: 'micros0ft-example.com (18 days old)',
+        source: 'Domain Intelligence Subsystem'
+      },
+      {
+        signal_id: 'SIG-AUTH-007',
+        category: 'authentication',
+        name: 'SPF authentication failed',
+        description: 'SPF check failed: sending IP 203.0.113.25 is not authorized by bounce@example.net SPF record',
+        why_it_matters: 'Permits unauthorized mail transfer agents to transmit messages purporting to originate from domains they do not control.',
+        raw_value: 'fail',
+        normalized_value: 1.0,
+        weight: 8,
+        contribution: 8,
+        direction: 'increase_risk',
+        confidence: 1.0,
+        evidence_reference: 'spf=fail (IP 203.0.113.25 unauthorized)',
+        source: 'Email Authentication Subsystem'
+      },
+      {
+        signal_id: 'SIG-AUTH-008',
+        category: 'authentication',
+        name: 'DKIM signature verification failed',
+        description: 'DKIM signature verification failed: header.i=@company.com',
+        why_it_matters: 'Cryptographic tampering or absence of valid domain signing confirms the body or headers were altered in transit or unsigned.',
+        raw_value: 'fail',
+        normalized_value: 1.0,
+        weight: 8,
+        contribution: 8,
+        direction: 'increase_risk',
+        confidence: 1.0,
+        evidence_reference: 'dkim=fail header.i=@company.com',
+        source: 'Cryptographic Signature Validator'
+      }
+    ],
+    negative_contributions: [
+      {
+        signal_id: 'SIG-MIT-001',
+        category: 'domain_intelligence',
+        name: 'Established Secondary Domain',
+        description: 'example.org is 11,000+ days old and well-established',
+        why_it_matters: 'Longstanding domains have verified operational history and lower probability of throwaway infrastructure abuse.',
+        raw_value: 11000,
+        normalized_value: 0.0,
+        weight: -5,
+        contribution: -5,
+        direction: 'decrease_risk',
+        confidence: 0.95,
+        evidence_reference: 'example.org (11,000+ days old)',
+        source: 'Domain Intelligence Subsystem'
+      },
+      {
+        signal_id: 'SIG-MIT-002',
+        category: 'attachments',
+        name: 'Safe Non-Executable Attachments',
+        description: 'No executable binaries or macro-enabled documents detected in attachment inventory',
+        why_it_matters: 'Eliminates immediate endpoint binary execution risk from primary delivery payloads.',
+        raw_value: 'clean_attachments',
+        normalized_value: 0.0,
+        weight: 0,
+        contribution: 0,
+        direction: 'decrease_risk',
+        confidence: 0.9,
+        evidence_reference: 'Attachment inventory verified',
+        source: 'Attachment Risk Inspector'
+      }
+    ],
+    category_breakdowns: {
+      authentication: {
+        category: 'authentication',
+        display_name: 'Authentication Risk',
+        risk_score: 28,
+        positive_signals_count: 3,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      sender_identity: {
+        category: 'sender_identity',
+        display_name: 'Sender Identity Risk',
+        risk_score: 0,
+        positive_signals_count: 0,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      domain_intelligence: {
+        category: 'domain_intelligence',
+        display_name: 'Domain Risk',
+        risk_score: 5,
+        positive_signals_count: 1,
+        mitigating_signals_count: 1,
+        signals: []
+      },
+      lookalike_detection: {
+        category: 'lookalike_detection',
+        display_name: 'Lookalike Risk',
+        risk_score: 18,
+        positive_signals_count: 1,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      url_intelligence: {
+        category: 'url_intelligence',
+        display_name: 'URL Risk',
+        risk_score: 15,
+        positive_signals_count: 1,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      infrastructure: {
+        category: 'infrastructure',
+        display_name: 'Infrastructure Risk',
+        risk_score: 0,
+        positive_signals_count: 0,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      email_content: {
+        category: 'email_content',
+        display_name: 'Content Risk',
+        risk_score: 22,
+        positive_signals_count: 2,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      campaign_intelligence: {
+        category: 'campaign_intelligence',
+        display_name: 'Campaign Risk',
+        risk_score: 0,
+        positive_signals_count: 0,
+        mitigating_signals_count: 0,
+        signals: []
+      },
+      attachments: {
+        category: 'attachments',
+        display_name: 'Attachment Risk',
+        risk_score: 0,
+        positive_signals_count: 0,
+        mitigating_signals_count: 1,
+        signals: []
+      }
+    },
     reasons: [
       {
         signal: 'brand_impersonation',
@@ -291,7 +528,41 @@ Content-Disposition: attachment; filename="invoice.pdf"
         evidence: 'dkim=fail header.i=@company.com'
       }
     ],
-    positive_evidence: []
+    positive_evidence: [],
+    model_version: 'v1.0-tfidf-logistic',
+    scoring_version: '2.0.0-explainable',
+    audit_metadata: {
+      scoring_version: '2.0.0-explainable',
+      weights_snapshot: {
+        brand_impersonation: 18,
+        html_link_mismatch: 15,
+        dmarc_fail: 12,
+        credential_request: 12,
+        ml_phishing_signal: 10,
+        newly_registered_domain: 10,
+        spf_fail: 8,
+        dkim_fail: 8,
+        trusted_sender_history: -5
+      },
+      thresholds_snapshot: {
+        low: { min: 0, max: 24 },
+        suspicious: { min: 25, max: 49 },
+        high: { min: 50, max: 74 },
+        critical: { min: 75, max: 100 }
+      },
+      timestamp: '2026-09-10T19:25:00Z',
+      evidence_ids: [
+        'SIG-LOOK-001',
+        'SIG-URLI-002',
+        'SIG-AUTH-003',
+        'SIG-EMAI-004',
+        'SIG-EMAI-005',
+        'SIG-DOMA-006',
+        'SIG-AUTH-007',
+        'SIG-AUTH-008'
+      ],
+      model_version: 'v1.0-tfidf-logistic'
+    }
   },
   ai_analyst: {
     summary: "Suspicious message exhibiting critical credential-harvesting indicators with severe sender spoofing, including failed DMARC and SPF checks alongside a deceptive lookalike domain.",

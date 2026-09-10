@@ -182,6 +182,31 @@ export interface URLAnalysisResult {
   score_reasons: string[];
 }
 
+export interface ThreatSignalContribution {
+  signal_id: string;
+  category: string;
+  name: string;
+  description: string;
+  why_it_matters?: string;
+  raw_value?: any;
+  normalized_value?: number;
+  weight: number;
+  contribution: number;
+  direction: 'increase_risk' | 'decrease_risk';
+  confidence: number;
+  evidence_reference?: string;
+  source: string;
+}
+
+export interface CategoryScoreBreakdown {
+  category: string;
+  display_name: string;
+  risk_score: number;
+  positive_signals_count: number;
+  mitigating_signals_count: number;
+  signals: ThreatSignalContribution[];
+}
+
 export interface ThreatScoreContribution {
   signal: string;
   label: string;
@@ -198,9 +223,26 @@ export interface PositiveEvidence {
 export interface ThreatScoreResult {
   score: number;
   severity: 'low' | 'suspicious' | 'high' | 'critical';
+  risk_level?: 'LOW' | 'SUSPICIOUS' | 'HIGH' | 'CRITICAL';
+  confidence?: 'LOW' | 'MODERATE' | 'HIGH' | 'VERY HIGH';
+  positive_contributions?: ThreatSignalContribution[];
+  negative_contributions?: ThreatSignalContribution[];
+  top_reasons?: string[];
   reasons: ThreatScoreContribution[];
   positive_evidence: PositiveEvidence[];
   summary: string;
+  why_flagged?: string;
+  category_breakdowns?: Record<string, CategoryScoreBreakdown>;
+  model_version?: string;
+  scoring_version?: string;
+  audit_metadata?: {
+    scoring_version?: string;
+    weights_snapshot?: Record<string, number>;
+    thresholds_snapshot?: Record<string, any>;
+    timestamp?: string;
+    evidence_ids?: string[];
+    model_version?: string;
+  };
 }
 
 export interface MLAssessmentResult {
