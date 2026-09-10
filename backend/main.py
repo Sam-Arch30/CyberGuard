@@ -1,6 +1,8 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 
 from backend.api.routes.email import router as email_router
 from backend.api.routes.cases import router as cases_router
@@ -11,19 +13,28 @@ from backend.api.routes.dashboard import router as dashboard_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
 from backend.services.log_sanitizer import install_log_sanitizer
-from backend.db.session import engine, Base
+from backend.db.session import engine, Base, init_db
 import backend.db.models  # Register models
 
 # Initialize logging privacy filter
 install_log_sanitizer()
 
-# Ensure tables exist on startup
-Base.metadata.create_all(bind=engine)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    Application lifespan manager.
+    Handles startup table verification with graceful retries if DB is starting slowly.
+    """
+    init_db(max_retries=15, retry_delay=2.0)
+    yield
+
 
 app = FastAPI(
     title="Cybersecurity Email Forensic Parser API",
     description="FastAPI service to ingest, parse, and analyze RFC-822 / .eml email files for cybersecurity threat investigation.",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Section 20: Register HTTP Security Hardening Middleware
@@ -49,7 +60,6 @@ app.include_router(evidence_router)
 app.include_router(dashboard_router)
 
 
-
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
@@ -60,7 +70,29 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    return {"status": "ok", "service": "cybersecurity-email-parser"}
+    """
+    Service health check endpoint.
+    Performs active database connectivity check.
+    """
+    db_status = "ok"
+    try:
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+    except Exception as exc:
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "degraded",
+                "service": "cybersecurity-email-parser",
+                "database": f"unhealthy: {str(exc)}"
+            }
+        )
+
+    return {
+        "status": "ok",
+        "service": "cybersecurity-email-parser",
+        "database": db_status
+    }
 
 
 if __name__ == "__main__":

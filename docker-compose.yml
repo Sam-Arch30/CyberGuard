@@ -1,0 +1,75 @@
+services:
+  postgresql:
+    image: postgres:16-alpine
+    container_name: mailtrace-postgresql
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mailtrace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailtrace_password}
+      POSTGRES_DB: ${POSTGRES_DB:-mailtrace}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailtrace} -d ${POSTGRES_DB:-mailtrace}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: mailtrace-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-mailtrace}:${POSTGRES_PASSWORD:-mailtrace_password}@postgresql:5432/${POSTGRES_DB:-mailtrace}
+      IP_INTELLIGENCE_PROVIDER: ${IP_INTELLIGENCE_PROVIDER:-ipapi}
+      IP_INTELLIGENCE_API_KEY: ${IP_INTELLIGENCE_API_KEY:-}
+      IPAPI_KEY: ${IPAPI_KEY:-}
+      IPINFO_API_KEY: ${IPINFO_API_KEY:-}
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-gemini-1.5-flash}
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
+      RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
+      RATE_LIMIT_ANALYSIS_PER_MIN: ${RATE_LIMIT_ANALYSIS_PER_MIN:-20}
+      RATE_LIMIT_LLM_PER_MIN: ${RATE_LIMIT_LLM_PER_MIN:-10}
+      RATE_LIMIT_INTEL_PER_MIN: ${RATE_LIMIT_INTEL_PER_MIN:-60}
+      RATE_LIMIT_GENERAL_PER_MIN: ${RATE_LIMIT_GENERAL_PER_MIN:-120}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      postgresql:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: mailtrace-frontend
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:80/nginx-health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  postgres_data:
+    driver: local

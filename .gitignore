@@ -32,6 +32,7 @@ ENV/
 *.sqlite
 *.sqlite3
 backend/data/*.db
+backend/data/reports/
 
 # Editor directories and files
 .vscode/*

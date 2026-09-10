@@ -84,6 +84,92 @@ const formatRelativeTime = (isoString?: string): string => {
   }
 };
 
+const FALLBACK_DASHBOARD_SUMMARY: DashboardSummary = {
+  metrics: {
+    emails_analyzed: 18,
+    threats_detected: 14,
+    critical_emails: 7,
+    open_cases: 4
+  },
+  severity_distribution: [
+    { severity: 'critical', count: 7 },
+    { severity: 'high', count: 7 },
+    { severity: 'medium', count: 3 },
+    { severity: 'low', count: 1 }
+  ],
+  analysis_trend: [
+    { date: '2026-09-04', total: 2, threats: 1 },
+    { date: '2026-09-05', total: 4, threats: 3 },
+    { date: '2026-09-06', total: 3, threats: 2 },
+    { date: '2026-09-07', total: 5, threats: 4 },
+    { date: '2026-09-08', total: 3, threats: 3 },
+    { date: '2026-09-09', total: 6, threats: 5 },
+    { date: '2026-09-10', total: 4, threats: 3 }
+  ],
+  top_suspicious_domains: [
+    { domain: 'bank-corp-update.com', count: 4 },
+    { domain: 'micros0ft-security-verify.net', count: 3 },
+    { domain: 'wire-transfer-gateway.ru', count: 3 },
+    { domain: 'hr-payroll-portal.org', count: 2 },
+    { domain: 'secure-login-attempt.xyz', count: 2 }
+  ],
+  top_countries: [
+    { country: 'Russia', count: 5 },
+    { country: 'Nigeria', count: 4 },
+    { country: 'China', count: 3 },
+    { country: 'United States', count: 3 },
+    { country: 'Romania', count: 2 }
+  ],
+  auth_failures: {
+    spf_failures: 12,
+    dkim_failures: 14,
+    dmarc_failures: 11,
+    total_evaluated: 18
+  },
+  recent_cases: [
+    {
+      id: 'case-001',
+      case_number: 'CASE-2026-000042',
+      title: 'Active BEC Wire Redirection Campaign',
+      severity: 'critical',
+      status: 'investigating',
+      emails_count: 3,
+      updated_at: '2026-09-10T14:30:00Z'
+    },
+    {
+      id: 'case-002',
+      case_number: 'CASE-2026-000041',
+      title: 'Credential Harvesting Target - Executive Accounts',
+      severity: 'high',
+      status: 'open',
+      emails_count: 5,
+      updated_at: '2026-09-10T11:15:00Z'
+    }
+  ],
+  recent_emails: [
+    {
+      id: 'EML-2026-8819',
+      evidence_id: 'EVD-97D4B2E811',
+      sha256: '97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a',
+      subject: 'URGENT: Executive Wire Transfer Instructions - Q3 Vendor Settlement #8819',
+      sender: 'robert.vance@bank-corp-update.com',
+      threat_score: 96,
+      severity: 'critical',
+      timestamp: '2026-09-10T16:20:00Z'
+    },
+    {
+      id: 'EML-2026-8820',
+      evidence_id: 'EVD-88F3A109C2',
+      sha256: '88f3a109c2a1e765bd489f023412ea5418b76543210987654321098765432109',
+      subject: 'Microsoft 365: Mandatory Password Expiration in 24 Hours',
+      sender: 'security@micros0ft-security-verify.net',
+      threat_score: 88,
+      severity: 'high',
+      timestamp: '2026-09-10T15:05:00Z'
+    }
+  ]
+};
+
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useTheme();
@@ -92,6 +178,7 @@ export const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isOfflineFallback, setIsOfflineFallback] = useState<boolean>(false);
 
   const fetchDashboardData = useCallback(async (isManualRefresh = false) => {
     if (isManualRefresh) {
@@ -101,20 +188,41 @@ export const Dashboard: React.FC = () => {
     }
     setError(null);
 
-    try {
-      const res = await fetch('http://localhost:8000/api/dashboard/summary?days=30&recent_limit=5');
-      if (!res.ok) {
-        throw new Error(`Failed to load dashboard telemetry: HTTP ${res.status}`);
+    const endpoints = [
+      '/api/dashboard/summary?days=30&recent_limit=5',
+      'http://localhost:8000/api/dashboard/summary?days=30&recent_limit=5'
+    ];
+
+    let liveData: DashboardSummary | null = null;
+    let lastError: string | null = null;
+
+    for (const endpoint of endpoints) {
+      try {
+        const res = await fetch(endpoint);
+        if (res.ok) {
+          liveData = await res.json();
+          break;
+        } else {
+          lastError = `HTTP ${res.status}`;
+        }
+      } catch (err: unknown) {
+        lastError = err instanceof Error ? err.message : 'Connection refused';
       }
-      const data: DashboardSummary = await res.json();
-      setSummary(data);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Unknown telemetry retrieval error';
-      setError(message);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
+
+    if (liveData) {
+      setSummary(liveData);
+      setIsOfflineFallback(false);
+      setError(null);
+    } else {
+      // Gracefully use local sample telemetry so the dashboard remains functional
+      setSummary(FALLBACK_DASHBOARD_SUMMARY);
+      setIsOfflineFallback(true);
+      setError(lastError || 'Backend service unreachable');
+    }
+
+    setLoading(false);
+    setRefreshing(false);
   }, []);
 
   useEffect(() => {
@@ -232,19 +340,27 @@ export const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* Error Banner */}
+      {/* Error / Offline Advisory Banner */}
       {error && (
-        <div className="p-3.5 rounded-control bg-danger-surface border border-danger-border text-danger flex items-center justify-between text-xs font-mono">
+        <div className={`p-3.5 rounded-control border flex items-center justify-between text-xs font-mono transition-all ${
+          isOfflineFallback
+            ? 'bg-warning-surface/30 border-warning-border/70 text-warning'
+            : 'bg-danger-surface border-danger-border text-danger'
+        }`}>
           <div className="flex items-center space-x-2">
-            <AlertTriangle className="w-4 h-4 text-danger flex-shrink-0" />
-            <span>Failed to connect to forensic telemetry service: {error}</span>
+            <AlertTriangle className={`w-4 h-4 flex-shrink-0 ${isOfflineFallback ? 'text-warning' : 'text-danger'}`} />
+            <span>
+              {isOfflineFallback
+                ? `Live backend telemetry offline (${error}). Displaying local sample telemetry. Start backend with 'uvicorn backend.main:app' or 'docker compose up' for live data.`
+                : `Failed to connect to forensic telemetry service: ${error}`}
+            </span>
           </div>
           <Button
-            variant="danger"
+            variant={isOfflineFallback ? 'secondary' : 'danger'}
             size="xs"
             onClick={() => fetchDashboardData(true)}
           >
-            Retry
+            {isOfflineFallback ? 'Connect Live' : 'Retry'}
           </Button>
         </div>
       )}
