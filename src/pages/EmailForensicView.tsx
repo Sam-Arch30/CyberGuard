@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { EmailAnalysis, ForensicTabType } from '../types/forensic';
 import { getAnalysisResult, saveAnalysisResult } from '../utils/forensicStore';
-import { resolveEmailIndicators } from '../utils/indicatorHelper';
+import { resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHelper';
 import { EmailSummaryHeader } from '../components/forensic/EmailSummaryHeader';
+import { InfrastructureAttributionSection } from '../components/forensic/InfrastructureAttributionSection';
 import { ForensicTabs } from '../components/forensic/ForensicTabs';
 import { OverviewTab } from '../components/forensic/OverviewTab';
 import { HeadersTab } from '../components/forensic/HeadersTab';
@@ -211,6 +212,14 @@ export const EmailForensicView: React.FC = () => {
       <div key={activeTab} className="page-enter">
         {activeTab === 'overview' && (
           <OverviewTab email={analysis} onFocusGraphNode={handleFocusGraphNode} />
+        )}
+        {activeTab === 'attribution' && (
+          <div className="space-y-6">
+            <InfrastructureAttributionSection
+              attribution={analysis.attribution || resolveAttribution(analysis)}
+              onFocusGraphNode={handleFocusGraphNode}
+            />
+          </div>
         )}
         {activeTab === 'graph' && (
           <InvestigationGraphTab email={analysis} focusNodeId={focusedGraphNodeId} />

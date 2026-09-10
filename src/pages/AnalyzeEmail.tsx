@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import {
   SearchCode,
@@ -9,17 +9,19 @@ import {
   ExternalLink,
   FolderPlus,
   CheckCircle2,
-  Copy
+  Copy,
+  Network
 } from 'lucide-react';
 import { SAMPLE_EMAILS } from '../data/mockData';
 import type { EmailAnalysisData } from '../types';
 import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
-import { decodeRfc2047 } from '../utils/indicatorHelper';
+import { decodeRfc2047, resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHelper';
 import { RiskBadge } from '../components/common/RiskBadge';
 import { HeaderProtocolStatus } from '../components/common/HeaderProtocolStatus';
 import { GeoTraceMap } from '../components/common/GeoTraceMap';
 import { AttributionGraph } from '../components/common/AttributionGraph';
+import { InfrastructureAttributionSection } from '../components/forensic/InfrastructureAttributionSection';
 
 export const AnalyzeEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -32,7 +34,7 @@ export const AnalyzeEmail: React.FC = () => {
   const [currentEmail, setCurrentEmail] = useState<EmailAnalysisData>(initialEmail);
   const [rawInput, setRawInput] = useState<string>(initialEmail.rawHeaders + '\n\n' + initialEmail.bodyText);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'HEADERS' | 'RELAY_TRACE' | 'IOCS' | 'GRAPH'>('OVERVIEW');
+  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ATTRIBUTION' | 'HEADERS' | 'RELAY_TRACE' | 'IOCS' | 'GRAPH'>('OVERVIEW');
   const [copySuccess, setCopySuccess] = useState<boolean>(false);
 
   useEffect(() => {
@@ -42,6 +44,65 @@ export const AnalyzeEmail: React.FC = () => {
       setRawInput(found.rawHeaders + '\n\n' + found.bodyText);
     }
   }, [selectedSampleId]);
+
+  const currentEmailAsAnalysis = useMemo<EmailAnalysis>(() => {
+    const fromDomain = currentEmail.senderEmail?.includes('@') ? currentEmail.senderEmail.split('@')[1] : '';
+    const receivedHeaders = (currentEmail.hops || []).map(h => `from ${h.fromHost || ''} (${h.fromIp || ''}) by ${h.byHost || ''}; ${h.timestamp}`);
+    const rawHeadersLines = currentEmail.rawHeaders ? currentEmail.rawHeaders.split('\n').filter(l => l.toLowerCase().startsWith('received:')) : [];
+    const hopIps = (currentEmail.hops || []).flatMap(h => [h.fromIp, h.byIp]).filter(Boolean);
+    const originIp = currentEmail.originGeo?.ip;
+    const allIps = Array.from(new Set([originIp, ...hopIps].filter(Boolean))) as string[];
+
+    return resolveEmailIndicators({
+      id: currentEmail.id,
+      evidence_id: `EVD-${currentEmail.id.toUpperCase()}`,
+      subject: currentEmail.subject,
+      from: `${currentEmail.senderName} <${currentEmail.senderEmail}>`,
+      to: currentEmail.recipientEmail,
+      reply_to: currentEmail.replyTo,
+      return_path: currentEmail.returnPath,
+      date: currentEmail.timestamp,
+      received: receivedHeaders.length > 0 ? receivedHeaders : rawHeadersLines,
+      raw_email: currentEmail.rawHeaders + '\n\n' + currentEmail.bodyText,
+      plain_text_body: currentEmail.bodyText,
+      ips: allIps,
+      domains: fromDomain ? [fromDomain] : [],
+      urls: (currentEmail.iocs?.urls || []).map(u => u.url),
+      attachments: (currentEmail.iocs?.hashes || []).map(h => ({
+        filename: h.filename,
+        mime_type: 'application/octet-stream',
+        size: 15000,
+        sha256: h.sha256
+      })),
+      threat_score: {
+        score: currentEmail.riskScore,
+        severity: currentEmail.severity === 'CRITICAL' ? 'critical' : currentEmail.severity === 'HIGH' ? 'high' : 'low',
+        reasons: [],
+        positive_evidence: [],
+        summary: currentEmail.summary || 'Threat score analysis'
+      },
+      ip_intelligence: currentEmail.originGeo?.ip ? {
+        [currentEmail.originGeo.ip]: {
+          ip: currentEmail.originGeo.ip,
+          country: currentEmail.originGeo.country,
+          city: currentEmail.originGeo.city,
+          asn: currentEmail.originGeo.asn,
+          isp: currentEmail.originGeo.isp,
+          is_proxy_vpn_tor: currentEmail.originGeo.isVpn || currentEmail.originGeo.isTor,
+          is_hosting: true
+        }
+      } : {},
+      authentication: {
+        spf: { result: (typeof currentEmail.protocols?.spf === 'string' ? currentEmail.protocols.spf : 'neutral').toLowerCase() },
+        dkim: { result: (typeof currentEmail.protocols?.dkim === 'string' ? currentEmail.protocols.dkim : 'neutral').toLowerCase() },
+        dmarc: { result: (typeof currentEmail.protocols?.dmarc === 'string' ? currentEmail.protocols.dmarc : 'neutral').toLowerCase() }
+      }
+    });
+  }, [currentEmail]);
+
+  const resolvedAttribution = useMemo(() => {
+    return currentEmailAsAnalysis.attribution || resolveAttribution(currentEmailAsAnalysis);
+  }, [currentEmailAsAnalysis]);
 
   const handleRunAnalysis = async () => {
     if (!rawInput.trim()) return;
@@ -99,6 +160,7 @@ export const AnalyzeEmail: React.FC = () => {
           ml_phishing_probability: data.ml_phishing_probability,
           ml_assessment: data.ml_assessment,
           ai_analyst: data.ai_analyst,
+          attribution: data.attribution,
           investigation_graph: data.investigation_graph
         };
 
@@ -225,6 +287,7 @@ export const AnalyzeEmail: React.FC = () => {
           ml_phishing_probability: data.ml_phishing_probability,
           ml_assessment: data.ml_assessment,
           ai_analyst: data.ai_analyst,
+          attribution: data.attribution,
           investigation_graph: data.investigation_graph
         };
 
@@ -487,24 +550,27 @@ export const AnalyzeEmail: React.FC = () => {
         <div className="flex space-x-1.5 border-b border-border pb-1 overflow-x-auto">
           {[
             { id: 'OVERVIEW', label: 'PROTOCOL BREAKDOWN' },
+            { id: 'ATTRIBUTION', label: 'INFRASTRUCTURE ATTRIBUTION', icon: Network },
             { id: 'RELAY_TRACE', label: 'ORIGIN GEOLOCATION TRACE' },
             { id: 'IOCS', label: 'EXTRACTED IOCS & HASHES' },
             { id: 'GRAPH', label: 'ATTRIBUTION TOPOLOGY GRAPH' },
             { id: 'HEADERS', label: 'RAW HEADERS' },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
+            const Icon = 'icon' in tab ? tab.icon : null;
             return (
               <button
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
+                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
                   isActive
                     ? 'bg-surface text-foreground font-semibold border border-border shadow-xs'
                     : 'text-foreground-muted hover:text-foreground hover:bg-surface/50 border border-transparent'
                 }`}
               >
-                {tab.label}
+                {Icon && <Icon className="w-3.5 h-3.5 text-primary" />}
+                <span>{tab.label}</span>
               </button>
             );
           })}
@@ -537,6 +603,24 @@ export const AnalyzeEmail: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* Section: Probabilistic Threat Attribution Engine */}
+            <div className="pt-2">
+              <InfrastructureAttributionSection
+                attribution={resolvedAttribution}
+                onFocusGraphNode={() => setActiveTab('GRAPH')}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Tab: Dedicated Infrastructure Attribution Section */}
+        {activeTab === 'ATTRIBUTION' && (
+          <div className="space-y-6">
+            <InfrastructureAttributionSection
+              attribution={resolvedAttribution}
+              onFocusGraphNode={() => setActiveTab('GRAPH')}
+            />
           </div>
         )}
 

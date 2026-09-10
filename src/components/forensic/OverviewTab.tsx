@@ -10,6 +10,7 @@ import { InfrastructureAttributionSection } from './InfrastructureAttributionSec
 import { EvidenceIntegritySection } from './EvidenceIntegritySection';
 import { RelatedInvestigationsCard } from '../correlation/RelatedInvestigationsCard';
 import type { CampaignCorrelationResponse } from '../../types/correlation';
+import { resolveAttribution } from '../../utils/indicatorHelper';
 import { User, Info, Layers, Activity } from 'lucide-react';
 
 interface OverviewTabProps {
@@ -60,12 +61,10 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
       <AIAnalystSection aiAnalyst={email.ai_analyst} />
 
       {/* Section 21: Probabilistic Threat Attribution Engine */}
-      {email.attribution && (
-        <InfrastructureAttributionSection
-          attribution={email.attribution}
-          onFocusGraphNode={onFocusGraphNode}
-        />
-      )}
+      <InfrastructureAttributionSection
+        attribution={email.attribution || resolveAttribution(email)}
+        onFocusGraphNode={onFocusGraphNode}
+      />
 
       {/* Section 15: Campaign Correlation & Related Investigations */}
       <RelatedInvestigationsCard

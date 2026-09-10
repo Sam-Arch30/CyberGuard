@@ -1,5 +1,5 @@
 import type { EmailAnalysis } from '../types/forensic';
-import { resolveEmailIndicators } from './indicatorHelper';
+import { resolveEmailIndicators, resolveAttribution } from './indicatorHelper';
 
 const STORAGE_KEY_PREFIX = 'mailtrace_forensic_';
 const memoryStore = new Map<string, EmailAnalysis>();
@@ -536,13 +536,20 @@ export const saveAnalysisResult = (id: string, data: EmailAnalysis): void => {
 
 export const getAnalysisResult = (id: string): EmailAnalysis | null => {
   if (memoryStore.has(id)) {
-    return resolveEmailIndicators(memoryStore.get(id)!);
+    const item = resolveEmailIndicators(memoryStore.get(id)!);
+    if (!item.attribution || !item.attribution.probable_origin_ip) {
+      item.attribution = resolveAttribution(item);
+    }
+    return item;
   }
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY_PREFIX + id);
     if (raw) {
       const parsed = JSON.parse(raw);
       const resolved = resolveEmailIndicators(parsed);
+      if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
+        resolved.attribution = resolveAttribution(resolved);
+      }
       memoryStore.set(id, resolved);
       return resolved;
     }
@@ -551,6 +558,9 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
   }
 
   if (id === 'sample-001' || id === 'latest' || id === 'demo') {
+    if (!MOCK_SAMPLE_ANALYSIS.attribution || !MOCK_SAMPLE_ANALYSIS.attribution.probable_origin_ip) {
+      MOCK_SAMPLE_ANALYSIS.attribution = resolveAttribution(MOCK_SAMPLE_ANALYSIS);
+    }
     return MOCK_SAMPLE_ANALYSIS;
   }
 

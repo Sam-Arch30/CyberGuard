@@ -304,6 +304,6 @@ export interface EmailAnalysis {
   attachments?: EmailAttachment[];
 }
 
-export type ForensicTabType = 'overview' | 'graph' | 'map' | 'headers' | 'content' | 'indicators' | 'attachments' | 'raw';
+export type ForensicTabType = 'overview' | 'attribution' | 'graph' | 'map' | 'headers' | 'content' | 'indicators' | 'attachments' | 'raw';
 
 
