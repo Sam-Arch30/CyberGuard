@@ -97,7 +97,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync mode with props if changed
   useEffect(() => {
@@ -158,9 +158,16 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
     }
   }, [initialQuestion]);
 
-  // Auto-scroll on new messages
+  // Auto-scroll ONLY internal messages container on new user queries or responses
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > 1 || isLoading) {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: 'smooth'
+        });
+      }
+    }
   }, [messages, isLoading]);
 
   const handleExecuteQuery = async (queryText: string) => {
@@ -391,7 +398,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       )}
 
       {/* Messages Stream */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-4">
+      <div ref={messagesContainerRef} className="flex-1 p-4 overflow-y-auto space-y-4">
         {messages.map((msg) => {
           if (msg.sender === 'user') {
             return (
@@ -572,7 +579,6 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
           </div>
         )}
 
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Toast Notification */}
