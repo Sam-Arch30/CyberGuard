@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ForensicTabType } from '../../types/forensic';
-import { LayoutDashboard, FileText, Code, Target, Paperclip, Terminal, Share2, MapPin, Network } from 'lucide-react';
+import { LayoutDashboard, FileText, Code, Target, Paperclip, Terminal, Share2, MapPin, Network, GitMerge } from 'lucide-react';
 
 interface ForensicTabsProps {
   activeTab: ForensicTabType;
@@ -9,6 +9,7 @@ interface ForensicTabsProps {
     receivedHops: number;
     urls: number;
     attachments: number;
+    relatedEmails?: number;
   };
 }
 
@@ -17,8 +18,15 @@ export const ForensicTabs: React.FC<ForensicTabsProps> = ({
   onTabChange,
   counts
 }) => {
-  const tabs: { id: ForensicTabType; label: string; icon: React.ReactNode; badge?: number }[] = [
+  const tabs: { id: ForensicTabType; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
+    {
+      id: 'cross_investigation',
+      label: 'Cross-Email Workspace',
+      icon: <GitMerge className="w-3.5 h-3.5" />,
+      badge: counts.relatedEmails ?? 16,
+      badgeColor: 'text-danger bg-danger/15 border-danger/30'
+    },
     { id: 'attribution', label: 'Infrastructure Attribution', icon: <Network className="w-3.5 h-3.5" /> },
     { id: 'graph', label: 'Investigation Graph', icon: <Share2 className="w-3.5 h-3.5" /> },
     { id: 'map', label: 'Investigation Map', icon: <MapPin className="w-3.5 h-3.5" /> },
@@ -51,9 +59,9 @@ export const ForensicTabs: React.FC<ForensicTabsProps> = ({
             {typeof tab.badge === 'number' && (
               <span
                 className={`ml-1 px-1.5 py-0.2 rounded-control text-[10px] font-mono border ${
-                  isActive
+                  tab.badgeColor || (isActive
                     ? 'bg-surface-secondary text-foreground border-border font-bold'
-                    : 'bg-surface-secondary/60 text-foreground-muted border-border/60'
+                    : 'bg-surface-secondary/60 text-foreground-muted border-border/60')
                 }`}
               >
                 {tab.badge}

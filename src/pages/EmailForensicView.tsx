@@ -14,6 +14,7 @@ import { AttachmentsTab } from '../components/forensic/AttachmentsTab';
 import { RawEmailTab } from '../components/forensic/RawEmailTab';
 import { InvestigationGraphTab } from '../components/forensic/InvestigationGraphTab';
 import { InvestigationMapTab } from '../components/forensic/InvestigationMapTab';
+import { CrossEmailWorkspace } from '../components/forensic/CrossEmailWorkspace';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
 export const EmailForensicView: React.FC = () => {
@@ -218,6 +219,7 @@ export const EmailForensicView: React.FC = () => {
     receivedHops: analysis.received?.length || 0,
     urls: analysis.urls?.length || 0,
     attachments: analysis.attachments?.length || analysis.indicators?.attachments?.length || 0,
+    relatedEmails: 16,
   };
 
   return (
@@ -235,7 +237,19 @@ export const EmailForensicView: React.FC = () => {
       {/* TAB CONTENT VIEWS */}
       <div key={activeTab} className="page-enter">
         {activeTab === 'overview' && (
-          <OverviewTab email={analysis} onFocusGraphNode={handleFocusGraphNode} />
+          <OverviewTab
+            email={analysis}
+            onFocusGraphNode={handleFocusGraphNode}
+            onOpenWorkspace={() => setActiveTab('cross_investigation')}
+          />
+        )}
+        {activeTab === 'cross_investigation' && (
+          <CrossEmailWorkspace
+            email={analysis}
+            onOpenEmail={(targetId) => {
+              navigate(`/analysis/${targetId}`);
+            }}
+          />
         )}
         {activeTab === 'attribution' && (
           <div className="space-y-6">

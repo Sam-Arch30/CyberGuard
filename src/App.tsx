@@ -12,6 +12,7 @@ import { ThreatIntelligence } from './pages/ThreatIntelligence';
 import { CampaignIntelligence } from './pages/CampaignIntelligence';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
+import { CrossInvestigationWorkspacePage } from './pages/CrossInvestigationWorkspacePage';
 
 function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -40,6 +41,8 @@ function AppContent() {
               <Route path="/analyze" element={<AnalyzeEmail />} />
               <Route path="/analysis" element={<EmailForensicView />} />
               <Route path="/analysis/:id" element={<EmailForensicView />} />
+              <Route path="/cross-investigation" element={<CrossInvestigationWorkspacePage />} />
+              <Route path="/cross-investigation/:id" element={<CrossInvestigationWorkspacePage />} />
               <Route path="/cases" element={<Cases />} />
               <Route path="/cases/:id" element={<CaseDetail />} />
               <Route path="/campaigns" element={<CampaignIntelligence />} />

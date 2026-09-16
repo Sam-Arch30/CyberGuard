@@ -228,4 +228,19 @@ class CampaignEmailModel(Base):
     )
 
 
+class AnalystDecisionModel(Base):
+    __tablename__ = "analyst_decisions"
 
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    email_id_a = Column(String(128), nullable=False, index=True)
+    email_id_b = Column(String(128), nullable=False, index=True)
+    decision = Column(String(50), nullable=False, index=True)  # unrelated, confirmed_related, assigned_campaign, added_to_case, escalated
+    campaign_id = Column(String(64), nullable=True)
+    case_id = Column(String(64), nullable=True)
+    analyst = Column(String(100), nullable=False, default="SOC Analyst")
+    notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_analyst_decisions_pair", "email_id_a", "email_id_b"),
+    )

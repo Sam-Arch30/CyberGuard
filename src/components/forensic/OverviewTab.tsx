@@ -16,14 +16,15 @@ import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import { EvidenceConfidencePanel } from './EvidenceConfidencePanel';
 import { CampaignAlertBanner } from '../campaign/CampaignAlertBanner';
 import type { CampaignAlertData } from '../../types/campaign';
-import { User, Info, Layers, Activity, ShieldCheck, AlertTriangle, CheckCircle2, HelpCircle } from 'lucide-react';
+import { User, Info, Layers, Activity, ShieldCheck, AlertTriangle, CheckCircle2, HelpCircle, ShieldAlert, ArrowRight, GitMerge } from 'lucide-react';
 
 interface OverviewTabProps {
   email: EmailAnalysis;
   onFocusGraphNode?: (nodeId: string) => void;
+  onOpenWorkspace?: () => void;
 }
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNode }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNode, onOpenWorkspace }) => {
   const [correlations, setCorrelations] = useState<CampaignCorrelationResponse | null>(null);
   const [loadingCorrelations, setLoadingCorrelations] = useState<boolean>(false);
   const [isConfidencePanelOpen, setIsConfidencePanelOpen] = useState<boolean>(false);
@@ -152,6 +153,52 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
 
   return (
     <div className="space-y-6">
+      {/* RELATED ACTIVITY DETECTED Cross-Email Workspace Callout */}
+      <div className="rounded-2xl border-2 border-danger/40 bg-gradient-to-r from-danger/15 via-warning/10 to-primary/15 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <div className="flex items-center space-x-2">
+            <span className="px-2.5 py-0.5 rounded text-[11px] font-mono font-bold tracking-wider uppercase bg-danger/20 text-danger border border-danger/30 flex items-center gap-1.5 animate-pulse">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              RELATED ACTIVITY DETECTED
+            </span>
+            <span className="px-2 py-0.5 rounded text-[11px] font-mono bg-surface border border-border text-foreground font-semibold">
+              Campaign: C-042
+            </span>
+            <span className="px-2 py-0.5 rounded text-[10px] font-mono uppercase bg-purple-500/15 text-purple-600 dark:text-purple-300 border border-purple-500/30 font-bold">
+              16 MATCHES
+            </span>
+          </div>
+          <div className="flex items-baseline space-x-2.5">
+            <h3 className="text-lg font-black font-sans text-foreground">
+              16 potentially related emails
+            </h3>
+            <span className="text-xs font-mono font-bold text-danger">
+              Campaign confidence: 89%
+            </span>
+          </div>
+          <div className="text-xs font-mono text-foreground-muted flex flex-wrap gap-x-3 gap-y-1">
+            <span>• same redirect domain</span>
+            <span>• same ASN</span>
+            <span>• highly similar HTML template</span>
+            <span>• similar subject</span>
+            <span>• same Reply-To domain</span>
+            <span>• overlapping sender infrastructure</span>
+          </div>
+        </div>
+
+        {onOpenWorkspace && (
+          <button
+            type="button"
+            onClick={onOpenWorkspace}
+            className="px-4 py-2.5 rounded-xl bg-danger text-white font-mono text-xs font-bold hover:bg-danger/90 transition-all flex items-center space-x-2 flex-shrink-0 shadow-sm cursor-pointer"
+          >
+            <GitMerge className="w-4 h-4" />
+            <span>Open Cross-Email Workspace</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
       {/* Campaign Fingerprint Tactical Alert Banner */}
       {campaignAlert && <CampaignAlertBanner alertData={campaignAlert} />}
 

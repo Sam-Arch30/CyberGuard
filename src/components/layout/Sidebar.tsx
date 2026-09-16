@@ -13,7 +13,8 @@ import {
   Radio,
   Zap,
   Palette,
-  Network
+  Network,
+  GitMerge
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -50,6 +51,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/analysis/demo',
       icon: FileText,
       badge: 'EVIDENCE'
+    },
+    {
+      name: 'Cross-Email Workspace',
+      path: '/cross-investigation',
+      icon: GitMerge,
+      badge: '16 NEW'
     },
     {
       name: 'Investigations',
