@@ -22,6 +22,15 @@
     "urgency_language": 8,
     "suspicious_attachment_extension": 15,
     "attachment_macro_payload": 18,
+    "executable_disguised_as_document": 25,
+    "pdf_suspicious_actions": 18,
+    "double_extension_detected": 18,
+    "archive_with_hidden_executable": 20,
+    "path_traversal_archive_exploit": 25,
+    "password_protected_suspicious_archive": 15,
+    "unsigned_executable": 12,
+    "embedded_phishing_url_in_attachment": 15,
+    "high_entropy_packed_binary": 10,
     "suspicious_ip_hosting_or_proxy": 8,
     "known_campaign_match": 14,
     "shared_malicious_infrastructure": 12,
@@ -211,6 +220,69 @@
       "description": "Attachment contains VBA macros (.docm, .xlsm) capable of remote process execution.",
       "why_it_matters": "Used to drop remote access trojans (RATs) and stage living-off-the-land attacks.",
       "source": "Attachment Risk Inspector"
+    },
+    "executable_disguised_as_document": {
+      "category": "attachments",
+      "name": "Executable Disguised as Document",
+      "description": "Attachment filename claims document format but magic bytes reveal a Windows PE executable or script.",
+      "why_it_matters": "Classic adversary defense evasion and social engineering technique to trick users into running binaries.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "pdf_suspicious_actions": {
+      "category": "attachments",
+      "name": "PDF Suspicious Execution Elements",
+      "description": "PDF contains active elements such as /JavaScript, /OpenAction, /Launch, or embedded payload files.",
+      "why_it_matters": "Frequently utilized in drive-by downloads and reader exploitation to execute payloads without user interaction.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "double_extension_detected": {
+      "category": "attachments",
+      "name": "Double Extension Evasion",
+      "description": "Attachment uses dual extensions (e.g. .pdf.exe or .docx.vbs) to camouflage dangerous payloads.",
+      "why_it_matters": "Exploits standard operating system hidden extension defaults to trick victims.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "archive_with_hidden_executable": {
+      "category": "attachments",
+      "name": "Archive Packaging Hidden Executables",
+      "description": "Archive safely inspected and discovered containing executable or script payloads (.exe, .scr, .bat).",
+      "why_it_matters": "Bypasses perimeter mail gateway filters that permit zip archives while blocking raw binaries.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "path_traversal_archive_exploit": {
+      "category": "attachments",
+      "name": "Archive Path Traversal (Zip Slip)",
+      "description": "Archive entry contains path traversal characters (../) targeting arbitrary file overwrite.",
+      "why_it_matters": "High-impact exploit attempting to drop files outside the extraction directory into system startup paths.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "password_protected_suspicious_archive": {
+      "category": "attachments",
+      "name": "Password-Protected Archive Evasion",
+      "description": "Attachment archive is encrypted with password protection, preventing automated perimeter inspection.",
+      "why_it_matters": "Commonly paired with phishing text providing the password to bypass corporate email gateways.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "unsigned_executable": {
+      "category": "attachments",
+      "name": "Unsigned Windows Executable",
+      "description": "Binary lacks valid Authenticode cryptographic code-signing certificate.",
+      "why_it_matters": "Legitimate enterprise software is typically signed; untrusted binaries pose substantial threat risk.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "embedded_phishing_url_in_attachment": {
+      "category": "attachments",
+      "name": "Embedded Phishing Links in Attachment",
+      "description": "Static analysis detected external phishing URLs or credential harvester links inside attachment streams.",
+      "why_it_matters": "Shifts malicious link hosting into documents to evade inline email body URL scanners.",
+      "source": "Attachment Intelligence Engine"
+    },
+    "high_entropy_packed_binary": {
+      "category": "attachments",
+      "name": "High-Entropy Packed Binary",
+      "description": "Executable exhibits Shannon entropy exceeding 7.5, indicating software packing, cryptors, or obfuscation.",
+      "why_it_matters": "Indicates active evasion against signature-based antivirus solutions.",
+      "source": "Attachment Intelligence Engine"
     },
     "suspicious_ip_hosting_or_proxy": {
       "category": "infrastructure",

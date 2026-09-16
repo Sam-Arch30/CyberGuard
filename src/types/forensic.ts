@@ -43,6 +43,8 @@ export interface EmailAddressIndicator {
   source?: string;
 }
 
+import type { AttachmentStaticAnalysisResult } from './attachment';
+
 export interface AttachmentIndicator {
   filename?: string;
   mime_type?: string;
@@ -50,6 +52,7 @@ export interface AttachmentIndicator {
   sha256?: string;
   md5?: string;
   sha1?: string;
+  static_analysis?: AttachmentStaticAnalysisResult;
 }
 
 export interface IndicatorsGroup {
@@ -65,6 +68,9 @@ export interface EmailAttachment {
   mime_type?: string;
   size?: number;
   sha256?: string;
+  md5?: string;
+  sha1?: string;
+  static_analysis?: AttachmentStaticAnalysisResult;
 }
 
 export interface RelayHop {

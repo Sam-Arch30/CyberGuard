@@ -11,7 +11,10 @@ from backend.schemas.email import (
     BodyInfo,
     AttachmentInfo,
     FileMeta,
-    IndicatorsGroup
+    IndicatorsGroup,
+    URLIndicator,
+    DomainIndicator,
+    IPIndicator
 )
 from backend.services.ioc_extractor import IOCExtractorService
 from backend.services.auth_analyzer import AuthAnalyzerService
@@ -274,6 +277,21 @@ class EmailParserService:
         domain_indicators = IOCExtractorService.extract_domains(url_indicators, email_indicators, text_sources)
         attachment_indicators = IOCExtractorService.extract_attachment_indicators(attachments_raw)
 
+        # Feed extracted attachment indicators (URLs, Domains, IPs) into the global IOC pipeline
+        for att in attachment_indicators:
+            if att.static_analysis:
+                att_name = att.filename or "attachment"
+                for u in att.static_analysis.embedded_urls:
+                    if not any(ui.value == u for ui in url_indicators):
+                        url_indicators.append(URLIndicator(value=u, source=f"attachment ({att_name})"))
+                for d in att.static_analysis.embedded_domains:
+                    if not any(di.value == d for di in domain_indicators):
+                        domain_indicators.append(DomainIndicator(value=d, source=f"attachment ({att_name})"))
+                for ip_val in att.static_analysis.embedded_ips:
+                    if not any(ipi.value == ip_val for ipi in ip_indicators):
+                        ver, scope = IOCExtractorService.classify_ip_scope(ip_val)
+                        ip_indicators.append(IPIndicator(value=ip_val, version=ver, scope=scope, source=f"attachment ({att_name})"))
+
         indicators_group = IndicatorsGroup(
             ips=ip_indicators,
             domains=domain_indicators,
@@ -310,7 +328,10 @@ class EmailParserService:
                 filename=att.filename,
                 mime_type=att.mime_type,
                 size=att.size,
-                sha256=att.sha256
+                sha256=att.sha256,
+                md5=att.md5,
+                sha1=att.sha1,
+                static_analysis=att.static_analysis
             )
             for att in attachment_indicators
         ]

@@ -404,8 +404,14 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
       mime_type: att.mime_type || 'application/octet-stream',
       size: att.size || 0,
       sha256: att.sha256 || 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
-      md5: 'd41d8cd98f00b204e9800998ecf8427e',
-      sha1: 'da39a3ee5e6b4b0d3255bfef95601890afd80709'
+      md5: att.md5 || 'd41d8cd98f00b204e9800998ecf8427e',
+      sha1: att.sha1 || 'da39a3ee5e6b4b0d3255bfef95601890afd80709',
+      static_analysis: att.static_analysis
+    }));
+  } else if (attObjs.length > 0 && email.attachments && email.attachments.length > 0) {
+    attObjs = attObjs.map((att, i) => ({
+      ...att,
+      static_analysis: att.static_analysis || email.attachments?.[i]?.static_analysis
     }));
   }
 
@@ -439,7 +445,10 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
     filename: att.filename,
     mime_type: att.mime_type,
     size: att.size,
-    sha256: att.sha256
+    sha256: att.sha256,
+    md5: att.md5,
+    sha1: att.sha1,
+    static_analysis: att.static_analysis
   }));
 
   const indicatorsGroup: IndicatorsGroup = {
@@ -1238,6 +1247,50 @@ export const calculateThreatScore = (email: Partial<EmailAnalysis>): ThreatScore
         points: 15,
         evidence: `Attachment '${att.filename}'`
       });
+    }
+
+    const sa = att.static_analysis;
+    if (sa) {
+      if (sa.extension_mismatch && sa.detected_type.toLowerCase().includes('executable')) {
+        suspiciousAtt = true;
+        rawScore += 25;
+        reasons.push({
+          signal: 'executable_disguised_as_document',
+          label: 'Executable Disguised as Document',
+          points: 25,
+          evidence: `Disguised binary: ${att.filename} (Detected: ${sa.detected_type})`
+        });
+      }
+      if (sa.double_extension) {
+        suspiciousAtt = true;
+        rawScore += 18;
+        reasons.push({
+          signal: 'double_extension_detected',
+          label: 'Double Extension Evasion',
+          points: 18,
+          evidence: `Double extension: ${att.filename}`
+        });
+      }
+      if (sa.pe_metadata && sa.pe_metadata.signature_status === 'Unsigned') {
+        suspiciousAtt = true;
+        rawScore += 12;
+        reasons.push({
+          signal: 'unsigned_executable',
+          label: 'Unsigned Windows Executable',
+          points: 12,
+          evidence: `Binary '${att.filename}' is unsigned`
+        });
+      }
+      if (sa.office_metadata && sa.office_metadata.has_macros) {
+        suspiciousAtt = true;
+        rawScore += 18;
+        reasons.push({
+          signal: 'attachment_macro_payload',
+          label: 'Macro-Enabled Office Document',
+          points: 18,
+          evidence: `Macro code in ${att.filename}`
+        });
+      }
     }
   });
 

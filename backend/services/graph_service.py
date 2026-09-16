@@ -400,15 +400,17 @@ class InvestigationGraphService:
                     add_edge(ip_id, country_node_id, "HOSTED_IN_COUNTRY")
 
         # -----------------------------------------------------------------
-        # 6. ATTACHMENT NODES
+        # 6. ATTACHMENT NODES & FORENSIC LINKAGES
         # -----------------------------------------------------------------
         attachments = self._get(email_analysis, "attachments", []) or []
+        created_att_node_ids: List[str] = []
         for att in attachments:
             fname = self._get(att, "filename", "unnamed_attachment") or "unnamed_attachment"
             sha = self._get(att, "sha256", "") or ""
             att_node_id = f"attachment:{sha[:16] if sha else fname}"
             mime = self._get(att, "mime_type", "application/octet-stream")
             size = self._get(att, "size", 0)
+            static_res = self._get(att, "static_analysis", None)
 
             # Flag dangerous extensions
             is_suspicious_ext = any(fname.lower().endswith(ext) for ext in [
@@ -424,10 +426,52 @@ class InvestigationGraphService:
                     "mime_type": mime,
                     "size_bytes": size,
                     "sha256": sha,
-                    "is_dangerous_extension": is_suspicious_ext
+                    "is_dangerous_extension": is_suspicious_ext,
+                    "threat_level": self._get(static_res, "threat_level", "UNKNOWN") if static_res else "UNKNOWN"
                 }
             )
             add_edge(email_node_id, att_node_id, "HAS_ATTACHMENT")
+            created_att_node_ids.append(att_node_id)
+
+            # Graph Linkage: Attachment -> Hash
+            if sha:
+                hash_node_id = f"hash:{sha[:16]}"
+                add_node(
+                    node_id=hash_node_id,
+                    node_type=NodeType.HASH,
+                    label=f"SHA-256: {sha[:8]}...",
+                    metadata={
+                        "sha256": sha,
+                        "algorithm": "SHA-256",
+                        "attachment": fname
+                    }
+                )
+                add_edge(att_node_id, hash_node_id, "HAS_HASH")
+
+            # Graph Linkage: Attachment -> URL & Attachment -> Domain
+            if static_res:
+                emb_urls = self._get(static_res, "embedded_urls", []) or []
+                for u in emb_urls:
+                    u_slug = re.sub(r'[^a-zA-Z0-9]+', '_', u.lower()).strip('_')[:40]
+                    u_node_id = f"url:{u_slug}"
+                    add_node(
+                        node_id=u_node_id,
+                        node_type=NodeType.URL,
+                        label=u[:40] + ("..." if len(u) > 40 else ""),
+                        metadata={"url": u, "source": f"attachment:{fname}"}
+                    )
+                    add_edge(att_node_id, u_node_id, "CONTAINS_URL")
+
+                emb_domains = self._get(static_res, "embedded_domains", []) or []
+                for d in emb_domains:
+                    d_node_id = f"domain:{d.lower()}"
+                    add_node(
+                        node_id=d_node_id,
+                        node_type=NodeType.DOMAIN,
+                        label=d,
+                        metadata={"domain": d, "source": f"attachment:{fname}"}
+                    )
+                    add_edge(att_node_id, d_node_id, "CONTAINS_DOMAIN")
 
         # -----------------------------------------------------------------
         # 7. CASE & CAMPAIGN NODES (Attribution & Infrastructure Linkage)
@@ -463,6 +507,11 @@ class InvestigationGraphService:
                 metadata={"campaign_id": camp_clean}
             )
             add_edge(email_node_id, camp_node_id, "ASSOCIATED_WITH_CAMPAIGN")
+
+            # Graph Linkage: Attachment -> Campaign
+            for a_id in created_att_node_ids:
+                add_edge(a_id, camp_node_id, "LINKED_TO_CAMPAIGN")
+
             if origin_ip and f"ip:{origin_ip}" in nodes:
                 add_edge(camp_node_id, f"ip:{origin_ip}", "UTILIZES_INFRASTRUCTURE")
             origin_asn = self._get(attribution, "probable_origin_asn", None) if attribution else None
@@ -487,7 +536,8 @@ class InvestigationGraphService:
                 NodeType.EMAIL_ADDRESS: 6,
                 NodeType.CASE: 7,
                 NodeType.CAMPAIGN: 8,
-                NodeType.COUNTRY: 9
+                NodeType.COUNTRY: 9,
+                NodeType.HASH: 10
             }
             final_nodes.sort(key=lambda n: priority_order.get(n.type, 10))
             final_nodes = final_nodes[:max_nodes]

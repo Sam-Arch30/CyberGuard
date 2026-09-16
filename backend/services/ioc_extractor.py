@@ -290,23 +290,33 @@ class IOCExtractorService:
     @classmethod
     def extract_attachment_indicators(cls, attachments_raw: List[Dict[str, Any]]) -> List[AttachmentIndicator]:
         """
-        Calculates SHA-256, MD5, SHA-1 hashes for attachments.
+        Calculates SHA-256, MD5, SHA-1 hashes for attachments and runs safe static malware analysis.
         attachments_raw is a list of dicts with 'filename', 'mime_type', 'bytes'.
         """
+        from backend.services.attachment_intelligence_service import AttachmentIntelligenceService
+
         results: List[AttachmentIndicator] = []
 
         for att in attachments_raw:
             raw_b = att.get("bytes") or b""
-            sha256_hash, md5_hash, sha1_hash = cls.calculate_hashes(raw_b)
+            fn = att.get("filename") or "unnamed_attachment"
+            mime = att.get("mime_type") or "application/octet-stream"
+
+            static_res = AttachmentIntelligenceService.analyze_attachment(
+                payload=raw_b,
+                filename=fn,
+                mime_type=mime
+            )
 
             results.append(
                 AttachmentIndicator(
-                    filename=att.get("filename") or "unnamed_attachment",
-                    mime_type=att.get("mime_type") or "application/octet-stream",
+                    filename=fn,
+                    mime_type=mime,
                     size=len(raw_b),
-                    sha256=sha256_hash,
-                    md5=md5_hash,
-                    sha1=sha1_hash
+                    sha256=static_res.sha256,
+                    md5=static_res.md5,
+                    sha1=static_res.sha1,
+                    static_analysis=static_res
                 )
             )
 

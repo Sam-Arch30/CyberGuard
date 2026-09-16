@@ -56,6 +56,9 @@ class EmailAddressIndicator(BaseModel):
     source: Optional[str] = Field("unknown", description="Extraction source location")
 
 
+from backend.schemas.attachment_analysis import AttachmentStaticAnalysisResult
+
+
 class AttachmentIndicator(BaseModel):
     filename: Optional[str] = Field(None, description="Filename of the attachment")
     mime_type: Optional[str] = Field(None, description="MIME content type of the attachment")
@@ -63,6 +66,7 @@ class AttachmentIndicator(BaseModel):
     sha256: str = Field(..., description="SHA-256 hash of attachment payload")
     md5: Optional[str] = Field(None, description="MD5 hash of attachment payload")
     sha1: Optional[str] = Field(None, description="SHA-1 hash of attachment payload")
+    static_analysis: Optional[AttachmentStaticAnalysisResult] = Field(None, description="Detailed static malware and intelligence analysis")
 
 
 class IndicatorsGroup(BaseModel):
@@ -78,6 +82,9 @@ class AttachmentInfo(BaseModel):
     mime_type: Optional[str] = Field(None, description="MIME content type of the attachment")
     size: Optional[int] = Field(0, description="Attachment file size in bytes")
     sha256: Optional[str] = Field(None, description="SHA-256 hash of attachment payload")
+    md5: Optional[str] = Field(None, description="MD5 hash of attachment payload")
+    sha1: Optional[str] = Field(None, description="SHA-1 hash of attachment payload")
+    static_analysis: Optional[AttachmentStaticAnalysisResult] = Field(None, description="Detailed static malware and intelligence analysis")
 
 
 class BodyInfo(BaseModel):

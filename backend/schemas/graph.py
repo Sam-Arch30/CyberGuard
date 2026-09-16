@@ -14,6 +14,7 @@ class NodeType(str, Enum):
     CASE = "Case"
     CAMPAIGN = "Campaign"
     COUNTRY = "Country"
+    HASH = "Hash"
 
 
 class GraphNode(BaseModel):

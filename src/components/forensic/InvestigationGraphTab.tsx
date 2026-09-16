@@ -25,7 +25,8 @@ import {
   Briefcase,
   Flag,
   Share2,
-  RefreshCw
+  RefreshCw,
+  Hash
 } from 'lucide-react';
 
 interface InvestigationGraphTabProps {
@@ -44,6 +45,7 @@ const NODE_TYPE_COLORS: Record<NodeType, { bg: string; border: string; text: str
   'Case': { bg: '#4f46e5', border: '#6366f1', text: '#e0e7ff', lightBg: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30' },
   'Campaign': { bg: '#db2777', border: '#ec4899', text: '#fce7f3', lightBg: 'bg-pink-500/15 text-pink-700 dark:text-pink-300 border-pink-500/30' },
   'Country': { bg: '#0d9488', border: '#14b8a6', text: '#ccfbf1', lightBg: 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30' },
+  'Hash': { bg: '#475569', border: '#64748b', text: '#f8fafc', lightBg: 'bg-slate-500/15 text-slate-700 dark:text-slate-300 border-slate-500/30' },
 };
 
 const getNodeIcon = (type: NodeType) => {
@@ -58,6 +60,7 @@ const getNodeIcon = (type: NodeType) => {
     case 'Case': return <Briefcase className="w-3.5 h-3.5" />;
     case 'Campaign': return <Flag className="w-3.5 h-3.5" />;
     case 'Country': return <Globe className="w-3.5 h-3.5" />;
+    case 'Hash': return <Hash className="w-3.5 h-3.5" />;
     default: return <Share2 className="w-3.5 h-3.5" />;
   }
 };
@@ -73,7 +76,7 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
 
   // Filter State
   const ALL_NODE_TYPES: NodeType[] = [
-    'Email', 'Email Address', 'Domain', 'URL', 'IP', 'ASN', 'Attachment', 'Case', 'Campaign', 'Country'
+    'Email', 'Email Address', 'Domain', 'URL', 'IP', 'ASN', 'Attachment', 'Case', 'Campaign', 'Country', 'Hash'
   ];
   const [selectedTypes, setSelectedTypes] = useState<Set<NodeType>>(new Set(ALL_NODE_TYPES));
 

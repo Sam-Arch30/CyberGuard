@@ -8,7 +8,8 @@ export type NodeType =
   | 'Attachment'
   | 'Case'
   | 'Campaign'
-  | 'Country';
+  | 'Country'
+  | 'Hash';
 
 export interface GraphNode {
   id: string;

@@ -92,6 +92,16 @@ class ThreatScorerService:
                 "credential_request": 12,
                 "financial_language": 10,
                 "suspicious_attachment_extension": 15,
+                "attachment_macro_payload": 18,
+                "executable_disguised_as_document": 25,
+                "pdf_suspicious_actions": 18,
+                "double_extension_detected": 18,
+                "archive_with_hidden_executable": 20,
+                "path_traversal_archive_exploit": 25,
+                "password_protected_suspicious_archive": 15,
+                "unsigned_executable": 12,
+                "embedded_phishing_url_in_attachment": 15,
+                "high_entropy_packed_binary": 10,
                 "suspicious_ip_hosting_or_proxy": 8,
                 "ml_phishing_signal": 10,
                 "trusted_sender_history": -5
@@ -505,16 +515,111 @@ class ThreatScorerService:
         attachments = getattr(email_analysis, "attachments", []) or []
         suspicious_att_found = False
         for att in attachments:
-            fname = getattr(att, "filename", "").lower()
+            fname = getattr(att, "filename", "") or "unnamed_attachment"
+            fname_lower = fname.lower()
+            static_res = getattr(att, "static_analysis", None)
+
+            # Check filename extension against suspicious list
             for ext in self.suspicious_extensions:
-                if fname.endswith(ext):
+                if fname_lower.endswith(ext):
                     suspicious_att_found = True
-                    ev_txt = f"Attachment '{getattr(att, 'filename', '')}'"
+                    ev_txt = f"Attachment '{fname}'"
                     add_risk_signal("suspicious_attachment_extension", "attachments", f"Dangerous executable or script attachment ({ext})",
                                     f"Dangerous executable or script attachment ({ext})",
-                                    f"Dangerous attachment observed: '{getattr(att, 'filename', '')}'",
-                                    ev_txt, "Attachment Risk Inspector", raw_val=ext, ev_ref=getattr(att, 'filename', ''))
+                                    f"Dangerous attachment observed: '{fname}'",
+                                    ev_txt, "Attachment Risk Inspector", raw_val=ext, ev_ref=fname)
                     break
+
+            if static_res:
+                # Disguised executable / extension mismatch
+                if static_res.extension_mismatch and "Windows executable" in static_res.detected_type:
+                    suspicious_att_found = True
+                    ev_txt = f"Executable disguised as document: '{fname}' (Detected: {static_res.detected_type})"
+                    add_risk_signal("executable_disguised_as_document", "attachments",
+                                    "Executable Disguised as Document",
+                                    "Attachment filename claims document format but payload is an executable binary",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                # Double extension evasion
+                if static_res.double_extension:
+                    suspicious_att_found = True
+                    ev_txt = f"Double extension evasion detected: '{fname}'"
+                    add_risk_signal("double_extension_detected", "attachments",
+                                    "Double Extension Evasion",
+                                    "Attachment employs dual extensions to conceal dangerous payload",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                # Office Macros
+                if static_res.office_metadata and static_res.office_metadata.has_macros:
+                    suspicious_att_found = True
+                    ev_txt = f"Macro-enabled document: '{fname}' contains VBA macro project"
+                    add_risk_signal("attachment_macro_payload", "attachments",
+                                    "Macro-Enabled Office Document",
+                                    "Office document contains executable VBA macros capable of remote code execution",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                # PDF suspicious elements
+                if static_res.pdf_metadata and static_res.pdf_metadata.suspicious_elements:
+                    suspicious_att_found = True
+                    elems_str = ", ".join(static_res.pdf_metadata.suspicious_elements[:2])
+                    ev_txt = f"PDF '{fname}' contains dangerous elements: {elems_str}"
+                    add_risk_signal("pdf_suspicious_actions", "attachments",
+                                    "PDF Suspicious Execution Elements",
+                                    f"PDF contains active auto-execution elements: {elems_str}",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                # Archive risks
+                if static_res.archive_metadata:
+                    if static_res.archive_metadata.has_path_traversal:
+                        suspicious_att_found = True
+                        ev_txt = f"Archive '{fname}' contains path traversal exploit (Zip Slip)"
+                        add_risk_signal("path_traversal_archive_exploit", "attachments",
+                                        "Archive Path Traversal (Zip Slip)",
+                                        "Archive contains directory traversal paths targeting arbitrary file overwrite",
+                                        ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                    if static_res.archive_metadata.has_hidden_executables:
+                        suspicious_att_found = True
+                        ev_txt = f"Archive '{fname}' packages hidden executable payloads"
+                        add_risk_signal("archive_with_hidden_executable", "attachments",
+                                        "Archive Packaging Hidden Executables",
+                                        "Archive packages concealed executable or script files",
+                                        ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                    if static_res.archive_metadata.is_encrypted:
+                        suspicious_att_found = True
+                        ev_txt = f"Archive '{fname}' is password-protected"
+                        add_risk_signal("password_protected_suspicious_archive", "attachments",
+                                        "Password-Protected Archive Evasion",
+                                        "Archive encryption prevents automated inspection",
+                                        ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                # Unsigned executable
+                if static_res.pe_metadata and static_res.pe_metadata.is_pe and static_res.pe_metadata.signature_status == "Unsigned":
+                    suspicious_att_found = True
+                    ev_txt = f"Binary '{fname}' is unsigned"
+                    add_risk_signal("unsigned_executable", "attachments",
+                                    "Unsigned Windows Executable",
+                                    "Executable binary lacks valid Authenticode code signing certificate",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=fname, ev_ref=fname)
+
+                # High entropy executable (packed) - Note: high entropy alone is NOT malware, only if executable
+                if static_res.entropy > 7.5 and "Windows executable" in static_res.detected_type:
+                    suspicious_att_found = True
+                    ev_txt = f"Binary '{fname}' exhibits very high entropy ({static_res.entropy:.2f}/8.00)"
+                    add_risk_signal("high_entropy_packed_binary", "attachments",
+                                    "High-Entropy Packed Binary",
+                                    f"Executable exhibits high entropy ({static_res.entropy:.2f}/8.00) indicating packing or cryptors",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=static_res.entropy, ev_ref=fname)
+
+                # Embedded Phishing URLs in document
+                if static_res.embedded_urls:
+                    suspicious_att_found = True
+                    ev_txt = f"Attachment '{fname}' embeds {len(static_res.embedded_urls)} external URL(s)"
+                    add_risk_signal("embedded_phishing_url_in_attachment", "attachments",
+                                    "Embedded Phishing Links in Attachment",
+                                    f"Attachment conceals external URLs ({len(static_res.embedded_urls)} found)",
+                                    ev_txt, ev_txt, "Attachment Intelligence Engine", raw_val=len(static_res.embedded_urls), ev_ref=fname)
 
         if attachments and not suspicious_att_found:
             ev_txt = f"{len(attachments)} attachment(s) verified safe"
