@@ -272,10 +272,13 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
         conclusions={conclusions}
       />
 
-      {/* Section 12: AI Analyst Assistant Assessment */}
+      {/* Section 12: MailTraceAI Investigation Copilot */}
       <AIAnalystSection
         aiAnalyst={email.ai_analyst}
         conclusions={conclusions}
+        email={email}
+        onFocusGraphNode={onFocusGraphNode}
+        onOpenWorkspace={onOpenWorkspace}
       />
 
       {/* Section 21: Probabilistic Threat Attribution Engine */}

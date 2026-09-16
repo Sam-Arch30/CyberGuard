@@ -353,6 +353,6 @@ export interface EmailAnalysis {
   attachments?: EmailAttachment[];
 }
 
-export type ForensicTabType = 'overview' | 'cross_investigation' | 'attribution' | 'graph' | 'map' | 'headers' | 'content' | 'indicators' | 'attachments' | 'raw';
+export type ForensicTabType = 'overview' | 'copilot' | 'cross_investigation' | 'attribution' | 'graph' | 'map' | 'headers' | 'content' | 'indicators' | 'attachments' | 'raw';
 
 

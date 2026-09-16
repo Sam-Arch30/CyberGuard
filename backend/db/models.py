@@ -151,6 +151,7 @@ class ReportModel(Base):
     severity = Column(String(20), nullable=True, default="low")
     analyst_name = Column(String(100), nullable=True, default="SOC Lead Analyst")
     summary = Column(Text, nullable=True)
+    ai_summary_json = Column(Text, nullable=True, default=None)
     file_path = Column(String(255), nullable=True)
     file_size_bytes = Column(Integer, nullable=True, default=0)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
@@ -244,3 +245,18 @@ class AnalystDecisionModel(Base):
     __table_args__ = (
         Index("ix_analyst_decisions_pair", "email_id_a", "email_id_b"),
     )
+
+
+class CopilotAuditLogModel(Base):
+    __tablename__ = "copilot_audit_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    user = Column(String(100), nullable=False, default="SOC Analyst")
+    query = Column(Text, nullable=False)
+    mode = Column(String(32), nullable=False, default="email")  # email, case, campaign
+    context_id = Column(String(128), nullable=True)
+    evidence_ids_json = Column(Text, default="[]", nullable=False)
+    confidence = Column(String(50), nullable=False, default="PROBABLE")
+    model_identifier = Column(String(100), nullable=False, default="mailtrace-copilot-v1")
+    timestamp = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+

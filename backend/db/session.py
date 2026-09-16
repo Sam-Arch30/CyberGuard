@@ -52,6 +52,12 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
             logger.info(f"Connecting to database (attempt {attempt}/{max_retries})...")
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
+                # Ensure newly added columns exist in SQLite without requiring manual drop
+                try:
+                    conn.execute(text("ALTER TABLE reports ADD COLUMN ai_summary_json TEXT;"))
+                    conn.commit()
+                except Exception:
+                    pass
             Base.metadata.create_all(bind=engine)
             logger.info("Database connection established and tables verified successfully.")
             return True

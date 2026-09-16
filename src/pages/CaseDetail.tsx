@@ -23,7 +23,8 @@ import {
   Target,
   GitMerge,
   Download,
-  Network
+  Network,
+  Sparkles
 } from 'lucide-react';
 import type {
   CaseDetail as CaseDetailType,
@@ -36,6 +37,7 @@ import type { CampaignCorrelationResponse } from '../types/correlation';
 import type { AttributionResult } from '../types/attribution';
 import { RelatedInvestigationsCard } from '../components/correlation/RelatedInvestigationsCard';
 import { InfrastructureAttributionSection } from '../components/forensic/InfrastructureAttributionSection';
+import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
 
 const STATUS_CONFIG: Record<CaseStatus, { label: string; badge: string }> = {
   open: { label: 'Open', badge: 'bg-info/10 text-info border-info/30' },
@@ -58,7 +60,7 @@ export const CaseDetail: React.FC = () => {
   const [caseData, setCaseData] = useState<CaseDetailType | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'emails' | 'attribution' | 'indicators' | 'findings' | 'notes' | 'timeline' | 'correlations'>('emails');
+  const [activeTab, setActiveTab] = useState<'emails' | 'copilot' | 'attribution' | 'indicators' | 'findings' | 'notes' | 'timeline' | 'correlations'>('emails');
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [correlations, setCorrelations] = useState<CampaignCorrelationResponse | null>(null);
   const [loadingCorrelations, setLoadingCorrelations] = useState<boolean>(false);
@@ -452,6 +454,7 @@ export const CaseDetail: React.FC = () => {
       <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-surface rounded-xl border border-border shadow-xs">
         {[
           { id: 'emails' as const, label: 'Linked Emails', icon: <Mail className="w-4 h-4" />, count: caseData.emails.length },
+          { id: 'copilot' as const, label: 'Investigation Copilot', icon: <Sparkles className="w-4 h-4 text-primary" />, count: 'AI' },
           { id: 'attribution' as const, label: 'Infrastructure Attribution', icon: <Network className="w-4 h-4" />, count: caseData.aggregated_indicators.ips.length || 1 },
           { id: 'indicators' as const, label: 'Aggregated Indicators', icon: <Target className="w-4 h-4" />, count: (caseData.aggregated_indicators.domains.length + caseData.aggregated_indicators.ips.length + caseData.aggregated_indicators.urls.length) },
           { id: 'findings' as const, label: 'Forensic Findings', icon: <ShieldAlert className="w-4 h-4" />, count: caseData.findings.length },
@@ -558,6 +561,19 @@ export const CaseDetail: React.FC = () => {
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* TAB: INVESTIGATION COPILOT */}
+      {activeTab === 'copilot' && (
+        <div className="space-y-4">
+          <InvestigationCopilot
+            mode="case"
+            contextId={caseData.id || id || 'CASE-2026-0042'}
+            onCompareEmails={() => setActiveTab('emails')}
+            onOpenEvidence={() => setActiveTab('findings')}
+            onAddToCase={() => setActiveTab('notes')}
+          />
         </div>
       )}
 

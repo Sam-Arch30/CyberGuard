@@ -15,6 +15,7 @@ import { RawEmailTab } from '../components/forensic/RawEmailTab';
 import { InvestigationGraphTab } from '../components/forensic/InvestigationGraphTab';
 import { InvestigationMapTab } from '../components/forensic/InvestigationMapTab';
 import { CrossEmailWorkspace } from '../components/forensic/CrossEmailWorkspace';
+import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
 
 export const EmailForensicView: React.FC = () => {
@@ -241,6 +242,16 @@ export const EmailForensicView: React.FC = () => {
             email={analysis}
             onFocusGraphNode={handleFocusGraphNode}
             onOpenWorkspace={() => setActiveTab('cross_investigation')}
+          />
+        )}
+        {activeTab === 'copilot' && (
+          <InvestigationCopilot
+            mode="email"
+            contextId={analysis.evidence_id || analysis.id || 'E-1042'}
+            emailPayload={analysis}
+            onOpenGraph={handleFocusGraphNode}
+            onCompareEmails={() => setActiveTab('cross_investigation')}
+            onOpenEvidence={() => setActiveTab('overview')}
           />
         )}
         {activeTab === 'cross_investigation' && (

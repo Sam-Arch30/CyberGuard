@@ -16,11 +16,13 @@ import {
   Check,
   ArrowUpRight,
   Info,
-  FileText
+  FileText,
+  Sparkles
 } from 'lucide-react';
 import type { CampaignClusterItem, CampaignDetail } from '../types/campaign';
 import { CampaignTimeline } from '../components/campaign/CampaignTimeline';
 import { CampaignGraphView } from '../components/campaign/CampaignGraphView';
+import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
 
 export const CampaignIntelligence: React.FC = () => {
   const { id: routeCampId } = useParams<{ id: string }>();
@@ -33,7 +35,7 @@ export const CampaignIntelligence: React.FC = () => {
   const [loadingDetail, setLoadingDetail] = useState<boolean>(false);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'emails' | 'infrastructure' | 'domains' | 'urls' | 'recipients' | 'timeline' | 'graph' | 'evidence'
+    'overview' | 'copilot' | 'emails' | 'infrastructure' | 'domains' | 'urls' | 'recipients' | 'timeline' | 'graph' | 'evidence'
   >('overview');
   const [copiedValue, setCopiedValue] = useState<string | null>(null);
 
@@ -99,6 +101,7 @@ export const CampaignIntelligence: React.FC = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: Target },
+    { id: 'copilot', label: 'Investigation Copilot', icon: Sparkles },
     { id: 'emails', label: 'Emails', icon: MailIcon, count: campaignDetail?.email_count },
     { id: 'infrastructure', label: 'Infrastructure', icon: Server, count: campaignDetail?.ip_count },
     { id: 'domains', label: 'Domains', icon: Globe, count: campaignDetail?.domain_count },
@@ -323,6 +326,18 @@ export const CampaignIntelligence: React.FC = () => {
               );
             })}
           </div>
+
+          {/* TAB: COPILOT */}
+          {activeTab === 'copilot' && (
+            <div className="space-y-6 animate-in fade-in duration-150">
+              <InvestigationCopilot
+                mode="campaign"
+                contextId={selectedCampId || 'C-042'}
+                onCompareEmails={() => setActiveTab('emails')}
+                onOpenEvidence={() => setActiveTab('evidence')}
+              />
+            </div>
+          )}
 
           {/* TAB 1: OVERVIEW */}
           {activeTab === 'overview' && (

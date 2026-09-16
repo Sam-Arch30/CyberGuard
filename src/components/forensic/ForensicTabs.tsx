@@ -1,6 +1,6 @@
 import React from 'react';
 import type { ForensicTabType } from '../../types/forensic';
-import { LayoutDashboard, FileText, Code, Target, Paperclip, Terminal, Share2, MapPin, Network, GitMerge } from 'lucide-react';
+import { LayoutDashboard, FileText, Code, Target, Paperclip, Terminal, Share2, MapPin, Network, GitMerge, Sparkles } from 'lucide-react';
 
 interface ForensicTabsProps {
   activeTab: ForensicTabType;
@@ -18,8 +18,15 @@ export const ForensicTabs: React.FC<ForensicTabsProps> = ({
   onTabChange,
   counts
 }) => {
-  const tabs: { id: ForensicTabType; label: string; icon: React.ReactNode; badge?: number; badgeColor?: string }[] = [
+  const tabs: { id: ForensicTabType; label: string; icon: React.ReactNode; badge?: number | string; badgeColor?: string }[] = [
     { id: 'overview', label: 'Overview', icon: <LayoutDashboard className="w-3.5 h-3.5" /> },
+    {
+      id: 'copilot',
+      label: 'Investigation Copilot',
+      icon: <Sparkles className="w-3.5 h-3.5 text-primary" />,
+      badge: 'AI',
+      badgeColor: 'text-primary bg-primary/15 border-primary/30 font-bold'
+    },
     {
       id: 'cross_investigation',
       label: 'Cross-Email Workspace',
