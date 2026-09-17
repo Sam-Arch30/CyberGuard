@@ -684,7 +684,7 @@ class CrossEmailWorkspaceService:
                 received_time=cand_data.get("received_time") or cand_data.get("date") or "2026-09-05 10:42:15 UTC",
                 threat_score=threat_val,
                 severity=cand_data.get("severity", "high"),
-                campaign=cand_data.get("campaign", "C-042"),
+                campaign=cand_data.get("campaign"),
                 similarity=similarity_pct,
                 shared_indicators=shared_inds,
                 status=status_val,
@@ -717,14 +717,18 @@ class CrossEmailWorkspaceService:
             campaign_id = "C-042"
         else:
             if scored_items:
-                strongest_relationships = [
-                    "same redirect domain",
-                    "same ASN",
-                    "highly similar HTML template",
-                    "similar subject",
-                    "same Reply-To domain",
-                    "overlapping sender infrastructure"
-                ]
+                extracted_reasons: List[str] = []
+                for itm in scored_items:
+                    for r in (itm.correlation_reasons or []):
+                        if r not in extracted_reasons:
+                            extracted_reasons.append(r)
+                if not extracted_reasons:
+                    for itm in scored_items:
+                        for k in (itm.shared_indicators or {}).keys():
+                            r_str = f"shared {k}"
+                            if r_str not in extracted_reasons:
+                                extracted_reasons.append(r_str)
+                strongest_relationships = extracted_reasons[:6] if extracted_reasons else ["shared forensic indicators"]
                 timeline_events = self._build_real_cross_email_timeline(scored_items)
                 campaign_confidence = round(sum(x.similarity for x in scored_items[:5]) / min(len(scored_items), 5), 1)
                 campaign_id = scored_items[0].campaign if scored_items[0].campaign else None

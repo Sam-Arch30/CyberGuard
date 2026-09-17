@@ -53,13 +53,6 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
       .catch(() => {})
       .finally(() => setLoadingCorrelations(false));
 
-    const numericThreatScore =
-      typeof email.threat_score === 'number'
-        ? email.threat_score
-        : typeof email.threat_score === 'object' && email.threat_score !== null
-        ? ((email.threat_score as any).score ?? 0)
-        : 0;
-
     // Proactive Campaign Detection Alert
     fetch('http://localhost:8000/api/campaigns/detect-alert?threshold=0.45', {
       method: 'POST',
@@ -70,71 +63,12 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
       .then((data: CampaignAlertData | null) => {
         if (data && data.is_campaign_detected) {
           setCampaignAlert(data);
-        } else if (numericThreatScore > 40 || email.id?.includes('sample-001')) {
-          // Tactical fallback for demo/fixtures
-          setCampaignAlert({
-            is_campaign_detected: true,
-            campaign_id: 'C-042',
-            campaign_name: 'Operation DarkHydra - Executive Invoice & Wire Harvester',
-            correlated_message_count: 16,
-            overall_confidence: 91,
-            strongest_reasons: [
-              'Shared dropzone IP 185.220.101.42 (Russia / Bulletproof Node AS4821)',
-              'URL redirect chain leading to /auth/v2/secure_login.php credential harvester',
-              'HTML SimHash template match 89% across executive invoice lures',
-              'Lookalike domain target: bank-corp-update.com impersonating BankCorp'
-            ],
-            category_scores: {
-              infrastructure_similarity: 92,
-              domain_similarity: 78,
-              url_similarity: 96,
-              content_similarity: 81,
-              template_similarity: 89,
-              authentication_similarity: 75,
-              attachment_similarity: 85,
-              overall_confidence: 91
-            },
-            alert_headline: 'Potential campaign detected',
-            alert_subtext: 'This email shares infrastructure or behavioral characteristics with 16 previously analyzed messages.',
-            first_seen: '2026-08-12T04:12:00Z',
-            last_seen: '2026-09-10T19:45:00Z',
-            dominant_attack_type: 'Credential Harvesting & BEC Wire Fraud',
-            targeted_brands: ['BankCorp', 'Microsoft 365', 'DocuSign']
-          });
+        } else {
+          setCampaignAlert(null);
         }
       })
       .catch(() => {
-        if (numericThreatScore > 40 || email.id?.includes('sample-001')) {
-          setCampaignAlert({
-            is_campaign_detected: true,
-            campaign_id: 'C-042',
-            campaign_name: 'Operation DarkHydra - Executive Invoice & Wire Harvester',
-            correlated_message_count: 16,
-            overall_confidence: 91,
-            strongest_reasons: [
-              'Shared dropzone IP 185.220.101.42 (Russia / Bulletproof Node AS4821)',
-              'URL redirect chain leading to /auth/v2/secure_login.php credential harvester',
-              'HTML SimHash template match 89% across executive invoice lures',
-              'Lookalike domain target: bank-corp-update.com impersonating BankCorp'
-            ],
-            category_scores: {
-              infrastructure_similarity: 92,
-              domain_similarity: 78,
-              url_similarity: 96,
-              content_similarity: 81,
-              template_similarity: 89,
-              authentication_similarity: 75,
-              attachment_similarity: 85,
-              overall_confidence: 91
-            },
-            alert_headline: 'Potential campaign detected',
-            alert_subtext: 'This email shares infrastructure or behavioral characteristics with 16 previously analyzed messages.',
-            first_seen: '2026-08-12T04:12:00Z',
-            last_seen: '2026-09-10T19:45:00Z',
-            dominant_attack_type: 'Credential Harvesting & BEC Wire Fraud',
-            targeted_brands: ['BankCorp', 'Microsoft 365', 'DocuSign']
-          });
-        }
+        setCampaignAlert(null);
       });
   }, [emailKey, email]);
 
@@ -182,8 +116,8 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
         </div>
       )}
 
-      {/* SCENARIO 3 / CAMPAIGN CORRELATION: RELATED ACTIVITY DETECTED BANNER */}
-      {(email.id === 'scenario-3-campaign' || email.id === 'sample-001' || (email.id !== 'scenario-1-legit' && email.threat_score && email.threat_score.score >= 50)) && (
+      {/* SCENARIO 3 / CAMPAIGN CORRELATION: RELATED ACTIVITY DETECTED BANNER (Demo fixture only) */}
+      {(email.id === 'scenario-3-campaign') && (
         <div className="rounded-2xl border-2 border-danger/40 bg-gradient-to-r from-danger/15 via-warning/10 to-primary/15 p-5 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1.5">
             <div className="flex items-center space-x-2">

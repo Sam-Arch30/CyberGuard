@@ -234,6 +234,16 @@ class IOCExtractorService:
         results: List[DomainIndicator] = []
         seen: Set[str] = set()
 
+        NON_DOMAIN_EXTENSIONS = {
+            'png', 'jpg', 'jpeg', 'gif', 'svg', 'webp', 'bmp', 'ico', 'tif', 'tiff',
+            'css', 'js', 'json', 'xml', 'html', 'htm', 'php', 'asp', 'aspx', 'jsp',
+            'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt', 'rtf', 'csv',
+            'zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'iso', 'dmg',
+            'exe', 'dll', 'bat', 'cmd', 'ps1', 'sh', 'bin', 'msi', 'apk',
+            'log', 'bak', 'tmp', 'map', 'ts', 'tsx', 'jsx', 'woff', 'woff2', 'ttf', 'eot',
+            'getelementbyid', 'matchmedia', 'backgroundcolor', 'mailfrom', 'from', 'ap'
+        }
+
         def add_domain(raw_domain: str, src: str):
             if not raw_domain:
                 return
@@ -245,24 +255,39 @@ class IOCExtractorService:
             if clean_domain in ('localhost', 'local', 'broadcasthost') or '.' not in clean_domain:
                 return
 
+            last_part = clean_domain.split('.')[-1]
+            if last_part in NON_DOMAIN_EXTENSIONS:
+                return
+
             try:
                 ipaddress.ip_address(clean_domain)
                 return
             except ValueError:
                 pass
 
+            RFC_RESERVED_TLDS = {'example', 'test', 'invalid', 'internal'}
+            if last_part in RFC_RESERVED_TLDS and len(clean_domain.split('.')) >= 2:
+                if clean_domain not in seen:
+                    seen.add(clean_domain)
+                    results.append(DomainIndicator(value=clean_domain, source=src))
+                return
+
             if tldextract:
                 ext = tldextract.extract(clean_domain)
-                if ext.domain and ext.suffix:
+                if ext.domain and ext.suffix and ext.suffix.lower() not in NON_DOMAIN_EXTENSIONS:
                     fqdn = f"{ext.subdomain}.{ext.domain}.{ext.suffix}".strip('.') if ext.subdomain else f"{ext.domain}.{ext.suffix}"
                     if fqdn not in seen:
                         seen.add(fqdn)
                         results.append(DomainIndicator(value=fqdn, source=src))
-                    return
+                # Strict: if tldextract is available, do not fall back to adding non-domains with empty suffix
+                return
 
-            if clean_domain not in seen:
-                seen.add(clean_domain)
-                results.append(DomainIndicator(value=clean_domain, source=src))
+            # Fallback when tldextract is unavailable: require valid alphanumeric domain parts and alphabetic TLD
+            parts = clean_domain.split('.')
+            if len(parts) >= 2 and parts[-1].isalpha() and 2 <= len(parts[-1]) <= 6 and parts[-1] not in NON_DOMAIN_EXTENSIONS:
+                if clean_domain not in seen:
+                    seen.add(clean_domain)
+                    results.append(DomainIndicator(value=clean_domain, source=src))
 
         for url_obj in urls:
             try:

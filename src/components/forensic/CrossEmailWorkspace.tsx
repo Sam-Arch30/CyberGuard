@@ -585,11 +585,13 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
 
             <div className="flex items-baseline gap-3">
               <h1 className="text-2xl lg:text-3xl font-black font-sans tracking-tight text-foreground">
-                {data ? `${data.related_count} potentially related emails` : '16 potentially related emails'}
+                {data ? `${data.related_count} potentially related emails` : '0 potentially related emails'}
               </h1>
-              <span className="text-sm lg:text-base font-mono font-bold text-danger">
-                Campaign confidence: {data?.campaign_confidence || 89}%
-              </span>
+              {data && data.campaign_confidence !== null && data.campaign_confidence !== undefined && (
+                <span className="text-sm lg:text-base font-mono font-bold text-danger">
+                  Campaign confidence: {data.campaign_confidence}%
+                </span>
+              )}
             </div>
 
             <p className="text-xs text-foreground-muted font-mono max-w-3xl">
@@ -597,29 +599,24 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
             </p>
 
             {/* Strongest relationships */}
-            <div className="pt-2">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground-muted block mb-2">
-                Strongest relationships:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono">
-                {(data?.strongest_relationships || [
-                  'same redirect domain',
-                  'same ASN',
-                  'highly similar HTML template',
-                  'similar subject',
-                  'same Reply-To domain',
-                  'overlapping sender infrastructure'
-                ]).map((reason, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center space-x-2 bg-surface/80 border border-border/70 rounded-lg px-2.5 py-1.5 text-foreground shadow-2xs"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 text-danger flex-shrink-0" />
-                    <span className="capitalize">{reason}</span>
-                  </div>
-                ))}
+            {data?.strongest_relationships && data.strongest_relationships.length > 0 && (
+              <div className="pt-2">
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-foreground-muted block mb-2">
+                  Strongest relationships:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 text-xs font-mono">
+                  {data.strongest_relationships.map((reason, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center space-x-2 bg-surface/80 border border-border/70 rounded-lg px-2.5 py-1.5 text-foreground shadow-2xs"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 text-danger flex-shrink-0" />
+                      <span className="capitalize">{reason}</span>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           {/* Quick Action Buttons */}
@@ -676,7 +673,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
             <GitMerge className="w-3.5 h-3.5 text-primary" />
             <span>Related Emails</span>
             <span className="px-1.5 py-0.2 rounded text-[10px] bg-primary/15 text-primary font-bold">
-              {data?.related_emails.length || 16}
+              {data?.related_emails ? data.related_emails.length : 0}
             </span>
           </button>
 

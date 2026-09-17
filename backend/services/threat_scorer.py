@@ -139,6 +139,7 @@ class ThreatScorerService:
         if isinstance(email_analysis, dict):
             class DictToObject:
                 def __init__(self, d):
+                    self._d = d
                     for k, v in d.items():
                         if isinstance(v, dict):
                             setattr(self, k, DictToObject(v))
@@ -148,6 +149,12 @@ class ThreatScorerService:
                             setattr(self, k, v)
                 def get(self, k, default=None):
                     return getattr(self, k, default)
+                def items(self):
+                    return [(k, getattr(self, k)) for k in self._d.keys()]
+                def keys(self):
+                    return self._d.keys()
+                def values(self):
+                    return [getattr(self, k) for k in self._d.keys()]
                 def __getattr__(self, k):
                     return None
             email_analysis = DictToObject(email_analysis)
@@ -412,8 +419,11 @@ class ThreatScorerService:
         domain_intel = getattr(email_analysis, "domain_intelligence", {}) or {}
         new_domains_flagged = set()
         established_domains = []
+        dns_failed_domains = []
+        suspicious_tld_flagged = set()
 
-        for d_name, d_data in domain_intel.items():
+        domain_items = domain_intel.items() if hasattr(domain_intel, "items") else []
+        for d_name, d_data in domain_items:
             age = getattr(d_data, "domain_age_days", None)
             is_new = getattr(d_data, "newly_registered_domain", False)
             is_resolvable = getattr(d_data, "is_resolvable", True)
@@ -430,7 +440,8 @@ class ThreatScorerService:
 
             # Suspicious TLD check
             for tld in self.suspicious_tlds:
-                if d_name.lower().endswith(tld):
+                if d_name.lower().endswith(tld) and d_name not in suspicious_tld_flagged:
+                    suspicious_tld_flagged.add(d_name)
                     ev_txt = f"Domain '{d_name}' operates under high-abuse TLD '{tld}'"
                     add_risk_signal("suspicious_tld", "domain_intelligence", "High-Risk Disposable TLD",
                                     "High-Risk Disposable TLD",
@@ -439,10 +450,13 @@ class ThreatScorerService:
 
             # DNS Anomaly
             if not is_resolvable:
-                ev_txt = f"Domain '{d_name}' failed authoritative DNS resolution"
-                add_risk_signal("dns_anomaly", "domain_intelligence", "DNS Resolution Failure",
-                                "DNS Resolution Failure",
-                                ev_txt, ev_txt, "DNS Resolver Subsystem", raw_val="unresolvable", ev_ref=d_name)
+                dns_failed_domains.append(d_name)
+
+        if dns_failed_domains:
+            ev_txt = f"Domain(s) failed authoritative DNS resolution: {', '.join(dns_failed_domains[:3])}"
+            add_risk_signal("dns_anomaly", "domain_intelligence", "DNS Resolution Failure",
+                            "DNS Resolution Failure",
+                            ev_txt, ev_txt, "DNS Resolver Subsystem", raw_val="unresolvable", ev_ref=dns_failed_domains[0])
 
         if established_domains and not new_domains_flagged:
             ev_txt = ", ".join(established_domains[:2])

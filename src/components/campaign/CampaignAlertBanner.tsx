@@ -70,7 +70,7 @@ export const CampaignAlertBanner: React.FC<CampaignAlertBannerProps> = ({
                   TACTICAL CORRELATION
                 </span>
                 <span className="text-xs font-mono font-bold text-warning uppercase tracking-wider">
-                  Campaign C-042 Detected
+                  {campaignId ? `Campaign ${campaignId} Detected` : 'Campaign Detected'}
                 </span>
               </div>
               <h2 className="text-base font-extrabold text-foreground font-sans tracking-tight mt-0.5">

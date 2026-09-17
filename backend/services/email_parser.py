@@ -297,10 +297,12 @@ class EmailParserService:
         analyzed_urls = url_analyzer.analyze_urls(url_strings, html_links=html_links)
 
         text_sources = [
-            (raw_email_str, "raw_email_source"),
             (plain_text_str or "", "plain_text_body"),
-            (html_str or "", "html_body"),
         ]
+        if html_str:
+            clean_html_text = re.sub(r'(?is)<(script|style)[^>]*>.*?</\1>', ' ', html_str)
+            clean_html_text = re.sub(r'<[^>]+>', ' ', clean_html_text)
+            text_sources.append((clean_html_text, "html_body"))
         for idx, r in enumerate(received_headers):
             text_sources.append((r, f"received_header_{idx+1}"))
 
