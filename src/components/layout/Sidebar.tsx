@@ -15,7 +15,8 @@ import {
   Palette,
   Network,
   GitMerge,
-  BarChart3
+  BarChart3,
+  Clock
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -52,6 +53,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/analysis/demo',
       icon: FileText,
       badge: 'EVIDENCE'
+    },
+    {
+      name: 'Investigation History',
+      path: '/history',
+      icon: Clock,
+      badge: 'ARCHIVE'
     },
     {
       name: 'Cross-Email Workspace',

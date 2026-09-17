@@ -16,6 +16,7 @@ import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { CrossInvestigationWorkspacePage } from './pages/CrossInvestigationWorkspacePage';
 import { BenchmarkEvaluation } from './pages/BenchmarkEvaluation';
+import { InvestigationHistory } from './pages/InvestigationHistory';
 
 function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -42,6 +43,7 @@ function AppContent() {
             <Routes>
               <Route path="/" element={<Dashboard />} />
               <Route path="/analyze" element={<AnalyzeEmail />} />
+              <Route path="/history" element={<InvestigationHistory />} />
               <Route path="/analysis" element={<EmailForensicView />} />
               <Route path="/analysis/:id" element={<EmailForensicView />} />
               <Route path="/cross-investigation" element={<CrossInvestigationWorkspacePage />} />
