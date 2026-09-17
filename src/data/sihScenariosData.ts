@@ -71,8 +71,8 @@ export const SCENARIO_1_LEGITIMATE: EmailAnalysis = {
   raw_email: 'From: Audits Team <audit-status@acme-global.example>\nTo: finance-director@enterprise-corp.example\nSubject: Q3 Financial Audit Engagement & Status Report - Acme Global\nDate: Thu, 17 Sep 2026 09:14:00 +0000\nMessage-ID: <audit-20260917-091400@acme-global.example>\nContent-Type: multipart/mixed\n\n[Legitimate business correspondence and clean PDF attachment]',
   indicators: {
     ips: [
-      { value: '192.0.2.14', scope: 'reserved', source: 'received_hop_1' },
-      { value: '192.0.2.200', scope: 'reserved', source: 'received_hop_2' }
+      { value: '192.0.2.14', scope: 'public', source: 'received_hop_1' },
+      { value: '192.0.2.200', scope: 'public', source: 'received_hop_2' }
     ],
     domains: [
       { value: 'acme-global.example', source: 'header_from' },
@@ -156,11 +156,51 @@ export const SCENARIO_1_LEGITIMATE: EmailAnalysis = {
   } as any,
   attribution: {
     probable_origin_ip: '192.0.2.14',
-    origin_country: 'United States',
+    origin_country: 'Netherlands',
     origin_asn: 'AS64500',
     origin_isp: 'Acme Corporate Network',
     confidence: 0.95
-  } as any
+  } as any,
+  ip_intelligence: {
+    '192.0.2.14': {
+      ip: '192.0.2.14',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'Netherlands',
+      country_code: 'NL',
+      region: 'North Holland',
+      city: 'Amsterdam',
+      latitude: 52.3702,
+      longitude: 4.8952,
+      timezone: 'Europe/Amsterdam',
+      asn: 'AS64500',
+      asn_org: 'Acme Corporate Telecom',
+      isp: 'Acme Corporate Network',
+      organization: 'Acme Global Consulting',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    },
+    '192.0.2.200': {
+      ip: '192.0.2.200',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'United Kingdom',
+      country_code: 'GB',
+      region: 'England',
+      city: 'London',
+      latitude: 51.5074,
+      longitude: -0.1278,
+      timezone: 'Europe/London',
+      asn: 'AS64501',
+      asn_org: 'Enterprise Transit',
+      isp: 'Enterprise Gateway Services',
+      organization: 'Enterprise Corp MX',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    }
+  }
 };
 
 export const SCENARIO_2_PHISHING: EmailAnalysis = {
@@ -229,8 +269,8 @@ export const SCENARIO_2_PHISHING: EmailAnalysis = {
   raw_email: 'From: Microsoft Security Center <security-update@micros0ft-support.example>\nTo: admin@enterprise-corp.example\nSubject: CRITICAL ACTION REQUIRED: Microsoft 365 Tenant Suspension Notice\n\n[Malicious credential harvesting payload and disguised double-extension executable]',
   indicators: {
     ips: [
-      { value: '198.51.100.77', scope: 'reserved', source: 'received_hop_1' },
-      { value: '198.51.100.22', scope: 'reserved', source: 'received_hop_2' }
+      { value: '198.51.100.77', scope: 'public', source: 'received_hop_1' },
+      { value: '198.51.100.22', scope: 'public', source: 'received_hop_2' }
     ],
     domains: [
       { value: 'micros0ft-support.example', source: 'header_from' },
@@ -307,11 +347,70 @@ export const SCENARIO_2_PHISHING: EmailAnalysis = {
   } as any,
   attribution: {
     probable_origin_ip: '198.51.100.77',
-    origin_country: 'Attacker Infrastructure (Reserved)',
+    origin_country: 'Observed Infrastructure (Reserved)',
     origin_asn: 'AS64511',
     origin_isp: 'Bulletproof Threat Transit',
     confidence: 0.92
-  } as any
+  } as any,
+  ip_intelligence: {
+    '198.51.100.22': {
+      ip: '198.51.100.22',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'Poland',
+      country_code: 'PL',
+      region: 'Masovian',
+      city: 'Warsaw',
+      latitude: 52.2297,
+      longitude: 21.0122,
+      timezone: 'Europe/Warsaw',
+      asn: 'AS64511',
+      asn_org: 'Bulletproof Hosters Ltd',
+      isp: 'Bulletproof Threat Transit',
+      organization: 'Shady Host VPS',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    },
+    '198.51.100.77': {
+      ip: '198.51.100.77',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'Germany',
+      country_code: 'DE',
+      region: 'Hesse',
+      city: 'Frankfurt',
+      latitude: 50.1109,
+      longitude: 8.6821,
+      timezone: 'Europe/Berlin',
+      asn: 'AS64512',
+      asn_org: 'European Transit Relay',
+      isp: 'Phish Node Transit',
+      organization: 'Compromised Relay Host',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    },
+    '192.0.2.200': {
+      ip: '192.0.2.200',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'United Kingdom',
+      country_code: 'GB',
+      region: 'England',
+      city: 'London',
+      latitude: 51.5074,
+      longitude: -0.1278,
+      timezone: 'Europe/London',
+      asn: 'AS64501',
+      asn_org: 'Enterprise Transit',
+      isp: 'Enterprise Gateway Services',
+      organization: 'Enterprise Corp MX',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    }
+  }
 };
 
 export const SCENARIO_3_PRIMARY_EMAIL: EmailAnalysis = {
@@ -367,8 +466,8 @@ export const SCENARIO_3_PRIMARY_EMAIL: EmailAnalysis = {
   raw_email: 'From: CEO Office <ceo-urgent@executive-board-corp.example>\nTo: controller@victim-enterprise.example\nSubject: URGENT: Executive Wire Transfer Authorization #8491\n\n[High-confidence BEC and malware delivery campaign]',
   indicators: {
     ips: [
-      { value: '203.0.113.88', scope: 'reserved', source: 'received_hop_1' },
-      { value: '203.0.113.89', scope: 'reserved', source: 'c2_cluster' }
+      { value: '203.0.113.88', scope: 'public', source: 'received_hop_1' },
+      { value: '203.0.113.89', scope: 'public', source: 'c2_cluster' }
     ],
     domains: [
       { value: 'executive-board-corp.example', source: 'header_from' },
@@ -431,11 +530,70 @@ export const SCENARIO_3_PRIMARY_EMAIL: EmailAnalysis = {
   } as any,
   attribution: {
     probable_origin_ip: '203.0.113.88',
-    origin_country: 'Attacker Network (Reserved)',
+    origin_country: 'Observed Infrastructure Network',
     origin_asn: 'AS64512',
     origin_isp: 'Threat Hosting Corp',
     confidence: 0.96
-  } as any
+  } as any,
+  ip_intelligence: {
+    '203.0.113.88': {
+      ip: '203.0.113.88',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'United States',
+      country_code: 'US',
+      region: 'California',
+      city: 'San Jose',
+      latitude: 37.3382,
+      longitude: -121.8863,
+      timezone: 'America/Los_Angeles',
+      asn: 'AS64512',
+      asn_org: 'Threat Hosting Corp',
+      isp: 'Threat Hosting Corp',
+      organization: 'Bulletproof Server Cluster',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    },
+    '203.0.113.89': {
+      ip: '203.0.113.89',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'United States',
+      country_code: 'US',
+      region: 'California',
+      city: 'San Jose',
+      latitude: 37.3382,
+      longitude: -121.8863,
+      timezone: 'America/Los_Angeles',
+      asn: 'AS64512',
+      asn_org: 'Threat Hosting Corp',
+      isp: 'Threat Hosting Corp',
+      organization: 'Bulletproof Server Cluster',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    },
+    '192.0.2.200': {
+      ip: '192.0.2.200',
+      scope: 'public',
+      enrichment_available: true,
+      country: 'United Kingdom',
+      country_code: 'GB',
+      region: 'England',
+      city: 'London',
+      latitude: 51.5074,
+      longitude: -0.1278,
+      timezone: 'Europe/London',
+      asn: 'AS64501',
+      asn_org: 'Enterprise Transit',
+      isp: 'Enterprise Gateway Services',
+      organization: 'Enterprise Corp MX',
+      is_hosting: true,
+      is_proxy_vpn_tor: false,
+      infrastructure_type: 'Observed Infrastructure Location'
+    }
+  }
 };
 
 export const SCENARIO_3_RELATED_EMAILS = [

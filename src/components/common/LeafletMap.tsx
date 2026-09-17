@@ -26,8 +26,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({ locations, height = '360
   const tileLayerRef = useRef<L.TileLayer | null>(null);
 
   const tileUrl = isDark
-    ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+    ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+    : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -41,9 +41,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({ locations, height = '360
       });
 
       const tileLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        maxZoom: 16,
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       }).addTo(map);
 
       tileLayerRef.current = tileLayer;
@@ -128,9 +127,8 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({ locations, height = '360
     if (mapRef.current && tileLayerRef.current) {
       mapRef.current.removeLayer(tileLayerRef.current);
       const newLayer = L.tileLayer(tileUrl, {
-        maxZoom: 19,
-        subdomains: 'abcd',
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        maxZoom: 16,
+        attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
       }).addTo(mapRef.current);
       tileLayerRef.current = newLayer;
     }
@@ -139,6 +137,11 @@ export const LeafletMap: React.FC<LeafletMapProps> = ({ locations, height = '360
   return (
     <div className="relative w-full rounded-card overflow-hidden border border-border shadow-sm bg-surface">
       <div ref={containerRef} style={{ height }} className="w-full z-0" />
+      {locations.length === 0 && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-10 bg-surface/95 text-foreground-muted text-xs font-mono px-3.5 py-1.5 rounded-control border border-border backdrop-blur-sm shadow-sm flex items-center gap-2">
+          <span>Internal network path — No public IP nodes</span>
+        </div>
+      )}
       <div className="absolute bottom-2 left-2 z-10 bg-surface/90 text-foreground-muted text-[10px] font-mono px-2.5 py-1 rounded-control border border-border backdrop-blur-sm">
         Observed infrastructure location estimates from IP allocation.
       </div>

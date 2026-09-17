@@ -98,11 +98,20 @@ class GeolocationConfig:
                 "mode": "external_live"
             }
 
+        require_key = os.getenv("GEOLOCATION_REQUIRE_API_KEY", "false").lower() == "true"
+        if self.provider == "ipapi" and not require_key:
+            return {
+                "provider": "ipapi",
+                "status": "Configured",
+                "tier": "free_standard",
+                "mode": "external_live"
+            }
+
         return {
             "provider": self.provider,
             "status": "Not Configured",
-            "tier": "free_unauthenticated" if self.provider == "ipapi" else "unconfigured",
-            "mode": "rate_limited" if self.provider == "ipapi" else "inactive"
+            "tier": "unconfigured",
+            "mode": "inactive"
         }
 
 

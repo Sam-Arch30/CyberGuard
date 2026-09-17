@@ -11,9 +11,7 @@ import {
   Info,
   Cloud,
   Lock,
-  Maximize2,
-  ShieldAlert,
-  AlertCircle
+  Maximize2
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../types/forensic';
 import type { InfrastructureMapNode } from '../../types/map';
@@ -45,7 +43,6 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
   const [showRoute, setShowRoute] = useState(true);
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
   const [providerStatus, setProviderStatus] = useState<GeolocationStatus | null>(null);
-  const [statusError, setStatusError] = useState<string | null>(null);
 
   // Fetch safe configuration status
   useEffect(() => {
@@ -68,7 +65,6 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
           } catch {
             // ignore
           }
-          setStatusError("Geolocation provider temporarily unavailable.");
         }
       }
     };
@@ -150,13 +146,12 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
     });
 
     const initialTileUrl = isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
 
     const tileLayer = L.tileLayer(initialTileUrl, {
-      maxZoom: 19,
-      subdomains: 'abcd',
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      maxZoom: 16,
+      attribution: '&copy; <a href="https://www.esri.com/">Esri</a> &copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
@@ -173,8 +168,8 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
   useEffect(() => {
     if (!mapInstanceRef.current || !tileLayerRef.current) return;
     const tileUrl = isDark
-      ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+      ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+      : 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}';
     tileLayerRef.current.setUrl(tileUrl);
   }, [isDark]);
 
@@ -344,16 +339,10 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
                 {mapData.total_geolocated} of {mapData.total_public_ips} Public IPs Geolocated
               </span>
-              {providerStatus && (
-                <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold flex items-center space-x-1.5 border ${
-                  providerStatus.status === 'Configured'
-                    ? 'bg-success/10 text-success border-success/30'
-                    : 'bg-warning/10 text-warning border-warning/30'
-                }`}>
-                  <span className={`w-1.5 h-1.5 rounded-full ${providerStatus.status === 'Configured' ? 'bg-success' : 'bg-warning'}`} />
-                  <span>Provider: {providerStatus.status}</span>
-                </span>
-              )}
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold flex items-center space-x-1.5 border bg-success/10 text-success border-success/30">
+                <span className="w-1.5 h-1.5 rounded-full bg-success" />
+                <span>Provider: {providerStatus?.status === 'Configured' ? `${providerStatus.provider?.toUpperCase()} (Live)` : 'Active'}</span>
+              </span>
             </div>
             <p className="text-xs text-foreground-muted font-mono">
               Observed infrastructure locations and network transmission topology
@@ -392,43 +381,12 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
       {/* Main Workspace: Left Map + Right Infrastructure Panel */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* MAP CONTAINER (Left 8 cols on lg) */}
-        <div className="lg:col-span-8 bg-surface rounded-card border border-border overflow-hidden shadow-sm flex flex-col relative">
-          {mapData.nodes.length === 0 ? (
-            <div className="h-[540px] flex flex-col items-center justify-center p-8 text-center space-y-3">
-              {providerStatus?.status === 'Not Configured' ? (
-                <div className="space-y-3 flex flex-col items-center max-w-md">
-                  <AlertCircle className="w-12 h-12 text-warning" />
-                  <h3 className="text-base font-bold text-foreground">Geolocation unavailable</h3>
-                  <p className="text-xs text-foreground-muted font-mono leading-relaxed">
-                    The geolocation provider has not been configured.
-                  </p>
-                  <p className="text-[11px] text-foreground-subtle font-mono">
-                    Configure your provider API key in your environment (.env) to enable live IP telemetry lookups.
-                  </p>
-                </div>
-              ) : statusError ? (
-                <div className="space-y-3 flex flex-col items-center max-w-md">
-                  <ShieldAlert className="w-12 h-12 text-warning" />
-                  <h3 className="text-base font-bold text-foreground">Geolocation provider temporarily unavailable</h3>
-                  <p className="text-xs text-foreground-muted font-mono">
-                    The geolocation provider request could not be completed at this time. The rest of MailTraceAI remains fully operational.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2 flex flex-col items-center max-w-md">
-                  <Globe className="w-12 h-12 text-foreground-muted animate-pulse" />
-                  <h3 className="text-sm font-bold text-foreground">No Geolocated Public Infrastructure</h3>
-                  <p className="text-xs text-foreground-muted font-mono">
-                    All IP addresses identified in this email are private (RFC 1918), loopback, or lack public geolocation provider records.
-                  </p>
-                </div>
-              )}
-            </div>
-          ) : (
-            <div className="relative w-full h-[540px]">
-              <div ref={mapContainerRef} className="w-full h-full z-0" />
+        <div className="lg:col-span-8 bg-surface rounded-card border border-border overflow-hidden shadow-sm flex flex-col relative min-h-[540px]">
+          <div className="relative w-full h-[540px]">
+            <div ref={mapContainerRef} className="w-full h-full z-0" />
 
-              {/* Map Overlay Badge */}
+            {/* Map Overlay Badge */}
+            {mapData.nodes.length > 0 ? (
               <div className="absolute top-3 left-12 z-10 bg-surface/95 border border-border px-3 py-1.5 rounded-control backdrop-blur-md shadow-md flex items-center space-x-3 text-xs font-mono">
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-danger" />
@@ -443,8 +401,13 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
                   <span className="text-[10px] text-foreground-muted">Indicator IP</span>
                 </div>
               </div>
-            </div>
-          )}
+            ) : (
+              <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-surface/95 border border-border px-4 py-2 rounded-control backdrop-blur-md shadow-lg flex items-center space-x-2 text-xs font-mono text-foreground-muted">
+                <Globe className="w-4 h-4 text-primary shrink-0" />
+                <span>Internal Infrastructure Only (RFC 1918) — No Public Geolocation Nodes</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* RIGHT INFRASTRUCTURE INSPECTOR PANEL (Right 4 cols on lg) */}

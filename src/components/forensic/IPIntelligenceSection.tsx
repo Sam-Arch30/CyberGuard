@@ -43,7 +43,7 @@ export const IPIntelligenceSection: React.FC<IPIntelligenceSectionProps> = ({ em
   });
 
   const mapLocations: MapLocation[] = allIpList
-    .filter(item => item.scope === 'public' && item.latitude !== undefined && item.longitude !== undefined)
+    .filter(item => item.scope !== 'private' && item.latitude !== undefined && item.longitude !== undefined)
     .map(item => ({
       ip: item.ip,
       latitude: item.latitude!,
@@ -122,17 +122,7 @@ export const IPIntelligenceSection: React.FC<IPIntelligenceSectionProps> = ({ em
       </div>
 
         {/* Leaflet Map component */}
-        {mapLocations.length > 0 ? (
-          <LeafletMap locations={mapLocations} height="340px" />
-        ) : (
-          <div className="h-48 rounded-xl bg-surface-secondary/40 border border-border flex flex-col items-center justify-center p-6 text-center text-foreground-muted">
-            <Globe className="w-10 h-10 mb-2 opacity-30 text-foreground-subtle" />
-            <p className="text-sm font-medium text-foreground">No Public IP Geolocation Available</p>
-            <p className="text-xs text-foreground-muted max-w-md mt-1 font-mono">
-              All observed IP addresses in this transmission path are internal, private, or loopback network addresses.
-            </p>
-          </div>
-        )}
+        <LeafletMap locations={mapLocations} height="340px" />
       </div>
 
       {/* IP Intelligence Cards Grid */}

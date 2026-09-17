@@ -1,5 +1,6 @@
 import type { EmailAnalysis, IPIntelligence } from '../types/forensic';
 import type { InfrastructureMapNode, InfrastructureRole, InvestigationMapData } from '../types/map';
+import { resolveIPIntelligence } from './indicatorHelper';
 
 /**
  * Checks whether an IP address is public or internal/reserved.
@@ -132,7 +133,10 @@ export const extractInfrastructureMapData = (email: EmailAnalysis): Investigatio
   let earliestNode: InfrastructureMapNode | undefined;
 
   candidateIps.forEach(ip => {
-    const intel = ipIntelMap[ip];
+    let intel = ipIntelMap[ip];
+    if (!intel || typeof intel.latitude !== 'number' || typeof intel.longitude !== 'number') {
+      intel = resolveIPIntelligence(ip, ipIntelMap);
+    }
     if (intel && typeof intel.latitude === 'number' && typeof intel.longitude === 'number') {
       const isEarliest = ip === earliestIp;
       const isRelay = relayIpOrderMap.has(ip);
