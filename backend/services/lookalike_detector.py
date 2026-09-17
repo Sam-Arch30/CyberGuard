@@ -104,12 +104,25 @@ class LookalikeDetectorService:
     def _extract_domain_parts(self, domain_str: str) -> Tuple[str, str, str, str]:
         """
         Public-suffix-aware domain breakdown using tldextract.
+        Also safely handles RFC-2606 reserved synthetic test domains (.example, .test, .invalid, .local).
         Returns (subdomain, registered_domain_base, suffix, full_registered_domain).
         """
         clean = domain_str.strip().lower().rstrip(".")
         ext = tldextract.extract(clean)
-        registered_domain = getattr(ext, "top_domain_under_public_suffix", None) or clean
-        return ext.subdomain.lower(), ext.domain.lower(), ext.suffix.lower(), registered_domain.lower()
+        subdomain = ext.subdomain.lower()
+        domain = ext.domain.lower()
+        suffix = ext.suffix.lower()
+
+        # Handle RFC-2606 synthetic / test reserved suffixes where tldextract produces empty suffix
+        if not suffix and any(clean.endswith(f".{res}") for res in ("example", "test", "invalid", "local")):
+            parts = clean.split(".")
+            suffix = parts[-1]
+            if len(parts) >= 2:
+                domain = parts[-2]
+                subdomain = ".".join(parts[:-2]) if len(parts) > 2 else ""
+
+        registered_domain = f"{domain}.{suffix}" if suffix and domain else clean
+        return subdomain, domain, suffix, registered_domain
 
     def check_domain_for_brand(self, domain_str: str, brand: BrandInfo) -> Optional[LookalikeDetectionResult]:
         """

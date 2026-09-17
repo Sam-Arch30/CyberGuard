@@ -55,11 +55,9 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
   const [directionFilter, setDirectionFilter] = useState<'all' | 'increase_risk' | 'decrease_risk'>('all');
   const [showAuditModal, setShowAuditModal] = useState<boolean>(false);
 
-  if (!threatScore) return null;
-
   const {
-    score,
-    severity,
+    score = 0,
+    severity = 'low',
     risk_level,
     confidence: rawConfidence,
     positive_contributions = [],
@@ -67,13 +65,13 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
     top_reasons = [],
     reasons = [],
     positive_evidence = [],
-    summary,
-    why_flagged,
+    summary = '',
+    why_flagged = [],
     category_breakdowns = {},
     scoring_version = '2.0.0-explainable',
     model_version = 'v1.0-tfidf-logistic',
     audit_metadata
-  } = threatScore;
+  } = threatScore || {};
 
   // Derive active risk level: explainable risk_level takes precedence, fallback to severity
   const effectiveRiskLevel: 'CRITICAL' | 'HIGH' | 'SUSPICIOUS' | 'LOW' =
@@ -284,6 +282,8 @@ export const GlobalThreatScoreSection: React.FC<GlobalThreatScoreSectionProps> =
         };
     }
   };
+
+  if (!threatScore) return null;
 
   const style = getRiskStyle(effectiveRiskLevel);
 

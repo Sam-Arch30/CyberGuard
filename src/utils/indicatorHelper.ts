@@ -121,12 +121,12 @@ export const resolveRelayAnalysis = (email: EmailAnalysis): RelayPathAnalysis =>
     if (fromMatch) {
       const fromClause = fromMatch[1].trim();
       fromIp = extractIpFromText(fromClause);
-      const tokenM = fromClause.match(/^([^\s;()\[\]]+)/);
+      const tokenM = fromClause.match(/^([^\s;()[\]]+)/);
       if (tokenM && !extractIpFromText(tokenM[1])) {
         fromHost = tokenM[1].trim();
       }
       if (!fromHost) {
-        const hostInParen = fromClause.match(/\b([a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})\b/);
+        const hostInParen = fromClause.match(/\b([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/);
         if (hostInParen && !extractIpFromText(hostInParen[1])) {
           fromHost = hostInParen[1];
         }
@@ -137,19 +137,19 @@ export const resolveRelayAnalysis = (email: EmailAnalysis): RelayPathAnalysis =>
     if (byMatch) {
       const byClause = byMatch[1].trim();
       byIp = extractIpFromText(byClause);
-      const tokenM = byClause.match(/^([^\s;()\[\]]+)/);
+      const tokenM = byClause.match(/^([^\s;()[\]]+)/);
       if (tokenM && !extractIpFromText(tokenM[1])) {
         byHost = tokenM[1].trim();
       }
       if (!byHost) {
-        const hostInParen = byClause.match(/\b([a-zA-Z0-9\.\-]+\.[a-zA-Z]{2,})\b/);
+        const hostInParen = byClause.match(/\b([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})\b/);
         if (hostInParen && !extractIpFromText(hostInParen[1])) {
           byHost = hostInParen[1];
         }
       }
     }
 
-    const withMatch = bodyText.match(/\bwith\s+([A-Za-z0-9\-\_]+)/i);
+    const withMatch = bodyText.match(/\bwith\s+([A-Za-z0-9_-]+)/i);
     if (withMatch) protocol = withMatch[1].trim();
 
     const idMatch = bodyText.match(/\bid\s+([^\s;]+)/i);
@@ -258,7 +258,7 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
   // 2. Resolve Authentication & Sender Alignment
   const extractDomain = (str?: string): string | undefined => {
     if (!str) return undefined;
-    const match = str.match(/[\w\.-]+@([\w\.-]+\.[a-zA-Z]{2,})/);
+    const match = str.match(/[\w.-]+@([\w.-]+\.[a-zA-Z]{2,})/);
     return match ? match[1].toLowerCase() : undefined;
   };
 
@@ -341,7 +341,7 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
   if (urlObjs.length === 0) {
     const rawUrls = email.urls && email.urls.length > 0
       ? email.urls
-      : Array.from(new Set((fullText.match(/https?:\/\/[^\s<>"'\)\(\]\[\}\s,]+/gi) || []).map(u => u.replace(/[.,;:!?"\')]>]+$/, ''))));
+      : Array.from(new Set((fullText.match(/https?:\/\/[^\s<>"')(\][}{,]+/gi) || []).map(u => u.replace(/[.,;:!?"')\]>]+$/, ''))));
     urlObjs = rawUrls.map(u => ({ value: u, source: 'plain_text_body' }));
   }
   const urlStrings = Array.from(new Set(urlObjs.map(u => u.value)));
