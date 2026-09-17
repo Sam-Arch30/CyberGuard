@@ -101,8 +101,8 @@ class AuthAnalyzerService:
                 end_pos = min(start_pos + 160, len(full_observed_header))
             dkim.details = full_observed_header[start_pos:end_pos].strip()
         elif re.search(r'\bDKIM-Signature:', full_observed_header, re.IGNORECASE):
-            dkim.result = "pass"
-            dkim.details = "DKIM-Signature header observed on message."
+            dkim.result = "unknown"
+            dkim.details = "DKIM-Signature header observed on message but cryptographic verification result is unverified."
         else:
             dkim.result = "none"
             dkim.details = "No DKIM result or DKIM-Signature header found."

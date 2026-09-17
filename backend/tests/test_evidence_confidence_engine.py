@@ -1,3 +1,4 @@
+import json
 import pytest
 from datetime import datetime, timezone, timedelta
 from fastapi.testclient import TestClient
@@ -362,8 +363,18 @@ def test_confidence_api_endpoints():
     assert "overall_confidence_level" in data
     assert data["engine_version"] == "1.0.0"
 
-    # 2. GET /api/emails/demo/confidence
-    res_get = client.get("/api/emails/demo/confidence")
+    # 2. GET /api/emails/{id}/confidence with stored email
+    from backend.db.session import SessionLocal
+    from backend.db.models import AnalysisPayloadModel
+    db = SessionLocal()
+    try:
+        if not db.query(AnalysisPayloadModel).filter_by(evidence_id="api-test-email").first():
+            db.add(AnalysisPayloadModel(evidence_id="api-test-email", analysis_json=json.dumps(payload)))
+            db.commit()
+    finally:
+        db.close()
+
+    res_get = client.get("/api/emails/api-test-email/confidence")
     assert res_get.status_code == 200
     data_get = res_get.json()
     assert len(data_get["conclusions"]) >= 4

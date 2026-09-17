@@ -59,6 +59,20 @@ def generate_forensic_report(
     db: Session = Depends(get_db)
 ):
     analysis = request.analysis or {}
+    if analysis.get("is_demo") or analysis.get("is_synthetic"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Demo/synthetic evidence cannot contaminate normal production report generation."
+        )
+    email_id = analysis.get("id") or analysis.get("evidence_id")
+    if email_id:
+        from backend.services.analysis_repository import load_analysis
+        try:
+            stored_analysis = load_analysis(db, email_id)
+            analysis = stored_analysis
+        except Exception:
+            pass
+
     subject = analysis.get("subject") or "Suspicious Email Investigation"
     sha256 = analysis.get("email_sha256") or analysis.get("id") or "UNCOMPUTED_HASH"
     evidence_id = analysis.get("id") or f"EVD-{sha256[:10]}"

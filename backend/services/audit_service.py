@@ -114,9 +114,6 @@ class AuditService:
         Finds evidence by evidence_id, sha256, or internal UUID.
         """
         clean_id = identifier.strip()
-        if clean_id.lower() in ("demo", "latest"):
-            cls._ensure_sample_seed(db)
-            clean_id = "EVD-97D4B2E811"
 
         return (
             db.query(EvidenceModel)
@@ -278,15 +275,6 @@ class AuditService:
         """
         clean_id = identifier.strip()
 
-        # Check if querying demo sample
-        if clean_id.lower() in (
-            "sample-001", "sample-1", "demo", "latest", "evd-97d4b2e811",
-            "97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a"
-        ):
-            cls._ensure_sample_seed(db)
-            if clean_id.lower() in ("demo", "latest"):
-                clean_id = "sample-001"
-
         evidence = cls.get_evidence(db, clean_id)
 
         # If evidence wasn't found directly by identifier (e.g. identifier is an email ID),
@@ -334,42 +322,6 @@ class AuditService:
             .order_by(AuditLogModel.timestamp.asc())
             .all()
         )
-
-        # If evidence exists but has 0 audit logs (e.g. from an unseeded or direct insert), seed baseline logs
-        if evidence and len(logs) == 0:
-            cls.log_audit(
-                db=db,
-                action="EMAIL_UPLOADED",
-                resource_type="email",
-                resource_id=evidence.evidence_id,
-                user=evidence.uploader or "SOC Analyst",
-                metadata={
-                    "filename": evidence.original_filename,
-                    "size": evidence.size,
-                    "sha256": evidence.sha256,
-                    "evidence_id": evidence.evidence_id
-                },
-                details=f"Email file '{evidence.original_filename}' ({evidence.size} bytes) ingested."
-            )
-            cls.log_audit(
-                db=db,
-                action="EVIDENCE_RECORDED",
-                resource_type="evidence",
-                resource_id=evidence.evidence_id,
-                user="Forensic Ingestion Agent",
-                metadata={
-                    "sha256": evidence.sha256,
-                    "evidence_id": evidence.evidence_id,
-                    "size": evidence.size
-                },
-                details=f"SHA-256 digest {evidence.sha256[:16]}... anchored with evidence ID {evidence.evidence_id}."
-            )
-            logs = (
-                db.query(AuditLogModel)
-                .filter(or_(*filters))
-                .order_by(AuditLogModel.timestamp.asc())
-                .all()
-            )
 
         has_added_to_case = any(l.action == "EMAIL_ADDED_TO_CASE" for l in logs)
 

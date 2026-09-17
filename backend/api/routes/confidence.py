@@ -93,36 +93,13 @@ def get_email_confidence_endpoint(
     clean_id = id.strip()
     analysis_record = None
 
-    if clean_id.lower() not in ("demo", "sample-001", "latest"):
-        analysis_record = (
-            db.query(EmailAnalysisModel)
-            .filter(
-                (EmailAnalysisModel.id == clean_id) |
-                (EmailAnalysisModel.evidence_id == clean_id) |
-                (EmailAnalysisModel.raw_sha256 == clean_id.lower())
-            )
-            .first()
-        )
+    from backend.services.analysis_repository import load_analysis
+    try:
+        data = load_analysis(db, clean_id)
+        analysis_obj = EmailAnalysisResponse(**data)
+        return calculate_confidence_endpoint(analysis_obj, user=user, db=db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=f"Email record '{clean_id}' not found: {str(e)}")
 
-    if analysis_record and analysis_record.analysis_json:
-        try:
-            data = json.loads(analysis_record.analysis_json)
-            analysis_obj = EmailAnalysisResponse(**data)
-            return calculate_confidence_endpoint(analysis_obj, user=user, db=db)
-        except Exception:
-            pass
-
-    # Built-in fallback demo object
-    sample_analysis = EmailAnalysisResponse(
-        id=clean_id,
-        evidence_id="EVD-97D4B2E811",
-        email_sha256="97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a",
-        subject="URGENT: Verify your Microsoft Account",
-        from_header="Microsoft Security <security@micros0ft-example.com>",
-        to="employee@company.com",
-        date="Sun, 7 Sep 2026 10:42:00 +0530",
-        ips=["203.0.113.25", "198.51.100.12"],
-        domains=["micros0ft-example.com", "example.net"],
-        urls=["https://micros0ft-example.com/login", "https://bit.ly/3sample-invoice"]
-    )
-    return calculate_confidence_endpoint(sample_analysis, user=user, db=db)

@@ -404,7 +404,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
             ) : (
               <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-surface/95 border border-border px-4 py-2 rounded-control backdrop-blur-md shadow-lg flex items-center space-x-2 text-xs font-mono text-foreground-muted">
                 <Globe className="w-4 h-4 text-primary shrink-0" />
-                <span>Internal Infrastructure Only (RFC 1918) — No Public Geolocation Nodes</span>
+                <span>No geolocated infrastructure available.</span>
               </div>
             )}
           </div>

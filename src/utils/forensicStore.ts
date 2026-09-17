@@ -6,1155 +6,6 @@ import { SCENARIO_1_LEGITIMATE, SCENARIO_2_PHISHING, SCENARIO_3_PRIMARY_EMAIL } 
 const STORAGE_KEY_PREFIX = 'mailtrace_forensic_';
 const memoryStore = new Map<string, EmailAnalysis>();
 
-export const MOCK_SAMPLE_ANALYSIS: EmailAnalysis = resolveEmailIndicators({
-  id: 'sample-001',
-  evidence_id: 'EVD-97D4B2E811',
-  email_sha256: '97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a',
-  original_filename: 'urgent_microsoft_verification.eml',
-  upload_timestamp: '2026-09-07T05:12:00Z',
-  size: 15420,
-  uploader: 'SOC Analyst',
-  subject: 'URGENT: Verify your Microsoft Account',
-  from: 'Microsoft Security <security@micros0ft-example.com>',
-  to: 'employee@company.com',
-  cc: '',
-  date: 'Sun, 7 Sep 2026 10:42:00 +0530',
-  reply_to: 'support@example.net',
-  return_path: 'bounce@example.net',
-  message_id: '<abc123@example.com>',
-  authentication_results: 'mx.company.com; dkim=fail header.i=@company.com; spf=fail (domain of bounce@example.net does not designate 203.0.113.25); dmarc=fail (p=reject)',
-  authentication: {
-    verification_type: 'observed_header',
-    verification_notice: 'Observed authentication result from supplied headers (unverified by local mail server)',
-    observed_header: 'mx.company.com; dkim=fail header.i=@company.com; spf=fail (domain of bounce@example.net does not designate 203.0.113.25); dmarc=fail (p=reject)',
-    spf: { result: 'fail', details: 'spf=fail (domain of bounce@example.net does not designate 203.0.113.25)' },
-    dkim: { result: 'fail', details: 'dkim=fail header.i=@company.com' },
-    dmarc: { result: 'fail', details: 'dmarc=fail (p=reject dis=none)' },
-    alignment: {
-      from_domain: 'micros0ft-example.com',
-      reply_to_domain: 'example.net',
-      return_path_domain: 'example.net',
-      reply_to_mismatch: true,
-      return_path_mismatch: true
-    }
-  },
-  received: [
-    'from mail.example.net (203.0.113.25) by mx.company.com; Sun, 7 Sep 2026 10:42:01 +0530',
-    'from smtp.example.org (198.51.100.12) by mail.example.net; Sun, 7 Sep 2026 10:41:59 +0530'
-  ],
-  plain_text_body: 'Your Microsoft account requires immediate verification. Please visit the secure link below to update your login credentials.\n\nLink: https://micros0ft-example.com/login\nShortlink: https://bit.ly/3sample-invoice',
-  html_body: '<html><body><p>Your Microsoft account requires immediate verification.</p><p>Please update your credentials: <a href="http://evil-tracker.example/login">https://microsoft.com/security</a></p><p>Official link: <a href="https://micros0ft-example.com/login">https://micros0ft-example.com/login</a></p><p>Invoice: <a href="https://bit.ly/3sample-invoice">Invoice Details</a></p></body></html>',
-  raw_email: `From: Microsoft Security <security@micros0ft-example.com>
-To: employee@company.com
-Subject: URGENT: Verify your Microsoft Account
-Date: Sun, 7 Sep 2026 10:42:00 +0530
-Reply-To: support@example.net
-Return-Path: bounce@example.net
-Message-ID: <abc123@example.com>
-Authentication-Results: spf=fail; dkim=none; dmarc=fail
-Received: from mail.example.net (203.0.113.25) by mx.company.com; Sun, 7 Sep 2026 10:42:01 +0530
-Received: from smtp.example.org (198.51.100.12) by mail.example.net; Sun, 7 Sep 2026 10:41:59 +0530
-Content-Type: multipart/mixed; boundary="BOUNDARY"
-
---BOUNDARY
-Content-Type: text/plain; charset=utf-8
-
-Your Microsoft account requires immediate verification.
-Link: https://micros0ft-example.com/login
-
---BOUNDARY
-Content-Type: application/pdf; name="invoice.pdf"
-Content-Disposition: attachment; filename="invoice.pdf"
-
-[PDF Attachment Bytes]
---BOUNDARY--`,
-  indicators: {
-    ips: [
-      { value: '203.0.113.25', version: 4, scope: 'public', source: 'received_header_1' },
-      { value: '198.51.100.12', version: 4, scope: 'public', source: 'received_header_2' }
-    ],
-    domains: [
-      { value: 'micros0ft-example.com', source: 'url' },
-      { value: 'example.net', source: 'reply_to' },
-      { value: 'example.org', source: 'received_header' },
-      { value: 'company.com', source: 'to' }
-    ],
-    urls: [
-      { value: 'https://micros0ft-example.com/login', source: 'plain_text_body' },
-      { value: 'http://evil-tracker.example/login', source: 'html_a_href' },
-      { value: 'https://bit.ly/3sample-invoice', source: 'html_a_href' }
-    ],
-    email_addresses: [
-      { value: 'security@micros0ft-example.com', source: 'header_from' },
-      { value: 'employee@company.com', source: 'header_to' },
-      { value: 'support@example.net', source: 'header_reply_to' },
-      { value: 'bounce@example.net', source: 'header_return_path' }
-    ],
-    attachments: [
-      {
-        filename: 'invoice_2026.pdf.exe',
-        mime_type: 'application/octet-stream',
-        size: 148520,
-        sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-        md5: '5d41402abc4b2a76b9719d911017c592',
-        sha1: '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12',
-        static_analysis: {
-          original_filename: 'invoice_2026.pdf.exe',
-          extension: '.exe',
-          claimed_type: 'PDF document',
-          mime_type: 'application/pdf',
-          detected_mime_type: 'application/vnd.microsoft.portable-executable',
-          detected_type: 'Windows executable',
-          magic_bytes_hex: '4D 5A 90 00 03 00 00 00 04 00 00 00 FF FF 00 00',
-          size: 148520,
-          extension_mismatch: true,
-          mismatch_details: 'Claimed type: PDF | Detected type: Windows executable',
-          double_extension: true,
-          sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-          sha1: '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12',
-          md5: '5d41402abc4b2a76b9719d911017c592',
-          entropy: 7.82,
-          entropy_level: 'very_high',
-          entropy_analysis: 'High entropy (7.82/8.00) indicates packed executable payload or cryptor routine. Note: high entropy alone is not proof of malware without malicious structure.',
-          signature_status: 'Unsigned',
-          pe_metadata: {
-            is_pe: true,
-            architecture: 'x64 (AMD64 / 64-bit)',
-            compile_timestamp: '2026-03-12 14:22:01 UTC',
-            subsystem: 'Windows GUI',
-            entry_point: '0x00014A20',
-            number_of_sections: 4,
-            sections: [
-              { name: '.text', virtual_size: 49152, virtual_address: '0x00001000', raw_size: 49152, entropy: 7.89, characteristics: '0x60000020', is_suspicious: true },
-              { name: '.rdata', virtual_size: 16384, virtual_address: '0x0000D000', raw_size: 16384, entropy: 6.42, characteristics: '0x40000040', is_suspicious: false },
-              { name: '.data', virtual_size: 8192, virtual_address: '0x00011000', raw_size: 8192, entropy: 5.12, characteristics: '0xC0000040', is_suspicious: false },
-              { name: '.rsrc', virtual_size: 12288, virtual_address: '0x00013000', raw_size: 12288, entropy: 5.65, characteristics: '0x40000040', is_suspicious: false }
-            ],
-            imported_dlls: ['KERNEL32.dll', 'USER32.dll', 'URLMON.dll', 'ADVAPI32.dll'],
-            imports: [
-              { dll: 'KERNEL32.dll', functions: ['VirtualAlloc', 'WriteProcessMemory', 'CreateRemoteThread'] },
-              { dll: 'URLMON.dll', functions: ['URLDownloadToFileA'] }
-            ],
-            suspicious_imports: ['VirtualAlloc', 'WriteProcessMemory', 'CreateRemoteThread', 'URLDownloadToFileA'],
-            has_authenticode: false,
-            signature_status: 'Unsigned',
-            warnings: []
-          },
-          embedded_urls: ['http://c2-collector.darknet-relay.biz/gate.php', 'https://telemetry-drop.in/stage2.bin'],
-          embedded_domains: ['c2-collector.darknet-relay.biz', 'telemetry-drop.in'],
-          embedded_ips: ['198.51.100.44', '203.0.113.88'],
-          embedded_hashes: [],
-          embedded_indicators_count: 4,
-          threat_level: 'CRITICAL',
-          threat_score: 88,
-          risk_signals: [
-            'Executable disguised as document (Claimed: PDF, Detected: Windows executable)',
-            'Double extension evasion technique (.pdf.exe)',
-            'Unsigned Windows executable binary',
-            'Suspicious process injection and download APIs detected (VirtualAlloc, URLDownloadToFileA)',
-            'Packed binary section with very high entropy (7.89)',
-            'Embedded C2 callback URLs detected in binary streams'
-          ],
-          analysis_summary: 'CRITICAL: Hostile Windows executable disguised with .pdf.exe double extension. Static analysis uncovered process injection primitives, downloader routines, and embedded C2 callback URLs.',
-          reputation_status: 'Reputation unavailable',
-          reputation_details: 'No external threat-intelligence reputation provider configured. (MailTraceAI strict forensic policy: Reputation is never fabricated).',
-          evidence_id: 'EVD-ATT-9F86D081',
-          integrity_status: 'Verified Authentic',
-          storage_guard: 'Non-executable forensic vault - execution permissions stripped',
-          timestamp: '2026-09-07T05:12:05Z'
-        }
-      },
-      {
-        filename: 'terms_and_conditions.pdf',
-        mime_type: 'application/pdf',
-        size: 84210,
-        sha256: '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b',
-        md5: '3c0a59a7f34c264be4ecbc4fa79eeef2',
-        sha1: '320e8b233a7e4bfa35b0b923a1fefc39e248f76a',
-        static_analysis: {
-          original_filename: 'terms_and_conditions.pdf',
-          extension: '.pdf',
-          claimed_type: 'PDF document',
-          mime_type: 'application/pdf',
-          detected_mime_type: 'application/pdf',
-          detected_type: 'PDF document',
-          magic_bytes_hex: '25 50 44 46 2D 31 2E 37 0A 25 E2 E3 CF D3 0A 31',
-          size: 84210,
-          extension_mismatch: false,
-          mismatch_details: null,
-          double_extension: false,
-          sha256: '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b',
-          sha1: '320e8b233a7e4bfa35b0b923a1fefc39e248f76a',
-          md5: '3c0a59a7f34c264be4ecbc4fa79eeef2',
-          entropy: 5.42,
-          entropy_level: 'normal',
-          entropy_analysis: 'Normal entropy (5.42/8.00) typical of compiled binary code, images, or formatted documents.',
-          signature_status: 'N/A',
-          pdf_metadata: {
-            is_pdf: true,
-            pdf_version: '1.7',
-            has_javascript: false,
-            javascript_snippets: [],
-            has_open_action: false,
-            has_launch_action: false,
-            has_embedded_files: false,
-            embedded_file_names: [],
-            has_submit_form: false,
-            has_external_uri: false,
-            external_uris: [],
-            suspicious_elements: [],
-            metadata: {
-              Title: 'Terms of Service',
-              Author: 'Legal Department',
-              Creator: 'Acrobat PDFMaker',
-              CreationDate: "D:20260810120000Z"
-            },
-            warnings: []
-          },
-          embedded_urls: [],
-          embedded_domains: [],
-          embedded_ips: [],
-          embedded_hashes: [],
-          embedded_indicators_count: 0,
-          threat_level: 'BENIGN',
-          threat_score: 0,
-          risk_signals: [],
-          analysis_summary: 'Benign: Clean PDF document without active JavaScript, auto-execution triggers, or embedded payload files.',
-          reputation_status: 'Reputation unavailable',
-          reputation_details: 'No external threat-intelligence reputation provider configured.',
-          evidence_id: 'EVD-ATT-4A5E1E4B',
-          integrity_status: 'Verified Authentic',
-          storage_guard: 'Non-executable forensic vault - execution permissions stripped',
-          timestamp: '2026-09-07T05:12:06Z'
-        }
-      }
-    ]
-  },
-  urls: [
-    'https://micros0ft-example.com/login',
-    'http://evil-tracker.example/login',
-    'https://bit.ly/3sample-invoice',
-    'http://c2-collector.darknet-relay.biz/gate.php',
-    'https://telemetry-drop.in/stage2.bin'
-  ],
-  ips: [
-    '203.0.113.25',
-    '198.51.100.12',
-    '198.51.100.44',
-    '203.0.113.88'
-  ],
-  domains: [
-    'micros0ft-example.com',
-    'example.net',
-    'example.org',
-    'company.com',
-    'c2-collector.darknet-relay.biz',
-    'telemetry-drop.in'
-  ],
-  emails: [
-    'security@micros0ft-example.com',
-    'employee@company.com',
-    'support@example.net',
-    'bounce@example.net'
-  ],
-  attachments: [
-    {
-      filename: 'invoice_2026.pdf.exe',
-      mime_type: 'application/octet-stream',
-      size: 148520,
-      sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-      md5: '5d41402abc4b2a76b9719d911017c592',
-      sha1: '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12',
-      static_analysis: {
-        original_filename: 'invoice_2026.pdf.exe',
-        extension: '.exe',
-        claimed_type: 'PDF document',
-        mime_type: 'application/pdf',
-        detected_mime_type: 'application/vnd.microsoft.portable-executable',
-        detected_type: 'Windows executable',
-        magic_bytes_hex: '4D 5A 90 00 03 00 00 00 04 00 00 00 FF FF 00 00',
-        size: 148520,
-        extension_mismatch: true,
-        mismatch_details: 'Claimed type: PDF | Detected type: Windows executable',
-        double_extension: true,
-        sha256: '9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08',
-        sha1: '2fd4e1c67a2d28fced849ee1bb76e7391b93eb12',
-        md5: '5d41402abc4b2a76b9719d911017c592',
-        entropy: 7.82,
-        entropy_level: 'very_high',
-        entropy_analysis: 'High entropy (7.82/8.00) indicates packed executable payload or cryptor routine. Note: high entropy alone is not proof of malware without malicious structure.',
-        signature_status: 'Unsigned',
-        pe_metadata: {
-          is_pe: true,
-          architecture: 'x64 (AMD64 / 64-bit)',
-          compile_timestamp: '2026-03-12 14:22:01 UTC',
-          subsystem: 'Windows GUI',
-          entry_point: '0x00014A20',
-          number_of_sections: 4,
-          sections: [
-            { name: '.text', virtual_size: 49152, virtual_address: '0x00001000', raw_size: 49152, entropy: 7.89, characteristics: '0x60000020', is_suspicious: true },
-            { name: '.rdata', virtual_size: 16384, virtual_address: '0x0000D000', raw_size: 16384, entropy: 6.42, characteristics: '0x40000040', is_suspicious: false },
-            { name: '.data', virtual_size: 8192, virtual_address: '0x00011000', raw_size: 8192, entropy: 5.12, characteristics: '0xC0000040', is_suspicious: false },
-            { name: '.rsrc', virtual_size: 12288, virtual_address: '0x00013000', raw_size: 12288, entropy: 5.65, characteristics: '0x40000040', is_suspicious: false }
-          ],
-          imported_dlls: ['KERNEL32.dll', 'USER32.dll', 'URLMON.dll', 'ADVAPI32.dll'],
-          imports: [
-            { dll: 'KERNEL32.dll', functions: ['VirtualAlloc', 'WriteProcessMemory', 'CreateRemoteThread'] },
-            { dll: 'URLMON.dll', functions: ['URLDownloadToFileA'] }
-          ],
-          suspicious_imports: ['VirtualAlloc', 'WriteProcessMemory', 'CreateRemoteThread', 'URLDownloadToFileA'],
-          has_authenticode: false,
-          signature_status: 'Unsigned',
-          warnings: []
-        },
-        embedded_urls: ['http://c2-collector.darknet-relay.biz/gate.php', 'https://telemetry-drop.in/stage2.bin'],
-        embedded_domains: ['c2-collector.darknet-relay.biz', 'telemetry-drop.in'],
-        embedded_ips: ['198.51.100.44', '203.0.113.88'],
-        embedded_hashes: [],
-        embedded_indicators_count: 4,
-        threat_level: 'CRITICAL',
-        threat_score: 88,
-        risk_signals: [
-          'Executable disguised as document (Claimed: PDF, Detected: Windows executable)',
-          'Double extension evasion technique (.pdf.exe)',
-          'Unsigned Windows executable binary',
-          'Suspicious process injection and download APIs detected (VirtualAlloc, URLDownloadToFileA)',
-          'Packed binary section with very high entropy (7.89)',
-          'Embedded C2 callback URLs detected in binary streams'
-        ],
-        analysis_summary: 'CRITICAL: Hostile Windows executable disguised with .pdf.exe double extension. Static analysis uncovered process injection primitives, downloader routines, and embedded C2 callback URLs.',
-        reputation_status: 'Reputation unavailable',
-        reputation_details: 'No external threat-intelligence reputation provider configured. (MailTraceAI strict forensic policy: Reputation is never fabricated).',
-        evidence_id: 'EVD-ATT-9F86D081',
-        integrity_status: 'Verified Authentic',
-        storage_guard: 'Non-executable forensic vault - execution permissions stripped',
-        timestamp: '2026-09-07T05:12:05Z'
-      }
-    },
-    {
-      filename: 'terms_and_conditions.pdf',
-      mime_type: 'application/pdf',
-      size: 84210,
-      sha256: '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b',
-      md5: '3c0a59a7f34c264be4ecbc4fa79eeef2',
-      sha1: '320e8b233a7e4bfa35b0b923a1fefc39e248f76a',
-      static_analysis: {
-        original_filename: 'terms_and_conditions.pdf',
-        extension: '.pdf',
-        claimed_type: 'PDF document',
-        mime_type: 'application/pdf',
-        detected_mime_type: 'application/pdf',
-        detected_type: 'PDF document',
-        magic_bytes_hex: '25 50 44 46 2D 31 2E 37 0A 25 E2 E3 CF D3 0A 31',
-        size: 84210,
-        extension_mismatch: false,
-        mismatch_details: null,
-        double_extension: false,
-        sha256: '4a5e1e4baab89f3a32518a88c31bc87f618f76673e2cc77ab2127b7afdeda33b',
-        sha1: '320e8b233a7e4bfa35b0b923a1fefc39e248f76a',
-        md5: '3c0a59a7f34c264be4ecbc4fa79eeef2',
-        entropy: 5.42,
-        entropy_level: 'normal',
-        entropy_analysis: 'Normal entropy (5.42/8.00) typical of compiled binary code, images, or formatted documents.',
-        signature_status: 'N/A',
-        pdf_metadata: {
-          is_pdf: true,
-          pdf_version: '1.7',
-          has_javascript: false,
-          javascript_snippets: [],
-          has_open_action: false,
-          has_launch_action: false,
-          has_embedded_files: false,
-          embedded_file_names: [],
-          has_submit_form: false,
-          has_external_uri: false,
-          external_uris: [],
-          suspicious_elements: [],
-          metadata: {
-            Title: 'Terms of Service',
-            Author: 'Legal Department',
-            Creator: 'Acrobat PDFMaker',
-            CreationDate: "D:20260810120000Z"
-          },
-          warnings: []
-        },
-        embedded_urls: [],
-        embedded_domains: [],
-        embedded_ips: [],
-        embedded_hashes: [],
-        embedded_indicators_count: 0,
-        threat_level: 'BENIGN',
-        threat_score: 0,
-        risk_signals: [],
-        analysis_summary: 'Benign: Clean PDF document without active JavaScript, auto-execution triggers, or embedded payload files.',
-        reputation_status: 'Reputation unavailable',
-        reputation_details: 'No external threat-intelligence reputation provider configured.',
-        evidence_id: 'EVD-ATT-4A5E1E4B',
-        integrity_status: 'Verified Authentic',
-        storage_guard: 'Non-executable forensic vault - execution permissions stripped',
-        timestamp: '2026-09-07T05:12:06Z'
-      }
-    }
-  ],
-  domain_intelligence: {
-    'micros0ft-example.com': {
-      domain: 'micros0ft-example.com',
-      dns: {
-        a: ['203.0.113.88'],
-        aaaa: [],
-        mx: ['10 mail.micros0ft-example.com'],
-        ns: ['ns1.shadow-dns.com', 'ns2.shadow-dns.com'],
-        txt: ['v=spf1 include:spf.protection.outlook.com -all']
-      },
-      registration: {
-        registrar: 'NameCheap, Inc.',
-        registration_date: new Date(Date.now() - 18 * 86400000).toISOString(),
-        expiration_date: new Date(Date.now() + 347 * 86400000).toISOString(),
-        nameservers: ['ns1.shadow-dns.com', 'ns2.shadow-dns.com'],
-        status: ['clientTransferProhibited'],
-        registration_source: 'RDAP'
-      },
-      domain_age_days: 18,
-      newly_registered_domain: true,
-      is_resolvable: true,
-      status_message: 'Active / Resolvable',
-      lookalike: {
-        domain: 'micros0ft-example.com',
-        suspected_brand: 'microsoft.com',
-        brand_name: 'Microsoft',
-        similarity: 0.91,
-        techniques: ['character_substitution', 'brand_keyword'],
-        confidence_label: 'Potential brand impersonation',
-        details: "Substitutes '0' for 'o' targeting Microsoft brand keyword"
-      }
-    },
-    'company.com': {
-      domain: 'company.com',
-      dns: {
-        a: ['198.51.100.10'],
-        aaaa: [],
-        mx: ['10 mx.company.com'],
-        ns: ['ns1.company.com', 'ns2.company.com'],
-        txt: ['v=spf1 ip4:198.51.100.10 -all']
-      },
-      registration: {
-        registrar: 'MarkMonitor Inc.',
-        registration_date: '1997-04-15T04:00:00Z',
-        expiration_date: '2028-04-15T04:00:00Z',
-        nameservers: ['ns1.company.com', 'ns2.company.com'],
-        status: ['clientDeleteProhibited', 'clientTransferProhibited'],
-        registration_source: 'RDAP'
-      },
-      domain_age_days: Math.floor((Date.now() - new Date('1997-04-15T04:00:00Z').getTime()) / 86400000),
-      newly_registered_domain: false,
-      is_resolvable: true,
-      status_message: 'Active / Resolvable'
-    },
-    'example.net': {
-      domain: 'example.net',
-      dns: {
-        a: ['93.184.216.34'],
-        aaaa: ['2606:2800:220:1:248:1893:25c8:1946'],
-        mx: ['0 .'],
-        ns: ['a.iana-servers.net', 'b.iana-servers.net'],
-        txt: ['v=spf1 -all']
-      },
-      registration: {
-        registrar: 'Internet Assigned Numbers Authority',
-        registration_date: '1995-07-10T04:00:00Z',
-        expiration_date: '2027-07-09T04:00:00Z',
-        nameservers: ['a.iana-servers.net', 'b.iana-servers.net'],
-        status: ['serverDeleteProhibited', 'serverTransferProhibited'],
-        registration_source: 'RDAP'
-      },
-      domain_age_days: Math.floor((Date.now() - new Date('1995-07-10T04:00:00Z').getTime()) / 86400000),
-      newly_registered_domain: false,
-      is_resolvable: true,
-      status_message: 'Active / Resolvable'
-    },
-    'example.org': {
-      domain: 'example.org',
-      dns: {
-        a: ['93.184.216.34'],
-        aaaa: ['2606:2800:220:1:248:1893:25c8:1946'],
-        mx: ['0 .'],
-        ns: ['a.iana-servers.net', 'b.iana-servers.net'],
-        txt: ['v=spf1 -all']
-      },
-      registration: {
-        registrar: 'Internet Assigned Numbers Authority',
-        registration_date: '1995-07-10T04:00:00Z',
-        expiration_date: '2027-07-09T04:00:00Z',
-        nameservers: ['a.iana-servers.net', 'b.iana-servers.net'],
-        status: ['serverDeleteProhibited', 'serverTransferProhibited'],
-        registration_source: 'RDAP'
-      },
-      domain_age_days: Math.floor((Date.now() - new Date('1995-07-10T04:00:00Z').getTime()) / 86400000),
-      newly_registered_domain: false,
-      is_resolvable: true,
-      status_message: 'Active / Resolvable'
-    }
-  },
-  ml_phishing_probability: 0.89,
-  ml_assessment: {
-    classification: 'phishing',
-    probability: 0.89,
-    confidence: 'high',
-    available: true,
-    top_features: ['httpurl', 'verify', 'password', 'update', 'account'],
-    model_name: 'TF-IDF + Logistic Regression'
-  },
-  threat_score: {
-    score: 82,
-    severity: 'critical',
-    risk_level: 'CRITICAL',
-    confidence: 'VERY HIGH',
-    summary: 'Email risk assessed as Critical (82/100) driven by 8 forensic signal(s): Brand impersonation (+18), Credential harvesting (+12), DMARC failure (+12), Link mismatch (+15), NLP phishing classifier (+10).',
-    why_flagged: "This email was flagged with a Threat Score of 82/100 (CRITICAL) because it triggered 8 positive threat signal(s) across 6 analytical categories. Key forensic drivers: Potential brand impersonation (+18 pts); HTML link text and destination domain mismatch (+15 pts); DMARC authentication failed (+12 pts); Credential harvesting or urgent security language (+12 pts).",
-    top_reasons: [
-      'Potential brand impersonation detected (+18 pts)',
-      'HTML link text and destination domain mismatch (+15 pts)',
-      'DMARC authentication failed (+12 pts)',
-      'Credential harvesting or urgent security language (+12 pts)'
-    ],
-    positive_contributions: [
-      {
-        signal_id: 'SIG-LOOK-001',
-        category: 'lookalike_detection',
-        name: 'Potential brand impersonation detected',
-        description: "Substitutes '0' for 'o' targeting Microsoft brand keyword (micros0ft-example.com)",
-        why_it_matters: 'Adversaries deploy visual lookalike domains to mislead recipients into believing the email originates from a trusted enterprise service provider.',
-        raw_value: 'micros0ft-example.com',
-        normalized_value: 0.94,
-        weight: 18,
-        contribution: 18,
-        direction: 'increase_risk',
-        confidence: 0.95,
-        evidence_reference: 'micros0ft-example.com',
-        source: 'Lookalike Domain Detector'
-      },
-      {
-        signal_id: 'SIG-URLI-002',
-        category: 'url_intelligence',
-        name: 'HTML link text and destination domain mismatch',
-        description: 'Anchor text displays microsoft.com but hyperlinks to evil-tracker.example',
-        why_it_matters: 'Deceptive hyperlinks conceal the real destination server, bypassing human visual inspection and leading victims to phishing landing sites.',
-        raw_value: 'evil-tracker.example',
-        normalized_value: 1.0,
-        weight: 15,
-        contribution: 15,
-        direction: 'increase_risk',
-        confidence: 0.98,
-        evidence_reference: 'evil-tracker.example',
-        source: 'HTML Body Parser'
-      },
-      {
-        signal_id: 'SIG-AUTH-003',
-        category: 'authentication',
-        name: 'DMARC authentication failed',
-        description: 'DMARC policy evaluation failed: p=reject dis=none',
-        why_it_matters: 'Indicates the sending IP lacks cryptographic or envelope authorization from the originating domain owner, a hallmark of sender spoofing.',
-        raw_value: 'fail',
-        normalized_value: 1.0,
-        weight: 12,
-        contribution: 12,
-        direction: 'increase_risk',
-        confidence: 1.0,
-        evidence_reference: 'dmarc=fail (p=reject dis=none)',
-        source: 'DMARC Alignment Engine'
-      },
-      {
-        signal_id: 'SIG-EMAI-004',
-        category: 'email_content',
-        name: 'Credential harvesting or urgent security language',
-        description: "Detected call-to-action pattern: 'update your login credentials'",
-        why_it_matters: 'Social engineering prompts targeting account credentials create artificial urgency to induce hurried compliance before IT verification.',
-        raw_value: 'update your login credentials',
-        normalized_value: 0.9,
-        weight: 12,
-        contribution: 12,
-        direction: 'increase_risk',
-        confidence: 0.88,
-        evidence_reference: 'update your login credentials',
-        source: 'Content Keyword Risk Scanner'
-      },
-      {
-        signal_id: 'SIG-EMAI-005',
-        category: 'email_content',
-        name: 'NLP phishing classifier flagged high suspicion',
-        description: 'ML text classifier estimated 89% phishing probability based on language and phrasing patterns',
-        why_it_matters: 'Statistical text classification corroborates psychological manipulation, deception, and phishing intent across the entire email body.',
-        raw_value: 0.89,
-        normalized_value: 0.89,
-        weight: 10,
-        contribution: 10,
-        direction: 'increase_risk',
-        confidence: 0.89,
-        evidence_reference: 'TF-IDF Logistic Regression: 0.89 probability',
-        source: 'Content ML Phishing Classifier'
-      },
-      {
-        signal_id: 'SIG-DOMA-006',
-        category: 'domain_intelligence',
-        name: 'Newly registered domain (< 30 days old)',
-        description: 'Domain micros0ft-example.com was registered 18 days ago',
-        why_it_matters: 'Young domains lack established reputation and are frequently provisioned exclusively for short-lived phishing and malware campaigns.',
-        raw_value: 18,
-        normalized_value: 0.4,
-        weight: 10,
-        contribution: 10,
-        direction: 'increase_risk',
-        confidence: 0.92,
-        evidence_reference: 'micros0ft-example.com (18 days old)',
-        source: 'Domain Intelligence Subsystem'
-      },
-      {
-        signal_id: 'SIG-AUTH-007',
-        category: 'authentication',
-        name: 'SPF authentication failed',
-        description: 'SPF check failed: sending IP 203.0.113.25 is not authorized by bounce@example.net SPF record',
-        why_it_matters: 'Permits unauthorized mail transfer agents to transmit messages purporting to originate from domains they do not control.',
-        raw_value: 'fail',
-        normalized_value: 1.0,
-        weight: 8,
-        contribution: 8,
-        direction: 'increase_risk',
-        confidence: 1.0,
-        evidence_reference: 'spf=fail (IP 203.0.113.25 unauthorized)',
-        source: 'Email Authentication Subsystem'
-      },
-      {
-        signal_id: 'SIG-AUTH-008',
-        category: 'authentication',
-        name: 'DKIM signature verification failed',
-        description: 'DKIM signature verification failed: header.i=@company.com',
-        why_it_matters: 'Cryptographic tampering or absence of valid domain signing confirms the body or headers were altered in transit or unsigned.',
-        raw_value: 'fail',
-        normalized_value: 1.0,
-        weight: 8,
-        contribution: 8,
-        direction: 'increase_risk',
-        confidence: 1.0,
-        evidence_reference: 'dkim=fail header.i=@company.com',
-        source: 'Cryptographic Signature Validator'
-      }
-    ],
-    negative_contributions: [
-      {
-        signal_id: 'SIG-MIT-001',
-        category: 'domain_intelligence',
-        name: 'Established Secondary Domain',
-        description: 'example.org is 11,000+ days old and well-established',
-        why_it_matters: 'Longstanding domains have verified operational history and lower probability of throwaway infrastructure abuse.',
-        raw_value: 11000,
-        normalized_value: 0.0,
-        weight: -5,
-        contribution: -5,
-        direction: 'decrease_risk',
-        confidence: 0.95,
-        evidence_reference: 'example.org (11,000+ days old)',
-        source: 'Domain Intelligence Subsystem'
-      },
-      {
-        signal_id: 'SIG-MIT-002',
-        category: 'attachments',
-        name: 'Safe Non-Executable Attachments',
-        description: 'No executable binaries or macro-enabled documents detected in attachment inventory',
-        why_it_matters: 'Eliminates immediate endpoint binary execution risk from primary delivery payloads.',
-        raw_value: 'clean_attachments',
-        normalized_value: 0.0,
-        weight: 0,
-        contribution: 0,
-        direction: 'decrease_risk',
-        confidence: 0.9,
-        evidence_reference: 'Attachment inventory verified',
-        source: 'Attachment Risk Inspector'
-      }
-    ],
-    category_breakdowns: {
-      authentication: {
-        category: 'authentication',
-        display_name: 'Authentication Risk',
-        risk_score: 28,
-        positive_signals_count: 3,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      sender_identity: {
-        category: 'sender_identity',
-        display_name: 'Sender Identity Risk',
-        risk_score: 0,
-        positive_signals_count: 0,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      domain_intelligence: {
-        category: 'domain_intelligence',
-        display_name: 'Domain Risk',
-        risk_score: 5,
-        positive_signals_count: 1,
-        mitigating_signals_count: 1,
-        signals: []
-      },
-      lookalike_detection: {
-        category: 'lookalike_detection',
-        display_name: 'Lookalike Risk',
-        risk_score: 18,
-        positive_signals_count: 1,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      url_intelligence: {
-        category: 'url_intelligence',
-        display_name: 'URL Risk',
-        risk_score: 15,
-        positive_signals_count: 1,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      infrastructure: {
-        category: 'infrastructure',
-        display_name: 'Infrastructure Risk',
-        risk_score: 0,
-        positive_signals_count: 0,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      email_content: {
-        category: 'email_content',
-        display_name: 'Content Risk',
-        risk_score: 22,
-        positive_signals_count: 2,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      campaign_intelligence: {
-        category: 'campaign_intelligence',
-        display_name: 'Campaign Risk',
-        risk_score: 0,
-        positive_signals_count: 0,
-        mitigating_signals_count: 0,
-        signals: []
-      },
-      attachments: {
-        category: 'attachments',
-        display_name: 'Attachment Risk',
-        risk_score: 0,
-        positive_signals_count: 0,
-        mitigating_signals_count: 1,
-        signals: []
-      }
-    },
-    reasons: [
-      {
-        signal: 'brand_impersonation',
-        label: 'Potential brand impersonation detected',
-        points: 18,
-        evidence: "Substitutes '0' for 'o' targeting Microsoft brand keyword"
-      },
-      {
-        signal: 'html_link_mismatch',
-        label: 'HTML link text and destination domain mismatch',
-        points: 15,
-        evidence: 'Text shows microsoft.com but links to evil-tracker.example'
-      },
-      {
-        signal: 'dmarc_fail',
-        label: 'DMARC authentication failed',
-        points: 12,
-        evidence: 'dmarc=fail (p=reject dis=none)'
-      },
-      {
-        signal: 'credential_request',
-        label: 'Credential harvesting or urgent security language',
-        points: 12,
-        evidence: "Detected pattern: 'update your login credentials'"
-      },
-      {
-        signal: 'ml_phishing_signal',
-        label: 'NLP phishing classifier flagged high suspicion',
-        points: 10,
-        evidence: 'ML text classifier estimated 89% phishing probability based on language and phrasing patterns'
-      },
-      {
-        signal: 'newly_registered_domain',
-        label: 'Newly registered domain (< 30 days old)',
-        points: 10,
-        evidence: 'micros0ft-example.com registered 18 days ago'
-      },
-      {
-        signal: 'spf_fail',
-        label: 'SPF authentication failed',
-        points: 8,
-        evidence: 'spf=fail (domain of bounce@example.net does not designate 203.0.113.25)'
-      },
-      {
-        signal: 'dkim_fail',
-        label: 'DKIM signature verification failed',
-        points: 8,
-        evidence: 'dkim=fail header.i=@company.com'
-      }
-    ],
-    positive_evidence: [],
-    model_version: 'v1.0-tfidf-logistic',
-    scoring_version: '2.0.0-explainable',
-    audit_metadata: {
-      scoring_version: '2.0.0-explainable',
-      weights_snapshot: {
-        brand_impersonation: 18,
-        html_link_mismatch: 15,
-        dmarc_fail: 12,
-        credential_request: 12,
-        ml_phishing_signal: 10,
-        newly_registered_domain: 10,
-        spf_fail: 8,
-        dkim_fail: 8,
-        trusted_sender_history: -5
-      },
-      thresholds_snapshot: {
-        low: { min: 0, max: 24 },
-        suspicious: { min: 25, max: 49 },
-        high: { min: 50, max: 74 },
-        critical: { min: 75, max: 100 }
-      },
-      timestamp: '2026-09-10T19:25:00Z',
-      evidence_ids: [
-        'SIG-LOOK-001',
-        'SIG-URLI-002',
-        'SIG-AUTH-003',
-        'SIG-EMAI-004',
-        'SIG-EMAI-005',
-        'SIG-DOMA-006',
-        'SIG-AUTH-007',
-        'SIG-AUTH-008'
-      ],
-      model_version: 'v1.0-tfidf-logistic'
-    }
-  },
-  ai_analyst: {
-    summary: "Suspicious message exhibiting critical credential-harvesting indicators with severe sender spoofing, including failed DMARC and SPF checks alongside a deceptive lookalike domain.",
-    likely_attack_type: "Credential Harvesting / Brand Impersonation Spear-Phishing",
-    likely_objective: "Exfiltrate corporate Microsoft credentials via disguised credential-collection landing pages.",
-    key_evidence: [
-      "Failed DMARC (p=reject) and SPF authentication from sending IP 203.0.113.25",
-      "Lookalike domain micros0ft-example.com imitating Microsoft (registered 18 days ago)",
-      "HTML display anchor showing microsoft.com while pointing to evil-tracker.example",
-      "NLP Phishing Classifier flagged high confidence (89% probability) for credential harvesting language",
-      "Suspicious embedded shortened link (bit.ly/3sample-invoice)"
-    ],
-    recommended_actions: [
-      "Block sending IP 203.0.113.25 and domain micros0ft-example.com on perimeter email gateway",
-      "Revoke active sessions and force password resets for any recipient who accessed the link",
-      "Search SIEM proxy/DNS telemetry for outbound HTTP requests to evil-tracker.example and bit.ly/3sample-invoice",
-      "Purge matching message IDs from all internal Exchange/M365 mailboxes"
-    ],
-    limitations: [
-      "Assessment is strictly derived from observed telemetry and headers; no dynamic sandbox detonation was executed on external URLs.",
-      "Threat actor infrastructure may rotate dynamically across unobserved IP ranges."
-    ],
-    model_name: "Grounded Forensic Assistant (Local / Abstracted)",
-    provider: "local-mock",
-    available: true
-  },
-  attribution: {
-    attribution_id: 'ATTR-97D4B2E8',
-    email_id: 'sample-001',
-    probable_origin_ip: '203.0.113.25',
-    probable_origin_asn: 'AS64512',
-    probable_origin_provider: 'Threat Hosting Corp',
-    probable_infrastructure_country: 'United States',
-    confidence_score: 78.0,
-    confidence_level: 'HIGH',
-    supporting_evidence: [
-      {
-        evidence_type: 'EARLIEST_UNTRUSTED_RELAY',
-        observation: 'Earliest untrusted public sending infrastructure identified at IP 203.0.113.25 (mail.example.net).',
-        contribution: 20.0,
-        source: 'SMTP Relay Path Analysis',
-        timestamp: '2026-09-07T05:12:01Z'
-      },
-      {
-        evidence_type: 'DOMAIN_HOSTING_RELATIONSHIP',
-        observation: "Suspicious domain 'micros0ft-example.com' directly resolves (A record) to probable sending IP 203.0.113.25.",
-        contribution: 15.0,
-        source: 'DNS Resolution Engine',
-        timestamp: '2026-09-07T05:12:01Z'
-      },
-      {
-        evidence_type: 'AUTHENTICATION_FAILURE_ALIGNMENT',
-        observation: "SPF/DMARC authentication failed for sender 'micros0ft-example.com' from IP 203.0.113.25, indicating unauthorized sending infrastructure.",
-        contribution: 10.0,
-        source: 'Email Authentication Subsystem',
-        timestamp: '2026-09-07T05:12:01Z'
-      },
-      {
-        evidence_type: 'LOOKALIKE_INFRASTRUCTURE_OVERLAP',
-        observation: "Brand lookalike domain 'micros0ft-example.com' shares hosting infrastructure (AS64512) with observed sending system.",
-        contribution: 10.0,
-        source: 'Lookalike Detection Engine',
-        timestamp: '2026-09-07T05:12:01Z'
-      },
-      {
-        evidence_type: 'HOSTING_PROVIDER_CONSISTENCY',
-        observation: 'Probable origin IP 203.0.113.25 operates within cloud/datacenter hosting infrastructure (Threat Hosting Corp).',
-        contribution: 10.0,
-        source: 'IP Intelligence Infrastructure Classification',
-        timestamp: '2026-09-07T05:12:01Z'
-      }
-    ],
-    conflicting_evidence: [
-      {
-        evidence_type: 'ANONYMIZATION_INFRASTRUCTURE_DETECTED',
-        observation: 'Sending infrastructure IP 203.0.113.25 is an identified anonymization proxy, VPN, or Tor exit node. Attribution points to proxy egress infrastructure rather than threat actor origin.',
-        contribution: -20.0,
-        source: 'IP Threat Intelligence',
-        timestamp: '2026-09-07T05:12:01Z'
-      }
-    ],
-    related_domains: ['micros0ft-example.com', 'example.net'],
-    related_ips: ['203.0.113.25', '198.51.100.12'],
-    related_campaigns: ['CASE-2026-000031'],
-    analysis_timestamp: '2026-09-07T05:12:00Z',
-    disclaimer: 'Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor.'
-  },
-  investigation_graph: {
-    nodes: [
-      {
-        id: 'email:sample-001',
-        type: 'Email',
-        label: 'Email: Urgent: Update Your Microsoft Account',
-        metadata: { subject: 'Urgent: Update Your Microsoft Account', threat_score: 82, severity: 'critical', date: '2026-09-07T12:00:00Z' }
-      },
-      {
-        id: 'email_addr:security@micros0ft-example.com',
-        type: 'Email Address',
-        label: 'security@micros0ft-example.com',
-        metadata: { role: 'sender' }
-      },
-      {
-        id: 'email_addr:employee@company.com',
-        type: 'Email Address',
-        label: 'employee@company.com',
-        metadata: { role: 'recipient' }
-      },
-      {
-        id: 'domain:micros0ft-example.com',
-        type: 'Domain',
-        label: 'micros0ft-example.com',
-        metadata: {
-          domain: 'micros0ft-example.com',
-          is_lookalike: true,
-          suspected_brand: 'microsoft.com',
-          similarity: 0.91,
-          domain_age_days: 18,
-          newly_registered: true,
-          registrar: 'NameCheap, Inc.'
-        }
-      },
-      {
-        id: 'domain:company.com',
-        type: 'Domain',
-        label: 'company.com',
-        metadata: { domain: 'company.com', domain_age_days: 8700, newly_registered: false, registrar: 'Network Solutions' }
-      },
-      {
-        id: 'domain:evil-tracker.example',
-        type: 'Domain',
-        label: 'evil-tracker.example',
-        metadata: { domain: 'evil-tracker.example', newly_registered: true }
-      },
-      {
-        id: 'domain:bit.ly',
-        type: 'Domain',
-        label: 'bit.ly',
-        metadata: { domain: 'bit.ly', status_message: 'Shortener Service' }
-      },
-      {
-        id: 'url:evil-tracker',
-        type: 'URL',
-        label: 'URL: hxxps://evil-tracker[.]example/track',
-        metadata: {
-          url: 'https://evil-tracker.example/track?id=987',
-          defanged_url: 'hxxps://evil-tracker[.]example/track?id=987',
-          suspicion_level: 'high',
-          score_reasons: ['Destination domain mismatch with anchor text']
-        }
-      },
-      {
-        id: 'url:bitly-invoice',
-        type: 'URL',
-        label: 'URL: hxxps://bit[.]ly/3sample-invoice',
-        metadata: {
-          url: 'https://bit.ly/3sample-invoice',
-          defanged_url: 'hxxps://bit[.]ly/3sample-invoice',
-          suspicion_level: 'suspicious',
-          score_reasons: ['Shortened link masking destination']
-        }
-      },
-      {
-        id: 'ip:203.0.113.25',
-        type: 'IP',
-        label: '203.0.113.25',
-        metadata: { ip: '203.0.113.25', country: 'US', asn: 'AS64512', org: 'Threat Hosting Corp', is_proxy_vpn_tor: true }
-      },
-      {
-        id: 'ip:198.51.100.12',
-        type: 'IP',
-        label: '198.51.100.12',
-        metadata: { ip: '198.51.100.12', country: 'DE', asn: 'AS24940', org: 'Hetzner Online GmbH', is_proxy_vpn_tor: false }
-      },
-      {
-        id: 'asn:AS64512',
-        type: 'ASN',
-        label: 'AS64512 (Threat Hosting)',
-        metadata: { asn: 'AS64512', org: 'Threat Hosting Corp', country: 'US' }
-      },
-      {
-        id: 'asn:AS24940',
-        type: 'ASN',
-        label: 'AS24940 (Hetzner Online)',
-        metadata: { asn: 'AS24940', org: 'Hetzner Online GmbH', country: 'DE' }
-      },
-      {
-        id: 'attachment:invoice-pdf',
-        type: 'Attachment',
-        label: 'invoice.pdf',
-        metadata: { filename: 'invoice.pdf', mime_type: 'application/pdf', size_bytes: 241000, sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' }
-      },
-      {
-        id: 'country:united_states',
-        type: 'Country',
-        label: 'United States',
-        metadata: { country: 'United States', disclaimer: 'Location refers to observed network infrastructure' }
-      }
-    ],
-    edges: [
-      { id: 'edge:email:sample-001->ORIGIN_INFRASTRUCTURE->ip:203.0.113.25', source: 'email:sample-001', target: 'ip:203.0.113.25', label: 'ORIGIN_INFRASTRUCTURE' },
-      { id: 'edge:ip:203.0.113.25->HOSTED_IN_COUNTRY->country:united_states', source: 'ip:203.0.113.25', target: 'country:united_states', label: 'HOSTED_IN_COUNTRY' },
-      { id: 'edge:email:sample-001->SENT_FROM->email_addr:security@micros0ft-example.com', source: 'email:sample-001', target: 'email_addr:security@micros0ft-example.com', label: 'SENT_FROM' },
-      { id: 'edge:email:sample-001->SENT_TO->email_addr:employee@company.com', source: 'email:sample-001', target: 'email_addr:employee@company.com', label: 'SENT_TO' },
-      { id: 'edge:email_addr:security@micros0ft-example.com->BELONGS_TO_DOMAIN->domain:micros0ft-example.com', source: 'email_addr:security@micros0ft-example.com', target: 'domain:micros0ft-example.com', label: 'BELONGS_TO_DOMAIN' },
-      { id: 'edge:email_addr:employee@company.com->BELONGS_TO_DOMAIN->domain:company.com', source: 'email_addr:employee@company.com', target: 'domain:company.com', label: 'BELONGS_TO_DOMAIN' },
-      { id: 'edge:email:sample-001->CONTAINS_URL->url:evil-tracker', source: 'email:sample-001', target: 'url:evil-tracker', label: 'CONTAINS_URL' },
-      { id: 'edge:email:sample-001->CONTAINS_URL->url:bitly-invoice', source: 'email:sample-001', target: 'url:bitly-invoice', label: 'CONTAINS_URL' },
-      { id: 'edge:url:evil-tracker->RESOLVES_TO_DOMAIN->domain:evil-tracker.example', source: 'url:evil-tracker', target: 'domain:evil-tracker.example', label: 'RESOLVES_TO_DOMAIN' },
-      { id: 'edge:url:bitly-invoice->RESOLVES_TO_DOMAIN->domain:bit.ly', source: 'url:bitly-invoice', target: 'domain:bit.ly', label: 'RESOLVES_TO_DOMAIN' },
-      { id: 'edge:domain:micros0ft-example.com->RESOLVES_TO_IP->ip:203.0.113.25', source: 'domain:micros0ft-example.com', target: 'ip:203.0.113.25', label: 'RESOLVES_TO_IP' },
-      { id: 'edge:email:sample-001->ROUTED_THROUGH->ip:203.0.113.25', source: 'email:sample-001', target: 'ip:203.0.113.25', label: 'ROUTED_THROUGH' },
-      { id: 'edge:email:sample-001->ROUTED_THROUGH->ip:198.51.100.12', source: 'email:sample-001', target: 'ip:198.51.100.12', label: 'ROUTED_THROUGH' },
-      { id: 'edge:ip:203.0.113.25->BELONGS_TO_ASN->asn:AS64512', source: 'ip:203.0.113.25', target: 'asn:AS64512', label: 'BELONGS_TO_ASN' },
-      { id: 'edge:ip:198.51.100.12->BELONGS_TO_ASN->asn:AS24940', source: 'ip:198.51.100.12', target: 'asn:AS24940', label: 'BELONGS_TO_ASN' },
-      { id: 'edge:email:sample-001->HAS_ATTACHMENT->attachment:invoice-pdf', source: 'email:sample-001', target: 'attachment:invoice-pdf', label: 'HAS_ATTACHMENT' }
-    ],
-    summary: {
-      total_nodes: 14,
-      total_edges: 14,
-      node_type_counts: {
-        'Email': 1,
-        'Email Address': 2,
-        'Domain': 4,
-        'URL': 2,
-        'IP': 2,
-        'ASN': 2,
-        'Attachment': 1
-      },
-      has_high_risk_entities: true
-    }
-  }
-});
-
-export const saveAnalysisResult = (id: string, data: EmailAnalysis): void => {
-  const resolved = resolveEmailIndicators({ ...data, id });
-  memoryStore.set(id, resolved);
-  try {
-    sessionStorage.setItem(STORAGE_KEY_PREFIX + id, JSON.stringify(resolved));
-  } catch (e) {
-    console.warn('Unable to persist analysis in sessionStorage', e);
-  }
-};
-
-export const getAnalysisResult = (id: string): EmailAnalysis | null => {
-  if (memoryStore.has(id)) {
-    const item = resolveEmailIndicators(memoryStore.get(id)!);
-    if (!item.attribution || !item.attribution.probable_origin_ip) {
-      item.attribution = resolveAttribution(item);
-    }
-    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) {
-      item.forensic_conclusions = resolveConfidenceConclusions(item);
-    }
-    return item;
-  }
-  try {
-    const raw = sessionStorage.getItem(STORAGE_KEY_PREFIX + id);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      // Invalidate stale cache for sample-001 if explainable audit metadata is missing
-      if (id === 'sample-001' && (!parsed.threat_score?.scoring_version || !parsed.threat_score?.audit_metadata)) {
-        sessionStorage.removeItem(STORAGE_KEY_PREFIX + id);
-      } else {
-        const resolved = resolveEmailIndicators(parsed);
-        if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
-          resolved.attribution = resolveAttribution(resolved);
-        }
-        if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
-          resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
-        }
-        memoryStore.set(id, resolved);
-        return resolved;
-      }
-    }
-  } catch (e) {
-    console.warn('Error reading analysis from sessionStorage', e);
-  }
-
-  if (id === 'sample-001' || id === 'latest' || id === 'demo') {
-    if (!MOCK_SAMPLE_ANALYSIS.attribution || !MOCK_SAMPLE_ANALYSIS.attribution.probable_origin_ip) {
-      MOCK_SAMPLE_ANALYSIS.attribution = resolveAttribution(MOCK_SAMPLE_ANALYSIS);
-    }
-    if (!MOCK_SAMPLE_ANALYSIS.forensic_conclusions || MOCK_SAMPLE_ANALYSIS.forensic_conclusions.length === 0) {
-      MOCK_SAMPLE_ANALYSIS.forensic_conclusions = resolveConfidenceConclusions(MOCK_SAMPLE_ANALYSIS);
-    }
-    return MOCK_SAMPLE_ANALYSIS;
-  }
-
-  // Check SIH Safe Synthetic Demo Scenarios
-  if (id === 'scenario-1-legit') {
-    const item = resolveEmailIndicators(SCENARIO_1_LEGITIMATE);
-    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
-    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
-    return item;
-  }
-  if (id === 'scenario-2-phish') {
-    const item = resolveEmailIndicators(SCENARIO_2_PHISHING);
-    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
-    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
-    return item;
-  }
-  if (id === 'scenario-3-campaign') {
-    const item = resolveEmailIndicators(SCENARIO_3_PRIMARY_EMAIL);
-    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
-    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
-    return item;
-  }
-
-  // Check if ID matches one of the sample emails from SAMPLE_EMAILS
-  const matchedSample = SAMPLE_EMAILS.find(s => s.id === id);
-  if (matchedSample) {
-    return convertMockSampleToAnalysis(matchedSample);
-  }
-
-  return null;
-};
-
-import { SAMPLE_EMAILS } from '../data/mockData';
-
-const SAMPLE_FILENAMES: Record<string, string> = {
-  'sample-001': 'urgent_microsoft_verification.eml',
-  'EML-2026-8819': 'executive_wire_transfer_settlement.eml',
-  'EML-2026-4402': 'm365_password_expiration_notice.eml',
-  'EML-2026-3190': 'q2_financial_performance_briefing.eml'
-};
-
 export const deriveFilename = (analysis: Partial<EmailAnalysis>): string => {
   if (analysis.original_filename) return analysis.original_filename;
   if (analysis.file_info?.filename) return analysis.file_info.filename;
@@ -1169,77 +20,90 @@ export const deriveFilename = (analysis: Partial<EmailAnalysis>): string => {
   return `${analysis.id || 'email'}.eml`;
 };
 
-export const convertMockSampleToAnalysis = (mock: any, filename?: string): EmailAnalysis => {
-  const fromDomain = mock.senderEmail?.includes('@') ? mock.senderEmail.split('@')[1] : '';
-  const hopIps = (mock.hops || []).flatMap((h: any) => [h.fromIp, h.byIp]).filter(Boolean);
-  const originIp = mock.originGeo?.ip;
-  const allIps = Array.from(new Set([originIp, ...hopIps].filter(Boolean))) as string[];
-  const actualFilename = filename || SAMPLE_FILENAMES[mock.id] || `${mock.id.toLowerCase().replace(/[^a-z0-9]/g, '_')}.eml`;
-
-  return resolveEmailIndicators({
-    id: mock.id,
-    evidence_id: `EVD-${mock.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase()}`,
-    original_filename: actualFilename,
-    upload_timestamp: mock.timestamp || '2026-09-05T10:42:15Z',
-    size: mock.rawHeaders ? mock.rawHeaders.length + (mock.bodyText?.length || 0) : 15420,
-    uploader: 'SOC Analyst',
-    subject: mock.subject,
-    from: `${mock.senderName} <${mock.senderEmail}>`,
-    to: mock.recipientEmail,
-    reply_to: mock.replyTo,
-    return_path: mock.returnPath,
-    date: mock.timestamp,
-    received: (mock.hops || []).map((h: any) => `from ${h.fromHost || ''} (${h.fromIp || ''}) by ${h.byHost || ''}; ${h.timestamp}`),
-    raw_email: (mock.rawHeaders || '') + '\n\n' + (mock.bodyText || ''),
-    plain_text_body: mock.bodyText,
-    ips: allIps,
-    domains: fromDomain ? [fromDomain] : [],
-    urls: (mock.iocs?.urls || []).map((u: any) => typeof u === 'string' ? u : u.url),
-    attachments: (mock.iocs?.hashes || []).map((h: any) => ({
-      filename: h.filename,
-      mime_type: 'application/octet-stream',
-      size: 15000,
-      sha256: h.sha256
-    })),
-    threat_score: {
-      score: mock.riskScore,
-      severity: mock.severity === 'CRITICAL' ? 'critical' : mock.severity === 'HIGH' ? 'high' : 'low',
-      risk_level: mock.severity,
-      summary: mock.summary || 'Email threat evaluation',
-      reasons: [],
-      positive_evidence: []
-    },
-    authentication: {
-      spf: { result: (typeof mock.protocols?.spf === 'string' ? mock.protocols.spf : 'neutral').toLowerCase() },
-      dkim: { result: (typeof mock.protocols?.dkim === 'string' ? mock.protocols.dkim : 'neutral').toLowerCase() },
-      dmarc: { result: (typeof mock.protocols?.dmarc === 'string' ? mock.protocols.dmarc : 'neutral').toLowerCase() }
-    }
-  });
+export const saveAnalysisResult = (id: string, data: EmailAnalysis): void => {
+  const resolved = resolveEmailIndicators({ ...data, id });
+  memoryStore.set(id, resolved);
+  try {
+    sessionStorage.setItem(STORAGE_KEY_PREFIX + id, JSON.stringify(resolved));
+    sessionStorage.setItem(STORAGE_KEY_PREFIX + 'latest_id', id);
+  } catch (e) {
+    console.warn('Unable to persist analysis in sessionStorage', e);
+  }
 };
 
-export const getAllAvailableAnalyses = (): EmailAnalysis[] => {
+export const getAnalysisResult = (id: string): EmailAnalysis | null => {
+  let targetId = id;
+  if (targetId === 'latest') {
+    const latestId = sessionStorage.getItem(STORAGE_KEY_PREFIX + 'latest_id');
+    if (latestId && (memoryStore.has(latestId) || sessionStorage.getItem(STORAGE_KEY_PREFIX + latestId))) {
+      targetId = latestId;
+    } else {
+      // Find the most recently added key in memoryStore or sessionStorage
+      const allReal = getAllAvailableAnalyses(false);
+      if (allReal.length > 0) {
+        return allReal[0];
+      }
+      return null;
+    }
+  }
+
+  if (memoryStore.has(targetId)) {
+    const item = resolveEmailIndicators(memoryStore.get(targetId)!);
+    if (!item.attribution || !item.attribution.probable_origin_ip) {
+      item.attribution = resolveAttribution(item);
+    }
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) {
+      item.forensic_conclusions = resolveConfidenceConclusions(item);
+    }
+    return item;
+  }
+
+  try {
+    const raw = sessionStorage.getItem(STORAGE_KEY_PREFIX + targetId);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      const resolved = resolveEmailIndicators(parsed);
+      if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
+        resolved.attribution = resolveAttribution(resolved);
+      }
+      if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
+        resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
+      }
+      memoryStore.set(targetId, resolved);
+      return resolved;
+    }
+  } catch (e) {
+    console.warn('Error reading analysis from sessionStorage', e);
+  }
+
+  // Explicit SIH Demo Benchmark Scenarios (only accessed when specifically requested by scenario ID)
+  if (targetId === 'scenario-1-legit') {
+    const item = resolveEmailIndicators({ ...SCENARIO_1_LEGITIMATE, is_demo: true });
+    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
+    return item;
+  }
+  if (targetId === 'scenario-2-phish') {
+    const item = resolveEmailIndicators({ ...SCENARIO_2_PHISHING, is_demo: true });
+    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
+    return item;
+  }
+  if (targetId === 'scenario-3-campaign') {
+    const item = resolveEmailIndicators({ ...SCENARIO_3_PRIMARY_EMAIL, is_demo: true });
+    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
+    return item;
+  }
+
+  return null;
+};
+
+export const getAllAvailableAnalyses = (includeDemo = false): EmailAnalysis[] => {
   const result: EmailAnalysis[] = [];
   const seenIds = new Set<string>();
 
-  // 1. Primary mock sample
-  if (MOCK_SAMPLE_ANALYSIS && MOCK_SAMPLE_ANALYSIS.id) {
-    if (!MOCK_SAMPLE_ANALYSIS.original_filename) {
-      MOCK_SAMPLE_ANALYSIS.original_filename = 'urgent_microsoft_verification.eml';
-    }
-    result.push(MOCK_SAMPLE_ANALYSIS);
-    seenIds.add(MOCK_SAMPLE_ANALYSIS.id);
-  }
-
-  // 2. Mock samples from SAMPLE_EMAILS
-  for (const sample of SAMPLE_EMAILS) {
-    if (!seenIds.has(sample.id)) {
-      const converted = convertMockSampleToAnalysis(sample);
-      result.push(converted);
-      seenIds.add(sample.id);
-    }
-  }
-
-  // 3. Memory store entries
+  // 1. Memory store entries
   for (const [id, analysis] of memoryStore.entries()) {
     if (!seenIds.has(id)) {
       const resolved = resolveEmailIndicators(analysis);
@@ -1251,11 +115,11 @@ export const getAllAvailableAnalyses = (): EmailAnalysis[] => {
     }
   }
 
-  // 4. SessionStorage entries
+  // 2. SessionStorage entries
   try {
     for (let i = 0; i < sessionStorage.length; i++) {
       const key = sessionStorage.key(i);
-      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+      if (key && key.startsWith(STORAGE_KEY_PREFIX) && key !== STORAGE_KEY_PREFIX + 'latest_id') {
         const id = key.substring(STORAGE_KEY_PREFIX.length);
         if (!seenIds.has(id)) {
           const raw = sessionStorage.getItem(key);
@@ -1275,16 +139,25 @@ export const getAllAvailableAnalyses = (): EmailAnalysis[] => {
     console.warn('Error reading sessionStorage for available analyses', e);
   }
 
-  // 5. SIH Safe Synthetic Demo Scenarios
-  const sihScenarios = [
-    resolveEmailIndicators(SCENARIO_1_LEGITIMATE),
-    resolveEmailIndicators(SCENARIO_2_PHISHING),
-    resolveEmailIndicators(SCENARIO_3_PRIMARY_EMAIL)
-  ];
-  for (const scenario of sihScenarios) {
-    if (scenario.id && !seenIds.has(scenario.id)) {
-      result.push(scenario);
-      seenIds.add(scenario.id);
+  // Sort by upload timestamp descending if available
+  result.sort((a, b) => {
+    const tA = new Date(a.upload_timestamp || 0).getTime();
+    const tB = new Date(b.upload_timestamp || 0).getTime();
+    return tB - tA;
+  });
+
+  // 3. Isolated demo scenarios only if explicitly requested
+  if (includeDemo) {
+    const sihScenarios = [
+      resolveEmailIndicators({ ...SCENARIO_1_LEGITIMATE, is_demo: true }),
+      resolveEmailIndicators({ ...SCENARIO_2_PHISHING, is_demo: true }),
+      resolveEmailIndicators({ ...SCENARIO_3_PRIMARY_EMAIL, is_demo: true })
+    ];
+    for (const scenario of sihScenarios) {
+      if (scenario.id && !seenIds.has(scenario.id)) {
+        result.push(scenario);
+        seenIds.add(scenario.id);
+      }
     }
   }
 
@@ -1310,7 +183,7 @@ export const resetDemoStore = async (): Promise<boolean> => {
     try {
       await fetch('http://127.0.0.1:8000/api/benchmark/demo-reset', { method: 'POST' });
     } catch {
-      // Backend might be offline or using proxy, safe fallback
+      // Safe fallback
     }
 
     return true;
@@ -1319,4 +192,3 @@ export const resetDemoStore = async (): Promise<boolean> => {
     return false;
   }
 };
-

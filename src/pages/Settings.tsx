@@ -8,7 +8,7 @@ import {
   Palette,
   Check
 } from 'lucide-react';
-import { INITIAL_SETTINGS } from '../data/mockData';
+import { INITIAL_SETTINGS } from '../config/systemSettings';
 import type { SystemSettings } from '../types';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../context/ThemeContext';
 

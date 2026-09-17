@@ -28,30 +28,15 @@ export const CampaignAlertBanner: React.FC<CampaignAlertBannerProps> = ({
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState<boolean>(true);
 
-  if (!alertData || !alertData.is_campaign_detected) {
+  if (!alertData || !alertData.is_campaign_detected || !alertData.campaign_id) {
     return null;
   }
 
-  const campaignId = alertData.campaign_id || 'C-042';
-  const messageCount = alertData.correlated_message_count || 16;
-  const confidence = Math.round(alertData.overall_confidence || 91);
-  const reasons = alertData.strongest_reasons || [
-    'Shared dropzone IP 185.220.101.42 (Russia / Bulletproof Node)',
-    'URL redirect chain to /auth/v2/secure_login.php credential harvester',
-    'HTML SimHash template match 89% across executive invoice lures',
-    'Lookalike domain target: bank-corp-update.com impersonating BankCorp'
-  ];
-
-  const catScores = alertData.category_scores || {
-    infrastructure_similarity: 92,
-    domain_similarity: 78,
-    url_similarity: 96,
-    content_similarity: 81,
-    template_similarity: 89,
-    authentication_similarity: 75,
-    attachment_similarity: 85,
-    overall_confidence: 91
-  };
+  const campaignId = alertData.campaign_id;
+  const messageCount = alertData.correlated_message_count || 0;
+  const confidence = alertData.overall_confidence !== undefined ? Math.round(alertData.overall_confidence) : 0;
+  const reasons = alertData.strongest_reasons || [];
+  const catScores = alertData.category_scores || null;
 
   const handleNavigate = () => {
     if (onViewCampaign) {
@@ -140,87 +125,89 @@ export const CampaignAlertBanner: React.FC<CampaignAlertBannerProps> = ({
         {isExpanded && (
           <div className="space-y-3.5 pt-2 border-t border-warning/15 animate-in fade-in duration-150">
             {/* Category Similarity Grid */}
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
-              <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
-                <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
-                  <Server className="w-3 h-3 text-primary" />
-                  <span>Infrastructure</span>
+            {catScores && (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+                <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
+                  <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
+                    <Server className="w-3 h-3 text-primary" />
+                    <span>Infrastructure</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-primary">
+                    {Math.round(catScores.infrastructure_similarity)}%
+                  </div>
+                  <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
+                    <div
+                      className="bg-primary h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, catScores.infrastructure_similarity)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-sm font-bold font-mono text-primary">
-                  {Math.round(catScores.infrastructure_similarity)}%
-                </div>
-                <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
-                  <div
-                    className="bg-primary h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, catScores.infrastructure_similarity)}%` }}
-                  />
-                </div>
-              </div>
 
-              <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
-                <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
-                  <Globe className="w-3 h-3 text-info" />
-                  <span>Domain</span>
+                <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
+                  <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
+                    <Globe className="w-3 h-3 text-info" />
+                    <span>Domain</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-info">
+                    {Math.round(catScores.domain_similarity)}%
+                  </div>
+                  <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
+                    <div
+                      className="bg-info h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, catScores.domain_similarity)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-sm font-bold font-mono text-info">
-                  {Math.round(catScores.domain_similarity)}%
-                </div>
-                <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
-                  <div
-                    className="bg-info h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, catScores.domain_similarity)}%` }}
-                  />
-                </div>
-              </div>
 
-              <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
-                <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
-                  <LinkIcon className="w-3 h-3 text-danger" />
-                  <span>URL Lure</span>
+                <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
+                  <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
+                    <LinkIcon className="w-3 h-3 text-danger" />
+                    <span>URL Lure</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-danger">
+                    {Math.round(catScores.url_similarity)}%
+                  </div>
+                  <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
+                    <div
+                      className="bg-danger h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, catScores.url_similarity)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-sm font-bold font-mono text-danger">
-                  {Math.round(catScores.url_similarity)}%
-                </div>
-                <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
-                  <div
-                    className="bg-danger h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, catScores.url_similarity)}%` }}
-                  />
-                </div>
-              </div>
 
-              <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
-                <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
-                  <FileText className="w-3 h-3 text-warning" />
-                  <span>Content Intent</span>
+                <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1">
+                  <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
+                    <FileText className="w-3 h-3 text-warning" />
+                    <span>Content Intent</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-warning">
+                    {Math.round(catScores.content_similarity)}%
+                  </div>
+                  <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
+                    <div
+                      className="bg-warning h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, catScores.content_similarity)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="text-sm font-bold font-mono text-warning">
-                  {Math.round(catScores.content_similarity)}%
-                </div>
-                <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
-                  <div
-                    className="bg-warning h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, catScores.content_similarity)}%` }}
-                  />
-                </div>
-              </div>
 
-              <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1 col-span-2 sm:col-span-1">
-                <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
-                  <Layers className="w-3 h-3 text-emerald-400" />
-                  <span>Template SimHash</span>
-                </div>
-                <div className="text-sm font-bold font-mono text-emerald-400">
-                  {Math.round(catScores.template_similarity)}%
-                </div>
-                <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
-                  <div
-                    className="bg-emerald-400 h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, catScores.template_similarity)}%` }}
-                  />
+                <div className="p-2.5 rounded-xl bg-surface border border-border/80 text-center space-y-1 col-span-2 sm:col-span-1">
+                  <div className="flex items-center justify-center space-x-1 text-[10px] font-mono text-foreground-muted uppercase">
+                    <Layers className="w-3 h-3 text-emerald-400" />
+                    <span>Template SimHash</span>
+                  </div>
+                  <div className="text-sm font-bold font-mono text-emerald-400">
+                    {Math.round(catScores.template_similarity)}%
+                  </div>
+                  <div className="w-full bg-surface-secondary h-1 rounded-full overflow-hidden">
+                    <div
+                      className="bg-emerald-400 h-full rounded-full transition-all"
+                      style={{ width: `${Math.min(100, catScores.template_similarity)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             {/* Strongest Correlation Reasons List */}
             <div className="space-y-1.5">

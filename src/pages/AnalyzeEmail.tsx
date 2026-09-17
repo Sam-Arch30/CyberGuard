@@ -1,142 +1,33 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   SearchCode,
   Zap,
   Upload,
-  Radio,
-  Hash,
-  ExternalLink,
-  FolderPlus,
-  CheckCircle2,
-  Copy,
-  Network
+  AlertCircle,
+  FileText,
+  Shield,
+  ArrowRight
 } from 'lucide-react';
-import { SAMPLE_EMAILS } from '../data/mockData';
-import type { EmailAnalysisData } from '../types';
 import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
-import { decodeRfc2047, resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHelper';
-import { RiskBadge } from '../components/common/RiskBadge';
-import { HeaderProtocolStatus } from '../components/common/HeaderProtocolStatus';
-import { GeoTraceMap } from '../components/common/GeoTraceMap';
-import { AttributionGraph } from '../components/common/AttributionGraph';
-import { InfrastructureAttributionSection } from '../components/forensic/InfrastructureAttributionSection';
-import { CampaignAlertBanner } from '../components/campaign/CampaignAlertBanner';
+import { decodeRfc2047 } from '../utils/indicatorHelper';
 
 export const AnalyzeEmail: React.FC = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const emailIdParam = searchParams.get('id');
-  const initialEmail = SAMPLE_EMAILS.find(e => e.id === emailIdParam) || SAMPLE_EMAILS[0];
-
-  const [selectedSampleId, setSelectedSampleId] = useState<string>(initialEmail.id);
-  const [currentEmail, setCurrentEmail] = useState<EmailAnalysisData>(initialEmail);
-  const [rawInput, setRawInput] = useState<string>(initialEmail.rawHeaders + '\n\n' + initialEmail.bodyText);
+  const [rawInput, setRawInput] = useState<string>('');
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'OVERVIEW' | 'ATTRIBUTION' | 'HEADERS' | 'RELAY_TRACE' | 'IOCS' | 'GRAPH'>('OVERVIEW');
-  const [copySuccess, setCopySuccess] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<boolean>(false);
 
-  useEffect(() => {
-    const found = SAMPLE_EMAILS.find(e => e.id === selectedSampleId);
-    if (found) {
-      setCurrentEmail(found);
-      setRawInput(found.rawHeaders + '\n\n' + found.bodyText);
-    }
-  }, [selectedSampleId]);
-
-  const currentEmailAsAnalysis = useMemo<EmailAnalysis>(() => {
-    const fromDomain = currentEmail.senderEmail?.includes('@') ? currentEmail.senderEmail.split('@')[1] : '';
-    const receivedHeaders = (currentEmail.hops || []).map(h => `from ${h.fromHost || ''} (${h.fromIp || ''}) by ${h.byHost || ''}; ${h.timestamp}`);
-    const rawHeadersLines = currentEmail.rawHeaders ? currentEmail.rawHeaders.split('\n').filter(l => l.toLowerCase().startsWith('received:')) : [];
-    const hopIps = (currentEmail.hops || []).flatMap(h => [h.fromIp, h.byIp]).filter(Boolean);
-    const originIp = currentEmail.originGeo?.ip;
-    const allIps = Array.from(new Set([originIp, ...hopIps].filter(Boolean))) as string[];
-
-    return resolveEmailIndicators({
-      id: currentEmail.id,
-      evidence_id: `EVD-${currentEmail.id.toUpperCase()}`,
-      subject: currentEmail.subject,
-      from: `${currentEmail.senderName} <${currentEmail.senderEmail}>`,
-      to: currentEmail.recipientEmail,
-      reply_to: currentEmail.replyTo,
-      return_path: currentEmail.returnPath,
-      date: currentEmail.timestamp,
-      received: receivedHeaders.length > 0 ? receivedHeaders : rawHeadersLines,
-      raw_email: currentEmail.rawHeaders + '\n\n' + currentEmail.bodyText,
-      plain_text_body: currentEmail.bodyText,
-      ips: allIps,
-      domains: fromDomain ? [fromDomain] : [],
-      urls: (currentEmail.iocs?.urls || []).map(u => u.url),
-      attachments: (currentEmail.iocs?.hashes || []).map(h => ({
-        filename: h.filename,
-        mime_type: 'application/octet-stream',
-        size: 15000,
-        sha256: h.sha256
-      })),
-      threat_score: {
-        score: currentEmail.riskScore,
-        severity: currentEmail.severity === 'CRITICAL' ? 'critical' : currentEmail.severity === 'HIGH' ? 'high' : 'low',
-        reasons: [],
-        positive_evidence: [],
-        summary: currentEmail.summary || 'Threat score analysis'
-      },
-      ip_intelligence: (() => {
-        const intel: Record<string, any> = {};
-        if (currentEmail.originGeo?.ip) {
-          intel[currentEmail.originGeo.ip] = {
-            ip: currentEmail.originGeo.ip,
-            country: currentEmail.originGeo.country,
-            city: currentEmail.originGeo.city,
-            latitude: currentEmail.originGeo.latitude,
-            longitude: currentEmail.originGeo.longitude,
-            asn: currentEmail.originGeo.asn,
-            isp: currentEmail.originGeo.isp,
-            is_proxy_vpn_tor: currentEmail.originGeo.isVpn || currentEmail.originGeo.isTor,
-            is_hosting: true,
-            infrastructure_type: 'Observed Infrastructure Location'
-          };
-        }
-        (currentEmail.hops || []).forEach((hop, idx) => {
-          const hIp = hop.fromIp;
-          if (hIp && !intel[hIp]) {
-            intel[hIp] = {
-              ip: hIp,
-              country: hop.country || 'United States',
-              city: hop.city || 'Mountain View',
-              latitude: hop.isOrigin && currentEmail.originGeo?.latitude ? currentEmail.originGeo.latitude : (37.3860 + (idx + 1) * 2.1),
-              longitude: hop.isOrigin && currentEmail.originGeo?.longitude ? currentEmail.originGeo.longitude : (-122.0839 + (idx + 1) * 2.8),
-              asn: (hop as any).asn || 'AS64512',
-              isp: hop.org,
-              is_hosting: true,
-              infrastructure_type: 'Observed Infrastructure Location'
-            };
-          }
-        });
-        return intel;
-      })(),
-      authentication: {
-        spf: { result: (typeof currentEmail.protocols?.spf === 'string' ? currentEmail.protocols.spf : 'neutral').toLowerCase() },
-        dkim: { result: (typeof currentEmail.protocols?.dkim === 'string' ? currentEmail.protocols.dkim : 'neutral').toLowerCase() },
-        dmarc: { result: (typeof currentEmail.protocols?.dmarc === 'string' ? currentEmail.protocols.dmarc : 'neutral').toLowerCase() }
-      }
-    });
-  }, [currentEmail]);
-
-  const resolvedAttribution = useMemo(() => {
-    return currentEmailAsAnalysis.attribution || resolveAttribution(currentEmailAsAnalysis);
-  }, [currentEmailAsAnalysis]);
-
-  const handleRunAnalysis = async () => {
-    if (!rawInput.trim()) return;
+  const processEmailContent = async (fileOrBlob: Blob, filename: string, rawText?: string) => {
     setIsAnalyzing(true);
+    setErrorMessage(null);
     const analysisId = `analysis-${Date.now()}`;
 
     try {
-      const blob = new Blob([rawInput], { type: 'message/rfc822' });
       const formData = new FormData();
-      formData.append('file', blob, 'pasted_email.eml');
+      formData.append('file', fileOrBlob, filename);
 
       let res: Response | null = null;
       try {
@@ -147,18 +38,19 @@ export const AnalyzeEmail: React.FC = () => {
 
       if (res && res.ok) {
         const data = await res.json();
+        const textFallback = rawText || '';
         const parsedAnalysis: EmailAnalysis = {
           id: analysisId,
           evidence_id: data.evidence_id || (data.email_sha256 ? `EVD-${data.email_sha256.slice(0, 10).toUpperCase()}` : `EVD-${analysisId.slice(-8).toUpperCase()}`),
           email_sha256: data.email_sha256,
-          original_filename: data.original_filename || 'pasted_email.eml',
+          original_filename: data.original_filename || filename,
           upload_timestamp: data.upload_timestamp || new Date().toISOString(),
-          size: data.size || rawInput.length,
+          size: data.size || fileOrBlob.size,
           uploader: data.uploader || 'SOC Analyst',
           authentication: data.authentication,
           relay_analysis: data.relay_analysis,
           indicators: data.indicators,
-          subject: decodeRfc2047(data.subject || data.headers?.subject || 'Pasted Email Analysis'),
+          subject: decodeRfc2047(data.subject || data.headers?.subject || filename),
           from: decodeRfc2047(data.from || data.from_header || data.headers?.from || ''),
           to: decodeRfc2047(Array.isArray(data.to) ? data.to.join(', ') : (data.to || data.headers?.to || '')),
           cc: decodeRfc2047(Array.isArray(data.cc) ? data.cc.join(', ') : (data.cc || data.headers?.cc || '')),
@@ -168,9 +60,9 @@ export const AnalyzeEmail: React.FC = () => {
           message_id: decodeRfc2047(data.message_id || data.headers?.message_id || ''),
           received: data.received || data.headers?.received || [],
           authentication_results: data.authentication_results || data.headers?.authentication_results || '',
-          plain_text_body: data.plain_text_body || data.body?.plain_text || rawInput,
+          plain_text_body: data.plain_text_body || data.body?.plain_text || textFallback,
           html_body: data.html_body || data.body?.html || '',
-          raw_email: data.raw_email || rawInput,
+          raw_email: data.raw_email || textFallback,
           urls: data.urls || [],
           ips: data.ips || [],
           domains: data.domains || [],
@@ -191,196 +83,53 @@ export const AnalyzeEmail: React.FC = () => {
         saveAnalysisResult(analysisId, parsedAnalysis);
         navigate(`/analysis/${analysisId}`);
         return;
+      } else {
+        const errText = res ? await res.text() : 'Server did not respond.';
+        setErrorMessage(`Forensic analysis failed: ${errText || 'Unprocessable email format'}`);
       }
-    } catch (err) {
-      console.warn('Backend parse failed, fallback to local analysis:', err);
+    } catch (err: any) {
+      setErrorMessage(`Error connecting to analysis engine: ${err?.message || 'Network error'}`);
     } finally {
       setIsAnalyzing(false);
     }
-
-    // Fallback: parse headers locally and save
-    const getHeaderVal = (name: string): string => {
-      const match = rawInput.match(new RegExp(`^${name}:[ \\t]*([^\\r\\n]+(?:\\r?\\n[ \\t]+[^\\r\\n]+)*)`, 'im'));
-      return match ? decodeRfc2047(match[1].replace(/\s+/g, ' ').trim()) : '';
-    };
-
-    const extractReceivedHeaders = (text: string): string[] => {
-      const matches = Array.from(text.matchAll(/^Received:[ \t]*(.+?)(?=\r?\n\S|\r?\n\r?\n|$)/gms));
-      return matches.map(m => m[1].replace(/\s+/g, ' ').trim()).filter(Boolean);
-    };
-
-    const fallbackAnalysis: EmailAnalysis = {
-      id: analysisId,
-      evidence_id: `EVD-${analysisId.slice(-8).toUpperCase()}`,
-      original_filename: 'pasted_email.eml',
-      upload_timestamp: new Date().toISOString(),
-      size: rawInput.length,
-      uploader: 'SOC Analyst',
-      subject: getHeaderVal('Subject') || currentEmail.subject || 'Forensic Analysis',
-      from: getHeaderVal('From') || currentEmail.senderEmail || '',
-      to: getHeaderVal('To') || currentEmail.recipientEmail || '',
-      cc: getHeaderVal('Cc') || '',
-      date: getHeaderVal('Date') || new Date().toUTCString(),
-      reply_to: getHeaderVal('Reply-To') || '',
-      return_path: getHeaderVal('Return-Path') || '',
-      message_id: getHeaderVal('Message-ID') || '',
-      received: extractReceivedHeaders(rawInput),
-      authentication_results: getHeaderVal('Authentication-Results') || '',
-      raw_email: rawInput,
-      plain_text_body: currentEmail.bodyText || rawInput,
-      urls: currentEmail.iocs.urls.map(u => u.url),
-      attachments: currentEmail.iocs.hashes.map(h => ({
-        filename: h.filename,
-        mime_type: 'application/octet-stream',
-        size: 24500,
-        sha256: h.sha256
-      }))
-    };
-
-    saveAnalysisResult(analysisId, fallbackAnalysis);
-    navigate(`/analysis/${analysisId}`);
   };
 
-  const handleCopyEvidence = () => {
-    navigator.clipboard.writeText(JSON.stringify(currentEmail, null, 2));
-    setCopySuccess(true);
-    setTimeout(() => setCopySuccess(false), 2000);
+  const handleRunAnalysis = async () => {
+    const text = rawInput.trim();
+    if (!text) {
+      setErrorMessage('Please paste RFC-822 raw email content or upload an .eml file to analyze.');
+      return;
+    }
+    const blob = new Blob([text], { type: 'message/rfc822' });
+    await processEmailContent(blob, 'pasted_email.eml', text);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    setIsAnalyzing(true);
     let textContent = '';
     try {
       textContent = await file.text();
       setRawInput(textContent);
     } catch {
-      // Failed reading file
+      // Binary or raw blob
     }
+    await processEmailContent(file, file.name, textContent);
+  };
 
-    const analysisId = `upload-${Date.now()}`;
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    let textContent = '';
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      let res: Response | null = null;
-      try {
-        res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
-      } catch {
-        res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
-      }
-
-      if (res && res.ok) {
-        const data = await res.json();
-        const parsedAnalysis: EmailAnalysis = {
-          id: analysisId,
-          evidence_id: data.evidence_id || (data.email_sha256 ? `EVD-${data.email_sha256.slice(0, 10).toUpperCase()}` : `EVD-${analysisId.slice(-8).toUpperCase()}`),
-          email_sha256: data.email_sha256,
-          original_filename: data.original_filename || file.name,
-          upload_timestamp: data.upload_timestamp || new Date().toISOString(),
-          size: data.size || file.size,
-          uploader: data.uploader || 'SOC Analyst',
-          authentication: data.authentication,
-          relay_analysis: data.relay_analysis,
-          indicators: data.indicators,
-          subject: decodeRfc2047(data.subject || data.headers?.subject || file.name),
-          from: decodeRfc2047(data.from || data.from_header || data.headers?.from || ''),
-          to: decodeRfc2047(Array.isArray(data.to) ? data.to.join(', ') : (data.to || data.headers?.to || '')),
-          cc: decodeRfc2047(Array.isArray(data.cc) ? data.cc.join(', ') : (data.cc || data.headers?.cc || '')),
-          date: decodeRfc2047(data.date || data.headers?.date || ''),
-          reply_to: decodeRfc2047(data.reply_to || data.headers?.reply_to || ''),
-          return_path: decodeRfc2047(data.return_path || data.headers?.return_path || ''),
-          message_id: decodeRfc2047(data.message_id || data.headers?.message_id || ''),
-          received: data.received || data.headers?.received || [],
-          authentication_results: data.authentication_results || data.headers?.authentication_results || '',
-          plain_text_body: data.plain_text_body || data.body?.plain_text || '',
-          html_body: data.html_body || data.body?.html || '',
-          raw_email: data.raw_email || textContent || '',
-          urls: data.urls || [],
-          ips: data.ips || [],
-          domains: data.domains || [],
-          emails: data.emails || [],
-          attachments: data.attachments || [],
-          ip_intelligence: data.ip_intelligence || {},
-          domain_intelligence: data.domain_intelligence || {},
-          lookalike_domains: data.lookalike_domains || [],
-          url_analysis: data.url_analysis || [],
-          threat_score: data.threat_score,
-          ml_phishing_probability: data.ml_phishing_probability,
-          ml_assessment: data.ml_assessment,
-          ai_analyst: data.ai_analyst,
-          attribution: data.attribution,
-          investigation_graph: data.investigation_graph
-        };
-
-        saveAnalysisResult(analysisId, parsedAnalysis);
-        navigate(`/analysis/${analysisId}`);
-        return;
-      }
-    } catch (err) {
-      console.warn('Backend API offline, constructing client-side fallback analysis', err);
-    } finally {
-      setIsAnalyzing(false);
+      textContent = await file.text();
+      setRawInput(textContent);
+    } catch {
+      // Binary or raw blob
     }
-
-    // Dynamic header extraction fallback if backend is offline
-    const getHeaderVal = (name: string): string => {
-      const match = textContent.match(new RegExp(`^${name}:[ \\t]*([^\\r\\n]+(?:\\r?\\n[ \\t]+[^\\r\\n]+)*)`, 'im'));
-      return match ? decodeRfc2047(match[1].replace(/\s+/g, ' ').trim()) : '';
-    };
-
-    const extractReceivedHeaders = (text: string): string[] => {
-      const matches = Array.from(text.matchAll(/^Received:[ \t]*(.+?)(?=\r?\n\S|\r?\n\r?\n|$)/gms));
-      return matches.map(m => m[1].replace(/\s+/g, ' ').trim()).filter(Boolean);
-    };
-
-    const fallbackAttachments: { filename: string; mime_type: string; size: number; sha256: string }[] = [];
-    const attRegex = /(?:Content-Disposition:\s*(?:attachment|inline)[^;\r\n]*;\s*filename=["']?([^"'\r\n;]+)["']?|Content-Type:\s*([^;\r\n]+)[^;\r\n]*;\s*name=["']?([^"'\r\n;]+)["']?)/gi;
-    let am;
-    const seenNames = new Set<string>();
-    while ((am = attRegex.exec(textContent || rawInput)) !== null) {
-      const rawName = am[1] || am[3];
-      const rawMime = am[2] || 'application/octet-stream';
-      if (rawName) {
-        const cleanName = decodeRfc2047(rawName.trim().replace(/^["']|["']$/g, ''));
-        if (cleanName && !seenNames.has(cleanName.toLowerCase())) {
-          seenNames.add(cleanName.toLowerCase());
-          fallbackAttachments.push({
-            filename: cleanName,
-            mime_type: rawMime.trim(),
-            size: 0,
-            sha256: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'
-          });
-        }
-      }
-    }
-
-    const fallbackAnalysis: EmailAnalysis = {
-      id: analysisId,
-      evidence_id: `EVD-${analysisId.slice(-8).toUpperCase()}`,
-      original_filename: file.name,
-      upload_timestamp: new Date().toISOString(),
-      size: file.size,
-      uploader: 'SOC Analyst',
-      subject: getHeaderVal('Subject') || file.name,
-      from: getHeaderVal('From') || '',
-      to: getHeaderVal('To') || '',
-      cc: getHeaderVal('Cc') || '',
-      date: getHeaderVal('Date') || new Date().toUTCString(),
-      reply_to: getHeaderVal('Reply-To') || '',
-      return_path: getHeaderVal('Return-Path') || '',
-      message_id: getHeaderVal('Message-ID') || '',
-      received: extractReceivedHeaders(textContent || rawInput),
-      authentication_results: getHeaderVal('Authentication-Results') || '',
-      raw_email: textContent || rawInput,
-      plain_text_body: textContent || rawInput,
-      urls: [],
-      attachments: fallbackAttachments
-    };
-    saveAnalysisResult(analysisId, fallbackAnalysis);
-    navigate(`/analysis/${analysisId}`);
+    await processEmailContent(file, file.name, textContent);
   };
 
   return (
@@ -399,367 +148,106 @@ export const AnalyzeEmail: React.FC = () => {
             Ingest raw RFC-822 email content, parse routing relay chains, analyze SPF/DKIM/DMARC headers, and extract IOCs.
           </p>
         </div>
+      </div>
 
-        <div className="flex items-center space-x-2.5">
-          <button
-            type="button"
-            onClick={handleCopyEvidence}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-surface hover:bg-surface-secondary text-foreground border border-border text-xs font-mono font-medium transition-colors btn-press cursor-pointer"
-          >
-            {copySuccess ? <CheckCircle2 className="w-3.5 h-3.5 text-success" /> : <Copy className="w-3.5 h-3.5 text-foreground-muted" />}
-            <span>{copySuccess ? 'COPIED JSON' : 'EXPORT EVIDENCE JSON'}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate('/cases')}
-            className="flex items-center space-x-1.5 px-3.5 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold transition-colors btn-press cursor-pointer"
-          >
-            <FolderPlus className="w-3.5 h-3.5" />
-            <span>CONVERT TO CASE</span>
-          </button>
+      {errorMessage && (
+        <div className="p-4 rounded-xl bg-danger-surface border border-danger-border flex items-start space-x-3 text-xs font-mono text-danger animate-in fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <strong className="block font-bold">Analysis Error</strong>
+            <span>{errorMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Upload Zone */}
+      <div
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={handleDrop}
+        className={`bg-surface border-2 border-dashed rounded-xl p-8 text-center transition-all ${
+          dragOver ? 'border-primary bg-primary-subtle/30' : 'border-border hover:border-border-hover'
+        }`}
+      >
+        <div className="max-w-md mx-auto space-y-4">
+          <div className="p-3.5 bg-surface-secondary rounded-full w-14 h-14 mx-auto flex items-center justify-center border border-border">
+            <Upload className="w-6 h-6 text-primary" />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-foreground font-sans">
+              Upload an RFC-822 .eml file
+            </h3>
+            <p className="text-xs text-foreground-muted font-mono mt-1">
+              Drag and drop an .eml or .txt email file here, or browse from your system.
+            </p>
+          </div>
+          <div>
+            <label className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold transition-colors btn-press cursor-pointer">
+              <Upload className="w-3.5 h-3.5" />
+              <span>Browse File</span>
+              <input type="file" accept=".eml,.txt,.msg" onChange={handleFileUpload} className="hidden" />
+            </label>
+          </div>
         </div>
       </div>
 
-      {/* Preset Selector & Input Console */}
+      {/* Direct Raw Content Ingestion Console */}
       <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex items-center space-x-2">
-            <Radio className="w-3.5 h-3.5 text-primary" />
-            <label className="text-xs font-mono font-semibold text-foreground uppercase">
-              SELECT PRESET THREAT SAMPLE OR PASTE EML HEADERS:
-            </label>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2 text-xs font-mono font-semibold text-foreground uppercase">
+            <FileText className="w-3.5 h-3.5 text-primary" />
+            <span>OR PASTE RAW RFC-822 EMAIL HEADERS AND BODY:</span>
           </div>
-
-          <div className="flex items-center space-x-2.5">
-            <select
-              value={selectedSampleId}
-              onChange={(e) => setSelectedSampleId(e.target.value)}
-              className="bg-surface-secondary border border-border rounded-lg px-3 py-1.5 text-xs font-mono text-foreground focus:outline-none focus:border-primary"
+          {rawInput && (
+            <button
+              type="button"
+              onClick={() => setRawInput('')}
+              className="text-[11px] font-mono text-foreground-muted hover:text-danger cursor-pointer"
             >
-              {SAMPLE_EMAILS.map((sample) => (
-                <option key={sample.id} value={sample.id}>
-                  {sample.id} - {sample.category} ({sample.severity})
-                </option>
-              ))}
-            </select>
-
-            <label className="cursor-pointer flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-surface text-xs font-mono text-foreground border border-border transition-colors btn-press">
-              <Upload className="w-3.5 h-3.5 text-primary" />
-              <span>UPLOAD .EML</span>
-              <input type="file" accept=".eml,.txt" onChange={handleFileUpload} className="hidden" />
-            </label>
-          </div>
+              Clear
+            </button>
+          )}
         </div>
 
-        {/* Input Textarea */}
         <div className="relative">
           <textarea
             value={rawInput}
             onChange={(e) => setRawInput(e.target.value)}
-            rows={5}
-            placeholder="Paste raw email headers and body text here..."
+            rows={8}
+            placeholder="From: sender@example.com&#10;To: recipient@example.com&#10;Subject: Security Notification&#10;Date: Mon, 15 Sep 2026 12:00:00 +0000&#10;Received: from mail.example.com...&#10;&#10;Email body content here..."
             className="w-full p-3.5 bg-surface-secondary border border-border rounded-lg font-mono text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed"
           />
+        </div>
+
+        <div className="flex justify-end">
           <button
             type="button"
             onClick={handleRunAnalysis}
-            disabled={isAnalyzing}
-            className="absolute bottom-3 right-3 flex items-center space-x-1.5 px-3.5 py-1.5 rounded-md bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs tracking-wider transition-colors btn-press disabled:opacity-50 cursor-pointer"
+            disabled={isAnalyzing || !rawInput.trim()}
+            className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs tracking-wider transition-colors btn-press disabled:opacity-50 cursor-pointer"
           >
             {isAnalyzing ? (
-              <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
+                <span>EXECUTING FORENSIC PIPELINE...</span>
+              </>
             ) : (
-              <Zap className="w-3.5 h-3.5" />
+              <>
+                <Zap className="w-3.5 h-3.5" />
+                <span>RUN FORENSIC ANALYSIS</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </>
             )}
-            <span>{isAnalyzing ? 'PARSING...' : 'RUN FORENSIC ANALYSIS'}</span>
           </button>
         </div>
       </div>
 
-      {/* Main Analysis Results Console */}
-      <div className="space-y-6">
-        {/* Campaign Fingerprinting Alert */}
-        {(currentEmail.riskScore > 60 || currentEmail.id === 'email-001') && (
-          <CampaignAlertBanner
-            alertData={{
-              is_campaign_detected: true,
-              campaign_id: 'C-042',
-              campaign_name: 'Operation DarkHydra - Executive Invoice & Wire Harvester',
-              correlated_message_count: 16,
-              overall_confidence: 91,
-              strongest_reasons: [
-                'Shared dropzone IP 185.220.101.42 (Russia / Bulletproof Node AS4821)',
-                'URL redirect chain leading to /auth/v2/secure_login.php credential harvester',
-                'HTML SimHash template match 89% across executive invoice lures',
-                'Lookalike domain target: bank-corp-update.com impersonating BankCorp'
-              ],
-              category_scores: {
-                infrastructure_similarity: 92,
-                domain_similarity: 78,
-                url_similarity: 96,
-                content_similarity: 81,
-                template_similarity: 89,
-                authentication_similarity: 75,
-                attachment_similarity: 85,
-                overall_confidence: 91
-              },
-              alert_headline: 'Potential campaign detected',
-              alert_subtext: 'This email shares infrastructure or behavioral characteristics with 16 previously analyzed messages.',
-              first_seen: '2026-08-12T04:12:00Z',
-              last_seen: '2026-09-10T19:45:00Z',
-              dominant_attack_type: 'Credential Harvesting & BEC Wire Fraud',
-              targeted_brands: ['BankCorp', 'Microsoft 365', 'DocuSign']
-            }}
-          />
-        )}
-
-        {/* Risk Score & Threat Summary Header Card */}
-        <div className="bg-surface border border-border rounded-xl p-6 grid grid-cols-1 lg:grid-cols-4 gap-6 items-center">
-          {/* Risk Gauge */}
-          <div className="flex flex-col items-center justify-center p-4 rounded-lg bg-surface-secondary border border-border text-center">
-            <span className="text-[10px] font-mono text-foreground-muted uppercase tracking-widest font-semibold">
-              FRAUD RISK SCORE
-            </span>
-            <div className="relative my-2 flex items-center justify-center">
-              <div
-                className={`text-3xl font-bold font-mono ${
-                  currentEmail.riskScore > 80
-                    ? 'text-danger'
-                    : currentEmail.riskScore > 50
-                    ? 'text-warning'
-                    : 'text-success'
-                }`}
-              >
-                {currentEmail.riskScore}%
-              </div>
-            </div>
-            <RiskBadge severity={currentEmail.severity} size="md" />
-          </div>
-
-          {/* Email Subject & Threat Overview */}
-          <div className="lg:col-span-3 space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2">
-              <span className="text-xs font-mono text-primary font-semibold">
-                ANALYSIS REF: {currentEmail.id}
-              </span>
-              <span className="text-xs font-mono text-foreground-muted">
-                Timestamp: {currentEmail.timestamp}
-              </span>
-            </div>
-
-            <div>
-              <h3 className="text-base font-bold text-foreground font-sans">
-                {currentEmail.subject}
-              </h3>
-              <p className="text-xs text-foreground-muted mt-1 leading-relaxed">
-                {currentEmail.summary}
-              </p>
-            </div>
-
-            {/* NLP Sentiment Cues */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-              <div
-                className={`p-2 rounded-lg border text-[10px] font-mono flex items-center justify-between ${
-                  currentEmail.nlpFlags.urgencyCues
-                    ? 'bg-danger-surface border-danger-border text-danger font-semibold'
-                    : 'bg-surface-secondary border-border text-foreground-muted'
-                }`}
-              >
-                <span>Urgency Cues</span>
-                <span>{currentEmail.nlpFlags.urgencyCues ? 'DETECTED' : 'NONE'}</span>
-              </div>
-
-              <div
-                className={`p-2 rounded-lg border text-[10px] font-mono flex items-center justify-between ${
-                  currentEmail.nlpFlags.financialDiversionLanguage
-                    ? 'bg-danger-surface border-danger-border text-danger font-semibold'
-                    : 'bg-surface-secondary border-border text-foreground-muted'
-                }`}
-              >
-                <span>Payment Diversion</span>
-                <span>{currentEmail.nlpFlags.financialDiversionLanguage ? 'DETECTED' : 'NONE'}</span>
-              </div>
-
-              <div
-                className={`p-2 rounded-lg border text-[10px] font-mono flex items-center justify-between ${
-                  currentEmail.nlpFlags.credentialHarvestingKeywords
-                    ? 'bg-danger-surface border-danger-border text-danger font-semibold'
-                    : 'bg-surface-secondary border-border text-foreground-muted'
-                }`}
-              >
-                <span>Credential Harvest</span>
-                <span>{currentEmail.nlpFlags.credentialHarvestingKeywords ? 'DETECTED' : 'NONE'}</span>
-              </div>
-
-              <div
-                className={`p-2 rounded-lg border text-[10px] font-mono flex items-center justify-between ${
-                  currentEmail.nlpFlags.authorityImpersonation
-                    ? 'bg-danger-surface border-danger-border text-danger font-semibold'
-                    : 'bg-surface-secondary border-border text-foreground-muted'
-                }`}
-              >
-                <span>Executive Impersonation</span>
-                <span>{currentEmail.nlpFlags.authorityImpersonation ? 'DETECTED' : 'NONE'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation Menu */}
-        <div className="flex space-x-1.5 border-b border-border pb-1 overflow-x-auto">
-          {[
-            { id: 'OVERVIEW', label: 'PROTOCOL BREAKDOWN' },
-            { id: 'ATTRIBUTION', label: 'INFRASTRUCTURE ATTRIBUTION', icon: Network },
-            { id: 'RELAY_TRACE', label: 'ORIGIN GEOLOCATION TRACE' },
-            { id: 'IOCS', label: 'EXTRACTED IOCS & HASHES' },
-            { id: 'GRAPH', label: 'ATTRIBUTION TOPOLOGY GRAPH' },
-            { id: 'HEADERS', label: 'RAW HEADERS' },
-          ].map((tab) => {
-            const isActive = activeTab === tab.id;
-            const Icon = 'icon' in tab ? tab.icon : null;
-            return (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-mono font-medium transition-colors cursor-pointer ${
-                  isActive
-                    ? 'bg-surface text-foreground font-semibold border border-border shadow-xs'
-                    : 'text-foreground-muted hover:text-foreground hover:bg-surface/50 border border-transparent'
-                }`}
-              >
-                {Icon && <Icon className="w-3.5 h-3.5 text-primary" />}
-                <span>{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Tab 1: Protocol Breakdown & Key Identity Specs */}
-        {activeTab === 'OVERVIEW' && (
-          <div className="space-y-6">
-            <HeaderProtocolStatus protocols={currentEmail.protocols} />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-surface border border-border space-y-2">
-                <h4 className="text-xs font-mono font-semibold text-primary uppercase">
-                  DISPLAY NAME vs SENDER DOMAIN ALIGNMENT
-                </h4>
-                <div className="text-xs font-mono space-y-1 text-foreground-muted">
-                  <div>Display Name: <strong className="text-foreground">{currentEmail.senderName}</strong></div>
-                  <div>Header From: <strong className="text-danger">{currentEmail.senderEmail}</strong></div>
-                  <div>Return-Path: <strong className="text-danger">{currentEmail.returnPath}</strong></div>
-                  <div>Reply-To: <strong className="text-warning">{currentEmail.replyTo}</strong></div>
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-surface border border-border space-y-2">
-                <h4 className="text-xs font-mono font-semibold text-primary uppercase">
-                  BODY TEXT CONTENT FORENSICS
-                </h4>
-                <div className="p-3 bg-surface-secondary rounded-lg text-xs font-mono text-foreground whitespace-pre-wrap max-h-40 overflow-y-auto">
-                  {currentEmail.bodyText}
-                </div>
-              </div>
-            </div>
-
-            {/* Section: Probabilistic Threat Attribution Engine */}
-            <div className="pt-2">
-              <InfrastructureAttributionSection
-                attribution={resolvedAttribution}
-                onFocusGraphNode={() => setActiveTab('GRAPH')}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Tab: Dedicated Infrastructure Attribution Section */}
-        {activeTab === 'ATTRIBUTION' && (
-          <div className="space-y-6">
-            <InfrastructureAttributionSection
-              attribution={resolvedAttribution}
-              onFocusGraphNode={() => setActiveTab('GRAPH')}
-            />
-          </div>
-        )}
-
-        {/* Tab 2: Geolocation & Hop Trajectory */}
-        {activeTab === 'RELAY_TRACE' && (
-          <GeoTraceMap originGeo={currentEmail.originGeo} hops={currentEmail.hops} />
-        )}
-
-        {/* Tab 3: Extracted Indicators of Compromise (IOCs) */}
-        {activeTab === 'IOCS' && (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Obfuscated Links */}
-            <div className="p-4 rounded-xl bg-surface border border-border space-y-3">
-              <div className="flex items-center space-x-2 text-xs font-mono font-semibold text-primary uppercase">
-                <ExternalLink className="w-3.5 h-3.5" />
-                <span>Extracted Obfuscated URLs ({currentEmail.iocs.urls.length})</span>
-              </div>
-              <div className="space-y-2">
-                {currentEmail.iocs.urls.map((urlObj, i) => (
-                  <div key={i} className="p-3 rounded-lg bg-surface-secondary border border-border text-xs font-mono">
-                    <div className="text-danger font-semibold break-all">{urlObj.url}</div>
-                    <div className="flex justify-between text-[10px] text-foreground-muted mt-1">
-                      <span>Target Domain: {urlObj.domain}</span>
-                      <span className="text-danger font-bold">{urlObj.riskScore}% Malicious Risk</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Hashes & File Attachments */}
-            <div className="p-4 rounded-xl bg-surface border border-border space-y-3">
-              <div className="flex items-center space-x-2 text-xs font-mono font-semibold text-primary uppercase">
-                <Hash className="w-3.5 h-3.5" />
-                <span>Payload Executable & Attachment Hashes</span>
-              </div>
-              {currentEmail.iocs.hashes.length > 0 ? (
-                <div className="space-y-2">
-                  {currentEmail.iocs.hashes.map((h, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-surface-secondary border border-border text-xs font-mono space-y-1">
-                      <div className="text-foreground font-semibold flex items-center justify-between">
-                        <span>{h.filename}</span>
-                        <span className="px-1.5 py-0.2 rounded bg-danger-surface text-danger text-[10px] border border-danger-border">
-                          MALICIOUS EXECUTABLE
-                        </span>
-                      </div>
-                      <div className="text-[10px] text-foreground-muted truncate">MD5: {h.md5}</div>
-                      <div className="text-[10px] text-primary truncate">SHA256: {h.sha256}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs font-mono text-foreground-muted">No file attachments detected in this message.</p>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Tab 4: Graph Topology */}
-        {activeTab === 'GRAPH' && (
-          <AttributionGraph
-            senderDomain={currentEmail.senderEmail.split('@')[1] || 'unknown'}
-            originIp={currentEmail.originGeo.ip}
-            targetEmail={currentEmail.recipientEmail}
-            campaignName={currentEmail.campaignName}
-            hashes={currentEmail.iocs.hashes.map(h => h.sha256)}
-          />
-        )}
-
-        {/* Tab 5: Raw Email Headers */}
-        {activeTab === 'HEADERS' && (
-          <div className="p-4 rounded-xl bg-surface border border-border">
-            <h4 className="text-xs font-mono font-semibold text-primary uppercase mb-2">
-              RFC-822 RAW MAIL HEADERS
-            </h4>
-            <pre className="p-4 bg-surface-secondary rounded-lg text-[11px] font-mono text-foreground overflow-x-auto leading-relaxed border border-border">
-              {currentEmail.rawHeaders}
-            </pre>
-          </div>
-        )}
+      {/* Forensic Verification Notice */}
+      <div className="p-4 rounded-xl bg-surface border border-border flex items-start space-x-3 text-xs font-mono text-foreground-muted">
+        <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+        <p className="leading-relaxed">
+          <strong className="text-foreground">Evidence Integrity Guarantee:</strong> Ingested emails are immutably hashed (SHA-256) upon upload. All authentication evaluations (SPF, DKIM, DMARC), network routing hops, and indicator extractions are derived exclusively from actual email content without synthetic fallbacks.
+        </p>
       </div>
     </div>
   );

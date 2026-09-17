@@ -515,3 +515,30 @@ class MockIPIntelligenceProvider(BaseIPIntelligenceProvider):
             confidence=0.90,
             error=None
         )
+
+
+class UnconfiguredIPIntelligenceProvider(BaseIPIntelligenceProvider):
+    """
+    Explicit unconfigured provider.
+    Used when no external provider credential is configured or when running keyless.
+    Returns honest un-enriched state per Phase 11 & Phase 19.
+    """
+
+    def get_provider_name(self) -> str:
+        return "unconfigured"
+
+    def is_configured(self) -> bool:
+        return False
+
+    async def lookup(self, ip: str) -> IPIntelligence:
+        is_public, clean_ip, early_res = _validate_and_check_ip(ip)
+        if early_res:
+            return early_res
+
+        return IPIntelligence(
+            ip=clean_ip,
+            scope="public",
+            enrichment_available=False,
+            error="Threat intelligence provider not configured."
+        )
+

@@ -1,4 +1,5 @@
 import asyncio
+import json
 from typing import Optional
 from fastapi import APIRouter, File, UploadFile, HTTPException, Header, Depends, status
 from fastapi.responses import JSONResponse
@@ -298,6 +299,15 @@ async def analyze_email(
         except Exception:
             analysis_result.ai_analyst = None
 
+        # Attach Section 18 Evidence Integrity Metadata
+        analysis_result.id = evidence_record.evidence_id
+        analysis_result.evidence_id = evidence_record.evidence_id
+        analysis_result.email_sha256 = raw_sha256
+        analysis_result.original_filename = safe_filename
+        analysis_result.upload_timestamp = evidence_record.upload_timestamp.isoformat()
+        analysis_result.size = evidence_record.size
+        analysis_result.uploader = evidence_record.uploader
+
         # Section 21: Probabilistic Threat Attribution Engine
         try:
             analysis_result.attribution = global_attribution_engine.attribute_email(analysis_result, db=db)
@@ -309,14 +319,6 @@ async def analyze_email(
             analysis_result.investigation_graph = global_graph_service.build_graph(analysis_result)
         except Exception:
             analysis_result.investigation_graph = None
-
-        # Attach Section 18 Evidence Integrity Metadata
-        analysis_result.id = evidence_record.evidence_id
-        analysis_result.evidence_id = evidence_record.evidence_id
-        analysis_result.original_filename = safe_filename
-        analysis_result.upload_timestamp = evidence_record.upload_timestamp.isoformat()
-        analysis_result.size = evidence_record.size
-        analysis_result.uploader = evidence_record.uploader
 
         # Log ANALYSIS_COMPLETED audit event
         score_val = analysis_result.threat_score.score if analysis_result.threat_score else 0.0
@@ -394,17 +396,29 @@ async def analyze_email(
         except Exception:
             pass
 
-        # Section 19: Record in email_analyses for Analyst Dashboard
+        # Section 19: Record in email_analyses for Analyst Dashboard and save full canonical payload
         try:
             from backend.services.dashboard_service import DashboardService
+            from backend.db.models import AnalysisPayloadModel
             DashboardService.record_email_analysis(
                 db=db,
                 evidence_record=evidence_record,
                 analysis_result=analysis_result,
                 raw_sha256=raw_sha256
             )
+            payload_json = analysis_result.model_dump_json(by_alias=True) if hasattr(analysis_result, "model_dump_json") else json.dumps(analysis_result)
+            existing_payload = db.query(AnalysisPayloadModel).filter(AnalysisPayloadModel.evidence_id == evidence_record.evidence_id).first()
+            if not existing_payload:
+                existing_payload = AnalysisPayloadModel(
+                    evidence_id=evidence_record.evidence_id,
+                    analysis_json=payload_json
+                )
+                db.add(existing_payload)
+            else:
+                existing_payload.analysis_json = payload_json
+            db.commit()
         except Exception:
-            pass
+            db.rollback()
 
         return analysis_result
     except EmailParseException as e:
@@ -420,6 +434,19 @@ async def analyze_email(
 
 
 @router.get(
+    "/{id}/analysis",
+    summary="Get canonical stored analysis for an email by evidence ID, SHA-256, or record ID",
+    description="Returns the exact immutable forensic analysis JSON generated at ingestion."
+)
+def get_canonical_email_analysis(
+    id: str,
+    db: Session = Depends(get_db)
+):
+    from backend.services.analysis_repository import load_analysis
+    return load_analysis(db, id)
+
+
+@router.get(
     "/{sha256:path}/timeline",
     response_model=InvestigationTimelineResponse,
     summary="Get investigation timeline for an email by SHA-256 or evidence ID",
@@ -430,3 +457,4 @@ def get_email_investigation_timeline(
     db: Session = Depends(get_db)
 ):
     return AuditService.get_timeline(db, identifier=sha256)
+

@@ -244,15 +244,7 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
   // 1. Calculate Evidence SHA-256 if missing
   let emailSha256 = email.email_sha256;
   if (!emailSha256 || emailSha256 === 'Not available') {
-    let hash = 0;
-    const str = email.raw_email || fullText;
-    for (let i = 0; i < str.length; i++) {
-      hash = (hash << 5) - hash + str.charCodeAt(i);
-      hash |= 0;
-    }
-    const hex = Math.abs(hash).toString(16).padStart(8, '0');
-    emailSha256 = `${hex}97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef` + hex;
-    emailSha256 = emailSha256.substring(0, 64);
+    emailSha256 = undefined;
   }
 
   // 2. Resolve Authentication & Sender Alignment
@@ -287,8 +279,7 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
   const dkimMatch = fullHeaderAndBody.match(/\bdkim=(pass|fail|neutral|none|temperror|permerror)\b/i);
   let dkimResult = dkimMatch ? dkimMatch[1].toLowerCase() : 'none';
   if (dkimResult === 'none' && /dkim=pass/i.test(fullHeaderAndBody)) dkimResult = 'pass';
-  if (dkimResult === 'none' && /dkim=fail/i.test(fullHeaderAndBody)) dkimResult = 'fail';
-  if (dkimResult === 'none' && /DKIM-Signature:/i.test(fullHeaderAndBody)) dkimResult = 'pass';
+  if (dkimResult === 'none' && /DKIM-Signature:/i.test(fullHeaderAndBody)) dkimResult = 'unknown';
 
   // Parse DMARC
   const dmarcMatch = fullHeaderAndBody.match(/\bdmarc=(pass|fail|neutral|none|temperror|permerror)\b/i);
@@ -736,76 +727,35 @@ export const resolveDomainIntelligence = (domain: string, existing?: Record<stri
     }
   }
 
-  // 3. Fallback for mock/demo domains
-  const isDemoNew = norm.includes('suspicious') || norm.includes('urgent') || norm.includes('phish') || norm.includes('micros0ft') || norm.includes('bank-corp-update') || norm.includes('wire-transfer');
-  const isEstablished = norm.includes('google') || norm.includes('microsoft') || norm.includes('company') || norm.includes('example.org') || norm.includes('example.net') || norm.includes('yandex');
-
-  const ageDays = isDemoNew ? 18 : (isEstablished ? 7300 : undefined);
-  const isNew = ageDays !== undefined ? ageDays <= 30 : undefined;
+  // 3. Fallback when provider is not configured or lookup unavailable
   const lookalikeFinding = detectLookalikeDomain(norm);
 
   return {
     domain: norm,
     dns: {
-      a: ['192.0.2.1'],
+      a: [],
       aaaa: [],
-      mx: [`10 mail.${norm}`],
-      ns: [`ns1.${norm}`, `ns2.${norm}`],
-      txt: ['v=spf1 ~all']
+      mx: [],
+      ns: [],
+      txt: []
     },
     registration: {
-      registrar: norm.includes('google') ? 'MarkMonitor Inc.' : (norm.includes('micros0ft') ? 'NameCheap, Inc.' : (ageDays !== undefined ? 'Authoritative Registrar LLC' : undefined)),
-      registration_date: ageDays !== undefined ? new Date(Date.now() - ageDays * 86400000).toISOString() : undefined,
-      expiration_date: ageDays !== undefined ? new Date(Date.now() + 365 * 86400000).toISOString() : undefined,
-      nameservers: [`ns1.${norm}`, `ns2.${norm}`],
-      status: ['clientTransferProhibited'],
-      registration_source: ageDays !== undefined ? 'RDAP' : 'unavailable'
+      registrar: undefined,
+      registration_date: undefined,
+      expiration_date: undefined,
+      nameservers: [],
+      status: [],
+      registration_source: 'unavailable'
     },
-    domain_age_days: ageDays,
-    newly_registered_domain: isNew,
-    is_resolvable: true,
-    status_message: 'Active / Resolvable',
+    domain_age_days: undefined,
+    newly_registered_domain: undefined,
+    is_resolvable: false,
+    status_message: 'Domain intelligence provider not configured or lookup unavailable',
     lookalike: lookalikeFinding
   };
 };
 
-const KNOWN_GEO_COORDS: Record<string, { lat: number; lon: number; city: string; country: string; countryCode: string; region: string; timezone: string }> = {
-  '192.0.2.14': { lat: 52.3702, lon: 4.8952, city: 'Amsterdam', country: 'Netherlands', countryCode: 'NL', region: 'North Holland', timezone: 'Europe/Amsterdam' },
-  '192.0.2.200': { lat: 51.5074, lon: -0.1278, city: 'London', country: 'United Kingdom', countryCode: 'GB', region: 'England', timezone: 'Europe/London' },
-  '198.51.100.22': { lat: 52.2297, lon: 21.0122, city: 'Warsaw', country: 'Poland', countryCode: 'PL', region: 'Masovian', timezone: 'Europe/Warsaw' },
-  '198.51.100.77': { lat: 50.1109, lon: 8.6821, city: 'Frankfurt', country: 'Germany', countryCode: 'DE', region: 'Hesse', timezone: 'Europe/Berlin' },
-  '198.51.100.12': { lat: 50.1109, lon: 8.6821, city: 'Frankfurt', country: 'Germany', countryCode: 'DE', region: 'Hesse', timezone: 'Europe/Berlin' },
-  '203.0.113.25': { lat: 40.7128, lon: -74.0060, city: 'New York', country: 'United States', countryCode: 'US', region: 'New York', timezone: 'America/New_York' },
-  '203.0.113.88': { lat: 37.3382, lon: -121.8863, city: 'San Jose', country: 'United States', countryCode: 'US', region: 'California', timezone: 'America/Los_Angeles' },
-  '203.0.113.89': { lat: 37.3382, lon: -121.8863, city: 'San Jose', country: 'United States', countryCode: 'US', region: 'California', timezone: 'America/Los_Angeles' },
-  '8.8.8.8': { lat: 39.0300, lon: -77.5000, city: 'Ashburn', country: 'United States', countryCode: 'US', region: 'Virginia', timezone: 'America/New_York' },
-  '1.1.1.1': { lat: -33.8688, lon: 151.2093, city: 'Sydney', country: 'Australia', countryCode: 'AU', region: 'New South Wales', timezone: 'Australia/Sydney' },
-};
 
-const CITY_COUNTRY_COORDS: Record<string, { lat: number; lon: number }> = {
-  amsterdam: { lat: 52.3676, lon: 4.9041 },
-  london: { lat: 51.5074, lon: -0.1278 },
-  frankfurt: { lat: 50.1109, lon: 8.6821 },
-  'new york': { lat: 40.7128, lon: -74.0060 },
-  'mountain view': { lat: 37.3860, lon: -122.0839 },
-  'san jose': { lat: 37.3382, lon: -121.8863 },
-  'san francisco': { lat: 37.7749, lon: -122.4194 },
-  ashburn: { lat: 39.0438, lon: -77.4874 },
-  warsaw: { lat: 52.2297, lon: 21.0122 },
-  paris: { lat: 48.8566, lon: 2.3522 },
-  tokyo: { lat: 35.6762, lon: 139.6503 },
-  singapore: { lat: 1.3521, lon: 103.8198 },
-  sydney: { lat: -33.8688, lon: 151.2093 },
-  mumbai: { lat: 19.0760, lon: 72.8777 },
-  germany: { lat: 50.1109, lon: 8.6821 },
-  netherlands: { lat: 52.3676, lon: 4.9041 },
-  'united kingdom': { lat: 51.5074, lon: -0.1278 },
-  'united states': { lat: 37.3860, lon: -122.0839 },
-  poland: { lat: 52.2297, lon: 21.0122 },
-  france: { lat: 48.8566, lon: 2.3522 },
-  japan: { lat: 35.6762, lon: 139.6503 },
-  india: { lat: 19.0760, lon: 72.8777 }
-};
 
 export const resolveIPIntelligence = (ip: string, existing?: Record<string, IPIntelligence>): IPIntelligence => {
   const clean = ip.replace(/^IPv6:/i, '').trim();
@@ -821,105 +771,39 @@ export const resolveIPIntelligence = (ip: string, existing?: Record<string, IPIn
     };
   }
 
-  // If existing has valid coordinates already, preserve it completely
+  // If existing record has valid enrichment from real backend, preserve it
   if (existing && existing[ip]) {
     const prev = existing[ip];
-    if (typeof prev.latitude === 'number' && typeof prev.longitude === 'number') {
+    if (prev.enrichment_available && typeof prev.latitude === 'number' && typeof prev.longitude === 'number') {
       return prev;
     }
-  }
-
-  // Check known IP registry
-  const known = KNOWN_GEO_COORDS[clean];
-  if (known) {
-    const prev = existing ? existing[ip] : undefined;
-    return {
-      ip,
-      scope: 'public',
-      enrichment_available: true,
-      country: prev?.country || known.country,
-      country_code: prev?.country_code || known.countryCode,
-      region: prev?.region || known.region,
-      city: prev?.city || known.city,
-      latitude: known.lat,
-      longitude: known.lon,
-      timezone: prev?.timezone || known.timezone,
-      asn: prev?.asn || 'AS64512',
-      asn_org: prev?.asn_org || 'Observed Transit Provider',
-      isp: prev?.isp || prev?.organization || 'Infrastructure Services',
-      organization: prev?.organization || 'Observed Hosting Network',
-      is_hosting: true,
-      is_proxy_vpn_tor: Boolean(prev?.is_proxy_vpn_tor),
-      infrastructure_type: prev?.infrastructure_type || 'Observed Infrastructure Location'
-    };
-  }
-
-  // Check if existing record has city or country that we can map to coordinates
-  const prev = existing ? existing[ip] : undefined;
-  if (prev?.city && CITY_COUNTRY_COORDS[prev.city.toLowerCase()]) {
-    const c = CITY_COUNTRY_COORDS[prev.city.toLowerCase()];
-    return {
-      ...prev,
-      scope: 'public',
-      enrichment_available: true,
-      latitude: c.lat,
-      longitude: c.lon,
-      infrastructure_type: prev.infrastructure_type || 'Observed Infrastructure Location'
-    };
-  }
-  if (prev?.country && CITY_COUNTRY_COORDS[prev.country.toLowerCase()]) {
-    const c = CITY_COUNTRY_COORDS[prev.country.toLowerCase()];
-    return {
-      ...prev,
-      scope: 'public',
-      enrichment_available: true,
-      latitude: c.lat,
-      longitude: c.lon,
-      infrastructure_type: prev.infrastructure_type || 'Observed Infrastructure Location'
-    };
-  }
-
-  // Default fallback enrichment for public IPs if backend lookup wasn't performed
-  if (clean.startsWith('203.0.113.') || clean.startsWith('198.51.100.') || clean.startsWith('192.0.2.')) {
-    return {
-      ip,
-      scope: 'public',
-      enrichment_available: true,
-      country: prev?.country || 'Netherlands',
-      country_code: prev?.country_code || 'NL',
-      region: prev?.region || 'North Holland',
-      city: prev?.city || 'Amsterdam',
-      latitude: 52.3676,
-      longitude: 4.9041,
-      timezone: prev?.timezone || 'Europe/Amsterdam',
-      asn: prev?.asn || 'AS12345',
-      asn_org: prev?.asn_org || 'Example Cloud Services BV',
-      isp: prev?.isp || 'Example Cloud Infrastructure',
-      organization: prev?.organization || 'Example Cloud Services',
-      is_hosting: true,
-      is_proxy_vpn_tor: false,
-      infrastructure_type: prev?.infrastructure_type || 'Observed Infrastructure Location'
-    };
+    if (prev.country || prev.asn) {
+      return {
+        ...prev,
+        ip,
+        scope: 'public'
+      };
+    }
   }
 
   return {
     ip,
     scope: 'public',
-    enrichment_available: true,
-    country: prev?.country || 'United States',
-    country_code: prev?.country_code || 'US',
-    region: prev?.region || 'California',
-    city: prev?.city || 'Mountain View',
-    latitude: 37.3860,
-    longitude: -122.0839,
-    timezone: prev?.timezone || 'America/Los_Angeles',
-    asn: prev?.asn || 'AS15169',
-    asn_org: prev?.asn_org || 'Google LLC',
-    isp: prev?.isp || 'Google LLC',
-    organization: prev?.organization || 'Google Cloud Platform',
-    is_hosting: true,
-    is_proxy_vpn_tor: false,
-    infrastructure_type: prev?.infrastructure_type || 'Observed Infrastructure Location'
+    enrichment_available: false,
+    country: undefined,
+    country_code: undefined,
+    region: undefined,
+    city: undefined,
+    latitude: undefined,
+    longitude: undefined,
+    timezone: undefined,
+    asn: undefined,
+    asn_org: undefined,
+    isp: undefined,
+    organization: undefined,
+    is_hosting: undefined,
+    is_proxy_vpn_tor: undefined,
+    infrastructure_type: 'Public IP (Enrichment unavailable)'
   };
 };
 

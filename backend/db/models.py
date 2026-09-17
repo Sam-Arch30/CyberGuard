@@ -260,3 +260,16 @@ class CopilotAuditLogModel(Base):
     model_identifier = Column(String(100), nullable=False, default="mailtrace-copilot-v1")
     timestamp = Column(DateTime, default=get_utc_now, nullable=False, index=True)
 
+
+class AnalysisPayloadModel(Base):
+    """
+    Stores canonical full analysis JSON for an ingested email evidence record.
+    Preserves complete forensic indicators and prevents fabrication on reload.
+    """
+    __tablename__ = "analysis_payloads"
+
+    evidence_id = Column(String(128), primary_key=True)
+    analysis_json = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+

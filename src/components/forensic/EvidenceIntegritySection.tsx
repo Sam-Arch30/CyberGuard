@@ -26,7 +26,7 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
   const syncTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const hasFetchedRef = React.useRef<string | null>(null);
 
-  // Derive robust 64-character SHA-256 hash without displaying internal IDs as hashes
+  // Derive 64-character SHA-256 hash
   const cleanSha = React.useMemo(() => {
     if (email.email_sha256 && /^[a-f0-9]{64}$/i.test(email.email_sha256)) {
       return email.email_sha256.toLowerCase();
@@ -34,13 +34,10 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
     if (email.id && /^[a-f0-9]{64}$/i.test(email.id)) {
       return email.id.toLowerCase();
     }
-    if (email.id === 'sample-001' || email.id === 'sample-1' || email.id === 'demo' || email.id === 'latest') {
-      return '97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a';
-    }
-    return email.email_sha256 || '97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a';
+    return email.email_sha256 || 'Hash not calculated';
   }, [email.email_sha256, email.id]);
 
-  const evidenceId = email.evidence_id || (cleanSha ? `EVD-${cleanSha.slice(0, 10).toUpperCase()}` : 'EVD-PENDING');
+  const evidenceId = email.evidence_id || (cleanSha && cleanSha !== 'Hash not calculated' ? `EVD-${cleanSha.slice(0, 10).toUpperCase()}` : 'EVD-DIRECT');
   const filename = email.original_filename || email.file_info?.filename || 'uploaded_email.eml';
   const fileSize = email.size || email.file_info?.size_bytes || 0;
   const uploader = email.uploader || 'SOC Analyst';
@@ -54,7 +51,7 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
       const d = new Date(email.date);
       if (!isNaN(d.getTime())) return d;
     }
-    return new Date(2026, 8, 8, 10, 38, 0);
+    return null;
   }, [email.upload_timestamp, email.date]);
 
   // Format size nicely
@@ -128,8 +125,8 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
         return true;
       });
       setTimelineEvents(deduped);
-    } else {
-      // Fallback synthesized timeline if server is offline or record is freshly created locally
+    } else if (uploadTime) {
+      // Synthesized timeline from actual upload timestamp if server record has not generated separate audit events
       const baseHour = uploadTime.getHours().toString().padStart(2, '0');
       const baseMin = uploadTime.getMinutes().toString().padStart(2, '0');
       const compMin = ((uploadTime.getMinutes() + 1) % 60).toString().padStart(2, '0');
@@ -166,13 +163,14 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
           description: threatScoreVal !== undefined
             ? `Deterministic Threat Score: ${threatScoreVal}/100 (${(threatSeverityVal || 'LOW').toUpperCase()})`
             : 'Forensic static features extracted and verified',
-          user: 'Automated Scoring Engine',
-          resource_type: 'email',
+          user: 'MailTrace Engine',
+          resource_type: 'analysis',
           resource_id: evidenceId
         }
       ];
-
       setTimelineEvents(synthesized);
+    } else {
+      setTimelineEvents([]);
     }
 
     // Always update last refreshed timestamp upon completion
@@ -318,10 +316,10 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
                 <span>Uploaded</span>
               </span>
               <p className="font-mono text-xs font-bold text-foreground">
-                {uploadTime.toUTCString()}
+                {uploadTime ? uploadTime.toUTCString() : 'Timestamp unavailable'}
               </p>
               <p className="font-mono text-[10px] text-foreground-muted">
-                Local: {uploadTime.toLocaleString()}
+                {uploadTime ? `Local: ${uploadTime.toLocaleString()}` : 'No date metadata in raw email'}
               </p>
             </div>
 

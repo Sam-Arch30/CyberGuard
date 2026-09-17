@@ -110,7 +110,7 @@ class InvestigationGraphService:
         severity_val = self._get(threat_score_obj, "severity", "low") if threat_score_obj else "low"
         ml_prob = self._get(email_analysis, "ml_phishing_probability", None)
 
-        email_node_id = f"email:{email_sha[:16] if email_sha else (email_id_str or 'main')}"
+        email_node_id = f"email:{email_id_str if email_id_str else (email_sha[:16] if email_sha else 'main')}"
         add_node(
             node_id=email_node_id,
             node_type=NodeType.EMAIL,

@@ -352,6 +352,8 @@ export interface EmailAnalysis {
   emails?: string[];
   attachments?: EmailAttachment[];
   hops?: any[];
+  is_demo?: boolean;
+  is_synthetic?: boolean;
 }
 
 export type ForensicTabType = 'overview' | 'copilot' | 'cross_investigation' | 'attribution' | 'graph' | 'map' | 'headers' | 'content' | 'indicators' | 'attachments' | 'raw';

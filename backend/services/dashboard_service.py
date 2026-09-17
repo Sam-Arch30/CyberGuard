@@ -51,20 +51,11 @@ class DashboardService:
                 except Exception:
                     pass
 
-            # Map known sample IPs to country if not already present
-            if not countries and ips:
-                for ip in ips:
-                    if ip.startswith("203.0.113"):
-                        countries.append("United States")
-                    elif ip.startswith("198.51.100"):
-                        countries.append("Germany")
-                    elif ip.startswith("192.0.2"):
-                        countries.append("Netherlands")
-
-            # Determine SPF/DKIM mock baseline for historical seeds based on severity
-            spf = "FAIL" if (ce.severity in ["high", "critical"] or (ce.threat_score or 0) > 50) else "PASS"
-            dkim = "FAIL" if (ce.severity == "critical" or (ce.threat_score or 0) >= 80) else "PASS"
-            dmarc = "FAIL" if spf == "FAIL" and dkim == "FAIL" else "PASS"
+            # Only use countries actually present in indicators
+            # Authentic SPF/DKIM/DMARC - leave as None if not evaluated
+            spf = None
+            dkim = None
+            dmarc = None
 
             record = EmailAnalysisModel(
                 evidence_id=ce.email_id if ce.email_id.startswith("EVD-") else None,
@@ -133,11 +124,12 @@ class DashboardService:
                     if c and c != "Unknown":
                         country_set.add(c)
 
-        if analysis_result.relay_analysis and analysis_result.relay_analysis.hops:
-            for hop in analysis_result.relay_analysis.hops:
-                c = getattr(hop, "country", None) or (hop.get("country") if isinstance(hop, dict) else None)
-                if c and c != "Unknown":
-                    country_set.add(c)
+        relay = analysis_result.relay_analysis
+        hops = (getattr(relay, "transmission_order_hops", None) or getattr(relay, "header_order_hops", None) or getattr(relay, "hops", None) or []) if relay else []
+        for hop in hops:
+            c = getattr(hop, "country", None) or (hop.get("country") if isinstance(hop, dict) else None)
+            if c and c != "Unknown":
+                country_set.add(c)
 
         indicators = {
             "domains": sorted(list(domain_set)),
@@ -150,7 +142,7 @@ class DashboardService:
             evidence_id=evidence_record.evidence_id,
             email_sha256=raw_sha256,
             subject=analysis_result.subject or "Untitled Email",
-            sender=analysis_result.sender or "unknown",
+            sender=(getattr(analysis_result, "sender", None) or getattr(analysis_result, "from_header", None) or "unknown"),
             threat_score=score_val,
             severity=sev_val,
             spf_result=spf_res,

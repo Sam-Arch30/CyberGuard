@@ -59,7 +59,7 @@ export const EmailForensicView: React.FC = () => {
       if (!hasML) {
         const textToAnalyze = resolved.plain_text_body || (resolved.html_body ? resolved.html_body.replace(/<[^>]+>/g, ' ') : '');
         if (resolved.subject || textToAnalyze) {
-          fetch('http://localhost:8000/api/emails/ml-classify', {
+          fetch('/api/emails/ml-classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -88,7 +88,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch AI Analyst assessment if not already cached
       if (!resolved.ai_analyst) {
-        fetch('http://localhost:8000/api/emails/ai-analyst', {
+        fetch('/api/emails/ai-analyst', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -112,7 +112,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch Attribution if not already cached
       if (!resolved.attribution) {
-        fetch('http://localhost:8000/api/emails/attribution', {
+        fetch('/api/emails/attribution', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -136,7 +136,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch Investigation Graph if not already cached
       if (!resolved.investigation_graph) {
-        fetch('http://localhost:8000/api/emails/investigation-graph', {
+        fetch('/api/emails/investigation-graph', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -160,7 +160,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch Explainable Threat Score if not already cached with audit metadata
       if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
-        fetch('http://localhost:8000/api/emails/calculate-threat-score', {
+        fetch('/api/emails/calculate-threat-score', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -181,10 +181,27 @@ export const EmailForensicView: React.FC = () => {
           })
           .catch(() => {});
       }
+      setLoading(false);
+    } else if (targetId && targetId !== 'latest') {
+      fetch(`/api/emails/${targetId}/analysis`)
+        .then(res => {
+          if (!res.ok) throw new Error('Not found');
+          return res.json();
+        })
+        .then(apiData => {
+          const resolved = resolveEmailIndicators(apiData);
+          saveAnalysisResult(targetId, resolved);
+          setAnalysis(resolved);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError(`Unable to load forensic analysis for email ID '${targetId}'.`);
+          setLoading(false);
+        });
     } else {
-      setError('Unable to load the forensic analysis for this email.');
+      setError('No emails analyzed yet. Upload or paste an email in the analysis console to begin.');
+      setLoading(false);
     }
-    setLoading(false);
   }, [id]);
 
   if (loading) {

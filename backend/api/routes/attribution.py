@@ -88,6 +88,13 @@ def get_email_attribution_endpoint(
     ).first()
 
     if record:
+        from backend.services.analysis_repository import load_analysis
+        try:
+            full_analysis = load_analysis(db, record.evidence_id)
+            return global_attribution_engine.attribute_email(full_analysis, db=db)
+        except Exception:
+            pass
+
         ind: Dict[str, Any] = {}
         if record.indicators_json:
             try:
@@ -104,7 +111,12 @@ def get_email_attribution_endpoint(
             "threat_score": {"score": record.threat_score, "severity": record.severity},
             "ips": ind.get("ips", []),
             "domains": ind.get("domains", []),
-            "urls": ind.get("urls", [])
+            "urls": ind.get("urls", []),
+            "ip_intelligence": ind.get("ip_intelligence", {}),
+            "domain_intelligence": ind.get("domain_intelligence", {}),
+            "lookalike_domains": ind.get("lookalike_domains", []),
+            "relay_analysis": ind.get("relay_analysis", {}),
+            "authentication": ind.get("authentication", {})
         }
         return global_attribution_engine.attribute_email(synth_analysis, db=db)
 
@@ -151,46 +163,6 @@ def get_email_attribution_endpoint(
             "urls": []
         }
         return global_attribution_engine.attribute_email(synth_analysis, db=db)
-
-    # If ID is sample-001 / latest fallback
-    if clean_id in ("sample-001", "latest", "demo"):
-        sample_sim = {
-            "id": "sample-001",
-            "evidence_id": "EVD-97D4B2E811",
-            "email_sha256": "97d4b2e811c7520e5e79603f9050d268159b360b9432df03d4083d8e57ef228a",
-            "subject": "URGENT: Verify your Microsoft Account",
-            "from_header": "Microsoft Security <security@micros0ft-example.com>",
-            "threat_score": {"score": 82.0, "severity": "critical"},
-            "ips": ["203.0.113.25", "198.51.100.12"],
-            "domains": ["micros0ft-example.com", "example.net"],
-            "urls": ["https://micros0ft-example.com/login"],
-            "relay_analysis": {
-                "earliest_observable_node": {
-                    "earliest_observable_ip": "203.0.113.25",
-                    "from_host": "mail.example.net"
-                }
-            },
-            "ip_intelligence": {
-                "203.0.113.25": {
-                    "country": "United States",
-                    "asn": "AS64512",
-                    "organization": "Threat Hosting Corp",
-                    "is_hosting": True,
-                    "is_proxy_vpn_tor": True
-                }
-            },
-            "domain_intelligence": {
-                "micros0ft-example.com": {
-                    "domain": "micros0ft-example.com",
-                    "dns": {"a": ["203.0.113.25"]},
-                    "lookalike": {
-                        "domain": "micros0ft-example.com",
-                        "suspected_brand": "microsoft.com"
-                    }
-                }
-            }
-        }
-        return global_attribution_engine.attribute_email(sample_sim, db=db)
 
     raise HTTPException(
         status_code=status.HTTP_404_NOT_FOUND,

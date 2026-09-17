@@ -6,7 +6,8 @@ from backend.services.ip_providers import (
     BaseIPIntelligenceProvider,
     IPApiProvider,
     IPInfoProvider,
-    MockIPIntelligenceProvider
+    MockIPIntelligenceProvider,
+    UnconfiguredIPIntelligenceProvider,
 )
 from backend.config.geolocation_config import GeolocationConfig, global_geolocation_config
 from backend.services.ip_cache import global_ip_cache, IPIntelligenceCache
@@ -30,11 +31,11 @@ class IPIntelligenceService:
 
     def _get_default_provider(self) -> BaseIPIntelligenceProvider:
         provider_name = self.config.provider
-        if provider_name == "mock":
-            return MockIPIntelligenceProvider()
-        elif provider_name == "ipinfo":
+        if provider_name == "ipinfo":
             return IPInfoProvider(config=self.config)
-        return IPApiProvider(config=self.config)
+        elif provider_name == "ipapi":
+            return IPApiProvider(config=self.config)
+        return UnconfiguredIPIntelligenceProvider()
 
     async def get_ip_intelligence(self, ip: str) -> IPIntelligence:
         """
@@ -65,14 +66,16 @@ class IPIntelligenceService:
         if cached_res is not None:
             return cached_res
 
-        # 3. Provider Lookup with Graceful Error Handling & Fallback
+        # 3. Provider Lookup with Graceful Error Handling
         try:
             res = await self.provider.lookup(ip)
         except Exception as e:
-            # Fallback to mock provider on unexpected error
-            mock_p = MockIPIntelligenceProvider()
-            res = await mock_p.lookup(ip)
-            res.error = f"Primary provider failed: {str(e)}"
+            res = IPIntelligence(
+                ip=ip,
+                scope="public",
+                enrichment_available=False,
+                error=f"Lookup unavailable: {str(e)}"
+            )
 
         # 4. Save result in cache
         self.cache.set(ip, res)

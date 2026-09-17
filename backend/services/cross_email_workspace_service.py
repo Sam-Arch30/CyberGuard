@@ -608,30 +608,55 @@ class CrossEmailWorkspaceService:
         # Sub-linear candidate discovery
         candidate_ids = self.find_candidate_email_ids(email_data, exclude_id=current_id)
 
-        # If candidates are empty (e.g., initial or unindexed demo upload), ensure we check
-        # all synthetic demo emails if the email exhibits wire fraud or C-042 markers
-        is_demo_context = False
-        sub_text = str(email_data.get("subject") or "").lower()
-        sender_text = str(email_data.get("from") or email_data.get("sender") or "").lower()
-        if (
-            "wire" in sub_text or "settlement" in sub_text or "bank-corp" in sender_text
-            or "c-042" in str(email_data.get("campaign") or "").lower()
-            or current_id in ("EML-2026-8819", "sample-001", "demo", "latest")
-            or not candidate_ids
-        ):
-            is_demo_context = True
+        # Ingest current email into index
+        self.index_email(current_id, email_data)
+
+        # Check if explicit demo context
+        is_demo_context = bool(
+            email_data.get("is_demo")
+            or email_data.get("is_synthetic")
+            or current_id == "EML-2026-8819"
+        )
+
+        if is_demo_context:
             for eid in self._memory_email_cache:
                 if eid != current_id:
                     candidate_ids.add(eid)
+        elif db is not None:
+            from backend.db.models import EmailAnalysisModel
+            from backend.services.analysis_repository import load_analysis
+            try:
+                db_emails = db.query(EmailAnalysisModel).filter(
+                    EmailAnalysisModel.evidence_id != current_id,
+                    EmailAnalysisModel.email_sha256 != (email_data.get("email_sha256") or "")
+                ).all()
+                for row in db_emails:
+                    if row.evidence_id not in self._memory_email_cache:
+                        try:
+                            stored = load_analysis(db, row.evidence_id)
+                            self.index_email(row.evidence_id, stored)
+                            candidate_ids.add(row.evidence_id)
+                        except Exception:
+                            pass
+                    else:
+                        candidate_ids.add(row.evidence_id)
+            except Exception:
+                pass
 
         scored_items: List[RelatedEmailItem] = []
 
         for cid in candidate_ids:
             # Check false positive suppression
             is_suppressed_by_analyst = cid in unrelated_target_ids
+            if is_suppressed_by_analyst and not is_demo_context:
+                continue
 
             cand_data = self._memory_email_cache.get(cid)
             if not cand_data:
+                continue
+
+            # In normal mode, strictly exclude synthetic records
+            if cand_data.get("is_synthetic") and not is_demo_context:
                 continue
 
             cand_profile = self.correlator.extract_profile_from_email_dict(cand_data)
@@ -678,43 +703,76 @@ class CrossEmailWorkspaceService:
         # * similar subject
         # * same Reply-To domain
         # * overlapping sender infrastructure
-        strongest_relationships = [
-            "same redirect domain",
-            "same ASN",
-            "highly similar HTML template",
-            "similar subject",
-            "same Reply-To domain",
-            "overlapping sender infrastructure"
-        ]
+        if is_demo_context:
+            strongest_relationships = [
+                "same redirect domain",
+                "same ASN",
+                "highly similar HTML template",
+                "similar subject",
+                "same Reply-To domain",
+                "overlapping sender infrastructure"
+            ]
+            timeline_events = self._build_synthetic_demo_timeline()
+            campaign_confidence = 89.0
+            campaign_id = "C-042"
+        else:
+            if scored_items:
+                strongest_relationships = [
+                    "same redirect domain",
+                    "same ASN",
+                    "highly similar HTML template",
+                    "similar subject",
+                    "same Reply-To domain",
+                    "overlapping sender infrastructure"
+                ]
+                timeline_events = self._build_real_cross_email_timeline(scored_items)
+                campaign_confidence = round(sum(x.similarity for x in scored_items[:5]) / min(len(scored_items), 5), 1)
+                campaign_id = scored_items[0].campaign if scored_items[0].campaign else None
+            else:
+                strongest_relationships = []
+                timeline_events = []
+                campaign_confidence = None
+                campaign_id = None
 
-        # Generate attack timeline events (chronologically ordered)
-        timeline_events = self._build_cross_email_attack_timeline(scored_items)
-
-        # Count related emails (ensuring canonical 16 emails discovered in demo context)
         related_count = len(scored_items)
-        campaign_confidence = 89.0 if (is_demo_context or related_count >= 10) else (
-            round(sum(x.similarity for x in scored_items[:5]) / min(len(scored_items), 5), 1) if scored_items else 0.0
-        )
 
         return CrossEmailAnalysisResponse(
             related_activity_detected=related_count > 0,
             related_count=related_count,
             campaign_confidence=campaign_confidence,
-            campaign_id="C-042" if is_demo_context else (scored_items[0].campaign if scored_items else None),
+            campaign_id=campaign_id,
             strongest_relationships=strongest_relationships,
             related_emails=scored_items,
             timeline=timeline_events,
             is_synthetic=is_demo_context
         )
 
-    # -------------------------------------------------------------------------
-    # Cross-Email Attack Timeline Synthesis
-    # -------------------------------------------------------------------------
-
-    def _build_cross_email_attack_timeline(
+    def _build_real_cross_email_timeline(
         self,
         emails: List[RelatedEmailItem]
     ) -> List[CrossEmailTimelineEvent]:
+        events: List[CrossEmailTimelineEvent] = []
+        for idx, item in enumerate(emails, start=1):
+            events.append(
+                CrossEmailTimelineEvent(
+                    id=f"real-tl-{idx}",
+                    timestamp=item.received_time,
+                    time_display=item.received_time[:16] if item.received_time else "",
+                    event_type="email_delivered",
+                    title=f"Related message: {item.subject[:45]}...",
+                    description=f"Correlated message from {item.sender} with threat score {item.threat_score}.",
+                    related_emails=[item.id],
+                    indicators=list(item.shared_indicators.keys()) if item.shared_indicators else [],
+                    severity=item.severity
+                )
+            )
+        return events
+
+    # -------------------------------------------------------------------------
+    # Cross-Email Attack Timeline Synthesis (Demo Only)
+    # -------------------------------------------------------------------------
+
+    def _build_synthetic_demo_timeline(self) -> List[CrossEmailTimelineEvent]:
         """
         Builds a cross-email attack timeline matching the required example:
         09:14 — Email A delivered
@@ -800,7 +858,8 @@ class CrossEmailWorkspaceService:
     def compare_emails_matrix(
         self,
         email_ids: List[str],
-        current_email: Optional[Dict[str, Any]] = None
+        current_email: Optional[Dict[str, Any]] = None,
+        db: Optional[Any] = None
     ) -> ComparisonMatrixResponse:
         """
         Constructs a deep side-by-side comparison interface for 2 to 5 selected emails.
@@ -830,22 +889,15 @@ class CrossEmailWorkspaceService:
                 emails_data.append(current_email)
             elif eid in self._memory_email_cache:
                 emails_data.append(self._memory_email_cache[eid])
+            elif db is not None:
+                from backend.services.analysis_repository import load_analysis
+                try:
+                    stored = load_analysis(db, eid)
+                    emails_data.append(stored)
+                except Exception:
+                    raise KeyError(f"Email record '{eid}' not found")
             else:
-                # Mock baseline for unindexed ID
-                emails_data.append({
-                    "id": eid,
-                    "subject": f"Investigation Item {eid}",
-                    "sender": "unknown@sender.net",
-                    "recipient": "analyst@bankcorp.com",
-                    "date": "2026-09-05 10:42:15 UTC",
-                    "threat_score": {"score": 85.0, "severity": "high"},
-                    "threat_score_val": 85.0,
-                    "severity": "high",
-                    "ips": ["185.220.101.42"],
-                    "domains": ["bank-corp-update.com"],
-                    "urls": ["https://bank-corp-update.com/auth/v2/secure_login.php"],
-                    "asns": ["AS49281"]
-                })
+                raise KeyError(f"Email record '{eid}' not found")
 
         # Build column header metadata
         email_metas: List[ComparisonEmailMeta] = []

@@ -11,7 +11,7 @@ class GeolocationConfig:
     - Accurately distinguishes between configured (authenticated/pro) and unconfigured states.
     """
 
-    SUPPORTED_PROVIDERS = {"ipapi", "ipinfo", "mock"}
+    SUPPORTED_PROVIDERS = {"ipapi", "ipinfo", "mock", "unconfigured", "none"}
 
     def __init__(
         self,
@@ -21,7 +21,7 @@ class GeolocationConfig:
         raw_provider = provider or os.getenv("IP_INTELLIGENCE_PROVIDER", "ipapi")
         self.provider = raw_provider.strip().lower() if raw_provider else "ipapi"
         if self.provider not in self.SUPPORTED_PROVIDERS:
-            self.provider = "ipapi"
+            self.provider = "unconfigured"
 
         self._api_key = self._resolve_api_key(self.provider, explicit_key=api_key)
 

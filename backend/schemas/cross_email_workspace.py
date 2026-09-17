@@ -39,7 +39,7 @@ class CrossEmailAnalysisResponse(BaseModel):
     """Response payload when an email analysis completes and cross-email correlation is triggered."""
     related_activity_detected: bool = Field(..., description="Whether correlated emails meet significance threshold")
     related_count: int = Field(0, description="Total count of potentially related emails discovered")
-    campaign_confidence: float = Field(0.0, description="Campaign cluster confidence percentage (e.g. 89.0)")
+    campaign_confidence: Optional[float] = Field(None, description="Campaign cluster confidence percentage (e.g. 89.0)")
     campaign_id: Optional[str] = Field(None, description="Primary correlated campaign cluster ID")
     strongest_relationships: List[str] = Field(
         default_factory=list,

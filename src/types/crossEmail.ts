@@ -32,8 +32,8 @@ export interface CrossEmailTimelineEvent {
 export interface CrossEmailAnalysisData {
   related_activity_detected: boolean;
   related_count: number;
-  campaign_confidence: number;
-  campaign_id?: string;
+  campaign_confidence?: number | null;
+  campaign_id?: string | null;
   strongest_relationships: string[];
   related_emails: RelatedEmailItem[];
   timeline: CrossEmailTimelineEvent[];

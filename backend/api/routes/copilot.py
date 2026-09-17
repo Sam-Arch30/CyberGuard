@@ -4,7 +4,7 @@ Exposes endpoints for interactive QA, context-sensitive suggested questions,
 report integration, and audit logging.
 """
 from typing import List, Optional
-from fastapi import APIRouter, Query, status
+from fastapi import APIRouter, Query, status, HTTPException
 
 from backend.schemas.copilot import (
     CopilotMode,
@@ -29,6 +29,12 @@ async def query_copilot(request: CopilotQueryRequest):
     """
     Query the evidence-grounded investigation copilot.
     """
+    payload = request.email_payload
+    if payload and (payload.get("is_demo") or payload.get("is_synthetic")):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Demo/synthetic evidence cannot contaminate normal production copilot investigation."
+        )
     return await global_copilot_service.query(request)
 
 

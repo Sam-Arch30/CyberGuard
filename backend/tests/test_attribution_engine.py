@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 
 from backend.main import app
 from backend.db.session import get_db, SessionLocal
-from backend.db.models import CaseModel, CaseEmailModel, AuditLogModel
+import json
+from backend.db.models import CaseModel, CaseEmailModel, AuditLogModel, EmailAnalysisModel
 from backend.services.attribution_engine import AttributionEngine, global_attribution_engine
 from backend.services.graph_service import InvestigationGraphService
 from backend.schemas.graph import NodeType
@@ -361,7 +362,44 @@ def test_attribution_api_endpoints():
     assert data["probable_infrastructure_country"] == "Netherlands"
     assert "disclaimer" in data
 
-    # Test GET endpoint with sample-001 fallback
+    # Test GET endpoint with seeded sample-001
+    db = SessionLocal()
+    try:
+        db.query(EmailAnalysisModel).filter_by(evidence_id="sample-001").delete()
+        ea = EmailAnalysisModel(
+            evidence_id="sample-001",
+            email_sha256="sha-sample-001",
+            subject="PayPal Security Notice",
+            sender="spoofed@paypal.com",
+            threat_score=85.0,
+            severity="high",
+            indicators_json=json.dumps({
+                "ips": ["203.0.113.25"],
+                "domains": ["paypal-fake.com"],
+                "urls": ["https://paypal-fake.com/login"],
+                "ip_intelligence": {
+                    "203.0.113.25": {
+                        "ip": "203.0.113.25",
+                        "country": "Netherlands",
+                        "asn": "AS12345",
+                        "organization": "Test Datacenter"
+                    }
+                },
+                "relay_analysis": {
+                    "earliest_observable_node": {"earliest_observable_ip": "203.0.113.25"}
+                },
+                "authentication": {
+                    "spf": {"result": "fail"},
+                    "dkim": {"result": "fail"},
+                    "dmarc": {"result": "fail"}
+                }
+            })
+        )
+        db.add(ea)
+        db.commit()
+    finally:
+        db.close()
+
     resp_sample = client.get("/api/emails/sample-001/attribution")
     assert resp_sample.status_code == 200
     data_sample = resp_sample.json()

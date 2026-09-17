@@ -32,6 +32,12 @@ def analyze_cross_email_correlations_endpoint(
     email_data: Dict[str, Any],
     db: Session = Depends(get_db)
 ):
+    if email_data.get("is_demo") or email_data.get("is_synthetic"):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Demo/synthetic evidence cannot contaminate normal production investigation workspace."
+        )
+
     try:
         return global_cross_email_workspace_service.analyze_cross_email_correlations(
             email_data=email_data,
@@ -51,12 +57,19 @@ def analyze_cross_email_correlations_endpoint(
     description="Compares 2 to 5 emails across 10 dimensions, highlighting identical, similar, conflicting, and unique evidence."
 )
 def compare_emails_endpoint(
-    request: CompareEmailsRequest
+    request: CompareEmailsRequest,
+    db: Session = Depends(get_db)
 ):
     try:
         return global_cross_email_workspace_service.compare_emails_matrix(
             email_ids=request.email_ids,
-            current_email=request.current_email
+            current_email=request.current_email,
+            db=db
+        )
+    except KeyError as key_err:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=str(key_err)
         )
     except ValueError as val_err:
         raise HTTPException(

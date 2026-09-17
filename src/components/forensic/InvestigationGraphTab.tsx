@@ -637,14 +637,20 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
         {filteredData.nodes.length === 0 && (
           <div className="absolute inset-0 flex flex-col items-center justify-center p-6 bg-surface/85 backdrop-blur-md text-center space-y-3">
             <AlertTriangle className="w-8 h-8 text-warning" />
-            <p className="text-sm font-mono text-foreground">No nodes match the selected entity filters.</p>
-            <button
-              type="button"
-              onClick={selectAllTypes}
-              className="px-3 py-1.5 rounded-control bg-primary/10 border border-primary text-primary font-mono text-xs cursor-pointer"
-            >
-              Reset Filters
-            </button>
+            <p className="text-sm font-mono text-foreground">
+              {!graphData?.nodes?.length
+                ? 'No relationships discovered for this investigation.'
+                : 'No nodes match the selected entity filters.'}
+            </p>
+            {Boolean(graphData?.nodes?.length) && (
+              <button
+                type="button"
+                onClick={selectAllTypes}
+                className="px-3 py-1.5 rounded-control bg-primary/10 border border-primary text-primary font-mono text-xs cursor-pointer"
+              >
+                Reset Filters
+              </button>
+            )}
           </div>
         )}
 

@@ -324,15 +324,43 @@ class CaseService:
 
         indicators_serialized = json.dumps(request.indicators or {})
 
+        from backend.db.models import EmailAnalysisModel
+        stored_analysis = (
+            db.query(EmailAnalysisModel)
+            .filter(
+                or_(
+                    EmailAnalysisModel.evidence_id == request.email_id,
+                    EmailAnalysisModel.id == request.email_id,
+                    EmailAnalysisModel.email_sha256 == request.email_id
+                )
+            )
+            .first()
+        )
+
+        if stored_analysis:
+            real_subject = stored_analysis.subject
+            real_sender = stored_analysis.sender
+            real_threat_score = stored_analysis.threat_score
+            real_severity = stored_analysis.severity
+            real_sha256 = stored_analysis.email_sha256
+            real_indicators = stored_analysis.indicators_json
+        else:
+            real_subject = request.subject or "Untitled Email"
+            real_sender = request.sender or "unknown"
+            real_threat_score = request.threat_score or 0
+            real_severity = request.severity or "low"
+            real_sha256 = request.email_sha256
+            real_indicators = indicators_serialized
+
         case_email = CaseEmailModel(
             case_id=case.id,
             email_id=request.email_id,
-            email_sha256=request.email_sha256,
-            subject=request.subject or "Untitled Email",
-            sender=request.sender or "unknown",
-            threat_score=request.threat_score or 0,
-            severity=request.severity or "low",
-            indicators_json=indicators_serialized,
+            email_sha256=real_sha256,
+            subject=real_subject,
+            sender=real_sender,
+            threat_score=real_threat_score,
+            severity=real_severity,
+            indicators_json=real_indicators,
             added_at=datetime.now(timezone.utc)
         )
         db.add(case_email)

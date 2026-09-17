@@ -103,7 +103,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
       campaign: 'C-042'
     };
 
-    fetch('http://localhost:8000/api/cross-investigation/analyze', {
+    fetch('/api/cross-investigation/analyze', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -113,7 +113,6 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
         if (!isMounted) return;
         if (resData && resData.related_emails) {
           setData(resData);
-          // Default selection: select top 3 emails for immediate comparison readiness
           if (resData.related_emails.length >= 3) {
             setSelectedEmailIds(new Set([
               resData.related_emails[0].id,
@@ -122,14 +121,31 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
             ]));
           }
         } else {
-          // Fallback to client-side default demo data
-          setData(buildFallbackAnalysisData(email));
+          setData({
+            related_activity_detected: false,
+            related_count: 0,
+            campaign_confidence: null,
+            campaign_id: null,
+            strongest_relationships: [],
+            is_synthetic: false,
+            timeline: [],
+            related_emails: []
+          });
         }
         setLoading(false);
       })
       .catch(() => {
         if (!isMounted) return;
-        setData(buildFallbackAnalysisData(email));
+        setData({
+          related_activity_detected: false,
+          related_count: 0,
+          campaign_confidence: null,
+          campaign_id: null,
+          strongest_relationships: [],
+          is_synthetic: false,
+          timeline: [],
+          related_emails: []
+        });
         setLoading(false);
       });
 
@@ -157,7 +173,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
     setLoadingCompare(true);
     setWorkspaceTab('compare');
 
-    fetch('http://localhost:8000/api/cross-investigation/compare', {
+    fetch('/api/cross-investigation/compare', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -169,12 +185,12 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
         if (matrix && matrix.categories) {
           setComparisonMatrix(matrix);
         } else {
-          setComparisonMatrix(buildFallbackComparison(Array.from(selectedEmailIds)));
+          showToast('Failed to load comparison matrix.');
         }
         setLoadingCompare(false);
       })
       .catch(() => {
-        setComparisonMatrix(buildFallbackComparison(Array.from(selectedEmailIds)));
+        showToast('Comparison request failed.');
         setLoadingCompare(false);
       });
   };
@@ -184,9 +200,14 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
     setWorkspaceTab('graph');
     const ids = selectedEmailIds.size > 0
       ? Array.from(selectedEmailIds)
-      : (data?.related_emails.slice(0, 4).map(e => e.id) || ['EML-2026-8819', 'EML-2026-8812']);
+      : (data?.related_emails.map(e => e.id) || [email.id].filter(Boolean));
 
-    fetch('http://localhost:8000/api/cross-investigation/graph', {
+    if (ids.length === 0) {
+      setGraphData({ nodes: [], edges: [] });
+      return;
+    }
+
+    fetch('/api/cross-investigation/graph', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -199,11 +220,11 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
         if (g && g.nodes) {
           setGraphData(g);
         } else {
-          setGraphData(buildFallbackGraph(ids));
+          setGraphData({ nodes: [], edges: [] });
         }
       })
       .catch(() => {
-        setGraphData(buildFallbackGraph(ids));
+        setGraphData({ nodes: [], edges: [] });
       });
   };
 
@@ -1529,195 +1550,4 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
   );
 };
 
-// Fallback Helper Builders for seamless offline/client demo resilience
-function buildFallbackAnalysisData(_email: EmailAnalysis): CrossEmailAnalysisData {
-  return {
-    related_activity_detected: true,
-    related_count: 16,
-    campaign_confidence: 89.0,
-    campaign_id: 'C-042',
-    strongest_relationships: [
-      'same redirect domain',
-      'same ASN',
-      'highly similar HTML template',
-      'similar subject',
-      'same Reply-To domain',
-      'overlapping sender infrastructure'
-    ],
-    is_synthetic: true,
-    timeline: [
-      {
-        id: 'tl-1',
-        timestamp: '2026-09-05T09:14:00Z',
-        time_display: '09:14',
-        event_type: 'email_delivered',
-        title: 'Email A delivered',
-        description: 'Initial spear-phishing wire transfer lure EML-2026-8819 delivered to CFO office.',
-        related_emails: ['EML-2026-8819'],
-        indicators: ['robert.vance@bank-corp-update.com', '185.220.101.42'],
-        severity: 'high'
-      },
-      {
-        id: 'tl-2',
-        timestamp: '2026-09-05T09:31:00Z',
-        time_display: '09:31',
-        event_type: 'email_delivered',
-        title: 'Email B delivered',
-        description: 'Secondary lure EML-2026-8812 delivered to Treasury operations.',
-        related_emails: ['EML-2026-8812'],
-        indicators: ['185.220.101.42', 'AS49281'],
-        severity: 'high'
-      },
-      {
-        id: 'tl-3',
-        timestamp: '2026-09-05T10:02:00Z',
-        time_display: '10:02',
-        event_type: 'domain_registered',
-        title: 'Domain B first observed',
-        description: 'Dropzone domain wire-transfer-node.ru registered with hidden WHOIS proxy.',
-        related_emails: ['EML-2026-8819', 'EML-2026-8812'],
-        indicators: ['wire-transfer-node.ru'],
-        severity: 'critical'
-      },
-      {
-        id: 'tl-4',
-        timestamp: '2026-09-05T10:11:00Z',
-        time_display: '10:11',
-        event_type: 'email_delivered',
-        title: 'Email C delivered',
-        description: 'Third campaign wave message EML-2026-8805 delivered to Accounts Payable.',
-        related_emails: ['EML-2026-8805'],
-        indicators: ['194.165.16.88', 'bank-corp-update.com'],
-        severity: 'high'
-      },
-      {
-        id: 'tl-5',
-        timestamp: '2026-09-05T10:17:00Z',
-        time_display: '10:17',
-        event_type: 'redirect_identified',
-        title: 'Same redirect infrastructure identified',
-        description: 'Identical redirect destination /auth/v2/secure_login.php identified on AS49281.',
-        related_emails: ['EML-2026-8819', 'EML-2026-8812', 'EML-2026-8805'],
-        indicators: ['https://bank-corp-update.com/auth/v2/secure_login.php'],
-        severity: 'critical'
-      }
-    ],
-    related_emails: Array.from({ length: 16 }).map((_, i) => ({
-      id: `EML-2026-88${String(19 - i).padStart(2, '0')}`,
-      subject: `URGENT: Executive Wire Transfer Instructions - Settlement #88${String(19 - i).padStart(2, '0')}`,
-      sender: 'robert.vance@bank-corp-update.com',
-      recipient: `finance-ops-${i + 1}@bankcorp.com`,
-      received_time: '2026-09-05 10:42:15 UTC',
-      threat_score: 94 - i * 0.5,
-      severity: i < 5 ? 'critical' : 'high',
-      campaign: 'C-042',
-      similarity: Math.max(75, 96 - i * 1.3),
-      shared_indicators: [],
-      status: i === 0 ? 'Investigating' : i % 3 === 0 ? 'Confirmed' : 'Flagged',
-      is_synthetic: true,
-      correlation_reasons: [
-        'same redirect domain: bank-corp-update.com',
-        'same ASN: AS49281'
-      ]
-    }))
-  };
-}
 
-function buildFallbackComparison(ids: string[]): ComparisonMatrixData {
-  return {
-    emails: ids.map((id, idx) => ({
-      id,
-      subject: `Executive Wire Instructions #${id.split('-').pop()}`,
-      sender: 'robert.vance@bank-corp-update.com',
-      recipient: `target-${idx + 1}@bankcorp.com`,
-      threat_score: 94.0,
-      severity: 'critical',
-      received_time: '2026-09-05 10:42:15 UTC',
-      is_synthetic: true
-    })),
-    categories: [
-      {
-        category_id: 'headers',
-        category_title: 'Email Headers',
-        category_alignment: 'similar',
-        items: [
-          {
-            field_key: 'sender',
-            field_label: 'Sender Address',
-            values: Object.fromEntries(ids.map(id => [id, 'robert.vance@bank-corp-update.com'])),
-            comparison_status: 'identical'
-          },
-          {
-            field_key: 'reply_to',
-            field_label: 'Reply-To Address',
-            values: Object.fromEntries(ids.map(id => [id, 'financial-operations-secure@wire-transfer-node.ru'])),
-            comparison_status: 'identical'
-          }
-        ]
-      },
-      {
-        category_id: 'auth',
-        category_title: 'Authentication',
-        category_alignment: 'identical',
-        items: [
-          {
-            field_key: 'spf',
-            field_label: 'SPF Result',
-            values: Object.fromEntries(ids.map(id => [id, 'FAIL'])),
-            comparison_status: 'identical'
-          },
-          {
-            field_key: 'dkim',
-            field_label: 'DKIM Result',
-            values: Object.fromEntries(ids.map(id => [id, 'FAIL'])),
-            comparison_status: 'identical'
-          }
-        ]
-      },
-      {
-        category_id: 'ips',
-        category_title: 'IP & Autonomous System',
-        category_alignment: 'identical',
-        items: [
-          {
-            field_key: 'origin_ip',
-            field_label: 'Originating IP',
-            values: Object.fromEntries(ids.map(id => [id, '185.220.101.42'])),
-            comparison_status: 'identical'
-          },
-          {
-            field_key: 'asn',
-            field_label: 'ASN',
-            values: Object.fromEntries(ids.map(id => [id, 'AS49281'])),
-            comparison_status: 'identical'
-          }
-        ]
-      }
-    ],
-    summary: { identical: 6, similar: 4, conflicting: 1, unique: 1 },
-    overall_alignment_percentage: 89.0
-  };
-}
-
-function buildFallbackGraph(ids: string[]): any {
-  const nodes = [
-    { id: 'campaign:C-042', label: 'Campaign: C-042', type: 'Campaign' },
-    { id: 'url:https://bank-corp-update.com/auth/v2/secure_login.php', label: 'hxxps://bank-corp-update[.]com/auth/v2/secure_login.php', type: 'URL' },
-    { id: 'ip:185.220.101.42', label: '185.220.101.42', type: 'IP' },
-    { id: 'domain:bank-corp-update.com', label: 'bank-corp-update.com', type: 'Domain' },
-    { id: 'asn:AS49281', label: 'AS49281', type: 'ASN' }
-  ];
-  const edges = [
-    { id: 'e-dom-asn', source: 'domain:bank-corp-update.com', target: 'asn:AS49281', label: 'ROUTED_THROUGH_ASN' },
-    { id: 'e-ip-asn', source: 'ip:185.220.101.42', target: 'asn:AS49281', label: 'BELONGS_TO_ASN' }
-  ];
-
-  ids.forEach(id => {
-    nodes.push({ id: `email:${id}`, label: `Email: ${id}`, type: 'Email' });
-    edges.push({ id: `e-camp-${id}`, source: 'campaign:C-042', target: `email:${id}`, label: 'INCLUDES_EMAIL' });
-    edges.push({ id: `e-url-${id}`, source: `email:${id}`, target: 'url:https://bank-corp-update.com/auth/v2/secure_login.php', label: 'CONTAINS_URL' });
-    edges.push({ id: `e-ip-${id}`, source: `email:${id}`, target: 'ip:185.220.101.42', label: 'ORIGINATED_FROM_IP' });
-  });
-
-  return { nodes, edges };
-}

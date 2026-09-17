@@ -91,7 +91,7 @@ async def test_provider_error_graceful_fallback():
     res = await svc.get_ip_intelligence("203.0.113.50")
 
     assert res.ip == "203.0.113.50"
-    assert res.enrichment_available is True  # Fallback succeeded
+    assert res.enrichment_available is False
     assert res.error is not None
     assert "Simulated upstream provider failure" in res.error
 
