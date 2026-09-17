@@ -23,9 +23,10 @@
    - [Local Development Setup](#local-development-setup)
    - [Docker Production Deployment](#docker-production-deployment)
 8. [Environment Configuration Reference](#environment-configuration-reference)
-9. [Security Architecture & Threat Model](#security-architecture--threat-model)
-10. [Feature Matrix: Implemented vs Planned](#feature-matrix-implemented-vs-planned)
-11. [Known Limitations & Air-Gapped Fallback](#known-limitations--air-gapped-fallback)
+9. [Geolocation / Map Configuration](#geolocation--map-configuration)
+10. [Security Architecture & Threat Model](#security-architecture--threat-model)
+11. [Feature Matrix: Implemented vs Planned](#feature-matrix-implemented-vs-planned)
+12. [Known Limitations & Air-Gapped Fallback](#known-limitations--air-gapped-fallback)
 
 ---
 
@@ -212,8 +213,11 @@ cp .env.example .env
 | `DATABASE_URL` | `sqlite:///backend/data/mailtrace.db` | Database connection string (auto-set in Docker to PostgreSQL) |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum email upload payload size in megabytes |
 | `IP_INTELLIGENCE_PROVIDER` | `ipapi` | IP provider (`ipapi`, `ipinfo`, or local offline `mock`) |
-| `IPAPI_KEY` | - | Optional ipapi.co commercial API key |
-| `IPINFO_API_KEY` | - | Optional ipinfo.io access token |
+| `IPAPI_KEY` | - | IP-API Pro secret commercial API key |
+| `IP_INTELLIGENCE_API_KEY` | - | Legacy/Alternative IP-API Pro key |
+| `IPINFO_TOKEN` / `IPINFO_API_KEY` | - | IPInfo.io secret access token |
+| `GEOLOCATION_API_KEY` | - | Generic provider credential fallback |
+| `GEOLOCATION_REQUIRE_API_KEY` | `false` | Enforces strict API key requirements across providers |
 | `LLM_PROVIDER` | `gemini` | Copilot model provider (`gemini`, `openai`, or local `mock`) |
 | `GEMINI_API_KEY` | - | Google Gemini API key |
 | `OPENAI_API_KEY` | - | OpenAI API key |
@@ -224,7 +228,93 @@ cp .env.example .env
 
 ---
 
-## 9. Security Architecture & Threat Model
+## 9. Geolocation / Map Configuration
+
+MailTraceAI features an interactive Geolocation and Infrastructure Transmission Map powered by Leaflet and enriched by enterprise IP intelligence providers.
+
+### 1. Active Providers
+MailTraceAI supports three configurable IP intelligence and geolocation backends:
+- **`ipapi` (Default)**: IP-API.com Pro authenticated tier (`https://pro.ip-api.com/json/{ip}?key=...`) and standard tier.
+- **`ipinfo`**: IPInfo.io authenticated endpoint (`https://ipinfo.io/{ip}/json?token=...`).
+- **`mock`**: Deterministic offline mock provider designed for air-gapped forensic labs and automated CI environments (requires no external keys).
+
+### 2. Required Environment Variables
+Configure your chosen provider in your environment (`.env`):
+```bash
+# Select provider: ipapi | ipinfo | mock
+IP_INTELLIGENCE_PROVIDER=ipapi
+
+# If using IP-API Pro:
+IPAPI_KEY=your_ipapi_key_here
+
+# If using IPInfo.io:
+IPINFO_TOKEN=your_ipinfo_token_here
+
+# Generic fallback:
+GEOLOCATION_API_KEY=your_api_key_here
+```
+
+### 3. Obtaining Credentials
+- **IP-API Pro**: Obtain your commercial Pro API key from [members.ip-api.com](https://members.ip-api.com/).
+- **IPInfo.io**: Register for an account and obtain your access token from [ipinfo.io/account/token](https://ipinfo.io/account/token).
+
+### 4. Secret vs Public Token Architecture
+> [!IMPORTANT]
+> **Strict Secret Server-Side Credential Handling**  
+> Geolocation API keys (`IPAPI_KEY`, `IPINFO_TOKEN`) are **strictly secret server-side credentials**.  
+> - The browser/frontend **NEVER** receives the API key, token, or provider authorization headers.  
+> - All lookups are executed server-side via `GeolocationService` and `IPIntelligenceService`.  
+> - The backend sanitizes all telemetry into a normalized `GeolocationResponse`, strips internal metadata, and enforces forensic accuracy notices before delivering coordinates to the frontend Leaflet map.
+
+```text
+Frontend Leaflet Map
+       │
+       ▼ (GET /api/intelligence/ip/{ip}/geolocation)
+MailTraceAI Backend (FastAPI)
+  ├── 1. SSRF & RFC-1918 Private IP Filter (Blocks loopback/private subnets)
+  ├── 2. In-Memory TTL Cache Check (3600s success, 30s failure)
+  └── 3. Outbound Provider Client (Injects secret API key)
+       │
+       ▼ (HTTPS with Server-Side Secret)
+External Geolocation Provider (ip-api.com Pro / ipinfo.io)
+       │
+       ▼ (Raw JSON Response)
+MailTraceAI Sanitization & Forensic Normalization
+       │
+       ▼ (Sanitized GeolocationResponse without credentials)
+Frontend Leaflet Map (Visualizes Observed Infrastructure)
+```
+
+### 5. Local Configuration
+1. Copy the template:
+   ```bash
+   cp .env.example .env
+   ```
+2. Set `IP_INTELLIGENCE_PROVIDER` and your respective API key (`IPAPI_KEY` or `IPINFO_TOKEN`).
+3. Ensure `.env` is listed in `.gitignore` (already verified). Never commit `.env` to version control.
+
+### 6. Docker Configuration
+Docker Compose injects credentials at runtime via environment variables or your local `.env` file without baking secrets into the Docker image:
+```bash
+docker compose --env-file .env up -d
+```
+The `docker-compose.yml` passes `${IPAPI_KEY}`, `${IPINFO_TOKEN}`, and `${GEOLOCATION_API_KEY}` into the backend container dynamically.
+
+### 7. Production Deployment Configuration
+In production environments (Kubernetes, AWS ECS, GCP Cloud Run, Azure Container Apps):
+- Store credentials in your platform's secret manager (e.g., AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault).
+- Inject as container environment variables: `IPAPI_KEY` or `IPINFO_TOKEN`.
+- Do NOT build images with `ENV IPAPI_KEY=...` or commit credentials to deployment manifests.
+
+### 8. Recommended Provider-Side Restrictions
+To maximize security and control quotas on the provider dashboard:
+- **IP / CIDR Restrictions**: Restrict your API key or token to query only from your MailTraceAI backend server's static egress IP addresses.
+- **Quota Alerts**: Enable notification thresholds (e.g., at 80% monthly quota) to avoid unexpected service interruptions.
+- **Forensic Accuracy**: MailTraceAI enforces standardized forensic terminology (`Observed Infrastructure Location`, `Probable Origin Infrastructure`) and displays the mandated forensic notice: *"IP geolocation represents the estimated location of observed network infrastructure and does not establish the physical location of the threat actor."*
+
+---
+
+## 10. Security Architecture & Threat Model
 
 MailTraceAI is engineered specifically to handle hostile, malicious payloads safely:
 
@@ -238,7 +328,7 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 
 ---
 
-## 10. Feature Matrix: Implemented vs Planned
+## 11. Feature Matrix: Implemented vs Planned
 
 ### Currently Implemented & Verified
 - RFC-822 / `.eml` multipart parsing and header normalization
@@ -266,7 +356,7 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 
 ---
 
-## 11. Known Limitations & Air-Gapped Fallback
+## 12. Known Limitations & Air-Gapped Fallback
 
 1. **Air-Gapped Operation**: When external WHOIS/DNS/IP APIs are unreachable or offline, MailTraceAI automatically falls back to its local Public Suffix List, internal RFC definitions, and local IP intelligence without error.
 2. **Deterministic Copilot Fallback**: If external LLM APIs (Gemini/OpenAI) are unavailable, the Investigation Copilot automatically switches to its local template retrieval engine, generating structured answers directly from the email's JSON evidence.
@@ -274,10 +364,10 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 
 ---
 
-## 12. Running Tests & Quality Verification
+## 13. Running Tests & Quality Verification
 
 ```bash
-# 1. Run all 242 backend tests
+# 1. Run all backend tests
 PYTHONPATH=. backend/venv/bin/pytest backend/tests/ -v
 
 # 2. Run frontend production build
@@ -289,7 +379,7 @@ npm run lint
 
 ---
 
-## 13. License
+## 14. License
 
 Developed for the **Smart India Hackathon (SIH 2024)** — Problem Statement 106.  
 All demo artifacts use reserved test infrastructure under RFC 2606 and RFC 5737.

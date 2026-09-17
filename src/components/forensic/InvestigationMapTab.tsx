@@ -11,7 +11,9 @@ import {
   Info,
   Cloud,
   Lock,
-  Maximize2
+  Maximize2,
+  ShieldAlert,
+  AlertCircle
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../types/forensic';
 import type { InfrastructureMapNode } from '../../types/map';
@@ -20,6 +22,13 @@ import { useTheme } from '../../context/ThemeContext';
 
 interface InvestigationMapTabProps {
   email: EmailAnalysis;
+}
+
+interface GeolocationStatus {
+  provider: string;
+  status: string;
+  tier: string;
+  mode: string;
 }
 
 export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email }) => {
@@ -35,6 +44,39 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showRoute, setShowRoute] = useState(true);
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
+  const [providerStatus, setProviderStatus] = useState<GeolocationStatus | null>(null);
+  const [statusError, setStatusError] = useState<string | null>(null);
+
+  // Fetch safe configuration status
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch('http://127.0.0.1:8000/api/intelligence/geolocation/status');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (isMounted) setProviderStatus(data);
+      } catch (err: any) {
+        if (isMounted) {
+          try {
+            const fallbackRes = await fetch('/api/intelligence/geolocation/status');
+            if (fallbackRes.ok) {
+              const data = await fallbackRes.json();
+              if (isMounted) setProviderStatus(data);
+              return;
+            }
+          } catch {
+            // ignore
+          }
+          setStatusError("Geolocation provider temporarily unavailable.");
+        }
+      }
+    };
+    fetchStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Extract infrastructure nodes and route path from email
   const mapData = useMemo(() => extractInfrastructureMapData(email), [email]);
@@ -177,6 +219,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
     }
 
     const bounds = L.latLngBounds([]);
+    const campaignName = (email as any)?.campaign_id || email.attribution?.campaign_id || email.attribution?.related_campaigns?.[0] || 'Individual Case';
 
     filteredNodes.forEach(node => {
       bounds.extend([node.latitude, node.longitude]);
@@ -220,7 +263,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
         popupAnchor: [0, -14]
       });
 
-      // HTML Popup content adapting to theme
+      // HTML Popup content adapting to theme with complete forensic metadata
       const popupBg = isDark ? '#0b0f17' : '#ffffff';
       const popupBorder = isDark ? '#1e293b' : '#e2e8f0';
       const popupText = isDark ? '#f1f5f9' : '#0f172a';
@@ -228,8 +271,18 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
       const popupIp = isDark ? '#38bdf8' : '#0284c7';
       const popupSubBorder = isDark ? '#1e293b' : '#f1f5f9';
 
+      const threatStatusLabel = node.is_earliest
+        ? 'Probable Origin Infrastructure'
+        : node.is_proxy_vpn_tor
+        ? 'Suspicious (Proxy/VPN/Tor Node)'
+        : 'Observed Infrastructure Node';
+
+      const relayRoleLabel = node.role === 'relay_node' && node.hop_number !== undefined
+        ? `Relay Hop #${node.hop_number}`
+        : node.role_label;
+
       const popupHtml = `
-        <div style="color: ${popupText}; background: ${popupBg}; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; min-width: 220px; padding: 8px; border-radius: 8px; border: 1px solid ${popupBorder}; box-shadow: 0 4px 12px rgba(0,0,0,0.15);">
+        <div style="color: ${popupText}; background: ${popupBg}; font-family: ui-sans-serif, system-ui, sans-serif; font-size: 12px; min-width: 250px; padding: 10px; border-radius: 8px; border: 1px solid ${popupBorder}; box-shadow: 0 4px 14px rgba(0,0,0,0.25);">
           <div style="display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid ${popupSubBorder}; padding-bottom: 6px; margin-bottom: 6px;">
             <span style="font-family: ui-monospace, monospace; font-weight: 700; font-size: 13px; color: ${popupIp};">${node.ip}</span>
             <span style="font-family: ui-monospace, monospace; font-size: 9px; text-transform: uppercase; font-weight: 700; padding: 2px 6px; border-radius: 4px; ${
@@ -237,17 +290,21 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
               node.role === 'relay_node' ? 'background: rgba(37, 99, 235, 0.15); color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.3);' :
               'background: rgba(8, 145, 178, 0.15); color: #0891b2; border: 1px solid rgba(8, 145, 178, 0.3);'
             }">
-              ${node.role_label}
+              ${relayRoleLabel}
             </span>
           </div>
 
           <div style="display: flex; flex-direction: column; gap: 4px; font-size: 11px; color: ${popupText};">
+            <div><strong style="color: ${popupMuted};">Infrastructure:</strong> Observed Infrastructure Location</div>
             <div><strong style="color: ${popupMuted};">Location:</strong> ${[node.city, node.region, node.country].filter(Boolean).join(', ') || 'Unknown'}</div>
+            <div><strong style="color: ${popupMuted};">Country:</strong> ${node.country || 'N/A'} ${node.country_code ? `(${node.country_code})` : ''}</div>
             <div><strong style="color: ${popupMuted};">ASN:</strong> <span style="font-family: ui-monospace, monospace; color: ${popupIp};">${node.asn || 'N/A'}</span></div>
-            <div style="max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;"><strong style="color: ${popupMuted};">Org:</strong> ${node.organization || 'N/A'}</div>
+            <div><strong style="color: ${popupMuted};">ISP / Provider:</strong> <span style="max-width: 170px; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: bottom;">${node.organization || 'N/A'}</span></div>
+            <div><strong style="color: ${popupMuted};">Threat Status:</strong> <span style="color: ${node.is_earliest ? '#e11d48' : node.is_proxy_vpn_tor ? '#f59e0b' : '#10b981'}; font-weight: 600;">${threatStatusLabel}</span></div>
+            <div><strong style="color: ${popupMuted};">Campaign:</strong> ${campaignName}</div>
           </div>
 
-          <div style="margin-top: 8px; padding-top: 4px; border-top: 1px solid ${popupSubBorder}; font-family: ui-monospace, monospace; font-size: 9px; color: ${popupMuted}; display: flex; justify-content: space-between;">
+          <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid ${popupSubBorder}; font-family: ui-monospace, monospace; font-size: 9px; color: ${popupMuted}; display: flex; justify-content: space-between;">
             <span>Estimated coords:</span>
             <span>${node.latitude.toFixed(4)}, ${node.longitude.toFixed(4)}</span>
           </div>
@@ -269,7 +326,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
     } else {
       map.fitBounds(bounds, { padding: [40, 40] });
     }
-  }, [filteredNodes, showRoute, mapData, isDark]);
+  }, [filteredNodes, showRoute, mapData, isDark, email]);
 
   return (
     <div className="space-y-4">
@@ -280,14 +337,26 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
             <Globe className="w-5 h-5" />
           </div>
           <div>
-            <h2 className="text-base font-bold text-foreground flex items-center space-x-2">
-              <span>Investigation Infrastructure Map</span>
+            <div className="flex items-center space-x-2.5">
+              <h2 className="text-base font-bold text-foreground">
+                Investigation Infrastructure Map
+              </h2>
               <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-primary/10 text-primary border border-primary/20">
                 {mapData.total_geolocated} of {mapData.total_public_ips} Public IPs Geolocated
               </span>
-            </h2>
+              {providerStatus && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-mono font-bold flex items-center space-x-1.5 border ${
+                  providerStatus.status === 'Configured'
+                    ? 'bg-success/10 text-success border-success/30'
+                    : 'bg-warning/10 text-warning border-warning/30'
+                }`}>
+                  <span className={`w-1.5 h-1.5 rounded-full ${providerStatus.status === 'Configured' ? 'bg-success' : 'bg-warning'}`} />
+                  <span>Provider: {providerStatus.status}</span>
+                </span>
+              )}
+            </div>
             <p className="text-xs text-foreground-muted font-mono">
-              Geographic topology of observed email transmission relays and indicators
+              Observed infrastructure locations and network transmission topology
             </p>
           </div>
         </div>
@@ -326,13 +395,34 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
         <div className="lg:col-span-8 bg-surface rounded-card border border-border overflow-hidden shadow-sm flex flex-col relative">
           {mapData.nodes.length === 0 ? (
             <div className="h-[540px] flex flex-col items-center justify-center p-8 text-center space-y-3">
-              <Globe className="w-12 h-12 text-foreground-muted animate-pulse" />
-              <div className="space-y-1">
-                <h3 className="text-sm font-bold text-foreground">No Geolocated Public Infrastructure</h3>
-                <p className="text-xs text-foreground-muted max-w-md font-mono">
-                  All IP addresses identified in this email are private (RFC 1918), loopback, or lack public geolocation provider records.
-                </p>
-              </div>
+              {providerStatus?.status === 'Not Configured' ? (
+                <div className="space-y-3 flex flex-col items-center max-w-md">
+                  <AlertCircle className="w-12 h-12 text-warning" />
+                  <h3 className="text-base font-bold text-foreground">Geolocation unavailable</h3>
+                  <p className="text-xs text-foreground-muted font-mono leading-relaxed">
+                    The geolocation provider has not been configured.
+                  </p>
+                  <p className="text-[11px] text-foreground-subtle font-mono">
+                    Configure your provider API key in your environment (.env) to enable live IP telemetry lookups.
+                  </p>
+                </div>
+              ) : statusError ? (
+                <div className="space-y-3 flex flex-col items-center max-w-md">
+                  <ShieldAlert className="w-12 h-12 text-warning" />
+                  <h3 className="text-base font-bold text-foreground">Geolocation provider temporarily unavailable</h3>
+                  <p className="text-xs text-foreground-muted font-mono">
+                    The geolocation provider request could not be completed at this time. The rest of MailTraceAI remains fully operational.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2 flex flex-col items-center max-w-md">
+                  <Globe className="w-12 h-12 text-foreground-muted animate-pulse" />
+                  <h3 className="text-sm font-bold text-foreground">No Geolocated Public Infrastructure</h3>
+                  <p className="text-xs text-foreground-muted font-mono">
+                    All IP addresses identified in this email are private (RFC 1918), loopback, or lack public geolocation provider records.
+                  </p>
+                </div>
+              )}
             </div>
           ) : (
             <div className="relative w-full h-[540px]">
@@ -342,7 +432,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
               <div className="absolute top-3 left-12 z-10 bg-surface/95 border border-border px-3 py-1.5 rounded-control backdrop-blur-md shadow-md flex items-center space-x-3 text-xs font-mono">
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-danger" />
-                  <span className="text-[10px] text-foreground-muted">Earliest Node</span>
+                  <span className="text-[10px] text-foreground-muted">Probable Origin Node</span>
                 </div>
                 <div className="flex items-center space-x-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-blue-500" />
@@ -375,7 +465,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
             <div className="flex rounded-control bg-surface-secondary p-1 border border-border text-[11px] font-mono">
               {[
                 { id: 'all' as const, label: 'All' },
-                { id: 'earliest' as const, label: 'Earliest' },
+                { id: 'earliest' as const, label: 'Origin' },
                 { id: 'relay' as const, label: 'Relays' },
                 { id: 'indicator' as const, label: 'Indicators' }
               ].map(tab => (
@@ -496,15 +586,20 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
         </div>
       </div>
 
-      {/* Geolocation Confidence & Privacy Notice */}
+      {/* Forensic Accuracy & Geolocation Disclaimer Notice */}
       <div className="p-4 rounded-card bg-surface border border-border flex items-start gap-3 shadow-xs text-xs text-foreground-muted font-mono">
         <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <div className="space-y-1">
-          <span className="font-bold text-foreground">
-            Geolocation Confidence & Infrastructure Route Notice:
-          </span>
+          <div className="flex items-center space-x-2">
+            <span className="font-bold text-foreground">
+              Forensic Intelligence Notice — IP Geolocation Accuracy:
+            </span>
+          </div>
           <p className="text-[11px] leading-relaxed text-foreground-muted">
-            Coordinates represent coarse city/regional estimates based on public IP registry allocations. They reflect network infrastructure routing nodes and do not establish street-level physical locations or the personal identity of the sender. The observed route sequence reflects email relay hops and is labeled exclusively as an <strong className="text-primary font-bold">observed infrastructure route</strong>.
+            <strong className="text-foreground font-semibold">
+              IP geolocation represents the estimated location of observed network infrastructure and does not establish the physical location of the threat actor.
+            </strong>{' '}
+            Coordinates represent coarse regional estimates based on public network allocations and BGP routing nodes. Observed transmission routes sequence email relay hops exclusively as an <strong className="text-primary font-bold">observed infrastructure route</strong>.
           </p>
         </div>
       </div>

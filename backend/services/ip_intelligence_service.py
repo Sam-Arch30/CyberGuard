@@ -2,7 +2,13 @@ import os
 from typing import List, Dict, Optional
 from backend.schemas.ip_intelligence import IPIntelligence
 from backend.services.relay_reconstructor import RelayReconstructorService
-from backend.services.ip_providers import BaseIPIntelligenceProvider, IPApiProvider, MockIPIntelligenceProvider
+from backend.services.ip_providers import (
+    BaseIPIntelligenceProvider,
+    IPApiProvider,
+    IPInfoProvider,
+    MockIPIntelligenceProvider
+)
+from backend.config.geolocation_config import GeolocationConfig, global_geolocation_config
 from backend.services.ip_cache import global_ip_cache, IPIntelligenceCache
 
 
@@ -15,17 +21,20 @@ class IPIntelligenceService:
     def __init__(
         self,
         provider: Optional[BaseIPIntelligenceProvider] = None,
-        cache: Optional[IPIntelligenceCache] = None
+        cache: Optional[IPIntelligenceCache] = None,
+        config: Optional[GeolocationConfig] = None
     ):
-        self.provider = provider or self._get_default_provider()
+        self.config = config or global_geolocation_config
         self.cache = cache or global_ip_cache
+        self.provider = provider or self._get_default_provider()
 
-    @staticmethod
-    def _get_default_provider() -> BaseIPIntelligenceProvider:
-        provider_name = os.getenv("IP_INTELLIGENCE_PROVIDER", "ipapi").lower()
+    def _get_default_provider(self) -> BaseIPIntelligenceProvider:
+        provider_name = self.config.provider
         if provider_name == "mock":
             return MockIPIntelligenceProvider()
-        return IPApiProvider()
+        elif provider_name == "ipinfo":
+            return IPInfoProvider(config=self.config)
+        return IPApiProvider(config=self.config)
 
     async def get_ip_intelligence(self, ip: str) -> IPIntelligence:
         """
@@ -47,8 +56,8 @@ class IPIntelligenceService:
                 ip=ip,
                 scope="private",
                 enrichment_available=False,
-                infrastructure_type="Private / Internal infrastructure",
-                error=None
+                infrastructure_type="Private/Reserved Address — external geolocation unavailable.",
+                error="Private/Reserved Address — external geolocation unavailable."
             )
 
         # 2. Check Backend Cache

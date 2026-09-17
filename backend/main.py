@@ -15,6 +15,7 @@ from backend.api.routes.confidence import router as confidence_router
 from backend.api.routes.cross_investigation import router as cross_investigation_router
 from backend.api.routes.copilot import router as copilot_router
 from backend.api.routes.benchmark import router as benchmark_router
+from backend.api.routes.intelligence import router as intelligence_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
 from backend.services.log_sanitizer import install_log_sanitizer
@@ -68,6 +69,7 @@ app.include_router(confidence_router)
 app.include_router(cross_investigation_router)
 app.include_router(copilot_router)
 app.include_router(benchmark_router)
+app.include_router(intelligence_router)
 
 
 
