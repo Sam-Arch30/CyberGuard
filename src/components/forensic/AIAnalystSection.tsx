@@ -23,6 +23,7 @@ interface AIAnalystSectionProps {
   email?: EmailAnalysis;
   onFocusGraphNode?: (id: string) => void;
   onOpenWorkspace?: () => void;
+  onSelectEmail?: (email: EmailAnalysis) => void;
 }
 
 export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({
@@ -30,7 +31,8 @@ export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({
   conclusions = [],
   email,
   onFocusGraphNode,
-  onOpenWorkspace
+  onOpenWorkspace,
+  onSelectEmail
 }) => {
   const [activeView, setActiveView] = useState<'copilot' | 'executive'>('copilot');
   const [selectedInitialPrompt, setSelectedInitialPrompt] = useState<string | undefined>(undefined);
@@ -133,6 +135,7 @@ export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({
           initialQuestion={selectedInitialPrompt}
           onOpenGraph={() => onFocusGraphNode?.(contextId)}
           onCompareEmails={onOpenWorkspace}
+          onSelectEmail={onSelectEmail}
         />
       )}
 

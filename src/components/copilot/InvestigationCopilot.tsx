@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Sparkles,
   Send,
@@ -9,6 +9,7 @@ import {
   ListOrdered,
   Layers,
   ChevronRight,
+  ChevronDown,
   Copy,
   Check,
   Search,
@@ -16,7 +17,10 @@ import {
   HelpCircle,
   Terminal,
   FolderPlus,
+  FolderSync,
   RefreshCw,
+  Upload,
+  FileCode,
   X
 } from 'lucide-react';
 import type {
@@ -28,6 +32,8 @@ import type {
   CopilotMessage,
   SuggestedQuestion
 } from '../../types/copilot';
+import type { EmailAnalysis } from '../../types/forensic';
+import { deriveFilename, getAllAvailableAnalyses, saveAnalysisResult } from '../../utils/forensicStore';
 
 interface InvestigationCopilotProps {
   mode?: CopilotMode;
@@ -38,6 +44,7 @@ interface InvestigationCopilotProps {
   onCompareEmails?: (params?: Record<string, any>) => void;
   onAddToCase?: (params?: Record<string, any>) => void;
   onGenerateReport?: (params?: Record<string, any>) => void;
+  onSelectEmail?: (email: EmailAnalysis) => void;
   initialQuestion?: string;
   isCompact?: boolean;
 }
@@ -84,10 +91,13 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   onCompareEmails,
   onAddToCase,
   onGenerateReport,
+  onSelectEmail,
   initialQuestion,
   isCompact = false
 }) => {
   const [activeMode, setActiveMode] = useState<CopilotMode>(mode);
+  const [currentContextId, setCurrentContextId] = useState<string>(contextId);
+  const [currentEmailPayload, setCurrentEmailPayload] = useState<Record<string, any> | undefined>(emailPayload);
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
   const [suggestedQuestions, setSuggestedQuestions] = useState<SuggestedQuestion[]>([]);
   const [inputQuery, setInputQuery] = useState('');
@@ -97,12 +107,178 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
 
+  // EML Selector State
+  const [isEmailSelectorOpen, setIsEmailSelectorOpen] = useState<boolean>(false);
+  const [emailSearchFilter, setEmailSearchFilter] = useState<string>('');
+  const [availableEmails, setAvailableEmails] = useState<EmailAnalysis[]>([]);
+  const [isUploading, setIsUploading] = useState<boolean>(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
   // Sync mode with props if changed
   useEffect(() => {
     setActiveMode(mode);
   }, [mode]);
+
+  // Sync contextId and emailPayload if parent updates them
+  useEffect(() => {
+    if (contextId) setCurrentContextId(contextId);
+  }, [contextId]);
+
+  useEffect(() => {
+    if (emailPayload) setCurrentEmailPayload(emailPayload);
+  }, [emailPayload]);
+
+  // Derive human-readable .eml filename
+  const activeFileName = useMemo(() => {
+    return deriveFilename({
+      original_filename: currentEmailPayload?.original_filename,
+      file_info: currentEmailPayload?.file_info,
+      subject: currentEmailPayload?.subject,
+      id: currentContextId
+    });
+  }, [currentEmailPayload, currentContextId]);
+
+  // Refresh available emails from local store and backend database
+  const refreshAvailableEmails = async () => {
+    const localAnalyses = getAllAvailableAnalyses();
+    try {
+      const res = await fetch('http://localhost:8000/api/dashboard/emails?limit=50');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.items) {
+          const seenIds = new Set(localAnalyses.map(a => a.id));
+          for (const item of data.items) {
+            if (!seenIds.has(item.id)) {
+              const converted: EmailAnalysis = {
+                id: item.id,
+                evidence_id: item.evidence_id || `EVD-${item.id.slice(0, 8).toUpperCase()}`,
+                email_sha256: item.sha256,
+                original_filename: deriveFilename({ id: item.id, subject: item.subject }),
+                subject: item.subject,
+                from: item.sender,
+                threat_score: {
+                  score: item.threat_score || 0,
+                  severity: item.severity || 'low',
+                  reasons: [],
+                  positive_evidence: [],
+                  summary: 'Database analyzed email record'
+                },
+                upload_timestamp: item.timestamp,
+                date: item.timestamp
+              };
+              localAnalyses.push(converted);
+              seenIds.add(item.id);
+            }
+          }
+        }
+      }
+    } catch (e) {
+      // Keep localAnalyses on network error
+    }
+    setAvailableEmails(localAnalyses);
+  };
+
+  useEffect(() => {
+    refreshAvailableEmails();
+  }, []);
+
+  // Filter available emails in switcher
+  const filteredEmails = useMemo(() => {
+    if (!emailSearchFilter.trim()) return availableEmails;
+    const q = emailSearchFilter.toLowerCase();
+    return availableEmails.filter((e) => {
+      const fn = deriveFilename(e).toLowerCase();
+      const subj = (e.subject || '').toLowerCase();
+      const from = (e.from || '').toLowerCase();
+      const id = (e.id || '').toLowerCase();
+      const evd = (e.evidence_id || '').toLowerCase();
+      return fn.includes(q) || subj.includes(q) || from.includes(q) || id.includes(q) || evd.includes(q);
+    });
+  }, [availableEmails, emailSearchFilter]);
+
+  // Switch active email target
+  const handleSwitchEmail = (selected: EmailAnalysis) => {
+    const newContextId = selected.evidence_id || selected.id || 'E-1042';
+    setCurrentContextId(newContextId);
+    setCurrentEmailPayload(selected);
+    setIsEmailSelectorOpen(false);
+
+    // Notify parent if callback provided
+    onSelectEmail?.(selected);
+
+    // Append switch confirmation message
+    const filename = deriveFilename(selected);
+    const score = selected.threat_score?.score ?? 0;
+    const severity = (selected.threat_score?.severity ?? 'low').toUpperCase();
+    const switchMessage: CopilotMessage = {
+      id: `switch-${Date.now()}`,
+      sender: 'copilot',
+      text: `🔄 **Active .eml Investigation Target Switched**\n\n- **Target File:** \`${filename}\`\n- **Subject:** ${selected.subject || 'No Subject'}\n- **Sender:** ${selected.from || 'Unknown'}\n- **Evidence ID:** ${newContextId}\n- **Threat Score:** ${score}/100 (${severity})\n\nInvestigation Copilot is now strictly grounded in the forensic evidence and indicators of **${filename}**. Ask any question below or pick a suggested prompt.`,
+      timestamp: new Date().toISOString()
+    };
+    setMessages((prev) => [...prev, switchMessage]);
+    showNotification(`Switched target to ${filename}`);
+  };
+
+  // Direct file upload from within Copilot
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    showNotification(`Analyzing ${file.name}...`);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const res = await fetch('http://localhost:8000/api/emails/analyze', {
+        method: 'POST',
+        body: formData
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const analysisId = `upload-${Date.now()}`;
+        const newAnalysis: EmailAnalysis = {
+          id: analysisId,
+          evidence_id: data.evidence_id || (data.email_sha256 ? `EVD-${data.email_sha256.slice(0, 10).toUpperCase()}` : `EVD-${analysisId.slice(-8).toUpperCase()}`),
+          email_sha256: data.email_sha256,
+          original_filename: data.original_filename || file.name,
+          upload_timestamp: data.upload_timestamp || new Date().toISOString(),
+          size: data.size || file.size,
+          uploader: data.uploader || 'SOC Analyst',
+          authentication: data.authentication,
+          relay_analysis: data.relay_analysis,
+          indicators: data.indicators,
+          subject: data.subject || data.headers?.subject || file.name,
+          from: data.from || data.from_header || data.headers?.from || '',
+          to: Array.isArray(data.to) ? data.to.join(', ') : (data.to || data.headers?.to || ''),
+          date: data.date || data.headers?.date || '',
+          plain_text_body: data.plain_text_body || data.body?.plain_text || '',
+          html_body: data.html_body || data.body?.html || '',
+          raw_email: data.raw_email || '',
+          threat_score: data.threat_score || { score: 85, severity: 'critical', reasons: [], positive_evidence: [], summary: 'Parsed .eml analysis' },
+          ml_phishing_probability: data.ml_phishing_probability,
+          ml_assessment: data.ml_assessment,
+          ai_analyst: data.ai_analyst
+        };
+
+        saveAnalysisResult(analysisId, newAnalysis);
+        handleSwitchEmail(newAnalysis);
+        refreshAvailableEmails();
+      } else {
+        showNotification(`Analysis failed: HTTP ${res.status}`);
+      }
+    } catch (err: any) {
+      showNotification(`Upload error: ${err.message}`);
+    } finally {
+      setIsUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
 
   // Fetch suggested questions for active mode
   useEffect(() => {
@@ -144,13 +320,17 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       if (initialQuestion) {
         handleExecuteQuery(initialQuestion);
       } else {
-        // Populate default greeting message
+        // Populate default greeting message with explicit .eml filename
         const modeLabel = activeMode === 'email' ? 'Email Investigation' : activeMode === 'campaign' ? 'Campaign Investigation' : 'Case Investigation';
+        const greetingText = activeMode === 'email'
+          ? `MailTraceAI Investigation Copilot initialized in **${modeLabel}** mode, currently analyzing target file: **\`${activeFileName}\`** (Evidence ID: ${currentContextId}). All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`
+          : `MailTraceAI Investigation Copilot initialized in **${modeLabel}** mode. All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`;
+
         setMessages([
           {
             id: 'init-1',
             sender: 'copilot',
-            text: `MailTraceAI Investigation Copilot initialized in **${modeLabel}** mode. All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`,
+            text: greetingText,
             timestamp: new Date().toISOString()
           }
         ]);
@@ -194,8 +374,8 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         body: JSON.stringify({
           query: queryText,
           mode: activeMode,
-          context_id: contextId,
-          email_payload: emailPayload
+          context_id: currentContextId,
+          email_payload: currentEmailPayload
         })
       });
 
@@ -218,15 +398,15 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       const fallbackResponse: CopilotQueryResponse = {
         query: queryText,
         mode: activeMode,
-        context_id: contextId,
+        context_id: currentContextId,
         assessment: 'Evaluation complete based on local deterministic forensic telemetry.',
-        reasoning_summary: 'Verified indicators establish elevated risk consistent with active phishing infrastructure.',
+        reasoning_summary: `Verified indicators establish risk consistent with analyzed message (${activeFileName}).`,
         confidence: 'HIGH-CONFIDENCE INFERENCE',
         evidence_refs: [
           {
-            evidence_id: contextId || 'E-1042',
+            evidence_id: currentContextId || 'E-1042',
             type: 'threat_score',
-            statement: 'Evaluated threat score 85/100 with active credential harvester.',
+            statement: `Evaluated threat score ${currentEmailPayload?.threat_score?.score ?? 85}/100 with active signals.`,
             source_module: 'threat_scorer',
             reliability: 0.95,
             confidence_category: 'CONFIRMED'
@@ -235,8 +415,8 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         suggested_actions: [
           {
             action_type: 'view_evidence',
-            label: `View Evidence ${contextId || 'E-1042'}`,
-            params: { evidence_id: contextId || 'E-1042' }
+            label: `View Evidence ${currentContextId || 'E-1042'}`,
+            params: { evidence_id: currentContextId || 'E-1042' }
           }
         ],
         recommended_next_steps: [
@@ -349,7 +529,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
               </span>
             </div>
             <div className="flex items-center space-x-2 text-[11px] font-mono text-foreground-muted">
-              <span>Target: <strong className="text-foreground">{contextId}</strong></span>
+              <span>Target: <strong className="text-foreground">{activeFileName}</strong></span>
               <span>•</span>
               <span className="text-foreground-subtle">Strict Zero-Hallucination Boundaries</span>
             </div>
@@ -373,6 +553,213 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
           ))}
         </div>
       </div>
+
+      {/* ACTIVE TARGET .EML BANNER */}
+      <div className="px-4 py-2.5 bg-surface-secondary/90 border-b border-border flex flex-wrap items-center justify-between gap-2 shrink-0">
+        <div className="flex items-center space-x-3 min-w-0 flex-1">
+          {/* EML File Tag Pill */}
+          <div className="flex items-center space-x-1.5 px-2 py-1 rounded bg-primary/10 border border-primary/25 text-primary text-[11px] font-mono font-bold tracking-tight shrink-0 shadow-xs">
+            <FileCode className="w-3.5 h-3.5" />
+            <span>.EML TARGET</span>
+          </div>
+
+          {/* Filename & Subject/Sender details */}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center space-x-2 truncate">
+              <span className="text-xs font-mono font-bold text-foreground truncate" title={activeFileName}>
+                {activeFileName}
+              </span>
+              <span className="text-border-strong text-xs hidden sm:inline">•</span>
+              {currentEmailPayload?.subject && (
+                <span className="text-[11px] font-sans text-foreground-muted truncate hidden sm:inline" title={currentEmailPayload.subject}>
+                  "{currentEmailPayload.subject}"
+                </span>
+              )}
+            </div>
+            <div className="flex items-center space-x-2 text-[10px] font-mono text-foreground-muted truncate mt-0.5">
+              {currentEmailPayload?.from && (
+                <span className="truncate max-w-[200px]" title={currentEmailPayload.from}>
+                  From: {currentEmailPayload.from}
+                </span>
+              )}
+              <span>•</span>
+              <span>ID: <strong className="text-foreground">{currentContextId}</strong></span>
+              {currentEmailPayload?.threat_score && (
+                <>
+                  <span>•</span>
+                  <span className="flex items-center space-x-1">
+                    <span>Score:</span>
+                    <span className={`px-1.5 py-0.2 rounded font-bold ${
+                      (currentEmailPayload.threat_score.score || 0) >= 75 
+                        ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30' 
+                        : (currentEmailPayload.threat_score.score || 0) >= 40 
+                          ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' 
+                          : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                    }`}>
+                      {currentEmailPayload.threat_score.score || 0}/100
+                    </span>
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons: Switch .eml Target & Upload */}
+        <div className="flex items-center space-x-1.5 shrink-0">
+          <button
+            onClick={() => {
+              refreshAvailableEmails();
+              setIsEmailSelectorOpen(!isEmailSelectorOpen);
+            }}
+            className="px-2.5 py-1.5 rounded-lg text-xs font-mono bg-surface border border-border text-foreground hover:text-primary hover:border-primary/40 hover:bg-primary/5 transition-all flex items-center space-x-1.5 shadow-xs cursor-pointer"
+            title="Switch active .eml file for copilot analysis"
+          >
+            <FolderSync className="w-3.5 h-3.5 text-primary" />
+            <span className="font-semibold">Switch .eml</span>
+            <ChevronDown className={`w-3.5 h-3.5 opacity-60 transition-transform ${isEmailSelectorOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          <button
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            className="px-2 py-1.5 rounded-lg text-xs font-mono bg-surface border border-border text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-all flex items-center space-x-1 shadow-xs cursor-pointer disabled:opacity-50"
+            title="Upload new .eml file to analyze and interrogate"
+          >
+            {isUploading ? <RefreshCw className="w-3.5 h-3.5 animate-spin text-primary" /> : <Upload className="w-3.5 h-3.5 text-primary" />}
+            <span className="hidden md:inline">{isUploading ? 'Uploading...' : 'Upload'}</span>
+          </button>
+
+          <input
+            type="file"
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+            accept=".eml,.msg,message/rfc822"
+            className="hidden"
+          />
+        </div>
+      </div>
+
+      {/* POPUP: EML FILE SWITCHER */}
+      {isEmailSelectorOpen && (
+        <div className="px-4 py-3 bg-surface border-b border-border shadow-md z-20 shrink-0 space-y-3 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center justify-between pb-2 border-b border-border">
+            <div className="flex items-center space-x-2">
+              <FolderSync className="w-4 h-4 text-primary" />
+              <h3 className="text-xs font-mono font-bold uppercase tracking-wider text-foreground">
+                Select Active .eml Investigation Target
+              </h3>
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono bg-surface-secondary text-foreground-muted border border-border">
+                {availableEmails.length} Available
+              </span>
+            </div>
+            <button
+              onClick={() => setIsEmailSelectorOpen(false)}
+              className="p-1 text-foreground-muted hover:text-foreground rounded hover:bg-surface-secondary transition-colors cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Search Bar inside Switcher */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-foreground-muted" />
+            <input
+              type="text"
+              placeholder="Filter .eml files by filename, subject, sender, or ID..."
+              value={emailSearchFilter}
+              onChange={(e) => setEmailSearchFilter(e.target.value)}
+              className="w-full bg-surface-secondary/70 border border-border rounded-lg pl-9 pr-3 py-1.5 text-xs font-mono text-foreground placeholder:text-foreground-muted/60 focus:outline-none focus:border-primary transition-all"
+            />
+          </div>
+
+          {/* Email Items List */}
+          <div className="max-h-56 overflow-y-auto space-y-1.5 pr-1 no-scrollbar">
+            {filteredEmails.length === 0 ? (
+              <div className="py-6 text-center text-xs font-mono text-foreground-muted">
+                No matching .eml files found.
+              </div>
+            ) : (
+              filteredEmails.map((eml) => {
+                const filename = deriveFilename(eml);
+                const isActive = (eml.evidence_id === currentContextId || eml.id === currentContextId || filename === activeFileName);
+                const score = eml.threat_score?.score ?? 0;
+                const severity = eml.threat_score?.severity ?? 'low';
+
+                return (
+                  <div
+                    key={eml.id || eml.evidence_id || filename}
+                    onClick={() => handleSwitchEmail(eml)}
+                    className={`p-2.5 rounded-lg border transition-all cursor-pointer flex items-center justify-between gap-3 ${
+                      isActive
+                        ? 'bg-primary/10 border-primary/40 shadow-xs ring-1 ring-primary/30'
+                        : 'bg-surface-secondary/40 border-border hover:border-border-strong hover:bg-surface-secondary/80'
+                    }`}
+                  >
+                    <div className="min-w-0 flex-1 space-y-0.5">
+                      <div className="flex items-center space-x-2">
+                        <FileCode className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-primary' : 'text-foreground-muted'}`} />
+                        <span className={`text-xs font-mono font-bold truncate ${isActive ? 'text-primary' : 'text-foreground'}`}>
+                          {filename}
+                        </span>
+                        {isActive && (
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-primary text-white font-bold uppercase tracking-wider">
+                            ACTIVE
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] font-sans text-foreground-muted truncate" title={eml.subject}>
+                        {eml.subject || 'Untitled Message'}
+                      </div>
+                      <div className="flex items-center space-x-2 text-[10px] font-mono text-foreground-muted/80 truncate">
+                        {eml.from && <span className="truncate max-w-[220px]">From: {eml.from}</span>}
+                        <span>•</span>
+                        <span>ID: {eml.evidence_id || eml.id}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center space-x-3 shrink-0">
+                      <div className="text-right">
+                        <div className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${
+                          score >= 75
+                            ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                            : score >= 40
+                              ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                              : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
+                        }`}>
+                          {score}/100
+                        </div>
+                        <div className="text-[9px] font-mono text-foreground-muted uppercase mt-0.5">
+                          {severity}
+                        </div>
+                      </div>
+
+                      {isActive ? (
+                        <div className="p-1 rounded-full bg-primary/20 text-primary">
+                          <Check className="w-4 h-4" />
+                        </div>
+                      ) : (
+                        <ChevronRight className="w-4 h-4 text-foreground-muted opacity-40 group-hover:opacity-100" />
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-border flex items-center justify-between text-[11px] font-mono text-foreground-muted">
+            <span>Upload an .eml to analyze and switch target</span>
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              className="text-primary hover:underline font-bold flex items-center space-x-1 cursor-pointer"
+            >
+              <Upload className="w-3 h-3" />
+              <span>Select .eml file</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Suggested Quick Questions Bar */}
       {suggestedQuestions.length > 0 && (

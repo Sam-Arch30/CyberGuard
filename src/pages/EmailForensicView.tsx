@@ -242,6 +242,12 @@ export const EmailForensicView: React.FC = () => {
             email={analysis}
             onFocusGraphNode={handleFocusGraphNode}
             onOpenWorkspace={() => setActiveTab('cross_investigation')}
+            onSelectEmail={(selected) => {
+              setAnalysis(selected);
+              if (selected.id) {
+                navigate(`/analysis/${selected.id}`, { replace: true });
+              }
+            }}
           />
         )}
         {activeTab === 'copilot' && (
@@ -252,6 +258,12 @@ export const EmailForensicView: React.FC = () => {
             onOpenGraph={handleFocusGraphNode}
             onCompareEmails={() => setActiveTab('cross_investigation')}
             onOpenEvidence={() => setActiveTab('overview')}
+            onSelectEmail={(selected) => {
+              setAnalysis(selected);
+              if (selected.id) {
+                navigate(`/analysis/${selected.id}`, { replace: true });
+              }
+            }}
           />
         )}
         {activeTab === 'cross_investigation' && (

@@ -22,9 +22,10 @@ interface OverviewTabProps {
   email: EmailAnalysis;
   onFocusGraphNode?: (nodeId: string) => void;
   onOpenWorkspace?: () => void;
+  onSelectEmail?: (email: EmailAnalysis) => void;
 }
 
-export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNode, onOpenWorkspace }) => {
+export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNode, onOpenWorkspace, onSelectEmail }) => {
   const [correlations, setCorrelations] = useState<CampaignCorrelationResponse | null>(null);
   const [loadingCorrelations, setLoadingCorrelations] = useState<boolean>(false);
   const [isConfidencePanelOpen, setIsConfidencePanelOpen] = useState<boolean>(false);
@@ -279,6 +280,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
         email={email}
         onFocusGraphNode={onFocusGraphNode}
         onOpenWorkspace={onOpenWorkspace}
+        onSelectEmail={onSelectEmail}
       />
 
       {/* Section 21: Probabilistic Threat Attribution Engine */}

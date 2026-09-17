@@ -1116,5 +1116,144 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
     return MOCK_SAMPLE_ANALYSIS;
   }
 
+  // Check if ID matches one of the sample emails from SAMPLE_EMAILS
+  const matchedSample = SAMPLE_EMAILS.find(s => s.id === id);
+  if (matchedSample) {
+    return convertMockSampleToAnalysis(matchedSample);
+  }
+
   return null;
 };
+
+import { SAMPLE_EMAILS } from '../data/mockData';
+
+const SAMPLE_FILENAMES: Record<string, string> = {
+  'sample-001': 'urgent_microsoft_verification.eml',
+  'EML-2026-8819': 'executive_wire_transfer_settlement.eml',
+  'EML-2026-4402': 'm365_password_expiration_notice.eml',
+  'EML-2026-3190': 'q2_financial_performance_briefing.eml'
+};
+
+export const deriveFilename = (analysis: Partial<EmailAnalysis>): string => {
+  if (analysis.original_filename) return analysis.original_filename;
+  if (analysis.file_info?.filename) return analysis.file_info.filename;
+  if (analysis.subject) {
+    const slug = analysis.subject
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 32);
+    if (slug) return `${slug}.eml`;
+  }
+  return `${analysis.id || 'email'}.eml`;
+};
+
+export const convertMockSampleToAnalysis = (mock: any, filename?: string): EmailAnalysis => {
+  const fromDomain = mock.senderEmail?.includes('@') ? mock.senderEmail.split('@')[1] : '';
+  const hopIps = (mock.hops || []).flatMap((h: any) => [h.fromIp, h.byIp]).filter(Boolean);
+  const originIp = mock.originGeo?.ip;
+  const allIps = Array.from(new Set([originIp, ...hopIps].filter(Boolean))) as string[];
+  const actualFilename = filename || SAMPLE_FILENAMES[mock.id] || `${mock.id.toLowerCase().replace(/[^a-z0-9]/g, '_')}.eml`;
+
+  return resolveEmailIndicators({
+    id: mock.id,
+    evidence_id: `EVD-${mock.id.replace(/[^a-zA-Z0-9]/g, '').slice(0, 10).toUpperCase()}`,
+    original_filename: actualFilename,
+    upload_timestamp: mock.timestamp || '2026-09-05T10:42:15Z',
+    size: mock.rawHeaders ? mock.rawHeaders.length + (mock.bodyText?.length || 0) : 15420,
+    uploader: 'SOC Analyst',
+    subject: mock.subject,
+    from: `${mock.senderName} <${mock.senderEmail}>`,
+    to: mock.recipientEmail,
+    reply_to: mock.replyTo,
+    return_path: mock.returnPath,
+    date: mock.timestamp,
+    received: (mock.hops || []).map((h: any) => `from ${h.fromHost || ''} (${h.fromIp || ''}) by ${h.byHost || ''}; ${h.timestamp}`),
+    raw_email: (mock.rawHeaders || '') + '\n\n' + (mock.bodyText || ''),
+    plain_text_body: mock.bodyText,
+    ips: allIps,
+    domains: fromDomain ? [fromDomain] : [],
+    urls: (mock.iocs?.urls || []).map((u: any) => typeof u === 'string' ? u : u.url),
+    attachments: (mock.iocs?.hashes || []).map((h: any) => ({
+      filename: h.filename,
+      mime_type: 'application/octet-stream',
+      size: 15000,
+      sha256: h.sha256
+    })),
+    threat_score: {
+      score: mock.riskScore,
+      severity: mock.severity === 'CRITICAL' ? 'critical' : mock.severity === 'HIGH' ? 'high' : 'low',
+      risk_level: mock.severity,
+      summary: mock.summary || 'Email threat evaluation',
+      reasons: [],
+      positive_evidence: []
+    },
+    authentication: {
+      spf: { result: (typeof mock.protocols?.spf === 'string' ? mock.protocols.spf : 'neutral').toLowerCase() },
+      dkim: { result: (typeof mock.protocols?.dkim === 'string' ? mock.protocols.dkim : 'neutral').toLowerCase() },
+      dmarc: { result: (typeof mock.protocols?.dmarc === 'string' ? mock.protocols.dmarc : 'neutral').toLowerCase() }
+    }
+  });
+};
+
+export const getAllAvailableAnalyses = (): EmailAnalysis[] => {
+  const result: EmailAnalysis[] = [];
+  const seenIds = new Set<string>();
+
+  // 1. Primary mock sample
+  if (MOCK_SAMPLE_ANALYSIS && MOCK_SAMPLE_ANALYSIS.id) {
+    if (!MOCK_SAMPLE_ANALYSIS.original_filename) {
+      MOCK_SAMPLE_ANALYSIS.original_filename = 'urgent_microsoft_verification.eml';
+    }
+    result.push(MOCK_SAMPLE_ANALYSIS);
+    seenIds.add(MOCK_SAMPLE_ANALYSIS.id);
+  }
+
+  // 2. Mock samples from SAMPLE_EMAILS
+  for (const sample of SAMPLE_EMAILS) {
+    if (!seenIds.has(sample.id)) {
+      const converted = convertMockSampleToAnalysis(sample);
+      result.push(converted);
+      seenIds.add(sample.id);
+    }
+  }
+
+  // 3. Memory store entries
+  for (const [id, analysis] of memoryStore.entries()) {
+    if (!seenIds.has(id)) {
+      const resolved = resolveEmailIndicators(analysis);
+      if (!resolved.original_filename) {
+        resolved.original_filename = deriveFilename(resolved);
+      }
+      result.push(resolved);
+      seenIds.add(id);
+    }
+  }
+
+  // 4. SessionStorage entries
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX)) {
+        const id = key.substring(STORAGE_KEY_PREFIX.length);
+        if (!seenIds.has(id)) {
+          const raw = sessionStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const resolved = resolveEmailIndicators(parsed);
+            if (!resolved.original_filename) {
+              resolved.original_filename = deriveFilename(resolved);
+            }
+            result.push(resolved);
+            seenIds.add(id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading sessionStorage for available analyses', e);
+  }
+
+  return result;
+};
+
