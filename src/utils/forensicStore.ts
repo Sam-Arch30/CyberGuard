@@ -1,6 +1,7 @@
 import type { EmailAnalysis } from '../types/forensic';
 import { resolveEmailIndicators, resolveAttribution } from './indicatorHelper';
 import { resolveConfidenceConclusions } from './confidenceResolver';
+import { SCENARIO_1_LEGITIMATE, SCENARIO_2_PHISHING, SCENARIO_3_PRIMARY_EMAIL } from '../data/sihScenariosData';
 
 const STORAGE_KEY_PREFIX = 'mailtrace_forensic_';
 const memoryStore = new Map<string, EmailAnalysis>();
@@ -1116,6 +1117,26 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
     return MOCK_SAMPLE_ANALYSIS;
   }
 
+  // Check SIH Safe Synthetic Demo Scenarios
+  if (id === 'scenario-1-legit') {
+    const item = resolveEmailIndicators(SCENARIO_1_LEGITIMATE);
+    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
+    return item;
+  }
+  if (id === 'scenario-2-phish') {
+    const item = resolveEmailIndicators(SCENARIO_2_PHISHING);
+    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
+    return item;
+  }
+  if (id === 'scenario-3-campaign') {
+    const item = resolveEmailIndicators(SCENARIO_3_PRIMARY_EMAIL);
+    if (!item.attribution || !item.attribution.probable_origin_ip) item.attribution = resolveAttribution(item);
+    if (!item.forensic_conclusions || item.forensic_conclusions.length === 0) item.forensic_conclusions = resolveConfidenceConclusions(item);
+    return item;
+  }
+
   // Check if ID matches one of the sample emails from SAMPLE_EMAILS
   const matchedSample = SAMPLE_EMAILS.find(s => s.id === id);
   if (matchedSample) {
@@ -1254,6 +1275,48 @@ export const getAllAvailableAnalyses = (): EmailAnalysis[] => {
     console.warn('Error reading sessionStorage for available analyses', e);
   }
 
+  // 5. SIH Safe Synthetic Demo Scenarios
+  const sihScenarios = [
+    resolveEmailIndicators(SCENARIO_1_LEGITIMATE),
+    resolveEmailIndicators(SCENARIO_2_PHISHING),
+    resolveEmailIndicators(SCENARIO_3_PRIMARY_EMAIL)
+  ];
+  for (const scenario of sihScenarios) {
+    if (scenario.id && !seenIds.has(scenario.id)) {
+      result.push(scenario);
+      seenIds.add(scenario.id);
+    }
+  }
+
   return result;
+};
+
+export const resetDemoStore = async (): Promise<boolean> => {
+  try {
+    // 1. Remove synthetic demo keys from sessionStorage
+    const toRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && (k.includes('scenario-') || k.includes('DH-') || k.includes('sih_demo'))) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k => sessionStorage.removeItem(k));
+
+    // 2. Remove from memoryStore
+    ['scenario-1-legit', 'scenario-2-phish', 'scenario-3-campaign'].forEach(id => memoryStore.delete(id));
+
+    // 3. Notify backend demo reset endpoint if reachable
+    try {
+      await fetch('http://127.0.0.1:8000/api/benchmark/demo-reset', { method: 'POST' });
+    } catch {
+      // Backend might be offline or using proxy, safe fallback
+    }
+
+    return true;
+  } catch (e) {
+    console.error('Failed to reset demo store:', e);
+    return false;
+  }
 };
 

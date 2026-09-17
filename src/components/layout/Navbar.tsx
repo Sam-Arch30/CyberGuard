@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, ShieldAlert, Cpu, Palette, Check } from 'lucide-react';
+import { Search, Bell, ShieldAlert, Cpu, Palette, Check, Sparkles, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../../context/ThemeContext';
+import { useDemoTour } from '../../context/DemoTourContext';
 
 export const Navbar: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -9,6 +10,7 @@ export const Navbar: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
   const { theme, setTheme, themeMeta } = useTheme();
+  const { isTourActive, startTour, endTour, resetDemo, isResetting } = useDemoTour();
 
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -84,6 +86,33 @@ export const Navbar: React.FC = () => {
           <Cpu className="w-3.5 h-3.5 text-primary" />
           <span>AI Engine: <strong className="text-foreground">NLP v4.2</strong></span>
         </div>
+
+        {/* SIH Demo Tour Trigger */}
+        <button
+          type="button"
+          onClick={() => (isTourActive ? endTour() : startTour('scenario-3-campaign', 1))}
+          className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-control text-xs font-mono font-bold transition-all cursor-pointer ${
+            isTourActive
+              ? 'bg-primary text-primary-foreground shadow-sm shadow-primary/30'
+              : 'bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30'
+          }`}
+          title="Launch Guided 10-Step SIH Demo Walkthrough"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">{isTourActive ? 'Demo Active' : 'SIH Demo'}</span>
+        </button>
+
+        {/* Reset Demo Button */}
+        <button
+          type="button"
+          onClick={resetDemo}
+          disabled={isResetting}
+          className="hidden md:flex items-center space-x-1 px-2.5 py-1.5 rounded-control text-xs font-mono bg-surface border border-border hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
+          title="Restore synthetic demo state to baseline without affecting production"
+        >
+          <RotateCcw className={`w-3.5 h-3.5 ${isResetting ? 'animate-spin text-primary' : ''}`} />
+          <span>{isResetting ? 'Resetting...' : 'Reset'}</span>
+        </button>
 
         {/* Theme Selector Dropdown */}
         <div className="relative" ref={themeMenuRef}>

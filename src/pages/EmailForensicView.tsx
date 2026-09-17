@@ -17,16 +17,24 @@ import { InvestigationMapTab } from '../components/forensic/InvestigationMapTab'
 import { CrossEmailWorkspace } from '../components/forensic/CrossEmailWorkspace';
 import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+import { useDemoTour } from '../context/DemoTourContext';
 
 export const EmailForensicView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { activeTabOverride } = useDemoTour();
 
   const [analysis, setAnalysis] = useState<EmailAnalysis | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ForensicTabType>('overview');
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (activeTabOverride) {
+      setActiveTab(activeTabOverride as ForensicTabType);
+    }
+  }, [activeTabOverride]);
 
   const handleFocusGraphNode = (nodeId: string) => {
     setFocusedGraphNodeId(nodeId);

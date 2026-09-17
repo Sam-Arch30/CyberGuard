@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { HashRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
+import { DemoTourProvider } from './context/DemoTourContext';
+import { SIHGuidedTour } from './components/demo/SIHGuidedTour';
 import { Sidebar } from './components/layout/Sidebar';
 import { Navbar } from './components/layout/Navbar';
 import { Dashboard } from './pages/Dashboard';
@@ -13,6 +15,7 @@ import { CampaignIntelligence } from './pages/CampaignIntelligence';
 import { Reports } from './pages/Reports';
 import { Settings } from './pages/Settings';
 import { CrossInvestigationWorkspacePage } from './pages/CrossInvestigationWorkspacePage';
+import { BenchmarkEvaluation } from './pages/BenchmarkEvaluation';
 
 function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -49,10 +52,14 @@ function AppContent() {
               <Route path="/campaigns/:id" element={<CampaignIntelligence />} />
               <Route path="/intelligence" element={<ThreatIntelligence />} />
               <Route path="/reports" element={<Reports />} />
+              <Route path="/benchmarks" element={<BenchmarkEvaluation />} />
               <Route path="/settings" element={<Settings />} />
             </Routes>
           </div>
         </main>
+
+        {/* Persistent SIH Guided Tour HUD */}
+        <SIHGuidedTour />
       </div>
     </div>
   );
@@ -62,10 +69,13 @@ export function App() {
   return (
     <ThemeProvider>
       <Router>
-        <AppContent />
+        <DemoTourProvider>
+          <AppContent />
+        </DemoTourProvider>
       </Router>
     </ThemeProvider>
   );
 }
 
 export default App;
+

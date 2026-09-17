@@ -14,7 +14,8 @@ import {
   Zap,
   Palette,
   Network,
-  GitMerge
+  GitMerge,
+  BarChart3
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -81,6 +82,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/reports',
       icon: FileText,
       badge: undefined
+    },
+    {
+      name: 'Benchmark & Evaluation',
+      path: '/benchmarks',
+      icon: BarChart3,
+      badge: 'SIH-SAFE'
     },
     {
       name: 'Settings',
