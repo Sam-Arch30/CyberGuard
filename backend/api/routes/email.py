@@ -427,6 +427,8 @@ async def analyze_email(
             content={"detail": f"Malformed email file: {str(e)}", "error_code": "MALFORMED_EMAIL"}
         )
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return JSONResponse(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": f"An error occurred while parsing email: {str(e)}", "error_code": "PARSE_ERROR"}

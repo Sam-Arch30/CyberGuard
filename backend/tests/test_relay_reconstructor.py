@@ -68,6 +68,23 @@ def test_ipv6_hop():
     assert analysis.earliest_observable_node.earliest_observable_ip == "2001:db8::1"
 
 
+def test_ipv6_various_formats():
+    # 1. Bracketed without 'IPv6:' prefix (standard Google/Postfix/M365 style)
+    r1 = "from mail-pj1-x230.google.com (mail-pj1-x230.google.com [2607:f8b0:4864:20::230]) by mx.dest.com; Mon, 8 Sep 2026 10:00:00 +0000"
+    # 2. Standalone IPv6 in from clause
+    r2 = "from 2001:db8:85a3::8a2e:370:7334 by mx.dest.com; Mon, 8 Sep 2026 09:59:00 +0000"
+    # 3. Parenthesized IPv6
+    r3 = "from relay.domain.com (2a00:1450:400c:c0b::22f) by mx.dest.com; Mon, 8 Sep 2026 09:58:00 +0000"
+
+    analysis = RelayReconstructorService.reconstruct_relay_path([r1, r2, r3])
+    assert analysis.header_order_hops[0].from_ip == "2607:f8b0:4864:20::230"
+    assert analysis.header_order_hops[1].from_ip == "2001:db8:85a3::8a2e:370:7334"
+    assert analysis.header_order_hops[2].from_ip == "2a00:1450:400c:c0b::22f"
+    # Earliest node should be from the bottom hop (r3)
+    assert analysis.earliest_observable_node.earliest_observable_ip == "2a00:1450:400c:c0b::22f"
+
+
+
 def test_malformed_received_header():
     received = [
         "Received: non-standard gibberish without semicolon or standard keywords"

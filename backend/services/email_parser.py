@@ -115,17 +115,48 @@ class EmailParserService:
             raise EmailParseException(f"Malformed headers in email: {str(e)}")
 
         # 2. Analyze Email Authentication & Sender Alignment
-        auth_analysis = AuthAnalyzerService.analyze_authentication(
-            from_header=from_header,
-            reply_to=reply_to,
-            return_path=return_path,
-            auth_headers=auth_results_list,
-            received_spf_headers=received_spf_headers,
-            raw_headers_text=raw_email_str
-        )
+        try:
+            auth_analysis = AuthAnalyzerService.analyze_authentication(
+                from_header=from_header,
+                reply_to=reply_to,
+                return_path=return_path,
+                auth_headers=auth_results_list,
+                received_spf_headers=received_spf_headers,
+                raw_headers_text=raw_email_str
+            )
+        except Exception as e:
+            from backend.schemas.email import ProtocolResult, SenderAlignment, AuthenticationAnalysis
+            auth_analysis = AuthenticationAnalysis(
+                spf=ProtocolResult(result="unknown", details=f"Error analyzing SPF: {str(e)}"),
+                dkim=ProtocolResult(result="unknown", details=f"Error analyzing DKIM: {str(e)}"),
+                dmarc=ProtocolResult(result="unknown", details=f"Error analyzing DMARC: {str(e)}"),
+                alignment=SenderAlignment(
+                    from_domain=None,
+                    reply_to_domain=None,
+                    return_path_domain=None,
+                    reply_to_mismatch=False,
+                    return_path_mismatch=False,
+                    display_name_spoofing=False,
+                    details=None
+                ),
+                raw_auth_results=auth_results_str
+            )
 
         # 3. Reconstruct Relay Path from Received headers
-        relay_analysis = RelayReconstructorService.reconstruct_relay_path(received_headers)
+        try:
+            relay_analysis = RelayReconstructorService.reconstruct_relay_path(received_headers)
+        except Exception as e:
+            from backend.schemas.email import EarliestObservableNode, RelayPathAnalysis
+            relay_analysis = RelayPathAnalysis(
+                header_order_hops=[],
+                transmission_order_hops=[],
+                earliest_observable_node=EarliestObservableNode(
+                    earliest_observable_ip=None,
+                    from_host=None,
+                    confidence="none",
+                    reason=f"Relay reconstruction encountered error: {str(e)}"
+                )
+            )
 
         headers_dict = {
             "from": from_header,

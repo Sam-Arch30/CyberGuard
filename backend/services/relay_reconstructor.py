@@ -45,45 +45,35 @@ class RelayReconstructorService:
         if not text:
             return None
 
-        # 1. IPv6 inside brackets: [IPv6:2001:db8::1] or [2001:db8::1]
-        ipv6_match = re.search(r'\[(?:IPv6:)?([0-9a-fA-F:]+)\]', text, re.IGNORECASE)
-        if ipv6_match:
-            cand = ipv6_match.group(1).strip()
+        # 1. Bracketed or parenthesized IP: [203.0.113.10], (203.0.113.10), [IPv6:2001:db8::1], (IPv6:2001:db8::1)
+        for m in re.finditer(r'[\[\(]\s*(?:IPv6:)?\s*([0-9a-fA-F:.]+)\s*[\]\)]', text, re.IGNORECASE):
+            cand = m.group(1).strip()
             try:
                 ipaddress.ip_address(cand)
                 return cand
             except ValueError:
                 pass
 
-        # 2. IPv4 inside brackets: [203.0.113.10]
-        ipv4_bracket = re.search(r'\[((?:\d{1,3}\.){3}\d{1,3})\]', text)
-        if ipv4_bracket:
-            cand = ipv4_bracket.group(1).strip()
+        # 2. Standalone IPv4: 203.0.113.10
+        ipv4_match = re.search(r'\b((?:\d{1,3}\.){3}\d{1,3})\b', text)
+        if ipv4_match:
+            cand = ipv4_match.group(1).strip()
             try:
                 ipaddress.ip_address(cand)
                 return cand
             except ValueError:
                 pass
 
-        # 3. Standalone IPv4: (203.0.113.10) or 203.0.113.10
-        ipv4_standalone = re.search(r'\b((?:\d{1,3}\.){3}\d{1,3})\b', text)
-        if ipv4_standalone:
-            cand = ipv4_standalone.group(1).strip()
-            try:
-                ipaddress.ip_address(cand)
-                return cand
-            except ValueError:
-                pass
-
-        # 4. Standalone IPv6: 2001:db8::1
-        ipv6_standalone = re.search(r'\b(?:[0-9a-fA-F]{1,4}:){2,7}[0-9a-fA-F]{1,4}\b', text)
-        if ipv6_standalone:
-            cand = ipv6_standalone.group(1).strip()
-            try:
-                ipaddress.ip_address(cand)
-                return cand
-            except ValueError:
-                pass
+        # 3. Standalone IPv6 (prefixed or unprefixed)
+        cleaned = re.sub(r'(?i)\bIPv6:\s*', '', text)
+        for token in re.findall(r'[0-9a-fA-F:.]+', cleaned):
+            cand = token.strip("[]():,; \t")
+            if ":" in cand and len(cand) >= 2:
+                try:
+                    ipaddress.ip_address(cand)
+                    return cand
+                except ValueError:
+                    pass
 
         return None
 

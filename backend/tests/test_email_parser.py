@@ -188,3 +188,53 @@ def test_missing_reply_to_defaults_safely():
     assert res.authentication.alignment.reply_to_mismatch is False
 
 
+def test_parse_eml_with_ipv6_received_header():
+    """Test EmailParserService correctly parses .eml with IPv6 Received headers without indexing error."""
+    eml = (
+        b"From: Service <service@domain.com>\r\n"
+        b"To: Recipient <recip@domain.com>\r\n"
+        b"Subject: Security Alert\r\n"
+        b"Date: Thu, 17 Sep 2026 12:00:00 +0000\r\n"
+        b"Received: from mail-pj1-x230.google.com (mail-pj1-x230.google.com [2607:f8b0:4864:20::230])\r\n"
+        b" by mx.destination.com with ESMTPS id 12345;\r\n"
+        b" Thu, 17 Sep 2026 12:00:01 +0000\r\n"
+        b"Content-Type: text/plain\r\n"
+        b"\r\n"
+        b"Test body with IPv6 relay hop.\r\n"
+    )
+    res = EmailParserService.parse_eml_bytes(eml, filename="ipv6_test.eml")
+    assert res is not None
+    assert res.from_header == "Service <service@domain.com>"
+    assert len(res.relay_analysis.header_order_hops) == 1
+    assert res.relay_analysis.header_order_hops[0].from_ip == "2607:f8b0:4864:20::230"
+
+
+def test_api_analyze_with_ipv6_eml():
+    """Test POST /api/emails/analyze with an .eml containing IPv6 Received headers returns 200 OK."""
+    eml_content = (
+        b"From: Notifications <notify@alert-system.org>\r\n"
+        b"To: SOC Team <soc@enterprise.local>\r\n"
+        b"Subject: Critical Infrastructure Notice\r\n"
+        b"Date: Thu, 17 Sep 2026 14:30:00 +0000\r\n"
+        b"Message-ID: <unique-alert-123@alert-system.org>\r\n"
+        b"Received: from relay01.cloud.org ([2a00:1450:400c:c0b::22f])\r\n"
+        b" by gateway.enterprise.local with ESMTP id gw99;\r\n"
+        b" Thu, 17 Sep 2026 14:30:01 +0000\r\n"
+        b"Content-Type: text/plain\r\n"
+        b"\r\n"
+        b"Please review firewall event logs.\r\n"
+    )
+    response = client.post(
+        "/api/emails/analyze",
+        files={"file": ("alert_ipv6.eml", eml_content, "message/rfc822")}
+    )
+    assert response.status_code == 200, f"Expected 200 but got {response.status_code}: {response.text}"
+    data = response.json()
+    assert "evidence_id" in data
+    assert data["subject"] == "Critical Infrastructure Notice"
+    assert len(data["relay_analysis"]["header_order_hops"]) >= 1
+    assert data["relay_analysis"]["header_order_hops"][0]["from_ip"] == "2a00:1450:400c:c0b::22f"
+
+
+
+
