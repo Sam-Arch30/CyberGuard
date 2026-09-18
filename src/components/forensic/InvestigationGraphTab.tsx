@@ -102,7 +102,7 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
     }
 
     setLoading(true);
-    fetch('http://localhost:8000/api/emails/investigation-graph', {
+    fetch('/api/emails/investigation-graph', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)

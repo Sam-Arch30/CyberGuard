@@ -24,7 +24,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email }) => {
   useEffect(() => {
     if (!emailKey || !email) return;
     setLoadingCorrelations(true);
-    fetch('http://localhost:8000/api/correlation/email?min_score=0.15', {
+    fetch('/api/correlation/email?min_score=0.15', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)
@@ -35,7 +35,29 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email }) => {
       })
       .catch(() => {})
       .finally(() => setLoadingCorrelations(false));
+<<<<<<< Updated upstream
   }, [emailKey]);
+=======
+
+    // Proactive Campaign Detection Alert
+    fetch('/api/campaigns/detect-alert?threshold=0.45', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(email)
+    })
+      .then(res => (res.ok ? res.json() : null))
+      .then((data: CampaignAlertData | null) => {
+        if (data && data.is_campaign_detected) {
+          setCampaignAlert(data);
+        } else {
+          setCampaignAlert(null);
+        }
+      })
+      .catch(() => {
+        setCampaignAlert(null);
+      });
+  }, [emailKey, email]);
+>>>>>>> Stashed changes
 
   const receivedHopsCount = email.received?.length || 0;
   const urlsCount = email.urls?.length || 0;

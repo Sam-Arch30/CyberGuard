@@ -487,3 +487,100 @@ export const getAnalysisResult = (id: string): EmailAnalysis | null => {
 
   return null;
 };
+<<<<<<< Updated upstream
+=======
+
+export const getAllAvailableAnalyses = (includeDemo = false): EmailAnalysis[] => {
+  const result: EmailAnalysis[] = [];
+  const seenIds = new Set<string>();
+
+  // 1. Memory store entries
+  for (const [id, analysis] of memoryStore.entries()) {
+    if (!seenIds.has(id)) {
+      const resolved = resolveEmailIndicators(analysis);
+      if (!resolved.original_filename) {
+        resolved.original_filename = deriveFilename(resolved);
+      }
+      result.push(resolved);
+      seenIds.add(id);
+    }
+  }
+
+  // 2. SessionStorage entries
+  try {
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const key = sessionStorage.key(i);
+      if (key && key.startsWith(STORAGE_KEY_PREFIX) && key !== STORAGE_KEY_PREFIX + 'latest_id') {
+        const id = key.substring(STORAGE_KEY_PREFIX.length);
+        if (!seenIds.has(id)) {
+          const raw = sessionStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            const resolved = resolveEmailIndicators(parsed);
+            if (!resolved.original_filename) {
+              resolved.original_filename = deriveFilename(resolved);
+            }
+            result.push(resolved);
+            seenIds.add(id);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading sessionStorage for available analyses', e);
+  }
+
+  // Sort by upload timestamp descending if available
+  result.sort((a, b) => {
+    const tA = new Date(a.upload_timestamp || 0).getTime();
+    const tB = new Date(b.upload_timestamp || 0).getTime();
+    return tB - tA;
+  });
+
+  // 3. Isolated demo scenarios only if explicitly requested
+  if (includeDemo) {
+    const sihScenarios = [
+      resolveEmailIndicators({ ...SCENARIO_1_LEGITIMATE, is_demo: true }),
+      resolveEmailIndicators({ ...SCENARIO_2_PHISHING, is_demo: true }),
+      resolveEmailIndicators({ ...SCENARIO_3_PRIMARY_EMAIL, is_demo: true })
+    ];
+    for (const scenario of sihScenarios) {
+      if (scenario.id && !seenIds.has(scenario.id)) {
+        result.push(scenario);
+        seenIds.add(scenario.id);
+      }
+    }
+  }
+
+  return result;
+};
+
+export const resetDemoStore = async (): Promise<boolean> => {
+  try {
+    // 1. Remove synthetic demo keys from sessionStorage
+    const toRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && (k.includes('scenario-') || k.includes('DH-') || k.includes('sih_demo'))) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k => sessionStorage.removeItem(k));
+
+    // 2. Remove from memoryStore
+    ['scenario-1-legit', 'scenario-2-phish', 'scenario-3-campaign'].forEach(id => memoryStore.delete(id));
+
+    // 3. Notify backend demo reset endpoint if reachable
+    try {
+      await fetch('/api/benchmark/demo-reset', { method: 'POST' });
+    } catch {
+      // Safe fallback
+    }
+
+    return true;
+  } catch (e) {
+    console.error('Failed to reset demo store:', e);
+    return false;
+  }
+};
+>>>>>>> Stashed changes

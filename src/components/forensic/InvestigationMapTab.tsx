@@ -35,6 +35,31 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [showRoute, setShowRoute] = useState(true);
   const [copiedIp, setCopiedIp] = useState<string | null>(null);
+<<<<<<< Updated upstream
+=======
+  const [providerStatus, setProviderStatus] = useState<GeolocationStatus | null>(null);
+
+  // Fetch safe configuration status
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStatus = async () => {
+      try {
+        const res = await fetch('/api/intelligence/geolocation/status');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (isMounted) setProviderStatus(data);
+      } catch (err: any) {
+        if (isMounted) {
+          setProviderStatus(null);
+        }
+      }
+    };
+    fetchStatus();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+>>>>>>> Stashed changes
 
   // Extract infrastructure nodes and route path from email
   const mapData = useMemo(() => extractInfrastructureMapData(email), [email]);

@@ -57,7 +57,7 @@ export const Cases: React.FC = () => {
     if (selectedSeverity !== 'ALL') params.append('severity', selectedSeverity);
     if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-    fetch(`http://localhost:8000/api/cases?${params.toString()}`)
+    fetch(`/api/cases?${params.toString()}`)
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (data && Array.isArray(data.cases)) {
@@ -94,7 +94,7 @@ export const Cases: React.FC = () => {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/api/cases', {
+      const res = await fetch('/api/cases', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

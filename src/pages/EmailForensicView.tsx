@@ -13,7 +13,15 @@ import { AttachmentsTab } from '../components/forensic/AttachmentsTab';
 import { RawEmailTab } from '../components/forensic/RawEmailTab';
 import { InvestigationGraphTab } from '../components/forensic/InvestigationGraphTab';
 import { InvestigationMapTab } from '../components/forensic/InvestigationMapTab';
+<<<<<<< Updated upstream
 import { AlertCircle, ArrowLeft, Loader2 } from 'lucide-react';
+=======
+import { CrossEmailWorkspace } from '../components/forensic/CrossEmailWorkspace';
+import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
+import { AlertCircle, ArrowLeft, Loader2, X } from 'lucide-react';
+import { useDemoTour } from '../context/DemoTourContext';
+import { api } from '../services/api';
+>>>>>>> Stashed changes
 
 export const EmailForensicView: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -23,6 +31,22 @@ export const EmailForensicView: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ForensicTabType>('overview');
+<<<<<<< Updated upstream
+=======
+  const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
+  const [isCopilotDrawerOpen, setIsCopilotDrawerOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (activeTabOverride) {
+      setActiveTab(activeTabOverride as ForensicTabType);
+    }
+  }, [activeTabOverride]);
+
+  const handleFocusGraphNode = (nodeId: string) => {
+    setFocusedGraphNodeId(nodeId);
+    setActiveTab('graph');
+  };
+>>>>>>> Stashed changes
 
   useEffect(() => {
     setLoading(true);
@@ -42,6 +66,7 @@ export const EmailForensicView: React.FC = () => {
       if (!hasML) {
         const textToAnalyze = resolved.plain_text_body || (resolved.html_body ? resolved.html_body.replace(/<[^>]+>/g, ' ') : '');
         if (resolved.subject || textToAnalyze) {
+<<<<<<< Updated upstream
           fetch('http://localhost:8000/api/emails/ml-classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -51,6 +76,9 @@ export const EmailForensicView: React.FC = () => {
             })
           })
             .then(res => (res.ok ? res.json() : null))
+=======
+          api.email.mlClassify(resolved.subject || '', textToAnalyze || '')
+>>>>>>> Stashed changes
             .then(mlData => {
               if (mlData && mlData.available) {
                 setAnalysis(prev => {
@@ -71,12 +99,16 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch AI Analyst assessment if not already cached
       if (!resolved.ai_analyst) {
+<<<<<<< Updated upstream
         fetch('http://localhost:8000/api/emails/ai-analyst', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
         })
           .then(res => (res.ok ? res.json() : null))
+=======
+        api.email.aiAnalyst(resolved)
+>>>>>>> Stashed changes
           .then(aiData => {
             if (aiData) {
               setAnalysis(prev => {
@@ -93,6 +125,7 @@ export const EmailForensicView: React.FC = () => {
           .catch(() => {});
       }
 
+<<<<<<< Updated upstream
       // Dynamically fetch Investigation Graph if not already cached
       if (!resolved.investigation_graph) {
         fetch('http://localhost:8000/api/emails/investigation-graph', {
@@ -101,6 +134,30 @@ export const EmailForensicView: React.FC = () => {
           body: JSON.stringify(resolved)
         })
           .then(res => (res.ok ? res.json() : null))
+=======
+      // Dynamically fetch Attribution if not already cached
+      if (!resolved.attribution) {
+        api.attribution.evaluate(resolved)
+          .then(attrData => {
+            if (attrData) {
+              setAnalysis(prev => {
+                if (!prev) return prev;
+                const updated: EmailAnalysis = {
+                  ...prev,
+                  attribution: attrData
+                };
+                saveAnalysisResult(targetId, updated);
+                return updated;
+              });
+            }
+          })
+          .catch(() => {});
+      }
+
+      // Dynamically fetch Investigation Graph if not already cached
+      if (!resolved.investigation_graph) {
+        api.email.getInvestigationGraph(resolved)
+>>>>>>> Stashed changes
           .then(graphData => {
             if (graphData && graphData.nodes) {
               setAnalysis(prev => {
@@ -116,6 +173,41 @@ export const EmailForensicView: React.FC = () => {
           })
           .catch(() => {});
       }
+<<<<<<< Updated upstream
+=======
+
+      // Dynamically fetch Threat Score if not already cached
+      if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
+        api.email.calculateThreatScore(resolved)
+          .then(scoreData => {
+            if (scoreData) {
+              setAnalysis(prev => {
+                if (!prev) return prev;
+                const updated: EmailAnalysis = {
+                  ...prev,
+                  threat_score: scoreData
+                };
+                saveAnalysisResult(targetId, updated);
+                return updated;
+              });
+            }
+          })
+          .catch(() => {});
+      }
+      setLoading(false);
+    } else if (targetId && targetId !== 'latest') {
+      api.email.getAnalysis(targetId)
+        .then(apiData => {
+          const resolved = resolveEmailIndicators(apiData);
+          saveAnalysisResult(targetId, resolved);
+          setAnalysis(resolved);
+          setLoading(false);
+        })
+        .catch(() => {
+          setError(`Unable to load forensic analysis for email ID '${targetId}'.`);
+          setLoading(false);
+        });
+>>>>>>> Stashed changes
     } else {
       setError('Unable to load the forensic analysis for this email.');
     }
@@ -127,7 +219,7 @@ export const EmailForensicView: React.FC = () => {
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
         <Loader2 className="w-6 h-6 text-primary animate-spin" />
         <p className="text-xs font-mono text-foreground-muted">
-          Loading forensic evidence...
+          Loading forensic evidence dossier...
         </p>
       </div>
     );
@@ -135,12 +227,12 @@ export const EmailForensicView: React.FC = () => {
 
   if (error || !analysis) {
     return (
-      <div className="max-w-xl mx-auto my-12 p-8 bg-surface rounded-xl border border-danger-border text-center space-y-4 shadow-sm">
+      <div className="max-w-xl mx-auto my-12 p-8 bg-surface rounded-card border border-danger-border text-center space-y-4 shadow-sm">
         <div className="p-3 bg-danger-surface rounded-full w-12 h-12 mx-auto flex items-center justify-center border border-danger-border">
           <AlertCircle className="w-5 h-5 text-danger" />
         </div>
         <h2 className="text-base font-bold text-foreground font-mono">
-          Analysis Not Found
+          Analysis Record Not Found
         </h2>
         <p className="text-xs font-mono text-foreground-muted">
           {error || 'Unable to load the forensic analysis for this email.'}
@@ -149,10 +241,10 @@ export const EmailForensicView: React.FC = () => {
           <button
             type="button"
             onClick={() => navigate('/analyze')}
-            className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-surface hover:bg-surface-secondary text-primary border border-border font-mono text-xs font-medium transition-colors btn-press cursor-pointer"
+            className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-control bg-surface hover:bg-surface-secondary text-primary border border-border font-mono text-xs font-medium transition-colors btn-press cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Return to Analyze Email</span>
+            <span>Return to Ingestion Console</span>
           </button>
         </div>
       </div>
@@ -166,18 +258,23 @@ export const EmailForensicView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-6 pb-16">
-      {/* 1. EMAIL SUMMARY HEADER */}
-      <EmailSummaryHeader email={analysis} />
+    <div className="space-y-4 pb-16 relative">
+      {/* 1. FORENSIC COMMAND STRIP */}
+      <EmailSummaryHeader
+        email={analysis}
+        onOpenCopilot={() => setIsCopilotDrawerOpen(true)}
+      />
 
-      {/* 2. FORENSIC TABS */}
+      {/* 2. GROUPED FORENSIC TABS WITH COPILOT DRAWER TOGGLE */}
       <ForensicTabs
         activeTab={activeTab}
         onTabChange={setActiveTab}
         counts={counts}
+        onToggleCopilotDrawer={() => setIsCopilotDrawerOpen(!isCopilotDrawerOpen)}
+        isCopilotDrawerOpen={isCopilotDrawerOpen}
       />
 
-      {/* TAB CONTENT VIEWS */}
+      {/* 3. ACTIVE TAB CONTENT WORKSPACE */}
       <div key={activeTab} className="page-enter">
         {activeTab === 'overview' && <OverviewTab email={analysis} />}
         {activeTab === 'graph' && <InvestigationGraphTab email={analysis} />}
@@ -188,6 +285,45 @@ export const EmailForensicView: React.FC = () => {
         {activeTab === 'attachments' && <AttachmentsTab email={analysis} />}
         {activeTab === 'raw' && <RawEmailTab email={analysis} />}
       </div>
+
+      {/* 4. CONTEXTUAL COPILOT SLIDE-OVER DRAWER (ON DEMAND) */}
+      {isCopilotDrawerOpen && (
+        <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[480px] md:w-[540px] investigation-drawer flex flex-col bg-surface border-l border-border shadow-popover animate-in slide-in-from-right duration-200">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-surface-secondary/80">
+            <span className="text-xs font-mono font-bold uppercase text-foreground">
+              Investigation Copilot Assistant
+            </span>
+            <button
+              type="button"
+              onClick={() => setIsCopilotDrawerOpen(false)}
+              className="p-1 rounded-control text-foreground-muted hover:text-foreground hover:bg-surface border border-transparent hover:border-border cursor-pointer"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-3">
+            <InvestigationCopilot
+              mode="email"
+              contextId={analysis.evidence_id || analysis.id || 'E-1042'}
+              emailPayload={analysis}
+              onOpenGraph={(params) => {
+                setIsCopilotDrawerOpen(false);
+                handleFocusGraphNode(params?.nodeId || '');
+              }}
+              onCompareEmails={() => {
+                setIsCopilotDrawerOpen(false);
+                setActiveTab('cross_investigation');
+              }}
+              onOpenEvidence={() => {
+                setIsCopilotDrawerOpen(false);
+                setActiveTab('overview');
+              }}
+              isCompact={true}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

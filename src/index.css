@@ -531,6 +531,40 @@
   animation: skeletonPulse 1.8s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
 
+/* Enterprise Forensic Investigation Utilities */
+.command-strip {
+  background-color: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.data-table-compact th {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground-muted);
+  border-bottom: 1px solid var(--border);
+}
+
+.data-table-compact td {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.data-table-compact tr:hover td {
+  background-color: var(--surface-secondary);
+}
+
+.investigation-drawer {
+  background-color: var(--surface);
+  border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-popover);
+}
+
 /* =========================================================================
    5. PREFERS-REDUCED-MOTION SUPPORT
    ========================================================================= */

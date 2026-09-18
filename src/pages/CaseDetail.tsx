@@ -86,7 +86,7 @@ export const CaseDetail: React.FC = () => {
     if (!caseData) return;
     setIsDownloadingDossier(true);
     try {
-      const res = await fetch(`http://localhost:8000/api/reports/case/${caseData.id}`);
+      const res = await fetch(`/api/reports/case/${caseData.id}`);
       if (!res.ok) throw new Error(`Dossier generation failed (${res.status})`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -115,7 +115,7 @@ export const CaseDetail: React.FC = () => {
   const fetchCaseDetail = useCallback(() => {
     if (!id) return;
     setLoading(true);
-    fetch(`http://localhost:8000/api/cases/${id}`)
+    fetch(`/api/cases/${id}`)
       .then(res => {
         if (!res.ok) throw new Error(`Case not found (${res.status})`);
         return res.json();
@@ -133,15 +133,29 @@ export const CaseDetail: React.FC = () => {
 
     // Fetch related investigations
     setLoadingCorrelations(true);
-    fetch(`http://localhost:8000/api/cases/${id}/correlation`)
+    fetch(`/api/cases/${id}/correlation`)
       .then(res => (res.ok ? res.json() : null))
       .then(corrData => {
         if (corrData) setCorrelations(corrData);
       })
       .catch(() => {})
+<<<<<<< Updated upstream
       .finally(() => {
         setLoadingCorrelations(false);
       });
+=======
+      .finally(() => setLoadingCorrelations(false));
+
+    // Fetch case infrastructure attribution
+    fetch(`/api/cases/${id}/attribution`)
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.case_attribution) {
+          setCaseAttribution(data.case_attribution);
+        }
+      })
+      .catch(() => {});
+>>>>>>> Stashed changes
   }, [id]);
 
   useEffect(() => {
@@ -151,7 +165,7 @@ export const CaseDetail: React.FC = () => {
   const handleStatusChange = async (newStatus: CaseStatus) => {
     if (!caseData) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/cases/${caseData.id}`, {
+      const res = await fetch(`/api/cases/${caseData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -169,7 +183,7 @@ export const CaseDetail: React.FC = () => {
   const handleSeverityChange = async (newSeverity: CaseSeverity) => {
     if (!caseData) return;
     try {
-      const res = await fetch(`http://localhost:8000/api/cases/${caseData.id}`, {
+      const res = await fetch(`/api/cases/${caseData.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ severity: newSeverity })
@@ -189,7 +203,7 @@ export const CaseDetail: React.FC = () => {
     if (!window.confirm('Detach this email from the investigation case?')) return;
 
     try {
-      const res = await fetch(`http://localhost:8000/api/cases/${caseData.id}/emails/${emailId}`, {
+      const res = await fetch(`/api/cases/${caseData.id}/emails/${emailId}`, {
         method: 'DELETE'
       });
       if (res.ok || res.status === 204) {
@@ -211,7 +225,7 @@ export const CaseDetail: React.FC = () => {
         author: noteAuthor.trim() || 'SOC Analyst',
         note_text: noteText.trim()
       };
-      const res = await fetch(`http://localhost:8000/api/cases/${caseData.id}/notes`, {
+      const res = await fetch(`/api/cases/${caseData.id}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -240,7 +254,7 @@ export const CaseDetail: React.FC = () => {
         description: findingDescription.trim(),
         severity: findingSeverity
       };
-      const res = await fetch(`http://localhost:8000/api/cases/${caseData.id}/findings`, {
+      const res = await fetch(`/api/cases/${caseData.id}/findings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

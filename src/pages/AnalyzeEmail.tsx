@@ -1,29 +1,48 @@
+<<<<<<< Updated upstream
 import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
+=======
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+>>>>>>> Stashed changes
 import {
-  SearchCode,
-  Zap,
   Upload,
+<<<<<<< Updated upstream
   Radio,
   Hash,
   ExternalLink,
   FolderPlus,
   CheckCircle2,
   Copy
+=======
+  FileText,
+  Shield,
+  ArrowRight,
+  AlertCircle,
+  FileCode,
+  Lock,
+  Layers,
+  Inbox
+>>>>>>> Stashed changes
 } from 'lucide-react';
 import { SAMPLE_EMAILS } from '../data/mockData';
 import type { EmailAnalysisData } from '../types';
 import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
 import { decodeRfc2047 } from '../utils/indicatorHelper';
+<<<<<<< Updated upstream
 import { RiskBadge } from '../components/common/RiskBadge';
 import { HeaderProtocolStatus } from '../components/common/HeaderProtocolStatus';
 import { GeoTraceMap } from '../components/common/GeoTraceMap';
 import { AttributionGraph } from '../components/common/AttributionGraph';
+=======
+import { api, ApiError } from '../services/api';
+>>>>>>> Stashed changes
 
 export const AnalyzeEmail: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+<<<<<<< Updated upstream
 
   const emailIdParam = searchParams.get('id');
   const initialEmail = SAMPLE_EMAILS.find(e => e.id === emailIdParam) || SAMPLE_EMAILS[0];
@@ -52,14 +71,73 @@ export const AnalyzeEmail: React.FC = () => {
       const blob = new Blob([rawInput], { type: 'message/rfc822' });
       const formData = new FormData();
       formData.append('file', blob, 'pasted_email.eml');
+=======
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-      let res: Response | null = null;
-      try {
-        res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
-      } catch {
-        res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
-      }
+  const [activeMode, setActiveMode] = useState<'upload' | 'paste'>('upload');
+  const [rawInput, setRawInput] = useState<string>('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
+  const [analysisStep, setAnalysisStep] = useState<string>('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dragOver, setDragOver] = useState<boolean>(false);
 
+  const processEmailStream = async (fileOrBlob: Blob, filename: string, rawText?: string) => {
+    setIsAnalyzing(true);
+    setErrorMessage(null);
+    setAnalysisStep('Ingesting RFC-822 stream & verifying evidence integrity...');
+
+    const tempId = `analysis-${Date.now()}`;
+
+    try {
+      setAnalysisStep('Parsing email headers, MIME parts & relay hop path...');
+      const data = await api.email.analyze(fileOrBlob, filename, 'SOC Analyst');
+>>>>>>> Stashed changes
+
+      setAnalysisStep('Normalizing IOCs, threat scores & relationship graph...');
+      const textFallback = rawText || '';
+      const parsedAnalysis: EmailAnalysis = {
+        id: data.evidence_id || data.id || tempId,
+        evidence_id: data.evidence_id || (data.email_sha256 ? `EVD-${data.email_sha256.slice(0, 10).toUpperCase()}` : `EVD-${tempId.slice(-8).toUpperCase()}`),
+        email_sha256: data.email_sha256,
+        original_filename: data.original_filename || filename,
+        upload_timestamp: data.upload_timestamp || new Date().toISOString(),
+        size: data.size || fileOrBlob.size,
+        uploader: data.uploader || 'SOC Analyst',
+        authentication: data.authentication,
+        relay_analysis: data.relay_analysis,
+        indicators: data.indicators,
+        subject: decodeRfc2047(data.subject || data.headers?.subject || filename),
+        from: decodeRfc2047(data.from || data.from_header || data.headers?.from || ''),
+        to: decodeRfc2047(Array.isArray(data.to) ? data.to.join(', ') : (data.to || data.headers?.to || '')),
+        cc: decodeRfc2047(Array.isArray(data.cc) ? data.cc.join(', ') : (data.cc || data.headers?.cc || '')),
+        date: decodeRfc2047(data.date || data.headers?.date || ''),
+        reply_to: decodeRfc2047(data.reply_to || data.headers?.reply_to || ''),
+        return_path: decodeRfc2047(data.return_path || data.headers?.return_path || ''),
+        message_id: decodeRfc2047(data.message_id || data.headers?.message_id || ''),
+        received: data.received || data.headers?.received || [],
+        authentication_results: data.authentication_results || data.headers?.authentication_results || '',
+        plain_text_body: data.plain_text_body || data.body?.plain_text || textFallback,
+        html_body: data.html_body || data.body?.html || '',
+        raw_email: data.raw_email || textFallback,
+        urls: data.urls || [],
+        ips: data.ips || [],
+        domains: data.domains || [],
+        emails: data.emails || [],
+        attachments: data.attachments || [],
+        ip_intelligence: data.ip_intelligence || {},
+        domain_intelligence: data.domain_intelligence || {},
+        lookalike_domains: data.lookalike_domains || [],
+        url_analysis: data.url_analysis || [],
+        threat_score: data.threat_score,
+        ml_phishing_probability: data.ml_phishing_probability,
+        ml_assessment: data.ml_assessment,
+        ai_analyst: data.ai_analyst,
+        attribution: data.attribution,
+        investigation_graph: data.investigation_graph
+      };
+
+<<<<<<< Updated upstream
       if (res && res.ok) {
         const data = await res.json();
         const parsedAnalysis: EmailAnalysis = {
@@ -108,8 +186,21 @@ export const AnalyzeEmail: React.FC = () => {
       }
     } catch (err) {
       console.warn('Backend parse failed, fallback to local analysis:', err);
+=======
+      const finalId = parsedAnalysis.id || tempId;
+      saveAnalysisResult(finalId, parsedAnalysis);
+      setAnalysisStep('Analysis complete. Directing to forensic workbench...');
+      navigate(`/analysis/${finalId}`);
+    } catch (err: any) {
+      if (err instanceof ApiError) {
+        setErrorMessage(`Forensic pipeline rejected file: ${err.message}`);
+      } else {
+        setErrorMessage(`Error connecting to analysis engine: ${err?.message || 'Network error'}`);
+      }
+>>>>>>> Stashed changes
     } finally {
       setIsAnalyzing(false);
+      setAnalysisStep('');
     }
 
     // Fallback: parse headers locally and save
@@ -155,6 +246,7 @@ export const AnalyzeEmail: React.FC = () => {
     navigate(`/analysis/${analysisId}`);
   };
 
+<<<<<<< Updated upstream
   const handleCopyEvidence = () => {
     navigator.clipboard.writeText(JSON.stringify(currentEmail, null, 2));
     setCopySuccess(true);
@@ -294,24 +386,55 @@ export const AnalyzeEmail: React.FC = () => {
     };
     saveAnalysisResult(analysisId, fallbackAnalysis);
     navigate(`/analysis/${analysisId}`);
+=======
+  const handleRunTextAnalysis = async () => {
+    const text = rawInput.trim();
+    if (!text) {
+      setErrorMessage('Please paste raw RFC-822 email headers and body content.');
+      return;
+    }
+    const blob = new Blob([text], { type: 'message/rfc822' });
+    await processEmailStream(blob, 'pasted_message.eml', text);
+  };
+
+  const handleFileSelection = async (file: File) => {
+    setSelectedFile(file);
+    let textContent = '';
+    try {
+      textContent = await file.text();
+    } catch {
+      // Binary .eml
+    }
+    await processEmailStream(file, file.name, textContent);
+  };
+
+  const handleDrop = async (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      await handleFileSelection(file);
+    }
+>>>>>>> Stashed changes
   };
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-6 rounded-xl border border-border">
+    <div className="space-y-6 max-w-5xl mx-auto pb-12">
+      {/* Top Banner */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-card bg-surface border border-border shadow-card">
         <div>
-          <div className="flex items-center space-x-2 text-primary font-mono text-xs mb-1 font-semibold uppercase tracking-wider">
-            <SearchCode className="w-3.5 h-3.5 text-primary" />
-            <span>AI EMAIL FORENSIC ANALYSIS ENGINE</span>
+          <div className="flex items-center space-x-2 text-primary font-mono text-[11px] font-semibold uppercase tracking-wider mb-1">
+            <Inbox className="w-3.5 h-3.5" />
+            <span>STAGE 01 • EVIDENCE INGESTION</span>
           </div>
           <h1 className="text-xl font-bold text-foreground font-sans tracking-tight">
-            Deep Email Threat & Origin Analysis
+            Ingest & Parse Suspicious Email
           </h1>
-          <p className="text-xs text-foreground-muted font-mono mt-1">
-            Ingest raw RFC-822 email content, parse routing relay chains, analyze SPF/DKIM/DMARC headers, and extract IOCs.
+          <p className="text-xs text-foreground-muted font-mono mt-0.5">
+            Accepts raw RFC-822 (.eml, .txt) files. Computes SHA-256 evidence seals, reconstructs SMTP relays, and extracts network IOCs.
           </p>
         </div>
+<<<<<<< Updated upstream
 
         <div className="flex items-center space-x-2.5">
           <button
@@ -330,9 +453,186 @@ export const AnalyzeEmail: React.FC = () => {
             <FolderPlus className="w-3.5 h-3.5" />
             <span>CONVERT TO CASE</span>
           </button>
+=======
+
+        {/* Ingest Mode Switcher */}
+        <div className="flex items-center p-1 rounded-control bg-surface-secondary border border-border self-start md:self-auto">
+          <button
+            type="button"
+            onClick={() => setActiveMode('upload')}
+            className={`px-3 py-1.5 rounded-control text-xs font-mono font-medium transition-all cursor-pointer ${
+              activeMode === 'upload'
+                ? 'bg-surface text-foreground shadow-xs font-semibold'
+                : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            File Upload
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveMode('paste')}
+            className={`px-3 py-1.5 rounded-control text-xs font-mono font-medium transition-all cursor-pointer ${
+              activeMode === 'paste'
+                ? 'bg-surface text-foreground shadow-xs font-semibold'
+                : 'text-foreground-muted hover:text-foreground'
+            }`}
+          >
+            Raw Headers & Text
+          </button>
         </div>
       </div>
 
+      {/* Error Banner */}
+      {errorMessage && (
+        <div className="p-3.5 rounded-control bg-danger-surface border border-danger-border flex items-start space-x-3 text-xs font-mono text-danger animate-in fade-in">
+          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <strong className="block font-bold">Ingestion Rejected</strong>
+            <span>{errorMessage}</span>
+          </div>
+        </div>
+      )}
+
+      {/* Mode 1: File Drag & Drop Zone */}
+      {activeMode === 'upload' && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={`p-10 rounded-card border-2 border-dashed text-center transition-all bg-surface ${
+            dragOver
+              ? 'border-primary bg-primary-subtle/30 scale-[0.99]'
+              : 'border-border hover:border-primary/50'
+          }`}
+        >
+          <div className="max-w-md mx-auto space-y-4">
+            <div className="w-12 h-12 rounded-full bg-surface-secondary border border-border mx-auto flex items-center justify-center text-primary">
+              <Upload className="w-5 h-5" />
+            </div>
+
+            <div>
+              <h3 className="text-sm font-semibold text-foreground font-sans">
+                Drop RFC-822 / .eml file here
+              </h3>
+              <p className="text-xs text-foreground-muted font-mono mt-1">
+                Supports standard RFC-822, MIME, .eml, or text headers up to 10 MB.
+              </p>
+            </div>
+
+            <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".eml,.txt,.msg"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) handleFileSelection(f);
+                }}
+                className="hidden"
+              />
+              <button
+                type="button"
+                disabled={isAnalyzing}
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-semibold transition-colors btn-press cursor-pointer disabled:opacity-50"
+              >
+                {selectedFile ? 'Choose Another File' : 'Browse Local Disk'}
+              </button>
+            </div>
+
+            {selectedFile && (
+              <div className="p-2.5 rounded-control bg-surface-secondary border border-border inline-flex items-center space-x-2 text-xs font-mono text-foreground">
+                <FileCode className="w-4 h-4 text-primary" />
+                <span className="font-semibold">{selectedFile.name}</span>
+                <span className="text-foreground-muted">({(selectedFile.size / 1024).toFixed(1)} KB)</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Mode 2: Direct RFC-822 Text Paste */}
+      {activeMode === 'paste' && (
+        <div className="p-5 rounded-card bg-surface border border-border shadow-card space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-2 text-xs font-mono font-semibold text-foreground uppercase">
+              <FileText className="w-3.5 h-3.5 text-primary" />
+              <span>PASTE COMPLETE RFC-822 EMAIL (HEADERS + BODY):</span>
+            </div>
+            {rawInput && (
+              <button
+                type="button"
+                onClick={() => setRawInput('')}
+                className="text-[11px] font-mono text-foreground-muted hover:text-danger cursor-pointer"
+              >
+                Clear Input
+              </button>
+            )}
+          </div>
+
+          <textarea
+            value={rawInput}
+            onChange={(e) => setRawInput(e.target.value)}
+            rows={10}
+            placeholder={`From: billing@external-vendor.com\nTo: finance-ops@corporation.internal\nSubject: Urgent Invoice Update\nDate: Mon, 14 Sep 2026 10:00:00 +0000\nReceived: from relay01.external-vendor.com...\n\nHello, please find updated wire instructions attached...`}
+            className="w-full p-3.5 bg-surface-secondary border border-border rounded-control font-mono text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed"
+          />
+
+          <div className="flex items-center justify-between pt-1">
+            <span className="text-[11px] font-mono text-foreground-muted">
+              {rawInput.length > 0 ? `${rawInput.length.toLocaleString()} characters` : 'Ready for RFC-822 stream'}
+            </span>
+
+            <button
+              type="button"
+              onClick={handleRunTextAnalysis}
+              disabled={isAnalyzing || !rawInput.trim()}
+              className="flex items-center space-x-2 px-4 py-2 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs transition-colors btn-press disabled:opacity-50 cursor-pointer"
+            >
+              <span>EXECUTE FORENSIC ANALYSIS</span>
+              <ArrowRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* In-Flight Pipeline Loading State */}
+      {isAnalyzing && (
+        <div className="p-5 rounded-card bg-surface border border-primary/40 shadow-md space-y-3 animate-in fade-in">
+          <div className="flex items-center space-x-3">
+            <div className="w-4 h-4 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+            <div className="flex flex-col">
+              <span className="text-xs font-mono font-bold text-foreground">
+                Executing Automated Forensic Pipeline
+              </span>
+              <span className="text-[11px] font-mono text-primary animate-pulse">
+                {analysisStep}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forensic Guarantees & Chain-of-Custody Footer */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="p-3.5 rounded-control bg-surface border border-border flex items-start space-x-2.5">
+          <Lock className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="text-[11px] font-mono">
+            <strong className="block text-foreground font-semibold">Cryptographic Hash</strong>
+            <span className="text-foreground-muted">Raw stream is SHA-256 hashed immediately upon intake.</span>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-control bg-surface border border-border flex items-start space-x-2.5">
+          <Layers className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="text-[11px] font-mono">
+            <strong className="block text-foreground font-semibold">Deterministic Scoring</strong>
+            <span className="text-foreground-muted">Explainable weighted signals; zero synthetic data invention.</span>
+          </div>
+>>>>>>> Stashed changes
+        </div>
+
+<<<<<<< Updated upstream
       {/* Preset Selector & Input Console */}
       <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -617,6 +917,15 @@ export const AnalyzeEmail: React.FC = () => {
             </pre>
           </div>
         )}
+=======
+        <div className="p-3.5 rounded-control bg-surface border border-border flex items-start space-x-2.5">
+          <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+          <div className="text-[11px] font-mono">
+            <strong className="block text-foreground font-semibold">Persistent History</strong>
+            <span className="text-foreground-muted">Canonical results stored in SQLite for replay and correlation.</span>
+          </div>
+        </div>
+>>>>>>> Stashed changes
       </div>
     </div>
   );

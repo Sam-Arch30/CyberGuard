@@ -89,11 +89,9 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
       if (remoteSucceeded) break;
 
       const endpoints = [
-        `http://localhost:8000/api/evidence/${encodeURIComponent(cid)}/timeline`,
         `/api/evidence/${encodeURIComponent(cid)}/timeline`,
-        `http://127.0.0.1:8000/api/evidence/${encodeURIComponent(cid)}/timeline`,
-        `http://localhost:8000/api/audit/timeline/${encodeURIComponent(cid)}`,
         `/api/audit/timeline/${encodeURIComponent(cid)}`,
+        `http://127.0.0.1:8000/api/evidence/${encodeURIComponent(cid)}/timeline`,
         `http://127.0.0.1:8000/api/audit/timeline/${encodeURIComponent(cid)}`
       ];
 

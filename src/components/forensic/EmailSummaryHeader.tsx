@@ -1,12 +1,27 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Shield, Mail, Calendar, User, CornerDownLeft, Repeat, Hash, Briefcase, FileText, Loader2, CheckCircle2 } from 'lucide-react';
+import {
+  Shield,
+  Mail,
+  Calendar,
+  User,
+  Hash,
+  Briefcase,
+  FileText,
+  Loader2,
+  CheckCircle2,
+  GitMerge,
+  ArrowLeft,
+  CornerDownLeft
+} from 'lucide-react';
 import type { EmailAnalysis } from '../../types/forensic';
 import { CopyButton } from './CopyButton';
 import { AddToCaseModal } from '../case/AddToCaseModal';
+import { api } from '../../services/api';
 
 interface EmailSummaryHeaderProps {
   email: EmailAnalysis;
+  onOpenCopilot?: () => void;
 }
 
 export const EmailSummaryHeader: React.FC<EmailSummaryHeaderProps> = ({ email }) => {
@@ -18,20 +33,11 @@ export const EmailSummaryHeader: React.FC<EmailSummaryHeaderProps> = ({ email })
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const res = await fetch('http://localhost:8000/api/reports/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          analysis: email,
-          analyst_name: 'SOC Lead Analyst'
-        })
+      const blob = await api.reports.generate({
+        analysis: email,
+        analyst_name: 'SOC Lead Analyst'
       });
 
-      if (!res.ok) {
-        throw new Error(`Report generation failed (${res.status})`);
-      }
-
-      const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -52,178 +58,181 @@ export const EmailSummaryHeader: React.FC<EmailSummaryHeaderProps> = ({ email })
   };
 
   const toDisplay = Array.isArray(email.to) ? email.to.join(', ') : email.to;
+  const scoreVal = email.threat_score?.score ?? 0;
+  const sevVal = (email.threat_score?.severity || 'low').toLowerCase();
 
   return (
-    <div className="bg-surface rounded-card border border-border p-6 shadow-sm space-y-6">
-      {/* Action Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center space-x-2">
-            <Shield className="w-5 h-5 text-primary" />
-            <span className="text-xs font-mono font-bold tracking-widest text-primary uppercase">
-              Forensic Evidence Analysis
-            </span>
+    <div className="command-strip p-4 sm:p-5 space-y-4">
+      {/* Top Strip: Status, Threat Score, & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border">
+        <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex items-center space-x-1.5 text-xs font-mono font-semibold uppercase text-primary">
+            <Shield className="w-4 h-4 text-primary" />
+            <span>Forensic Evidence Record</span>
           </div>
 
           {email.threat_score && (
-            <div className={`px-2.5 py-1 rounded-full border text-xs font-mono font-semibold flex items-center space-x-1.5 ${
-              email.threat_score.score >= 80 ? 'bg-danger/10 border-danger/30 text-danger' :
-              email.threat_score.score >= 60 ? 'bg-warning/15 border-warning/30 text-warning' :
-              email.threat_score.score >= 30 ? 'bg-warning/10 border-warning/20 text-warning' :
-              'bg-success/10 border-success/30 text-success'
+            <div className={`px-2 py-0.5 rounded text-xs font-mono font-bold flex items-center space-x-1.5 ${
+              scoreVal >= 80 ? 'bg-danger-surface text-danger border border-danger-border' :
+              scoreVal >= 50 ? 'bg-warning-surface text-warning border border-warning-border' :
+              'bg-surface-secondary text-foreground-muted border border-border'
             }`}>
-              <span className={`w-2 h-2 rounded-full ${
-                email.threat_score.score >= 80 ? 'bg-danger' :
-                email.threat_score.score >= 60 ? 'bg-warning' :
-                email.threat_score.score >= 30 ? 'bg-warning' :
-                'bg-success'
+              <span className={`w-1.5 h-1.5 rounded-full ${
+                scoreVal >= 80 ? 'bg-danger' : scoreVal >= 50 ? 'bg-warning' : 'bg-foreground-muted'
               }`} />
-              <span>Threat Score: {email.threat_score.score}/100</span>
-              <span className="opacity-80 uppercase text-[10px]">({email.threat_score.severity})</span>
+              <span>Score: {scoreVal}/100</span>
+              <span className="uppercase text-[10px] opacity-80">({sevVal})</span>
             </div>
+          )}
+
+          {email.evidence_id && (
+            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-muted">
+              {email.evidence_id}
+            </span>
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        {/* Action Controls */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Correlate Button */}
           <button
-            id="generate-forensic-report-btn"
             type="button"
-            onClick={handleGenerateReport}
-            disabled={isGeneratingReport}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-control bg-surface-secondary hover:bg-surface border border-border text-foreground font-mono text-xs font-semibold transition-all btn-press disabled:opacity-50 cursor-pointer"
-            title="Generate and download official PDF forensic evidence dossier"
+            onClick={() => navigate(`/cross-investigation/${email.id || 'demo'}`)}
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-control bg-surface-secondary hover:bg-surface border border-border text-foreground font-mono text-xs font-medium transition-colors btn-press cursor-pointer"
+            title="Correlate with historical emails and campaign clusters"
           >
-            {isGeneratingReport ? (
-              <>
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
-                <span>Generating PDF...</span>
-              </>
-            ) : reportSuccess ? (
-              <>
-                <CheckCircle2 className="w-3.5 h-3.5 text-success" />
-                <span>Report Downloaded</span>
-              </>
-            ) : (
-              <>
-                <FileText className="w-3.5 h-3.5 text-primary" />
-                <span>Forensic Report</span>
-              </>
-            )}
+            <GitMerge className="w-3.5 h-3.5 text-primary" />
+            <span>Correlate</span>
           </button>
+
+          {/* Add to Case */}
           <button
-            id="add-to-case-button"
             type="button"
+            id="add-to-case-button"
             onClick={() => setIsCaseModalOpen(true)}
-            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-control bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold transition-all btn-press cursor-pointer"
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-control bg-surface-secondary hover:bg-surface border border-border text-foreground font-mono text-xs font-medium transition-colors btn-press cursor-pointer"
           >
             <Briefcase className="w-3.5 h-3.5 text-primary" />
             <span>Add to Case</span>
           </button>
-          {email.message_id && (
-            <CopyButton
-              text={email.message_id}
-              label="Copy Message ID"
-              className="px-3 py-1.5 bg-surface-secondary border border-border text-foreground hover:bg-surface rounded-control"
-            />
-          )}
+
+          {/* Export Report */}
+          <button
+            type="button"
+            id="generate-forensic-report-btn"
+            onClick={handleGenerateReport}
+            disabled={isGeneratingReport}
+            className="flex items-center space-x-1 px-2.5 py-1.5 rounded-control bg-surface-secondary hover:bg-surface border border-border text-foreground font-mono text-xs font-medium transition-colors btn-press disabled:opacity-50 cursor-pointer"
+            title="Generate forensic PDF report"
+          >
+            {isGeneratingReport ? (
+              <>
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                <span>Exporting...</span>
+              </>
+            ) : reportSuccess ? (
+              <>
+                <CheckCircle2 className="w-3.5 h-3.5 text-success" />
+                <span>Downloaded</span>
+              </>
+            ) : (
+              <>
+                <FileText className="w-3.5 h-3.5 text-primary" />
+                <span>Export PDF</span>
+              </>
+            )}
+          </button>
+
+          {/* Ingest Another */}
           <button
             type="button"
             onClick={() => navigate('/analyze')}
-            className="flex items-center space-x-2 px-3.5 py-1.5 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-semibold transition-all btn-press cursor-pointer"
+            className="flex items-center space-x-1 px-3 py-1.5 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-semibold transition-colors btn-press cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Analyze Another</span>
+            <ArrowLeft className="w-3.5 h-3.5" />
+            <span>New Ingest</span>
           </button>
         </div>
       </div>
 
+      {/* Modal Dialog */}
       <AddToCaseModal
         email={email}
         isOpen={isCaseModalOpen}
         onClose={() => setIsCaseModalOpen(false)}
       />
 
-      {/* Main Header Info */}
-      <div className="space-y-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground font-sans tracking-tight break-words">
-            {email.subject || 'Not available'}
-          </h1>
-        </div>
+      {/* Subject Line */}
+      <div>
+        <h1 className="text-lg sm:text-xl font-bold text-foreground font-sans tracking-tight break-words">
+          {email.subject || '(No Subject)'}
+        </h1>
+      </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-surface-secondary/50 p-4 rounded-control border border-border">
-          {/* From */}
-          <div className="flex items-start space-x-3 min-w-0">
-            <User className="w-4 h-4 text-primary mt-0.5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span className="text-[11px] font-mono font-semibold text-foreground-subtle uppercase tracking-wider block">
-                From
-              </span>
-              <p className="text-xs font-mono text-foreground break-all mt-0.5">
-                {email.from || 'Not available'}
-              </p>
-            </div>
-          </div>
-
-          {/* To */}
-          <div className="flex items-start space-x-3 min-w-0">
-            <Mail className="w-4 h-4 text-info mt-0.5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span className="text-[11px] font-mono font-semibold text-foreground-subtle uppercase tracking-wider block">
-                To
-              </span>
-              <p className="text-xs font-mono text-foreground break-all mt-0.5">
-                {toDisplay || 'Not available'}
-              </p>
-            </div>
-          </div>
-
-          {/* Date */}
-          <div className="flex items-start space-x-3 min-w-0">
-            <Calendar className="w-4 h-4 text-foreground-muted mt-0.5 shrink-0" />
-            <div className="min-w-0 flex-1">
-              <span className="text-[11px] font-mono font-semibold text-foreground-subtle uppercase tracking-wider block">
-                Date
-              </span>
-              <p className="text-xs font-mono text-foreground break-all mt-0.5">
-                {email.date || 'Not available'}
-              </p>
-            </div>
+      {/* Primary Metadata Matrix */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 rounded-control bg-surface-secondary/40 border border-border text-xs font-mono">
+        {/* Sender */}
+        <div className="flex items-start space-x-2 min-w-0">
+          <User className="w-3.5 h-3.5 text-primary shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] text-foreground-subtle uppercase tracking-wider block">From</span>
+            <p className="text-foreground truncate mt-0.5" title={email.from}>
+              {email.from || 'Not available'}
+            </p>
           </div>
         </div>
 
-        {/* Smaller Metadata */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs font-mono border-t border-border">
-          <div className="flex flex-col">
-            <span className="text-foreground-subtle text-[11px] flex items-center space-x-1">
-              <CornerDownLeft className="w-3 h-3 text-primary" />
-              <span>Reply-To:</span>
-            </span>
-            <span className="text-foreground break-all mt-0.5 font-medium">
-              {email.reply_to || (email.from ? `None (defaults to From)` : 'Not available')}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-foreground-subtle text-[11px] flex items-center space-x-1">
-              <Repeat className="w-3 h-3 text-primary" />
-              <span>Return-Path:</span>
-            </span>
-            <span className="text-foreground break-all mt-0.5 font-medium">
-              {email.return_path || 'Not available'}
-            </span>
-          </div>
-
-          <div className="flex flex-col">
-            <span className="text-foreground-subtle text-[11px] flex items-center space-x-1">
-              <Hash className="w-3 h-3 text-primary" />
-              <span>Message-ID:</span>
-            </span>
-            <span className="text-foreground break-all mt-0.5 font-medium">
-              {email.message_id || 'Not available'}
-            </span>
+        {/* Recipient */}
+        <div className="flex items-start space-x-2 min-w-0">
+          <Mail className="w-3.5 h-3.5 text-info shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] text-foreground-subtle uppercase tracking-wider block">To</span>
+            <p className="text-foreground truncate mt-0.5" title={toDisplay}>
+              {toDisplay || 'Not available'}
+            </p>
           </div>
         </div>
+
+        {/* Date */}
+        <div className="flex items-start space-x-2 min-w-0">
+          <Calendar className="w-3.5 h-3.5 text-foreground-muted shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1">
+            <span className="text-[10px] text-foreground-subtle uppercase tracking-wider block">Received Date</span>
+            <p className="text-foreground truncate mt-0.5">
+              {email.date || 'Not available'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Secondary Evidence Row: Message-ID, SHA-256, Reply-To */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pt-1 text-[11px] font-mono text-foreground-muted">
+        <div className="flex flex-wrap items-center gap-3">
+          {email.email_sha256 && (
+            <div className="flex items-center space-x-1">
+              <span className="text-foreground-subtle">SHA-256:</span>
+              <span className="text-foreground font-mono">{email.email_sha256.slice(0, 16)}...</span>
+              <CopyButton text={email.email_sha256} label="" className="p-0.5 hover:text-primary" />
+            </div>
+          )}
+
+          {email.reply_to && email.reply_to !== email.from && (
+            <div className="flex items-center space-x-1">
+              <CornerDownLeft className="w-3 h-3 text-warning" />
+              <span className="text-foreground-subtle">Reply-To mismatch:</span>
+              <span className="text-warning truncate max-w-xs">{email.reply_to}</span>
+            </div>
+          )}
+        </div>
+
+        {email.message_id && (
+          <div className="flex items-center space-x-1 max-w-md truncate">
+            <Hash className="w-3 h-3 text-foreground-subtle shrink-0" />
+            <span className="text-foreground-subtle shrink-0">ID:</span>
+            <span className="truncate">{email.message_id}</span>
+            <CopyButton text={email.message_id} label="" className="p-0.5 hover:text-primary" />
+          </div>
+        )}
       </div>
     </div>
   );

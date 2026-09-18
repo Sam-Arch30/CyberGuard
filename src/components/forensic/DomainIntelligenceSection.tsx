@@ -33,7 +33,7 @@ export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps>
       const existing = initialMap[dom];
       if (!existing || existing.domain_age_days === undefined || !existing.registration?.registration_date) {
         try {
-          const resp = await fetch(`http://localhost:8000/api/emails/lookup-domain/${encodeURIComponent(dom)}`);
+          const resp = await fetch(`/api/emails/lookup-domain/${encodeURIComponent(dom)}`);
           if (resp.ok && isMounted) {
             const data: DomainIntelligence = await resp.json();
             setLiveDomainIntel(prev => {
