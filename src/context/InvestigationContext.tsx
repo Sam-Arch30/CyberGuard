@@ -44,8 +44,8 @@ export const INVESTIGATION_SECTIONS: SectionMetadata[] = [
     number: '03',
     label: 'Analysis',
     shortLabel: 'Analysis',
-    description: 'IOC extraction, URL analysis, lookalike detection & NLP scoring',
-    defaultSubTab: 'scoring'
+    description: 'Summary, indicators, URLs, domain similarity, content & scoring',
+    defaultSubTab: 'all'
   },
   {
     id: 'intelligence',
