@@ -98,6 +98,7 @@ interface InvestigationContextType {
   focusGraphNode: (nodeId: string) => void;
   stepGuidance: StepGuidance;
   reloadActiveEmail: () => Promise<void>;
+  reanalyzeActiveEmail: () => Promise<void>;
 }
 
 const InvestigationContext = createContext<InvestigationContextType | null>(null);
@@ -202,17 +203,38 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       let resolved = getAnalysisResult(targetId);
 
+      // Check all available analyses by ID, evidence_id, or SHA-256
+      if (!resolved && targetId) {
+        const all = getAllAvailableAnalyses(true);
+        const match = all.find(a =>
+          a.id === targetId ||
+          a.evidence_id === targetId ||
+          a.email_sha256 === targetId ||
+          (a.email_sha256 && a.email_sha256.startsWith(targetId))
+        );
+        if (match) {
+          resolved = match;
+        }
+      }
+
       // If not in local/demo store, try backend API
       if (!resolved && targetId && targetId !== 'latest') {
-        try {
-          const res = await fetch(`/api/emails/${targetId}/analysis`);
-          if (res.ok) {
-            const apiData = await res.json();
-            resolved = resolveEmailIndicators(apiData);
-            saveAnalysisResult(targetId, resolved);
+        const endpoints = [
+          `/api/emails/${targetId}/analysis`,
+          `http://127.0.0.1:8000/api/emails/${targetId}/analysis`
+        ];
+        for (const ep of endpoints) {
+          try {
+            const res = await fetch(ep);
+            if (res.ok) {
+              const apiData = await res.json();
+              resolved = resolveEmailIndicators(apiData);
+              saveAnalysisResult(targetId, resolved);
+              break;
+            }
+          } catch {
+            // Try next endpoint
           }
-        } catch {
-          // Backend unreachable or not found
         }
       }
 
@@ -433,6 +455,40 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const reanalyzeActiveEmail = useCallback(async () => {
+    if (!activeEmail) return;
+    setLoading(true);
+    try {
+      if (activeEmail.raw_email) {
+        const blob = new Blob([activeEmail.raw_email], { type: 'message/rfc822' });
+        const formData = new FormData();
+        formData.append('file', blob, activeEmail.original_filename || `${activeEmailId}.eml`);
+        
+        let res: Response | null = null;
+        try {
+          res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
+        } catch {
+          res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
+        }
+
+        if (res && res.ok) {
+          const freshData = await res.json();
+          const resolved = resolveEmailIndicators(freshData);
+          saveAnalysisResult(activeEmailId, resolved);
+          setActiveEmail(resolved);
+          setLoading(false);
+          return;
+        }
+      }
+      await loadEmailData(activeEmailId);
+    } catch (err) {
+      console.warn('Re-analysis error:', err);
+      await loadEmailData(activeEmailId);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeEmail, activeEmailId, loadEmailData]);
+
   const stepGuidance = getStepGuidance();
 
   return (
@@ -453,7 +509,8 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         setSubTab,
         focusGraphNode,
         stepGuidance,
-        reloadActiveEmail: () => loadEmailData(activeEmailId)
+        reloadActiveEmail: () => loadEmailData(activeEmailId),
+        reanalyzeActiveEmail
       }}
     >
       {children}
