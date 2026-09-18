@@ -193,7 +193,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Primary 6-Area Navigation */}
-        <nav className="px-2.5 space-y-0.5">
+        <nav className="px-2 space-y-0.5">
           {primaryInvestigationAreas.map((item) => {
             const Icon = item.icon;
             const active = isAreaActive(item);
@@ -203,13 +203,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 to={item.path}
                 className={`flex items-center justify-between px-2.5 py-2 rounded-control text-xs font-medium transition-all group ${
                   active
-                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
+                    ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary pl-2'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border-l-2 border-transparent'
                 }`}
                 title={isCollapsed ? `${item.step}. ${item.name}` : item.description}
               >
                 <div className="flex items-center space-x-2.5 min-w-0">
-                  <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${active ? 'text-primary-foreground' : 'group-hover:text-primary'}`} />
+                  <Icon className={`w-4 h-4 flex-shrink-0 transition-colors ${active ? 'text-primary' : 'group-hover:text-primary'}`} />
                   {!isCollapsed && (
                     <div className="flex flex-col min-w-0">
                       <span className="truncate leading-snug">{item.name}</span>
@@ -221,7 +221,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   <span
                     className={`text-[9px] font-mono px-1 rounded ${
                       active
-                        ? 'bg-black/20 text-white'
+                        ? 'bg-primary/20 text-primary font-bold'
                         : 'bg-surface/70 border border-border text-foreground-subtle'
                     }`}
                   >
@@ -235,7 +235,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
         {/* Platform & Intake Header */}
         {!isCollapsed ? (
-          <div className="px-4 pt-5 pb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-foreground-subtle">
+          <div className="px-4 pt-4 pb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-foreground-subtle">
             <span>Platform Tools</span>
           </div>
         ) : (
@@ -243,7 +243,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         )}
 
         {/* Secondary Navigation */}
-        <nav className="px-2.5 space-y-0.5 pb-4">
+        <nav className="px-2 space-y-0.5 pb-4">
           {platformTools.map((item) => {
             const Icon = item.icon;
             return (
@@ -253,8 +253,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 className={({ isActive }) =>
                   `flex items-center justify-between px-2.5 py-1.5 rounded-control text-xs font-medium transition-all group ${
                     isActive
-                      ? 'bg-surface-secondary text-primary font-semibold border border-border shadow-xs'
-                      : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
+                      ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary pl-2'
+                      : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border-l-2 border-transparent'
                   }`
                 }
                 title={isCollapsed ? item.name : undefined}

@@ -17,11 +17,11 @@ export const THEME_OPTIONS: ThemeOption[] = [
   {
     id: 'obsidian',
     name: 'Obsidian',
-    description: 'Deep stone dark theme with subtle olive green accents',
-    accentLabel: 'Olive Green',
-    previewBg: '#0d0f0e',
-    previewSurface: '#151916',
-    previewAccent: '#7e945c',
+    description: 'Enterprise near-black theme with precision electric cyan accents',
+    accentLabel: 'Electric Cyan',
+    previewBg: '#090d12',
+    previewSurface: '#0e141c',
+    previewAccent: '#00d2ff',
     isDark: true,
   },
   {

@@ -29,29 +29,29 @@ import { deriveFilename } from '../../utils/forensicStore';
 
 const CONFIDENCE_BADGES: Record<UncertaintyLevel, { bg: string; border: string; text: string }> = {
   'CONFIRMED': {
-    bg: 'bg-emerald-500/10',
-    border: 'border-emerald-500/30',
-    text: 'text-emerald-400'
+    bg: 'bg-success-surface',
+    border: 'border-success-border',
+    text: 'text-success'
   },
   'HIGH-CONFIDENCE INFERENCE': {
-    bg: 'bg-cyan-500/10',
-    border: 'border-cyan-500/30',
-    text: 'text-cyan-400'
+    bg: 'bg-primary/10',
+    border: 'border-primary/30',
+    text: 'text-primary'
   },
   'PROBABLE': {
-    bg: 'bg-amber-500/10',
-    border: 'border-amber-500/30',
-    text: 'text-amber-400'
+    bg: 'bg-warning-surface',
+    border: 'border-warning-border',
+    text: 'text-warning'
   },
   'LOW-CONFIDENCE HYPOTHESIS': {
-    bg: 'bg-orange-500/10',
-    border: 'border-orange-500/30',
-    text: 'text-orange-400'
+    bg: 'bg-warning-surface',
+    border: 'border-warning-border',
+    text: 'text-warning'
   },
   'UNKNOWN': {
-    bg: 'bg-slate-500/10',
-    border: 'border-slate-500/30',
-    text: 'text-slate-400'
+    bg: 'bg-surface-secondary',
+    border: 'border-border',
+    text: 'text-foreground-muted'
   }
 };
 
@@ -487,12 +487,12 @@ export const InvestigationAIDrawer: React.FC = () => {
         </div>
 
         {/* 3. MESSAGES CHAT LOG */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4 font-mono text-xs">
+        <div className="flex-1 overflow-y-auto p-4 space-y-3.5 font-mono text-xs">
           {messages.map((msg) => {
             if (msg.sender === 'user') {
               return (
                 <div key={msg.id} className="flex justify-end">
-                  <div className="max-w-[85%] rounded-xl px-3.5 py-2.5 bg-primary text-primary-foreground shadow-xs">
+                  <div className="max-w-[85%] rounded-control px-3.5 py-2.5 bg-primary text-primary-foreground shadow-xs">
                     <p className="text-xs font-sans whitespace-pre-wrap leading-relaxed">
                       {msg.text}
                     </p>
@@ -511,7 +511,7 @@ export const InvestigationAIDrawer: React.FC = () => {
               const isAdded = addedReportIds.has(msg.id);
 
               return (
-                <div key={msg.id} className="flex flex-col space-y-2.5 bg-surface-secondary/60 rounded-xl p-3.5 border border-border">
+                <div key={msg.id} className="flex flex-col space-y-2.5 bg-surface-secondary/60 rounded-card p-3.5 border border-border">
                   {/* Confidence Tier & Evidence ID Tag */}
                   <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-border/60">
                     <div className="flex items-center space-x-2">

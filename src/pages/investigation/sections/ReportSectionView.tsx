@@ -338,7 +338,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
       )}
 
       {/* 1. TOP REPORT COMMAND & EXPORT BAR */}
-      <div className="bg-surface p-5 rounded-2xl border border-border shadow-xs">
+      <div className="bg-surface p-4 rounded-card border border-border">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-2 text-primary font-mono text-xs font-bold uppercase tracking-wider">
@@ -448,7 +448,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
 
       {/* HISTORICAL REPORT ARCHIVE DRAWER / PANEL (If toggled) */}
       {showArchiveDrawer && (
-        <div className="p-4 rounded-2xl bg-surface border border-primary/30 space-y-3 font-mono text-xs shadow-md animate-in fade-in duration-200">
+        <div className="p-4 rounded-card bg-surface border border-primary/30 space-y-3 font-mono text-xs shadow-xs animate-in fade-in duration-200">
           <div className="flex items-center justify-between pb-2 border-b border-border">
             <div className="flex items-center space-x-2 text-primary font-bold">
               <Clock className="w-4 h-4" />
@@ -508,7 +508,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
       <div
         ref={reportDocRef}
         id="readable-forensic-report"
-        className="bg-surface rounded-2xl border border-border p-6 sm:p-10 shadow-sm space-y-10 max-w-5xl mx-auto"
+        className="bg-surface rounded-card border border-border p-6 sm:p-8 space-y-8 max-w-5xl mx-auto"
       >
         {/* DOCUMENT MASTHEAD & ADMINISTRATIVE CLASSIFICATION */}
         <div className="space-y-4 pb-6 border-b-2 border-border">

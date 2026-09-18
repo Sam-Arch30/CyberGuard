@@ -350,9 +350,9 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
 
         {/* AI Investigation Copilot Drawer Launcher */}
         {currentSubTab === 'copilot' && (
-          <div className="bg-surface rounded-xl border border-border p-8 shadow-xs space-y-6 text-center max-w-2xl mx-auto my-6">
-            <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/25 text-primary flex items-center justify-center mx-auto shadow-xs">
-              <Sparkles className="w-7 h-7" />
+          <div className="bg-surface rounded-card border border-border p-6 sm:p-8 space-y-5 text-center max-w-2xl mx-auto my-6">
+            <div className="w-12 h-12 rounded-control bg-primary/10 border border-primary/25 text-primary flex items-center justify-center mx-auto">
+              <Sparkles className="w-6 h-6" />
             </div>
 
             <div className="space-y-2">

@@ -166,11 +166,11 @@ export const ActiveInvestigationHeader: React.FC = () => {
   };
 
   return (
-    <header className="bg-surface border border-border rounded-xl shadow-xs overflow-visible transition-all duration-200 mb-6">
+    <header className="bg-surface border border-border rounded-card shadow-xs overflow-visible transition-colors mb-6">
       {/* =========================================================================
           1. TOP CONTEXTUAL HEADER: Subject, Sender, Timestamp, Score, Status, Actions
           ========================================================================= */}
-      <div className="p-4 sm:p-5 border-b border-border/70 bg-gradient-to-b from-surface-secondary/40 to-surface">
+      <div className="p-4 border-b border-border bg-surface">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Left Side: Context Details & Switcher */}
           <div className="flex items-start space-x-3.5 min-w-0 flex-1">
@@ -205,7 +205,7 @@ export const ActiveInvestigationHeader: React.FC = () => {
 
                   {/* Switcher Dropdown */}
                   {switcherOpen && (
-                    <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-surface-elevated border border-border rounded-xl shadow-2xl z-50 p-2 animate-fadeIn">
+                    <div className="absolute left-0 top-full mt-2 w-80 sm:w-96 bg-surface-elevated border border-border rounded-card shadow-popover z-50 p-2 animate-fadeIn">
                       <div className="p-2 border-b border-border">
                         <div className="flex items-center justify-between mb-2">
                           <span className="text-[11px] font-mono font-semibold uppercase text-foreground">
@@ -497,9 +497,9 @@ export const ActiveInvestigationHeader: React.FC = () => {
                 key={sec.id}
                 type="button"
                 onClick={() => setSection(sec.id)}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-control text-xs font-mono transition-all cursor-pointer ${
                   isActive
-                    ? 'bg-primary text-primary-foreground font-bold shadow-xs'
+                    ? 'bg-primary/12 text-primary font-bold border border-primary/30 shadow-xs'
                     : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
                 }`}
                 title={sec.description}

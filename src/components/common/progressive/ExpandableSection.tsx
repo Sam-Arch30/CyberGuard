@@ -46,40 +46,40 @@ export const ExpandableSection: React.FC<ExpandableSectionProps> = ({
   };
 
   return (
-    <div className={`rounded-card border border-border bg-surface shadow-xs transition-all overflow-hidden ${className}`}>
+    <div className={`rounded-card border border-border bg-surface transition-colors overflow-hidden ${className}`}>
       {/* Section Header (Clickable Accordion Trigger) */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 border-b border-border bg-surface select-none">
+      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 px-4 py-3 bg-surface select-none ${isExpanded ? 'border-b border-border' : ''}`}>
         <div
           role="button"
           tabIndex={0}
           onClick={handleToggle}
           onKeyDown={handleKeyDown}
           aria-expanded={isExpanded}
-          className="flex items-center space-x-3 min-w-0 flex-1 cursor-pointer group focus:outline-none"
+          className="flex items-center space-x-2.5 min-w-0 flex-1 cursor-pointer group focus:outline-none"
         >
           {Icon && (
-            <div className="p-2 rounded-xl bg-primary/10 border border-primary/20 text-primary shrink-0 group-hover:scale-105 transition-transform">
-              <Icon className="w-4 h-4" />
+            <div className="p-1.5 rounded-control bg-surface-secondary border border-border text-foreground-muted group-hover:text-primary group-hover:border-primary/40 shrink-0 transition-colors">
+              <Icon className="w-3.5 h-3.5" />
             </div>
           )}
 
           <div className="space-y-0.5 min-w-0 flex-1">
-            <div className="flex items-center space-x-2.5 flex-wrap">
-              <h3 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider group-hover:text-primary transition-colors truncate">
+            <div className="flex items-center space-x-2 flex-wrap">
+              <h3 className="text-xs font-mono font-bold text-foreground uppercase tracking-wider group-hover:text-primary transition-colors truncate">
                 {title}
               </h3>
               {badge}
             </div>
             {subtitle && (
-              <p className="text-xs text-foreground-muted font-sans line-clamp-1">
+              <p className="text-[11px] text-foreground-muted font-sans line-clamp-1">
                 {subtitle}
               </p>
             )}
           </div>
 
-          <div className="p-1 rounded-md text-foreground-muted group-hover:text-foreground transition-colors shrink-0">
+          <div className="p-1 rounded-control-sm text-foreground-muted group-hover:text-foreground transition-colors shrink-0">
             <ChevronDown
-              className={`w-4 h-4 transition-transform duration-200 ${
+              className={`w-3.5 h-3.5 transition-transform duration-150 ${
                 isExpanded ? 'rotate-180 text-primary' : ''
               }`}
             />
@@ -93,9 +93,9 @@ export const ExpandableSection: React.FC<ExpandableSectionProps> = ({
         )}
       </div>
 
-      {/* Section Content (Animated Expansion) */}
+      {/* Section Content (Expanded Body) */}
       {isExpanded && (
-        <div className="p-4 sm:p-5 space-y-4 animate-fadeIn">
+        <div className="p-4 space-y-3.5 animate-fadeIn">
           {children}
         </div>
       )}

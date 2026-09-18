@@ -66,24 +66,24 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
     switch (level) {
       case 'VERY HIGH':
         return {
-          pill: 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25',
-          outline: 'border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10'
+          pill: 'bg-success-surface text-success border-success-border hover:bg-success-surface/80',
+          outline: 'border-success-border text-success hover:bg-success-surface'
         };
       case 'HIGH':
         return {
-          pill: 'bg-cyan-500/15 text-cyan-400 border-cyan-500/30 hover:bg-cyan-500/25',
-          outline: 'border-cyan-500/50 text-cyan-400 hover:bg-cyan-500/10'
+          pill: 'bg-primary-subtle text-primary border-primary/30 hover:bg-primary/15',
+          outline: 'border-primary/40 text-primary hover:bg-primary-subtle'
         };
       case 'MODERATE':
         return {
-          pill: 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25',
-          outline: 'border-amber-500/50 text-amber-400 hover:bg-amber-500/10'
+          pill: 'bg-warning-surface text-warning border-warning-border hover:bg-warning-surface/80',
+          outline: 'border-warning-border text-warning hover:bg-warning-surface'
         };
       case 'LOW':
       default:
         return {
-          pill: 'bg-rose-500/15 text-rose-400 border-rose-500/30 hover:bg-rose-500/25',
-          outline: 'border-rose-500/50 text-rose-400 hover:bg-rose-500/10'
+          pill: 'bg-danger-surface text-danger border-danger-border hover:bg-danger-surface/80',
+          outline: 'border-danger-border text-danger hover:bg-danger-surface'
         };
     }
   };
@@ -145,7 +145,7 @@ export const ConfidenceBadge: React.FC<ConfidenceBadgeProps> = ({
             ? 'Click to inspect underlying evidence, conflicts, and confidence dimensions'
             : undefined
         }
-        className={`inline-flex items-center rounded-full font-mono transition-all border ${
+        className={`inline-flex items-center rounded-badge font-mono transition-all border ${
           variant === 'outline' ? theme.outline : theme.pill
         } ${sizeClasses} ${
           interactive

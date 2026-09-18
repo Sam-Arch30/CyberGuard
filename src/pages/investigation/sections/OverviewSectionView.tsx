@@ -335,7 +335,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       {/* =======================================================================
           SECTION 1 — THREAT ASSESSMENT (Verdict, Score, Genuine Confidence)
           ======================================================================= */}
-      <section className="bg-surface rounded-2xl border border-border p-6 shadow-xs relative overflow-hidden">
+      <section className="bg-surface rounded-card border border-border p-5 relative overflow-hidden">
         {/* Subtle status backdrop tint */}
         <div
           className={`absolute top-0 left-0 right-0 h-1.5 ${
@@ -529,9 +529,9 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       {/* =======================================================================
           SECTION 3 & 4 (2-Column Grid): Authentication Snapshot & Key IOCs
           ======================================================================= */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
         {/* SECTION 3 — Authentication Snapshot */}
-        <section className="bg-surface rounded-2xl border border-border p-5 shadow-xs space-y-4 flex flex-col justify-between">
+        <section className="bg-surface rounded-card border border-border p-4 space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center space-x-2">
@@ -611,7 +611,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
         </section>
 
         {/* SECTION 4 — Important Indicators (Highest Priority IOCs) */}
-        <section className="bg-surface rounded-2xl border border-border p-5 shadow-xs space-y-4 flex flex-col justify-between">
+        <section className="bg-surface rounded-card border border-border p-4 space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center space-x-2">
@@ -678,7 +678,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       {/* =======================================================================
           SECTION 5 — INVESTIGATION SUMMARY (Concise Backend/LLM Narrative)
           ======================================================================= */}
-      <section className="bg-surface rounded-2xl border border-border p-5 shadow-xs space-y-3">
+      <section className="bg-surface rounded-card border border-border p-4 space-y-3">
         <div className="flex items-center justify-between pb-2 border-b border-border">
           <div className="flex items-center space-x-2">
             <Sparkles className="w-4 h-4 text-primary" />

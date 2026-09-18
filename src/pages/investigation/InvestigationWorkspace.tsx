@@ -1,9 +1,10 @@
 import React from 'react';
-import { Loader2, AlertCircle, ArrowLeft, Sparkles } from 'lucide-react';
+import { ArrowLeft, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInvestigation } from '../../context/InvestigationContext';
 import { ActiveInvestigationHeader } from '../../components/layout/ActiveInvestigationHeader';
 import { InvestigationAIDrawer } from '../../components/copilot/InvestigationAIDrawer';
+import { LoadingState, ErrorState, Button } from '../../components/ui';
 import { OverviewSectionView } from './sections/OverviewSectionView';
 import { EmailSectionView } from './sections/EmailSectionView';
 import { AnalysisSectionView } from './sections/AnalysisSectionView';
@@ -25,45 +26,31 @@ export const InvestigationWorkspace: React.FC = () => {
 
   if (loading && !activeEmail) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-3">
-        <Loader2 className="w-8 h-8 text-primary animate-spin" />
-        <p className="text-xs font-mono text-foreground-muted">
-          Loading investigation telemetry...
-        </p>
-      </div>
+      <LoadingState
+        message="Loading investigation telemetry..."
+        subtext="Reconstructing envelope provenance, hops, and indicators"
+        fullHeight
+      />
     );
   }
 
   if (error || !activeEmail) {
     return (
-      <div className="max-w-xl mx-auto my-12 p-8 bg-surface rounded-xl border border-danger/40 text-center space-y-4 shadow-sm">
-        <div className="p-3 bg-danger/10 rounded-full w-12 h-12 mx-auto flex items-center justify-center border border-danger/30 text-danger">
-          <AlertCircle className="w-6 h-6" />
-        </div>
-        <h2 className="text-base font-bold text-foreground font-mono">
-          Investigation Record Not Found
-        </h2>
-        <p className="text-xs font-mono text-foreground-muted">
-          {error || 'Unable to locate forensic evidence for the requested ID.'}
-        </p>
-        <div className="pt-3 flex items-center justify-center gap-3">
-          <button
-            type="button"
-            onClick={reloadActiveEmail}
-            className="px-3.5 py-1.5 rounded-lg bg-surface hover:bg-surface-secondary border border-border text-foreground text-xs font-mono transition-colors cursor-pointer"
-          >
-            Retry Load
-          </button>
-          <button
-            type="button"
+      <ErrorState
+        title="Investigation Record Not Found"
+        message={error || 'Unable to locate forensic evidence for the requested ID.'}
+        onRetry={reloadActiveEmail}
+        action={
+          <Button
+            size="sm"
+            variant="primary"
             onClick={() => navigate('/analyze')}
-            className="inline-flex items-center space-x-2 px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-semibold transition-colors cursor-pointer"
+            leftIcon={<ArrowLeft className="w-3.5 h-3.5" />}
           >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Ingest New Email</span>
-          </button>
-        </div>
-      </div>
+            Ingest New Email
+          </Button>
+        }
+      />
     );
   }
 
@@ -91,10 +78,10 @@ export const InvestigationWorkspace: React.FC = () => {
           <button
             type="button"
             onClick={() => openCopilotDrawer()}
-            className="group flex items-center space-x-2 px-3.5 py-2.5 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg hover:shadow-primary/25 border border-primary-border transition-all duration-200 cursor-pointer text-xs font-mono font-semibold"
+            className="group flex items-center space-x-2 px-3.5 py-2.5 rounded-full bg-surface hover:bg-surface-secondary text-primary shadow-lg border border-primary/35 hover:border-primary transition-all duration-150 cursor-pointer text-xs font-mono font-semibold"
             title="Open Investigation AI Copilot Drawer"
           >
-            <Sparkles className="w-4 h-4 animate-pulse group-hover:scale-110 transition-transform" />
+            <Sparkles className="w-4 h-4 text-primary animate-pulse group-hover:scale-110 transition-transform" />
             <span>Ask Copilot</span>
           </button>
         </div>
