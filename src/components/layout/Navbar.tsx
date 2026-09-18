@@ -3,6 +3,7 @@ import { Search, Bell, ShieldAlert, Cpu, Palette, Check, Sparkles, RotateCcw } f
 import { useNavigate } from 'react-router-dom';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../../context/ThemeContext';
 import { useDemoTour } from '../../context/DemoTourContext';
+import { useInvestigation } from '../../context/InvestigationContext';
 
 export const Navbar: React.FC = () => {
   const [showNotifications, setShowNotifications] = useState(false);
@@ -11,6 +12,7 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const { theme, setTheme, themeMeta } = useTheme();
   const { isTourActive, startTour, endTour, resetDemo, isResetting } = useDemoTour();
+  const { activeEmail, activeEmailId } = useInvestigation();
 
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -55,23 +57,40 @@ export const Navbar: React.FC = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/analyze?search=${encodeURIComponent(searchQuery)}`);
+      navigate(`/history?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
   return (
     <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-border px-6 h-16 flex items-center justify-between transition-colors">
-      {/* Global Search Box */}
-      <form onSubmit={handleSearchSubmit} className="relative w-72 md:w-96">
-        <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search IP, Domain, Message-ID or Hash..."
-          className="w-full pl-9 pr-3.5 py-1.5 bg-surface-secondary border border-border rounded-control text-xs font-mono text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-        />
-      </form>
+      {/* Left: Global Search Box & Active Investigation Chip */}
+      <div className="flex items-center space-x-3">
+        <form onSubmit={handleSearchSubmit} className="relative w-64 md:w-80">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Subject, Sender, or Hash..."
+            className="w-full pl-9 pr-3.5 py-1.5 bg-surface-secondary border border-border rounded-control text-xs font-mono text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+          />
+        </form>
+
+        {activeEmail && (
+          <button
+            type="button"
+            onClick={() => navigate(`/investigate/${activeEmailId}/overview`)}
+            className="hidden xl:flex items-center space-x-2 px-2.5 py-1 rounded-control bg-surface-secondary/80 hover:bg-surface-secondary border border-border text-xs font-mono transition-colors cursor-pointer"
+            title="Jump to current active investigation"
+          >
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-foreground-muted">Target:</span>
+            <span className="text-foreground font-semibold truncate max-w-[150px]">
+              {activeEmail.subject || activeEmailId}
+            </span>
+          </button>
+        )}
+      </div>
 
       {/* Right Navbar Utility Controls */}
       <div className="flex items-center space-x-2.5">
