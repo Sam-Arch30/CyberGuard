@@ -2,30 +2,20 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   FileText,
   Printer,
-  ShieldCheck,
   ShieldAlert,
-  AlertTriangle,
   Download,
   Loader2,
-  RefreshCw,
   Clock,
   Lock,
-  Hash,
   Server,
   Globe,
   Link as LinkIcon,
   GitMerge,
   FileCode,
-  ChevronDown,
-  ChevronRight,
   Copy,
   Check,
-  ExternalLink,
   CheckCircle2,
-  XCircle,
-  FileDown,
   Info,
-  Layers,
   ArrowRight
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
@@ -204,17 +194,21 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
   const attribution = email.attribution || resolveAttribution(email);
   const score = Math.round(email.threat_score?.score ?? 0);
   const severity = (email.threat_score?.severity || (score >= 80 ? 'critical' : score >= 50 ? 'high' : score >= 25 ? 'medium' : 'low')).toLowerCase();
-  const confidence = email.threat_score?.confidence ? Math.round(email.threat_score.confidence * 100) : (attribution?.confidence_score ?? 88);
+  const rawConfidence = email.threat_score?.confidence;
+  const confidence = typeof rawConfidence === 'number'
+    ? Math.round(rawConfidence * 100)
+    : (attribution?.confidence_score ?? 88);
 
   const auth = email.authentication;
   const spfVal = (auth?.spf?.result || 'FAIL').toUpperCase();
   const dkimVal = (auth?.dkim?.result || 'FAIL').toUpperCase();
   const dmarcVal = (auth?.dmarc?.result || 'FAIL').toUpperCase();
 
-  const originIp = attribution?.probable_origin_ip || email.relay_analysis?.earliest_observable_node?.earliest_observable_ip || '203.0.113.88';
-  const originAsn = attribution?.probable_origin_asn || email.relay_analysis?.earliest_observable_node?.asn || 'AS64512';
+  const earliestNode = email.relay_analysis?.earliest_observable_node as any;
+  const originIp = attribution?.probable_origin_ip || earliestNode?.earliest_observable_ip || '203.0.113.88';
+  const originAsn = attribution?.probable_origin_asn || earliestNode?.asn || 'AS64512';
   const originProvider = attribution?.probable_origin_provider || 'Threat Infrastructure Host';
-  const originCountry = attribution?.probable_infrastructure_country || email.relay_analysis?.earliest_observable_node?.country || 'United States';
+  const originCountry = attribution?.probable_infrastructure_country || earliestNode?.country || 'United States';
 
   const lookalikes = email.lookalike_domains || [];
   const rawDomains = email.indicators?.domains || email.domains || [];
@@ -223,11 +217,12 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
 
   /* ── Formatted raw headers map ─── */
   const formattedHeaders = useMemo(() => {
-    if (email.headers && typeof email.headers === 'object') {
-      if (Array.isArray(email.headers)) {
-        return email.headers.map((h: any) => `${h.key || h.name || 'Header'}: ${h.value || ''}`).join('\n');
+    const emailAny = email as any;
+    if (emailAny.headers && typeof emailAny.headers === 'object') {
+      if (Array.isArray(emailAny.headers)) {
+        return emailAny.headers.map((h: any) => `${h.key || h.name || 'Header'}: ${h.value || ''}`).join('\n');
       }
-      return Object.entries(email.headers).map(([k, v]) => `${k}: ${v}`).join('\n');
+      return Object.entries(emailAny.headers).map(([k, v]) => `${k}: ${v}`).join('\n');
     }
     // Synthetic RFC-822 baseline from actual properties
     const lines = [
@@ -248,7 +243,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
   const filteredHeadersString = useMemo(() => {
     if (!headerFilter.trim()) return formattedHeaders;
     const q = headerFilter.toLowerCase();
-    return formattedHeaders.split('\n').filter(line => line.toLowerCase().includes(q)).join('\n');
+    return formattedHeaders.split('\n').filter((line: string) => line.toLowerCase().includes(q)).join('\n');
   }, [formattedHeaders, headerFilter]);
 
   /* ── Dynamic Key Findings ─── */
@@ -256,10 +251,12 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
     const list: Array<{ severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'; title: string; explanation: string }> = [];
 
     if (lookalikes.length > 0) {
+      const firstLookalike = lookalikes[0];
+      const targetBrand = firstLookalike.suspected_brand || (firstLookalike as any).brand || firstLookalike.brand_name || 'Target Brand';
       list.push({
         severity: 'CRITICAL',
-        title: `Homograph / Lookalike Domain Impersonation (${lookalikes[0].domain})`,
-        explanation: `Adversary utilized domain "${lookalikes[0].domain}" employing character substitution techniques targeting brand "${lookalikes[0].brand}".`
+        title: `Homograph / Lookalike Domain Impersonation (${firstLookalike.domain})`,
+        explanation: `Adversary utilized domain "${firstLookalike.domain}" employing character substitution techniques targeting brand "${targetBrand}".`
       });
     }
 
@@ -267,7 +264,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
       list.push({
         severity: 'HIGH',
         title: 'DMARC Alignment Verification Failed',
-        explanation: `Header domain (${auth.alignment?.from_domain || 'sender'}) failed alignment against authenticated Return-Path and DKIM identity under policy p=${auth.dmarc?.details || 'reject'}.`
+        explanation: `Header domain (${auth?.alignment?.from_domain || 'sender'}) failed alignment against authenticated Return-Path and DKIM identity under policy p=${auth?.dmarc?.details || 'reject'}.`
       });
     }
 
@@ -582,7 +579,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
 
             {lookalikes.length > 0 && (
               <p>
-                Forensic domain inspection revealed active homograph typosquatting: domain <code className="text-primary font-bold font-mono">{lookalikes[0].domain}</code> impersonates legitimate brand <strong className="text-foreground">{lookalikes[0].brand}</strong> with {Math.round(lookalikes[0].confidence * 100)}% algorithmic confidence, designed to induce credential entry or unauthorized wire transfer approvals.
+                Forensic domain inspection revealed active homograph typosquatting: domain <code className="text-primary font-bold font-mono">{lookalikes[0].domain}</code> impersonates legitimate brand <strong className="text-foreground">{lookalikes[0].suspected_brand || (lookalikes[0] as any).brand || lookalikes[0].brand_name}</strong> with {Math.round(((lookalikes[0].similarity || (lookalikes[0] as any).confidence || 0.9)) * 100)}% algorithmic confidence, designed to induce credential entry or unauthorized wire transfer approvals.
               </p>
             )}
 
@@ -668,7 +665,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
                 <tr className="hover:bg-surface-secondary/40 transition-colors">
                   <td className="py-2 px-3 font-semibold text-foreground">Domain Typosquatting & Homoglyphs</td>
                   <td className="py-2 px-3 text-foreground-muted">
-                    {lookalikes.length > 0 ? `Identified ${lookalikes[0].domain} (${lookalikes[0].brand})` : 'No lookalikes'}
+                    {lookalikes.length > 0 ? `Identified ${lookalikes[0].domain} (${lookalikes[0].suspected_brand || (lookalikes[0] as any).brand || lookalikes[0].brand_name})` : 'No lookalikes'}
                   </td>
                   <td className="py-2 px-3 text-foreground-muted">High</td>
                   <td className="py-2 px-3 text-right font-bold text-danger">+{lookalikes.length > 0 ? 30 : 0} pts</td>
@@ -782,7 +779,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
               <p className="text-[11px] text-foreground-muted leading-relaxed">
                 {dmarcVal === 'PASS'
                   ? 'Domain alignment verified between RFC-5322 From and authenticated identity.'
-                  : `Alignment failed under domain policy (${auth.dmarc?.details || 'p=reject'}).`}
+                  : `Alignment failed under domain policy (${auth?.dmarc?.details || 'p=reject'}).`}
               </p>
             </div>
           </div>
@@ -795,15 +792,15 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
               <div className="p-2 rounded bg-surface border border-border">
                 <span className="text-foreground-muted block text-[10px]">From Domain:</span>
-                <span className="font-bold text-foreground truncate block">{auth.alignment?.from_domain || email.from || 'sender.corp'}</span>
+                <span className="font-bold text-foreground truncate block">{auth?.alignment?.from_domain || email.from || 'sender.corp'}</span>
               </div>
               <div className="p-2 rounded bg-surface border border-border">
                 <span className="text-foreground-muted block text-[10px]">Return-Path:</span>
-                <span className="font-bold text-foreground truncate block">{auth.alignment?.return_path_domain || 'bounce.corp'}</span>
+                <span className="font-bold text-foreground truncate block">{auth?.alignment?.return_path_domain || 'bounce.corp'}</span>
               </div>
               <div className="p-2 rounded bg-surface border border-border">
                 <span className="text-foreground-muted block text-[10px]">Reply-To:</span>
-                <span className="font-bold text-foreground truncate block">{auth.alignment?.reply_to_domain || email.reply_to || 'inbox.corp'}</span>
+                <span className="font-bold text-foreground truncate block">{auth?.alignment?.reply_to_domain || email.reply_to || 'inbox.corp'}</span>
               </div>
             </div>
           </div>
@@ -1099,8 +1096,8 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
                           <td className="py-2 px-2 font-bold text-primary">#{hop.hop_number || i + 1}</td>
                           <td className="py-2 px-2 text-foreground font-mono truncate max-w-xs">{hop.from_host || hop.from_ip || originIp}</td>
                           <td className="py-2 px-2 text-foreground-muted font-mono truncate max-w-xs">{hop.by_host || hop.by_ip || 'mx.recipient.corp'}</td>
-                          <td className="py-2 px-2 text-foreground-muted">{hop.authentication_context || 'ESMTPS'}</td>
-                          <td className="py-2 px-2 text-right text-foreground font-bold">{hop.delay_seconds ?? 0}s</td>
+                          <td className="py-2 px-2 text-foreground-muted">{(hop as any).authentication_context || hop.protocol || 'ESMTPS'}</td>
+                          <td className="py-2 px-2 text-right text-foreground font-bold">{(hop as any).delay_seconds ?? 0}s</td>
                         </tr>
                       ))
                     ) : (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HashRouter as Router, Routes, Route, useLocation, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { DemoTourProvider } from './context/DemoTourContext';
@@ -21,7 +21,13 @@ import { InvestigationHistory } from './pages/InvestigationHistory';
 
 function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const location = useLocation();
+
+  // Automatically close mobile sidebar when route changes
+  useEffect(() => {
+    setMobileSidebarOpen(false);
+  }, [location.pathname]);
 
   return (
     <div className="min-h-screen bg-background text-foreground flex transition-colors duration-200">
@@ -29,17 +35,19 @@ function AppContent() {
       <Sidebar
         collapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        mobileOpen={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
       {/* Main Content Workspace Area */}
       <div
-        className={`flex-1 flex flex-col min-w-0 transition-all duration-250 ${
-          sidebarCollapsed ? 'pl-20' : 'pl-64'
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-200 pl-0 ${
+          sidebarCollapsed ? 'md:pl-20' : 'md:pl-64'
         }`}
       >
-        <Navbar />
+        <Navbar onToggleMobileSidebar={() => setMobileSidebarOpen(!mobileSidebarOpen)} />
 
-        <main className="flex-1 p-6 max-w-7xl w-full mx-auto">
+        <main className="flex-1 p-3 sm:p-5 lg:p-6 max-w-[1600px] w-full mx-auto">
           <div key={location.pathname} className="page-enter">
             <Routes>
               {/* Primary 6-Stage Investigation Routes */}

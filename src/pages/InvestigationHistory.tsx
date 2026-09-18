@@ -433,7 +433,7 @@ export const InvestigationHistory: React.FC = () => {
       evidenceId: run.evidence_id || run.id,
       sha256: run.sha256 || 'UNCOMPUTED_HASH',
       originalFilename: filename,
-      sizeBytes: run.fullAnalysis?.file_info?.size ?? 14280,
+      sizeBytes: run.fullAnalysis?.file_info?.size_bytes ?? 14280,
       uploader: 'SOC Forensics Pipeline',
       timestamp: run.timestamp,
       subject: run.subject,
@@ -457,7 +457,9 @@ export const InvestigationHistory: React.FC = () => {
         threat_score: {
           score: run.threat_score,
           severity: run.severity as any,
-          summary: `Stored forensic analysis from ${formatUtcTimestamp(run.timestamp)}`
+          summary: `Stored forensic analysis from ${formatUtcTimestamp(run.timestamp)}`,
+          reasons: [],
+          positive_evidence: []
         },
         indicators: {
           domains: [],

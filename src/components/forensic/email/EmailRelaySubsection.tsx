@@ -12,6 +12,7 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { ExpandableSection, DetailDrawer, MetadataRow } from '../../common/progressive';
+import { TruncatedForensicValue } from '../TruncatedForensicValue';
 
 interface EmailRelaySubsectionProps {
   relayAnalysis?: RelayPathAnalysis;
@@ -146,63 +147,65 @@ export const EmailRelaySubsection: React.FC<EmailRelaySubsectionProps> = ({
               </div>
 
               {/* Horizontal Pipeline */}
-              <div className="flex flex-wrap items-center gap-2 pt-1">
-                {hops.map((hop, idx) => {
-                  const role = getRoleTitle(idx, hops.length);
-                  const isOrigin = idx === 0;
-                  const isDestination = idx === hops.length - 1;
-                  const activeIp = hop.from_ip || hop.by_ip;
-                  const geo = activeIp ? ipIntelligence[activeIp] : undefined;
-                  const isExpanded = Boolean(expandedHopIndices[idx]);
+              <div className="overflow-x-auto pb-1.5 scrollbar-thin -mx-1 px-1">
+                <div className="flex items-center gap-2 min-w-max pt-1">
+                  {hops.map((hop, idx) => {
+                    const role = getRoleTitle(idx, hops.length);
+                    const isOrigin = idx === 0;
+                    const isDestination = idx === hops.length - 1;
+                    const activeIp = hop.from_ip || hop.by_ip;
+                    const geo = activeIp ? ipIntelligence[activeIp] : undefined;
+                    const isExpanded = Boolean(expandedHopIndices[idx]);
 
-                  return (
-                    <React.Fragment key={`pipeline-step-${idx}`}>
-                      <button
-                        type="button"
-                        onClick={() => toggleHop(idx)}
-                        className={`group p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col min-w-[130px] sm:min-w-[150px] max-w-[200px] ${
-                          isExpanded
-                            ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20'
-                            : isOrigin
-                              ? 'bg-warning-surface/30 border-warning-border/80 hover:border-warning'
-                              : isDestination
-                                ? 'bg-success-surface/30 border-success-border/80 hover:border-success'
-                                : 'bg-surface border-border hover:border-primary/50'
-                        }`}
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider ${
-                            isOrigin ? 'text-warning' : isDestination ? 'text-success' : 'text-primary'
-                          }`}>
-                            {role}
-                          </span>
-                          <span className="text-[9px] text-foreground-muted">
-                            Hop #{idx + 1}
-                          </span>
-                        </div>
-
-                        <span className="font-bold text-foreground text-xs truncate block" title={hop.from_host || hop.from_ip || 'Origin Node'}>
-                          {hop.from_host || hop.from_ip || 'Origin Node'}
-                        </span>
-
-                        <div className="flex items-center space-x-1.5 text-[10px] text-foreground-muted mt-1 truncate">
-                          {geo?.country_code && (
-                            <span className="font-mono text-foreground font-semibold">
-                              {geo.country_code}
+                    return (
+                      <React.Fragment key={`pipeline-step-${idx}`}>
+                        <button
+                          type="button"
+                          onClick={() => toggleHop(idx)}
+                          className={`group p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col min-w-[140px] sm:min-w-[160px] max-w-[220px] ${
+                            isExpanded
+                              ? 'bg-primary/10 border-primary shadow-xs ring-1 ring-primary/20'
+                              : isOrigin
+                                ? 'bg-warning-surface/30 border-warning-border/80 hover:border-warning'
+                                : isDestination
+                                  ? 'bg-success-surface/30 border-success-border/80 hover:border-success'
+                                  : 'bg-surface border-border hover:border-primary/50'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-[10px] font-bold uppercase tracking-wider ${
+                              isOrigin ? 'text-warning' : isDestination ? 'text-success' : 'text-primary'
+                            }`}>
+                              {role}
                             </span>
-                          )}
-                          <span className="truncate">{hop.from_ip || 'No IP'}</span>
-                        </div>
-                      </button>
+                            <span className="text-[9px] text-foreground-muted">
+                              Hop #{idx + 1}
+                            </span>
+                          </div>
 
-                      {idx < hops.length - 1 && (
-                        <div className="flex items-center justify-center text-foreground-subtle shrink-0 px-0.5">
-                          <ArrowRight className="w-4 h-4" />
-                        </div>
-                      )}
-                    </React.Fragment>
-                  );
-                })}
+                          <span className="font-bold text-foreground text-xs truncate block" title={hop.from_host || hop.from_ip || 'Origin Node'}>
+                            {hop.from_host || hop.from_ip || 'Origin Node'}
+                          </span>
+
+                          <div className="flex items-center space-x-1.5 text-[10px] text-foreground-muted mt-1 truncate">
+                            {geo?.country_code && (
+                              <span className="font-mono text-foreground font-semibold">
+                                {geo.country_code}
+                              </span>
+                            )}
+                            <span className="truncate">{hop.from_ip || 'No IP'}</span>
+                          </div>
+                        </button>
+
+                        {idx < hops.length - 1 && (
+                          <div className="flex items-center justify-center text-foreground-subtle shrink-0 px-0.5">
+                            <ArrowRight className="w-4 h-4" />
+                          </div>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -255,13 +258,17 @@ export const EmailRelaySubsection: React.FC<EmailRelaySubsectionProps> = ({
 
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center space-x-2 flex-wrap">
-                            <span className="font-bold text-foreground text-xs break-all">
-                              {hop.from_host || hop.from_ip || 'Unspecified Host'}
-                            </span>
+                            <TruncatedForensicValue
+                              value={hop.from_host || hop.from_ip || 'Unspecified Host'}
+                              type={hop.from_ip ? 'ip' : 'domain'}
+                              maxWidth="max-w-[150px] sm:max-w-[220px] md:max-w-xs"
+                            />
                             <ArrowRight className="w-3 h-3 text-foreground-muted shrink-0" />
-                            <span className="text-foreground text-xs break-all">
-                              {hop.by_host || hop.by_ip || 'Recipient System'}
-                            </span>
+                            <TruncatedForensicValue
+                              value={hop.by_host || hop.by_ip || 'Recipient System'}
+                              type={hop.by_ip ? 'ip' : 'domain'}
+                              maxWidth="max-w-[150px] sm:max-w-[220px] md:max-w-xs"
+                            />
                           </div>
                         </div>
                       </div>

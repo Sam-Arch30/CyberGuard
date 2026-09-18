@@ -24,6 +24,8 @@ import {
 } from 'lucide-react';
 import { useInvestigation, INVESTIGATION_SECTIONS, type InvestigationSection } from '../../context/InvestigationContext';
 import { AddToCaseModal } from '../case/AddToCaseModal';
+import { CopyButton } from '../forensic/CopyButton';
+import { truncateMiddle } from '../../utils/forensicFormatters';
 
 const SECTION_ICONS: Record<InvestigationSection, React.FC<{ className?: string }>> = {
   overview: Compass,
@@ -305,21 +307,50 @@ export const ActiveInvestigationHeader: React.FC = () => {
               </div>
 
               {/* Subject Title */}
-              <h1 className="text-sm sm:text-base font-bold text-foreground font-sans truncate mt-1">
-                {activeEmail.subject || 'Untitled Incident Message'}
-              </h1>
+              <div className="flex items-center space-x-2 mt-1 min-w-0 max-w-full">
+                <h1
+                  title={activeEmail.subject || 'Untitled Incident Message'}
+                  className="text-sm sm:text-base font-bold text-foreground font-sans truncate"
+                >
+                  {activeEmail.subject || 'Untitled Incident Message'}
+                </h1>
+                {activeEmail.subject && (
+                  <CopyButton text={activeEmail.subject} iconOnly />
+                )}
+              </div>
 
               {/* Sender & Timestamp Subline */}
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs font-mono text-foreground-muted mt-0.5">
-                <span>
-                  <strong className="text-foreground-subtle font-medium">From: </strong>
-                  <span className="text-foreground">{activeEmail.from || 'Unknown'}</span>
-                </span>
+              <div className="flex flex-wrap items-center gap-x-2 sm:gap-x-3 gap-y-0.5 text-xs font-mono text-foreground-muted mt-0.5">
+                <div className="flex items-center space-x-1.5 min-w-0">
+                  <strong className="text-foreground-subtle font-medium shrink-0">From: </strong>
+                  <span
+                    title={activeEmail.from || 'Unknown'}
+                    className="text-foreground font-semibold truncate max-w-[200px] sm:max-w-xs md:max-w-md"
+                  >
+                    {activeEmail.from || 'Unknown'}
+                  </span>
+                  {activeEmail.from && <CopyButton text={activeEmail.from} iconOnly />}
+                </div>
                 <span>·</span>
-                <span>
+                <span className="shrink-0">
                   <strong className="text-foreground-subtle font-medium">Received: </strong>
                   <span>{formatTimestamp(activeEmail.date || activeEmail.upload_timestamp)}</span>
                 </span>
+                {activeEmail.email_sha256 && (
+                  <>
+                    <span className="hidden xl:inline">·</span>
+                    <div className="hidden xl:flex items-center space-x-1">
+                      <strong className="text-foreground-subtle font-medium">SHA-256: </strong>
+                      <span
+                        title={activeEmail.email_sha256}
+                        className="font-mono text-[11px] text-foreground"
+                      >
+                        {truncateMiddle(activeEmail.email_sha256, 8, 8)}
+                      </span>
+                      <CopyButton text={activeEmail.email_sha256} iconOnly />
+                    </div>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -487,7 +518,7 @@ export const ActiveInvestigationHeader: React.FC = () => {
       {/* =========================================================================
           2. COMPACT INVESTIGATION NAVIGATION: Overview, Email, Analysis, Intel, Investigate, Report
           ========================================================================= */}
-      <nav className="bg-surface px-2 sm:px-4 py-1.5 flex items-center justify-between border-b border-border overflow-x-auto">
+      <nav className="bg-surface px-2 sm:px-4 py-1 flex items-center justify-between border-b border-border overflow-x-auto scrollbar-none">
         <div className="flex items-center space-x-1 min-w-max">
           {INVESTIGATION_SECTIONS.map((sec) => {
             const isActive = activeSection === sec.id;
@@ -497,15 +528,15 @@ export const ActiveInvestigationHeader: React.FC = () => {
                 key={sec.id}
                 type="button"
                 onClick={() => setSection(sec.id)}
-                className={`flex items-center space-x-2 px-3 py-1.5 rounded-control text-xs font-mono transition-all cursor-pointer ${
+                className={`flex items-center space-x-1.5 px-2.5 py-1.5 rounded-control text-xs font-mono transition-all cursor-pointer ${
                   isActive
                     ? 'bg-primary/12 text-primary font-bold border border-primary/30 shadow-xs'
                     : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
                 }`}
                 title={sec.description}
               >
-                <Icon className="w-3.5 h-3.5" />
-                <span>{sec.label}</span>
+                <Icon className="w-3.5 h-3.5 shrink-0" />
+                <span className="whitespace-nowrap">{sec.label}</span>
               </button>
             );
           })}
@@ -516,7 +547,7 @@ export const ActiveInvestigationHeader: React.FC = () => {
           <button
             type="button"
             onClick={stepGuidance.execute}
-            className="flex items-center space-x-1.5 px-3 py-1 rounded-lg bg-surface-secondary hover:bg-primary/10 border border-border hover:border-primary/40 text-primary text-xs font-mono font-medium transition-colors cursor-pointer"
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-control bg-surface-secondary hover:bg-primary/10 border border-border hover:border-primary/40 text-primary text-xs font-mono font-medium transition-colors cursor-pointer"
             title={stepGuidance.guidanceText}
           >
             <span>{stepGuidance.buttonLabel}</span>

@@ -1252,11 +1252,11 @@ export const CaseDetail: React.FC = () => {
                         <span className="font-bold text-primary">{rel.case_number}</span>
                         <span className="font-semibold text-foreground">{rel.title}</span>
                         <span className="px-2 py-0.2 rounded bg-primary/15 text-primary text-[10px] font-bold">
-                          {Math.round(rel.similarity_score * 100)}% Match
+                          {Math.round((rel.correlation_score ?? (rel as any).similarity_score ?? 0) * 100)}% Match
                         </span>
                       </div>
                       <p className="text-[11px] text-foreground-muted">
-                        Shared overlap across {rel.shared_domains?.length || 0} domains, {rel.shared_ips?.length || 0} IPs.
+                        {rel.shared_evidence_summary || `Shared overlap across ${rel.shared_indicators?.length || 0} correlated indicators.`}
                       </p>
                     </div>
 

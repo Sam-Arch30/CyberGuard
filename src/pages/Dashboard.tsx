@@ -294,7 +294,7 @@ export const Dashboard: React.FC = () => {
     : recentRows;
 
   return (
-    <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 space-y-8 animate-fadeIn">
+    <div className="max-w-5xl lg:max-w-6xl w-full mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fadeIn">
       {/* =========================================================================
           TOP: Minimal MailTraceAI Branding & Global Context
           ========================================================================= */}

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { EmailAnalysis, IPIndicator, URLAnalysisResult } from '../../../types/forensic';
 import {
   Target,
@@ -16,6 +16,7 @@ import {
 import { useInvestigation } from '../../../context/InvestigationContext';
 import { ExpandableSection, DetailDrawer } from '../../common/progressive';
 import { CopyButton } from '../CopyButton';
+import { TruncatedForensicValue } from '../TruncatedForensicValue';
 
 interface AnalysisIndicatorsSectionProps {
   email: EmailAnalysis;
@@ -46,6 +47,8 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [onlySuspicious, setOnlySuspicious] = useState<boolean>(false);
   const [selectedIOC, setSelectedIOC] = useState<IOCItem | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 15;
 
   // Synthesize unified list of IOC items from email indicators
   const iocList = useMemo<IOCItem[]>(() => {
@@ -266,6 +269,17 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
     });
   }, [iocList, selectedType, onlySuspicious, searchQuery]);
 
+  // Reset pagination on filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [selectedType, onlySuspicious, searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredList.length / pageSize));
+  const displayedList = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredList.slice(start, start + pageSize);
+  }, [filteredList, currentPage, pageSize]);
+
   const typeCounts = useMemo(() => {
     return {
       all: iocList.length,
@@ -377,19 +391,95 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
             </div>
           ) : (
             <div className="rounded-xl border border-border overflow-hidden bg-surface shadow-xs">
-              <div className="overflow-x-auto">
+              {/* Tablet / Mobile Compact Card Rows (< md) */}
+              <div className="md:hidden divide-y divide-border">
+                {displayedList.map((ioc) => (
+                  <div
+                    key={`mob-${ioc.id}`}
+                    onClick={() => setSelectedIOC(ioc)}
+                    className={`p-3 space-y-2 cursor-pointer transition-colors ${
+                      selectedIOC?.id === ioc.id ? 'bg-primary/10 entity-selected' : 'hover:bg-surface-secondary/40'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="flex items-center space-x-1.5 text-foreground-muted font-bold text-[11px] uppercase">
+                        {getTypeIcon(ioc.type)}
+                        <span>{ioc.type}</span>
+                      </span>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
+                        ioc.status === 'critical'
+                          ? 'bg-danger-surface text-danger border-danger-border'
+                          : ioc.status === 'suspicious'
+                          ? 'bg-warning-surface text-warning border-warning-border'
+                          : ioc.status === 'public'
+                          ? 'bg-primary/10 text-primary border-primary/20'
+                          : 'bg-surface-secondary text-foreground-muted border-border'
+                      }`}>
+                        {ioc.statusLabel}
+                      </span>
+                    </div>
+
+                    <div className="min-w-0">
+                      <TruncatedForensicValue
+                        value={ioc.value}
+                        type={ioc.type}
+                        defanged={true}
+                        maxWidth="max-w-[260px] sm:max-w-md"
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between pt-1 text-[11px] text-foreground-muted">
+                      <span className="truncate max-w-[160px] text-foreground-subtle">{ioc.source}</span>
+                      <div className="flex items-center space-x-2">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openCopilotDrawer(
+                              `Explain this ${ioc.type.toUpperCase()} observable: '${ioc.value}'. What is its reputation, forensic role, and threat context?`,
+                              {
+                                type: ioc.type.toUpperCase(),
+                                identifier: ioc.value,
+                                details: ioc.statusLabel
+                              }
+                            );
+                          }}
+                          className="px-1.5 py-0.5 rounded text-[10px] font-bold text-primary/80 hover:text-primary transition-colors flex items-center space-x-1 cursor-pointer"
+                        >
+                          <Sparkles className="w-3 h-3" />
+                          <span>Ask AI</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedIOC(ioc);
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-bold text-primary hover:bg-primary/10 transition-colors flex items-center space-x-1 cursor-pointer"
+                        >
+                          <span>Inspect</span>
+                          <ExternalLink className="w-2.5 h-2.5" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop / Laptop Table (>= md) */}
+              <div className="hidden md:block overflow-x-auto">
                 <table className="w-full text-left text-xs border-collapse">
                   <thead>
                     <tr className="bg-surface-secondary/60 border-b border-border text-[10px] uppercase font-bold text-foreground-muted tracking-wider">
                       <th className="py-2.5 px-3 w-28">Type</th>
                       <th className="py-2.5 px-3 min-w-[220px]">Indicator (Defanged)</th>
-                      <th className="py-2.5 px-3 hidden md:table-cell">Context / Source</th>
+                      <th className="py-2.5 px-3">Context / Source</th>
                       <th className="py-2.5 px-3 w-32">Status</th>
-                      <th className="py-2.5 px-3 text-right w-24">Action</th>
+                      <th className="py-2.5 px-3 text-right w-28">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border">
-                    {filteredList.map((ioc) => {
+                    {displayedList.map((ioc) => {
                       return (
                         <tr
                           key={ioc.id}
@@ -399,7 +489,7 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                           }`}
                         >
                           {/* Type */}
-                          <td className="py-2.5 px-3 whitespace-nowrap">
+                          <td className="py-2 px-3 whitespace-nowrap">
                             <span className="flex items-center space-x-1.5 text-foreground-muted font-bold text-[11px] uppercase">
                               {getTypeIcon(ioc.type)}
                               <span>{ioc.type}</span>
@@ -407,24 +497,22 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                           </td>
 
                           {/* Indicator Value */}
-                          <td className="py-2.5 px-3 min-w-0">
-                            <div className="flex items-center space-x-2 min-w-0">
-                              <span className="font-mono text-foreground font-semibold break-all select-all group-hover:text-primary transition-colors">
-                                {ioc.defangedValue}
-                              </span>
-                              <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                                <CopyButton text={ioc.value} iconOnly />
-                              </div>
-                            </div>
+                          <td className="py-2 px-3 min-w-0">
+                            <TruncatedForensicValue
+                              value={ioc.value}
+                              type={ioc.type}
+                              defanged={true}
+                              maxWidth="max-w-[200px] lg:max-w-md"
+                            />
                           </td>
 
                           {/* Source */}
-                          <td className="py-2.5 px-3 text-foreground-muted hidden md:table-cell text-[11px] truncate max-w-[180px]">
+                          <td className="py-2 px-3 text-foreground-muted text-[11px] truncate max-w-[200px]">
                             {ioc.source}
                           </td>
 
                           {/* Status */}
-                          <td className="py-2.5 px-3 whitespace-nowrap">
+                          <td className="py-2 px-3 whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${
                               ioc.status === 'critical'
                                 ? 'bg-danger-surface text-danger border-danger-border'
@@ -439,7 +527,7 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                           </td>
 
                           {/* Action */}
-                          <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                          <td className="py-2 px-3 text-right whitespace-nowrap">
                             <div className="flex items-center justify-end space-x-1 ml-auto">
                               <button
                                 type="button"
@@ -458,7 +546,7 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                                 title="Ask AI about this observable"
                               >
                                 <Sparkles className="w-3 h-3" />
-                                <span className="hidden sm:inline">Ask AI</span>
+                                <span>Ask AI</span>
                               </button>
                               <button
                                 type="button"
@@ -479,6 +567,36 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                   </tbody>
                 </table>
               </div>
+
+              {/* Pagination Controls for Large Collections */}
+              {filteredList.length > pageSize && (
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 border-t border-border bg-surface-secondary/20 text-xs font-mono text-foreground-muted">
+                  <span>
+                    Showing <strong className="text-foreground">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredList.length)}</strong> of <strong className="text-foreground">{filteredList.length}</strong> observables
+                  </span>
+                  <div className="flex items-center space-x-2">
+                    <button
+                      type="button"
+                      disabled={currentPage === 1}
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      className="px-2.5 py-1 rounded-control bg-surface hover:bg-surface-secondary border border-border text-foreground disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                    >
+                      Prev
+                    </button>
+                    <span>
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button
+                      type="button"
+                      disabled={currentPage === totalPages}
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      className="px-2.5 py-1 rounded-control bg-surface hover:bg-surface-secondary border border-border text-foreground disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

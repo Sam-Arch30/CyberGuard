@@ -86,6 +86,13 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
       .catch(() => {});
   }, [email]);
 
+  useEffect(() => {
+    if (currentSubTab === 'copilot') {
+      openCopilotDrawer();
+      setSubTab('graph');
+    }
+  }, [currentSubTab, openCopilotDrawer, setSubTab]);
+
   const subTabItems: { id: InvestigationSubTab; label: string; icon: React.FC<{ className?: string }>; count?: number | string; badgeColor?: string }[] = [
     { id: 'graph', label: 'Relationship Graph', icon: Share2 },
     { id: 'campaigns', label: 'Campaign Correlation', icon: Network, count: 'CLUSTERS' },
@@ -114,7 +121,13 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
               <button
                 key={tab.id}
                 type="button"
-                onClick={() => setSubTab(tab.id)}
+                onClick={() => {
+                  if (tab.id === 'copilot') {
+                    openCopilotDrawer();
+                  } else {
+                    setSubTab(tab.id);
+                  }
+                }}
                 className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
                   isActive
                     ? 'bg-primary text-primary-foreground font-semibold shadow-xs'

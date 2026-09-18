@@ -135,11 +135,13 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
         </div>
       </div>
 
-      {/* 2. TOP TRIAGE SUMMARY CARD */}
-      <IntelligenceSummaryCard
-        email={email}
-        onSelectGroup={handleSelectGroup}
-      />
+      {/* 2. TOP TRIAGE SUMMARY CARD (Surfaced in 'All Groups' overview mode) */}
+      {currentSubTab === 'all' && (
+        <IntelligenceSummaryCard
+          email={email}
+          onSelectGroup={handleSelectGroup}
+        />
+      )}
 
       {/* 3. PRIMARY GROUPS CONTAINER */}
       <div className="space-y-6">

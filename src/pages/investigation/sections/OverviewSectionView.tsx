@@ -331,7 +331,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       : 'Automated forensic inspection completed. The email adheres to standard enterprise cryptographic authentication, verified sender domains, and exhibits baseline benign characteristics.');
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto animate-fadeIn">
+    <div className="space-y-6 max-w-[1600px] w-full mx-auto animate-fadeIn">
       {/* =======================================================================
           SECTION 1 — THREAT ASSESSMENT (Verdict, Score, Genuine Confidence)
           ======================================================================= */}

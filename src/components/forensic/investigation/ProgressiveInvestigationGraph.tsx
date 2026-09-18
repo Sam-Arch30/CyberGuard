@@ -418,7 +418,7 @@ export const ProgressiveInvestigationGraph: React.FC<ProgressiveInvestigationGra
             'text-max-width': '140px',
             'text-wrap': 'ellipsis',
             'transition-property': 'background-color, border-color, width, height',
-            'transition-duration': prefersReducedMotion ? '0s' : '0.15s'
+            'transition-duration': (prefersReducedMotion ? 0 : 0.15) as any
           }
         },
         {

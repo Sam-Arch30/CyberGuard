@@ -43,7 +43,7 @@ export const DetailDrawer: React.FC<DetailDrawerProps> = ({
     >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-neutral-950/60 backdrop-blur-xs transition-opacity cursor-pointer"
+        className="fixed inset-0 bg-neutral-950/60 xl:bg-neutral-950/20 xl:backdrop-blur-none backdrop-blur-xs transition-opacity cursor-pointer"
         onClick={onClose}
         aria-hidden="true"
       />

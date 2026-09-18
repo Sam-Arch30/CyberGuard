@@ -24,11 +24,15 @@ import { useInvestigation } from '../../context/InvestigationContext';
 interface SidebarProps {
   collapsed?: boolean;
   onToggleCollapse?: () => void;
+  mobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
   collapsed: externalCollapsed,
-  onToggleCollapse: externalToggle
+  onToggleCollapse: externalToggle,
+  mobileOpen = false,
+  onCloseMobile
 }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(false);
   const isCollapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
@@ -141,11 +145,23 @@ export const Sidebar: React.FC<SidebarProps> = ({
   };
 
   return (
-    <aside
-      className={`fixed top-0 left-0 bottom-0 z-40 bg-sidebar-bg border-r border-sidebar-border transition-all duration-250 flex flex-col justify-between select-none ${
-        isCollapsed ? 'w-20' : 'w-64'
-      }`}
-    >
+    <>
+      {/* Mobile Drawer Backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/60 backdrop-blur-xs md:hidden animate-in fade-in duration-150"
+          onClick={onCloseMobile}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside
+        className={`fixed top-0 bottom-0 z-50 md:z-40 bg-sidebar-bg border-r border-sidebar-border transition-all duration-200 flex flex-col justify-between select-none ${
+          mobileOpen ? 'left-0 w-64 shadow-2xl' : '-left-64 md:left-0'
+        } ${
+          isCollapsed ? 'md:w-20' : 'md:w-64'
+        }`}
+      >
       <div className="flex-1 overflow-y-auto">
         {/* Top Header Logo */}
         <div className="h-16 px-4 flex items-center justify-between border-b border-sidebar-border sticky top-0 bg-sidebar-bg/95 backdrop-blur-xs z-10">
@@ -305,6 +321,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };

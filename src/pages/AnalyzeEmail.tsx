@@ -4,7 +4,6 @@ import {
   SearchCode,
   Zap,
   Upload,
-  AlertCircle,
   FileText,
   Shield,
   ArrowRight

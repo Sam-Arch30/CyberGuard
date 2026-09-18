@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { EmailAnalysis, URLAnalysisResult } from '../../../types/forensic';
 import {
   Link2,
@@ -9,7 +9,7 @@ import {
   Route
 } from 'lucide-react';
 import { ExpandableSection, DetailDrawer } from '../../common/progressive';
-import { CopyButton } from '../CopyButton';
+import { TruncatedForensicValue } from '../TruncatedForensicValue';
 
 interface AnalysisURLsSectionProps {
   email: EmailAnalysis;
@@ -27,6 +27,8 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
   const [expandedUrls, setExpandedUrls] = useState<Record<string, boolean>>({});
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedRawUrl, setSelectedRawUrl] = useState<URLAnalysisResult | null>(null);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const pageSize = 6;
 
   const rawUrlList: URLAnalysisResult[] = useMemo(() => {
     if (email.url_analysis && email.url_analysis.length > 0) {
@@ -116,6 +118,16 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
     );
   }, [enrichedUrls, searchQuery]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredUrls.length / pageSize));
+  const displayedUrls = useMemo(() => {
+    const start = (currentPage - 1) * pageSize;
+    return filteredUrls.slice(start, start + pageSize);
+  }, [filteredUrls, currentPage, pageSize]);
+
   const toggleUrl = (key: string) => {
     setExpandedUrls((prev) => ({
       ...prev,
@@ -161,8 +173,9 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
               No URLs match the current search filter.
             </div>
           ) : (
-            <div className="space-y-3">
-              {filteredUrls.map((item) => {
+            <>
+              <div className="space-y-3">
+              {displayedUrls.map((item) => {
                 const isExpanded = Boolean(expandedUrls[item.uniqueKey]);
                 const isCrit = item.suspicion_score >= 60;
                 const isSusp = item.suspicion_score >= 25 || item.features?.display_link_mismatch;
@@ -189,33 +202,37 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
                           toggleUrl(item.uniqueKey);
                         }
                       }}
-                      className="p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none"
+                      className="p-3 sm:p-3.5 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none"
                     >
                       {/* Left: Visible URL and Destination */}
-                      <div className="space-y-1 min-w-0 flex-1">
+                      <div className="space-y-1.5 min-w-0 flex-1">
                         <div className="flex items-center space-x-2 flex-wrap">
-                          <span className="text-[10px] uppercase font-bold text-foreground-muted">
+                          <span className="text-[10px] uppercase font-bold text-foreground-muted shrink-0">
                             Visible URL:
                           </span>
-                          <span className="font-bold text-foreground break-all select-all text-xs">
-                            {defang(item.url)}
-                          </span>
-                          <div onClick={(e) => e.stopPropagation()} className="shrink-0">
-                            <CopyButton text={item.url} iconOnly />
-                          </div>
+                          <TruncatedForensicValue
+                            value={item.url}
+                            type="url"
+                            defanged={true}
+                            maxWidth="max-w-[260px] sm:max-w-md lg:max-w-xl xl:max-w-2xl"
+                          />
                         </div>
 
                         {/* Final Destination */}
-                        <div className="flex items-center space-x-1.5 text-xs text-foreground-muted">
-                          <span className="text-[10px] uppercase font-bold text-foreground-subtle">
+                        <div className="flex items-center space-x-1.5 text-xs text-foreground-muted flex-wrap">
+                          <span className="text-[10px] uppercase font-bold text-foreground-subtle shrink-0">
                             Destination:
                           </span>
                           {item.finalDestination ? (
-                            <span className="text-warning font-bold break-all">
-                              {defang(item.finalDestination)}
-                            </span>
+                            <TruncatedForensicValue
+                              value={item.finalDestination}
+                              type="url"
+                              defanged={true}
+                              maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl xl:max-w-2xl"
+                              className="text-warning font-bold"
+                            />
                           ) : (
-                            <span className="text-foreground-muted">
+                            <span className="text-foreground-muted text-[11px]">
                               Direct (No redirection detected)
                             </span>
                           )}
@@ -268,16 +285,21 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
                             {item.redirectChain.map((hop, hopIdx) => (
                               <div
                                 key={hopIdx}
-                                className="flex items-center space-x-2 p-2 rounded-lg bg-surface-secondary/60 border border-border text-[11px]"
+                                className="flex items-center justify-between gap-2 p-2 rounded-lg bg-surface-secondary/60 border border-border text-[11px]"
                               >
-                                <span className="px-1.5 py-0.2 rounded bg-surface border border-border text-primary font-bold text-[10px]">
-                                  Hop {hopIdx + 1}
-                                </span>
-                                <span className="font-bold text-foreground break-all select-all flex-1">
-                                  {defang(hop)}
-                                </span>
+                                <div className="flex items-center space-x-2 min-w-0 flex-1">
+                                  <span className="px-1.5 py-0.2 rounded bg-surface border border-border text-primary font-bold text-[10px] shrink-0">
+                                    Hop {hopIdx + 1}
+                                  </span>
+                                  <TruncatedForensicValue
+                                    value={hop}
+                                    type="url"
+                                    defanged={true}
+                                    maxWidth="max-w-[220px] sm:max-w-md lg:max-w-2xl"
+                                  />
+                                </div>
                                 {hopIdx === item.redirectChain.length - 1 && (
-                                  <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 text-[9px] uppercase font-bold">
+                                  <span className="px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 text-[9px] uppercase font-bold shrink-0">
                                     Final Landing
                                   </span>
                                 )}
@@ -327,7 +349,38 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
                 );
               })}
             </div>
-          )}
+
+            {/* Pagination Controls for Large URL Collections */}
+            {filteredUrls.length > pageSize && (
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl border border-border bg-surface-secondary/20 text-xs font-mono text-foreground-muted">
+                <span>
+                  Showing <strong className="text-foreground">{(currentPage - 1) * pageSize + 1}–{Math.min(currentPage * pageSize, filteredUrls.length)}</strong> of <strong className="text-foreground">{filteredUrls.length}</strong> URLs
+                </span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    type="button"
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                    className="px-2.5 py-1 rounded-control bg-surface hover:bg-surface-secondary border border-border text-foreground disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                  >
+                    Prev
+                  </button>
+                  <span>
+                    Page {currentPage} of {totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                    className="px-2.5 py-1 rounded-control bg-surface hover:bg-surface-secondary border border-border text-foreground disabled:opacity-40 disabled:pointer-events-none transition-colors cursor-pointer"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
+            )}
+          </>
+        )}
         </div>
       </ExpandableSection>
 

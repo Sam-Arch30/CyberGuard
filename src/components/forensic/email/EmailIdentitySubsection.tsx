@@ -3,6 +3,7 @@ import type { EmailAnalysis } from '../../../types/forensic';
 import { Mail, AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
 import { CopyButton } from '../CopyButton';
 import { ExpandableSection } from '../../common/progressive';
+import { TruncatedForensicValue } from '../TruncatedForensicValue';
 
 interface EmailIdentitySubsectionProps {
   email: EmailAnalysis;
@@ -135,9 +136,11 @@ export const EmailIdentitySubsection: React.FC<EmailIdentitySubsectionProps> = (
             </div>
             <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className="font-bold text-foreground break-all select-all">
-                  {email.from || 'Not specified'}
-                </span>
+                <TruncatedForensicValue
+                  value={email.from || 'Not specified'}
+                  type="email"
+                  maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl"
+                />
                 {isDisplayNameSpoofing && (
                   <span className="px-2 py-0.5 rounded text-[10px] bg-danger-surface text-danger border border-danger-border font-bold flex items-center gap-1">
                     <ShieldAlert className="w-3 h-3" />
@@ -160,9 +163,12 @@ export const EmailIdentitySubsection: React.FC<EmailIdentitySubsectionProps> = (
             </div>
             <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className={`font-semibold break-all select-all ${replyToMismatch ? 'text-warning font-bold' : 'text-foreground'}`}>
-                  {email.reply_to || (email.from ? `${email.from} (Defaults to From)` : 'Not specified')}
-                </span>
+                <TruncatedForensicValue
+                  value={email.reply_to || (email.from ? `${email.from} (Defaults to From)` : 'Not specified')}
+                  type="email"
+                  maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl"
+                  className={replyToMismatch ? 'text-warning font-bold' : 'text-foreground'}
+                />
                 {replyToMismatch && (
                   <span className="px-2 py-0.5 rounded text-[10px] bg-warning-surface text-warning border border-warning-border font-bold flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
@@ -185,9 +191,12 @@ export const EmailIdentitySubsection: React.FC<EmailIdentitySubsectionProps> = (
             </div>
             <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className={`font-semibold break-all select-all ${returnPathMismatch ? 'text-warning font-bold' : 'text-foreground'}`}>
-                  {email.return_path || 'Not specified in message envelope'}
-                </span>
+                <TruncatedForensicValue
+                  value={email.return_path || 'Not specified in message envelope'}
+                  type="email"
+                  maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl"
+                  className={returnPathMismatch ? 'text-warning font-bold' : 'text-foreground'}
+                />
                 {returnPathMismatch && (
                   <span className="px-2 py-0.5 rounded text-[10px] bg-warning-surface text-warning border border-warning-border font-bold flex items-center gap-1">
                     <AlertTriangle className="w-3 h-3" />
@@ -205,9 +214,11 @@ export const EmailIdentitySubsection: React.FC<EmailIdentitySubsectionProps> = (
               <span className="font-bold uppercase text-[11px]">To:</span>
             </div>
             <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
-              <span className="font-semibold text-foreground break-all select-all">
-                {Array.isArray(email.to) ? email.to.join(', ') : email.to || 'Undisclosed recipients'}
-              </span>
+              <TruncatedForensicValue
+                value={Array.isArray(email.to) ? email.to.join(', ') : email.to || 'Undisclosed recipients'}
+                type="email"
+                maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl"
+              />
               {email.to && (
                 <CopyButton
                   text={Array.isArray(email.to) ? email.to.join(', ') : String(email.to)}
@@ -223,9 +234,12 @@ export const EmailIdentitySubsection: React.FC<EmailIdentitySubsectionProps> = (
               <span className="font-bold uppercase text-[11px]">Subject:</span>
             </div>
             <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
-              <span className="font-sans font-bold text-foreground break-all select-all text-sm">
-                {email.subject || '(No Subject)'}
-              </span>
+              <TruncatedForensicValue
+                value={email.subject || '(No Subject)'}
+                type="subject"
+                maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl"
+                className="font-sans font-bold text-foreground text-sm"
+              />
               {email.subject && <CopyButton text={email.subject} iconOnly />}
             </div>
           </div>
@@ -250,9 +264,12 @@ export const EmailIdentitySubsection: React.FC<EmailIdentitySubsectionProps> = (
             </div>
             <div className="flex-1 flex flex-wrap items-center justify-between gap-2 min-w-0">
               <div className="flex flex-wrap items-center gap-2 min-w-0">
-                <span className="font-semibold text-foreground break-all select-all text-[11px]">
-                  {email.message_id || 'Not present'}
-                </span>
+                <TruncatedForensicValue
+                  value={email.message_id || 'Not present'}
+                  type="hash"
+                  maxWidth="max-w-[240px] sm:max-w-md lg:max-w-xl"
+                  className="text-[11px]"
+                />
                 {msgIdMismatch && (
                   <span className="px-2 py-0.5 rounded text-[10px] bg-surface-secondary text-foreground-muted border border-border font-mono">
                     Host: {parsedMsgIdDomain}

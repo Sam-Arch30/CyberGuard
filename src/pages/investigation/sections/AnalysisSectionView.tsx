@@ -99,11 +99,13 @@ export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email 
         })}
       </div>
 
-      {/* 2. TOP ANALYSIS SUMMARY CARD (Always visible for rapid triage context) */}
-      <AnalysisSummaryCard
-        email={email}
-        onJumpToSection={(sec) => setSubTab(sec)}
-      />
+      {/* 2. TOP ANALYSIS SUMMARY CARD (Surfaced in 'All Sections' overview mode) */}
+      {currentSubTab === 'all' && (
+        <AnalysisSummaryCard
+          email={email}
+          onJumpToSection={(sec) => setSubTab(sec)}
+        />
+      )}
 
       {/* 3. COLLAPSIBLE FORENSIC SECTIONS */}
       <div className="space-y-6">

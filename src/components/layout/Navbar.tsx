@@ -1,11 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, ShieldAlert, Cpu, Palette, Check, Sparkles, RotateCcw } from 'lucide-react';
+import { Search, Bell, ShieldAlert, Cpu, Palette, Check, Sparkles, RotateCcw, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../../context/ThemeContext';
 import { useDemoTour } from '../../context/DemoTourContext';
 import { useInvestigation } from '../../context/InvestigationContext';
 
-export const Navbar: React.FC = () => {
+export interface NavbarProps {
+  onToggleMobileSidebar?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -62,10 +66,22 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-border px-6 h-16 flex items-center justify-between transition-colors">
-      {/* Left: Global Search Box & Active Investigation Chip */}
-      <div className="flex items-center space-x-3">
-        <form onSubmit={handleSearchSubmit} className="relative w-64 md:w-80">
+    <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-border px-3 sm:px-6 h-16 flex items-center justify-between transition-colors">
+      {/* Left: Hamburger (mobile), Global Search Box & Active Investigation Chip */}
+      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+        {onToggleMobileSidebar && (
+          <button
+            type="button"
+            onClick={onToggleMobileSidebar}
+            className="p-1.5 rounded-control text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-border md:hidden cursor-pointer shrink-0"
+            aria-label="Toggle navigation menu"
+            title="Toggle Navigation Sidebar"
+          >
+            <Menu className="w-4 h-4 text-foreground" />
+          </button>
+        )}
+
+        <form onSubmit={handleSearchSubmit} className="relative w-36 sm:w-64 md:w-80">
           <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             type="text"

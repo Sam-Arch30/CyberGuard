@@ -368,7 +368,7 @@ export const InvestigationAIDrawer: React.FC = () => {
     <div className="fixed inset-0 z-50 flex justify-end animate-fadeIn">
       {/* Semi-transparent Backdrop for Dismissal */}
       <div
-        className="fixed inset-0 bg-background/60 backdrop-blur-xs transition-opacity cursor-pointer"
+        className="fixed inset-0 bg-background/60 xl:bg-background/15 xl:backdrop-blur-none backdrop-blur-xs transition-opacity cursor-pointer"
         onClick={closeCopilotDrawer}
         aria-label="Close drawer"
       />
