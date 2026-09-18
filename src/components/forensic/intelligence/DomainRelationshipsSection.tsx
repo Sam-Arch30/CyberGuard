@@ -354,7 +354,7 @@ export const DomainRelationshipsSection: React.FC<DomainRelationshipsSectionProp
                 key={entity.domain}
                 className={`rounded-xl border transition-all ${
                   selectedDomainExternal === entity.domain
-                    ? 'border-primary ring-1 ring-primary/30 bg-surface'
+                    ? 'border-primary ring-1 ring-primary/30 bg-surface entity-selected'
                     : 'bg-surface border-border hover:border-border-hover'
                 } shadow-xs overflow-hidden`}
               >
@@ -438,7 +438,7 @@ export const DomainRelationshipsSection: React.FC<DomainRelationshipsSectionProp
 
                 {/* Expanded Content (Progressive Disclosure) */}
                 {isExpanded && (
-                  <div className="p-4 border-t border-border bg-surface-secondary/20 space-y-4 text-xs font-mono">
+                  <div className="p-4 border-t border-border bg-surface-secondary/20 space-y-4 text-xs font-mono accordion-expand">
                     {/* 1. Lookalike Impersonation Details (if applicable) */}
                     {lookalike && (
                       <div className="p-3.5 rounded-xl bg-danger/10 border border-danger/30 space-y-2">

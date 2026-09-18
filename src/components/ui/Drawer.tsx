@@ -87,7 +87,7 @@ export const Drawer: React.FC<DrawerProps> = ({
         aria-modal="true"
         className={cn(
           'relative h-full bg-surface border-l border-border shadow-2xl flex flex-col z-10',
-          'animate-in slide-in-from-right duration-200 ease-out',
+          'drawer-enter',
           sizeClasses[size],
           className
         )}

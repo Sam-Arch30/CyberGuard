@@ -348,7 +348,7 @@ export const InfrastructureIPSection: React.FC<InfrastructureIPSectionProps> = (
                 onClick={() => setSelectedIpForDrawer(entity)}
                 className={`p-3.5 rounded-xl border transition-all cursor-pointer group flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                   selectedIpExternal === entity.ip
-                    ? 'bg-primary/5 border-primary shadow-xs ring-1 ring-primary/30'
+                    ? 'bg-primary/5 border-primary shadow-xs ring-1 ring-primary/30 entity-selected'
                     : 'bg-surface hover:bg-surface-secondary/60 border-border hover:border-border-hover shadow-xs'
                 }`}
               >

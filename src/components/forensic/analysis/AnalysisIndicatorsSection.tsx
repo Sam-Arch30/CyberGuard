@@ -394,7 +394,9 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                         <tr
                           key={ioc.id}
                           onClick={() => setSelectedIOC(ioc)}
-                          className="hover:bg-surface-secondary/50 transition-colors cursor-pointer group"
+                          className={`hover:bg-surface-secondary/50 transition-colors cursor-pointer group ${
+                            selectedIOC?.id === ioc.id ? 'bg-primary/10 entity-selected' : ''
+                          }`}
                         >
                           {/* Type */}
                           <td className="py-2.5 px-3 whitespace-nowrap">

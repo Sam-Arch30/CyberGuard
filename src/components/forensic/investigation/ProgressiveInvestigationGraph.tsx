@@ -386,6 +386,9 @@ export const ProgressiveInvestigationGraph: React.FC<ProgressiveInvestigationGra
     const edgeColor = isDark ? '#475569' : '#94a3b8';
     const edgeArrowColor = isDark ? '#64748b' : '#64748b';
 
+    const prefersReducedMotion = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const animDuration = prefersReducedMotion ? 0 : 200;
+
     const cy = cytoscape({
       container: containerRef.current,
       elements,
@@ -415,7 +418,7 @@ export const ProgressiveInvestigationGraph: React.FC<ProgressiveInvestigationGra
             'text-max-width': '140px',
             'text-wrap': 'ellipsis',
             'transition-property': 'background-color, border-color, width, height',
-            'transition-duration': 0.2
+            'transition-duration': prefersReducedMotion ? '0s' : '0.15s'
           }
         },
         {
@@ -452,8 +455,8 @@ export const ProgressiveInvestigationGraph: React.FC<ProgressiveInvestigationGra
       ],
       layout: {
         name: 'cose',
-        animate: true,
-        animationDuration: 500,
+        animate: !prefersReducedMotion,
+        animationDuration: animDuration,
         nodeRepulsion: () => 8000,
         idealEdgeLength: () => 120,
         edgeElasticity: () => 100,
@@ -624,7 +627,8 @@ export const ProgressiveInvestigationGraph: React.FC<ProgressiveInvestigationGra
             type="button"
             aria-label="Reset layout"
             onClick={() => {
-              cyRef.current?.layout({ name: 'cose', animate: true, fit: true, padding: 40 }).run();
+              const prefersReduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+              cyRef.current?.layout({ name: 'cose', animate: !prefersReduced, animationDuration: prefersReduced ? 0 : 200, fit: true, padding: 40 }).run();
             }}
             className="p-1.5 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-foreground transition-colors cursor-pointer"
           >
@@ -672,7 +676,7 @@ export const ProgressiveInvestigationGraph: React.FC<ProgressiveInvestigationGra
 
         {/* Docked Contextual Detail Panel */}
         {selectedNode && (
-          <div className="absolute right-3 top-3 bottom-3 z-20">
+          <div className="absolute right-3 top-3 bottom-3 z-20 drawer-enter">
             <GraphNodeDetailPanel
               node={selectedNode}
               connectedEdges={connectedEdgesToSelected}

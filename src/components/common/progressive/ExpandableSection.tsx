@@ -95,7 +95,7 @@ export const ExpandableSection: React.FC<ExpandableSectionProps> = ({
 
       {/* Section Content (Expanded Body) */}
       {isExpanded && (
-        <div className="p-4 space-y-3.5 animate-fadeIn">
+        <div className="p-4 space-y-3.5 accordion-expand">
           {children}
         </div>
       )}

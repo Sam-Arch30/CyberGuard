@@ -589,19 +589,87 @@ div[class*="w-"] > svg:only-child {
   height: 100%;
 }
 
-/* Page fade transition */
+/* Page fade transition (Restrained 150ms) */
 .page-enter {
-  animation: pageFadeIn var(--duration-slow) var(--ease-default) forwards;
+  animation: pageFadeIn var(--duration-base) var(--ease-default) forwards;
 }
 
 @keyframes pageFadeIn {
   from {
     opacity: 0;
-    transform: translateY(3px);
+    transform: translateY(2px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Restrained Accordion Expansion Transition */
+.accordion-expand {
+  animation: accordionExpand var(--duration-base) var(--ease-default) forwards;
+}
+
+@keyframes accordionExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Forensic Entity Selection Transition */
+.entity-selected {
+  transition: background-color var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+
+/* Restrained Drawer Slide-in */
+.drawer-enter,
+.animate-slideLeft {
+  animation: drawerSlideIn var(--duration-base) var(--ease-default) forwards;
+}
+
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Restrained Modal Dialog Scale-in */
+.modal-enter {
+  animation: modalScaleIn var(--duration-base) var(--ease-default) forwards;
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Pipeline Step Pulse for active forensic processing */
+.pipeline-step-pulse {
+  animation: pipelinePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pipelinePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 
@@ -634,6 +702,22 @@ div[class*="w-"] > svg:only-child {
   }
   .page-enter {
     animation: none !important;
+  }
+  .accordion-expand {
+    animation: none !important;
+  }
+  .drawer-enter,
+  .animate-slideLeft {
+    animation: none !important;
+    transform: none !important;
+  }
+  .modal-enter {
+    animation: none !important;
+    transform: none !important;
+  }
+  .pipeline-step-pulse {
+    animation: none !important;
+    opacity: 1 !important;
   }
   .panel-interactive:hover {
     transform: none !important;

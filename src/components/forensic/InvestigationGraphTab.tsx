@@ -390,6 +390,10 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
   }, [focusNodeId, filteredData]);
 
   function getLayoutConfig(name: string) {
+    const prefersReduced = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const duration = prefersReduced ? 0 : 200;
+    const animate = !prefersReduced;
+
     switch (name) {
       case 'concentric':
         return {
@@ -404,8 +408,8 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
           },
           levelWidth: () => 1,
           padding: 40,
-          animate: true,
-          animationDuration: 500
+          animate,
+          animationDuration: duration
         };
       case 'breadthfirst':
         return {
@@ -413,22 +417,22 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
           directed: true,
           padding: 40,
           spacingFactor: 1.25,
-          animate: true,
-          animationDuration: 500
+          animate,
+          animationDuration: duration
         };
       case 'circle':
         return {
           name: 'circle',
           padding: 40,
-          animate: true,
-          animationDuration: 500
+          animate,
+          animationDuration: duration
         };
       case 'cose':
       default:
         return {
           name: 'cose',
-          animate: true,
-          animationDuration: 600,
+          animate,
+          animationDuration: duration,
           nodeRepulsion: () => 8500,
           idealEdgeLength: () => 90,
           edgeElasticity: () => 100,

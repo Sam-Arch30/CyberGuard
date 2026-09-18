@@ -174,7 +174,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
 
       {/* LEVEL 2: Explanation (Visible When Expanded) */}
       {isExpanded && (
-        <div className="border-t border-border bg-surface-secondary/25 p-4 space-y-3.5 animate-fadeIn">
+        <div className="border-t border-border bg-surface-secondary/25 p-4 space-y-3.5 accordion-expand">
           {/* Custom explanation content passed as children */}
           <div className="space-y-2 text-xs font-mono">
             {children}

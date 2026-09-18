@@ -155,7 +155,7 @@ export const FindingRow: React.FC<FindingRowProps> = ({
 
       {/* LEVEL 2: Explanation */}
       {isExpanded && (
-        <div className="border-t border-border bg-surface-secondary/25 p-4 space-y-3.5 animate-fadeIn">
+        <div className="border-t border-border bg-surface-secondary/25 p-4 space-y-3.5 accordion-expand">
           <div className="space-y-2 text-xs font-mono">
             {children}
           </div>

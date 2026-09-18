@@ -12,22 +12,75 @@ import {
 import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
 import { decodeRfc2047 } from '../utils/indicatorHelper';
+import { AnalysisPipelineProgress, type PipelineOverallStatus } from '../components/forensic/AnalysisPipelineProgress';
+
+const SAMPLE_PHISHING = `Received: from edge-relay.security-gateway.net (194.165.16.88) by mx01.enterprise.corp with ESMTPS id p4102 for <security.ops@enterprise.corp>; Tue, 15 Sep 2026 10:41:45 +0000
+Received: from smtp-origin.shadow-node.ru (185.220.101.42) by edge-relay.security-gateway.net with ESMTP id r9182; Tue, 15 Sep 2026 10:41:02 +0000
+From: IT Security Team <security-alert@m1crosoft-auth-verify.com>
+To: security.ops@enterprise.corp
+Subject: Urgent: Password Expiration Notification Required
+Date: Tue, 15 Sep 2026 10:40:55 +0000
+Message-ID: <20260915104055.8921@m1crosoft-auth-verify.com>
+Authentication-Results: mx01.enterprise.corp; spf=fail smtp.mailfrom=m1crosoft-auth-verify.com; dkim=fail; dmarc=fail
+Content-Type: text/plain; charset="UTF-8"
+
+Your enterprise account credentials are set to expire within 24 hours.
+Please authenticate your identity immediately at:
+https://login.m1crosoft-auth-verify.com/portal/login?id=8829
+
+Failure to re-verify will result in administrative account revocation.
+
+Internal IT Helpdesk
+Support ID: 9812-B`;
+
+const SAMPLE_CEO_FRAUD = `Received: from mx.outbound-route.org (185.100.85.10) by mx01.enterprise.corp with ESMTP id m4402; Tue, 15 Sep 2026 08:15:30 +0000
+From: Jonathan Vance <ceo.vance@executive-board-global.net>
+To: finance@enterprise.corp
+Subject: Urgent: Confidential Wire Transaction Request
+Date: Tue, 15 Sep 2026 08:14:20 +0000
+Message-ID: <ceo-confidential-99120@executive-board-global.net>
+Authentication-Results: mx01.enterprise.corp; spf=softfail; dkim=pass; dmarc=fail
+Content-Type: text/plain; charset="UTF-8"
+
+Hi Team,
+
+I am currently in meetings with overseas acquisition partners. 
+Please expedite an international wire transfer of $142,500 for legal retainer fees.
+Wiring instructions are accessible at:
+https://portal-secure-vault.net/invoices/INV-2026-9812.pdf
+
+Please handle this with strict confidentiality.
+
+Jonathan Vance
+Chief Executive Officer`;
 
 export const AnalyzeEmail: React.FC = () => {
   const navigate = useNavigate();
   const [rawInput, setRawInput] = useState<string>('');
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dragOver, setDragOver] = useState<boolean>(false);
 
+  // Real Pipeline Progress Lifecycle State
+  const [pipelineStatus, setPipelineStatus] = useState<PipelineOverallStatus>('idle');
+  const [activeFilename, setActiveFilename] = useState<string>('');
+  const [activeFileSize, setActiveFileSize] = useState<number>(0);
+  const [analysisData, setAnalysisData] = useState<any>(null);
+  const [targetAnalysisId, setTargetAnalysisId] = useState<string | null>(null);
+
   const processEmailContent = async (fileOrBlob: Blob, filename: string, rawText?: string) => {
-    setIsAnalyzing(true);
+    setActiveFilename(filename);
+    setActiveFileSize(fileOrBlob.size);
+    setPipelineStatus('uploading');
     setErrorMessage(null);
     const analysisId = `analysis-${Date.now()}`;
+    setTargetAnalysisId(analysisId);
 
     try {
       const formData = new FormData();
       formData.append('file', fileOrBlob, filename);
+
+      // Server in-flight processing
+      setPipelineStatus('processing');
 
       let res: Response | null = null;
       try {
@@ -81,16 +134,22 @@ export const AnalyzeEmail: React.FC = () => {
         };
 
         saveAnalysisResult(analysisId, parsedAnalysis);
-        navigate(`/analysis/${analysisId}`);
+        setAnalysisData(data);
+        setPipelineStatus('completed');
+
+        // Allow user a restrained moment to perceive completed pipeline stages before workspace entry
+        setTimeout(() => {
+          navigate(`/investigate/${parsedAnalysis.evidence_id || analysisId}/overview`);
+        }, 500);
         return;
       } else {
         const errText = res ? await res.text() : 'Server did not respond.';
         setErrorMessage(`Forensic analysis failed: ${errText || 'Unprocessable email format'}`);
+        setPipelineStatus('error');
       }
     } catch (err: any) {
       setErrorMessage(`Error connecting to analysis engine: ${err?.message || 'Network error'}`);
-    } finally {
-      setIsAnalyzing(false);
+      setPipelineStatus('error');
     }
   };
 
@@ -132,10 +191,12 @@ export const AnalyzeEmail: React.FC = () => {
     await processEmailContent(file, file.name, textContent);
   };
 
+  const isBusy = pipelineStatus === 'uploading' || pipelineStatus === 'processing';
+
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-6 pb-12 max-w-5xl mx-auto page-enter">
       {/* Top Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-6 rounded-xl border border-border">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-surface p-5 rounded-card border border-border">
         <div>
           <div className="flex items-center space-x-2 text-primary font-mono text-xs mb-1 font-semibold uppercase tracking-wider">
             <SearchCode className="w-3.5 h-3.5 text-primary" />
@@ -150,100 +211,123 @@ export const AnalyzeEmail: React.FC = () => {
         </div>
       </div>
 
-      {errorMessage && (
-        <div className="p-4 rounded-xl bg-danger-surface border border-danger-border flex items-start space-x-3 text-xs font-mono text-danger animate-in fade-in">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          <div className="flex-1">
-            <strong className="block font-bold">Analysis Error</strong>
-            <span>{errorMessage}</span>
-          </div>
+      {/* REAL PIPELINE PROGRESS DISPLAY (Active while analyzing or recently completed) */}
+      {pipelineStatus !== 'idle' && (
+        <div className="animate-in fade-in duration-150">
+          <AnalysisPipelineProgress
+            status={pipelineStatus}
+            filename={activeFilename}
+            fileSizeBytes={activeFileSize}
+            analysisData={analysisData}
+            errorMessage={errorMessage || undefined}
+            onRetry={() => {
+              setPipelineStatus('idle');
+              setErrorMessage(null);
+            }}
+            onViewResults={() => {
+              if (targetAnalysisId) {
+                navigate(`/investigate/${analysisData?.evidence_id || targetAnalysisId}/overview`);
+              }
+            }}
+          />
         </div>
       )}
 
-      {/* Upload Zone */}
-      <div
-        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={`bg-surface border-2 border-dashed rounded-xl p-8 text-center transition-all ${
-          dragOver ? 'border-primary bg-primary-subtle/30' : 'border-border hover:border-border-hover'
-        }`}
-      >
-        <div className="max-w-md mx-auto space-y-4">
-          <div className="p-3.5 bg-surface-secondary rounded-full w-14 h-14 mx-auto flex items-center justify-center border border-border">
-            <Upload className="w-6 h-6 text-primary" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-foreground font-sans">
-              Upload an RFC-822 .eml file
-            </h3>
-            <p className="text-xs text-foreground-muted font-mono mt-1">
-              Drag and drop an .eml or .txt email file here, or browse from your system.
-            </p>
-          </div>
-          <div>
-            <label className="inline-flex items-center space-x-2 px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold transition-colors btn-press cursor-pointer">
-              <Upload className="w-3.5 h-3.5" />
-              <span>Browse File</span>
-              <input type="file" accept=".eml,.txt,.msg" onChange={handleFileUpload} className="hidden" />
-            </label>
-          </div>
-        </div>
-      </div>
-
-      {/* Direct Raw Content Ingestion Console */}
-      <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center space-x-2 text-xs font-mono font-semibold text-foreground uppercase">
-            <FileText className="w-3.5 h-3.5 text-primary" />
-            <span>OR PASTE RAW RFC-822 EMAIL HEADERS AND BODY:</span>
-          </div>
-          {rawInput && (
-            <button
-              type="button"
-              onClick={() => setRawInput('')}
-              className="text-[11px] font-mono text-foreground-muted hover:text-danger cursor-pointer"
-            >
-              Clear
-            </button>
-          )}
-        </div>
-
-        <div className="relative">
-          <textarea
-            value={rawInput}
-            onChange={(e) => setRawInput(e.target.value)}
-            rows={8}
-            placeholder="From: sender@example.com&#10;To: recipient@example.com&#10;Subject: Security Notification&#10;Date: Mon, 15 Sep 2026 12:00:00 +0000&#10;Received: from mail.example.com...&#10;&#10;Email body content here..."
-            className="w-full p-3.5 bg-surface-secondary border border-border rounded-lg font-mono text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed"
-          />
-        </div>
-
-        <div className="flex justify-end">
-          <button
-            type="button"
-            onClick={handleRunAnalysis}
-            disabled={isAnalyzing || !rawInput.trim()}
-            className="flex items-center space-x-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs tracking-wider transition-colors btn-press disabled:opacity-50 cursor-pointer"
+      {/* Upload Zone (Hidden while actively analyzing to prevent state conflict) */}
+      {!isBusy && (
+        <>
+          <div
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={handleDrop}
+            className={`bg-surface border-2 border-dashed rounded-card p-6 sm:p-8 text-center transition-all ${
+              dragOver ? 'border-primary bg-primary-subtle/30' : 'border-border hover:border-primary/40'
+            }`}
           >
-            {isAnalyzing ? (
-              <>
-                <div className="w-3.5 h-3.5 border-2 border-primary-foreground border-t-transparent rounded-full animate-spin" />
-                <span>EXECUTING FORENSIC PIPELINE...</span>
-              </>
-            ) : (
-              <>
+            <div className="max-w-md mx-auto space-y-3.5">
+              <div className="p-3 bg-surface-secondary rounded-control w-12 h-12 mx-auto flex items-center justify-center border border-border text-primary">
+                <Upload className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-foreground font-sans">
+                  Upload an RFC-822 .eml file
+                </h3>
+                <p className="text-xs text-foreground-muted font-mono mt-1">
+                  Drag and drop an .eml or .txt email file here, or browse from your system.
+                </p>
+              </div>
+              <div>
+                <label className="inline-flex items-center space-x-2 px-4 py-2 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold transition-colors btn-press cursor-pointer shadow-xs">
+                  <Upload className="w-3.5 h-3.5" />
+                  <span>Browse File</span>
+                  <input type="file" accept=".eml,.txt,.msg" onChange={handleFileUpload} className="hidden" />
+                </label>
+              </div>
+            </div>
+          </div>
+
+          {/* Direct Raw Content Ingestion Console */}
+          <div className="bg-surface border border-border rounded-card p-5 space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center space-x-2 text-xs font-mono font-semibold text-foreground uppercase">
+                <FileText className="w-3.5 h-3.5 text-primary" />
+                <span>OR PASTE RAW RFC-822 EMAIL HEADERS AND BODY:</span>
+              </div>
+              <div className="flex items-center space-x-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => setRawInput(SAMPLE_PHISHING)}
+                  className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface border border-border text-primary hover:text-primary-hover cursor-pointer transition-colors"
+                >
+                  Load Phishing Sample
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRawInput(SAMPLE_CEO_FRAUD)}
+                  className="text-[11px] font-mono px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-foreground cursor-pointer transition-colors"
+                >
+                  Load Executive Impersonation
+                </button>
+                {rawInput && (
+                  <button
+                    type="button"
+                    onClick={() => setRawInput('')}
+                    className="text-[11px] font-mono text-foreground-muted hover:text-danger cursor-pointer ml-1 transition-colors"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="relative">
+              <textarea
+                value={rawInput}
+                onChange={(e) => setRawInput(e.target.value)}
+                rows={8}
+                placeholder="From: sender@example.com&#10;To: recipient@example.com&#10;Subject: Security Notification&#10;Date: Mon, 15 Sep 2026 12:00:00 +0000&#10;Received: from mail.example.com...&#10;&#10;Email body content here..."
+                className="w-full p-3 bg-surface-secondary border border-border rounded-control font-mono text-xs text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary leading-relaxed"
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <button
+                type="button"
+                onClick={handleRunAnalysis}
+                disabled={isBusy || !rawInput.trim()}
+                className="flex items-center space-x-2 px-4 py-2 rounded-control bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs tracking-wider transition-colors btn-press disabled:opacity-50 cursor-pointer shadow-xs"
+              >
                 <Zap className="w-3.5 h-3.5" />
-                <span>RUN FORENSIC ANALYSIS</span>
+                <span>RUN FORENSIC PIPELINE</span>
                 <ArrowRight className="w-3.5 h-3.5" />
-              </>
-            )}
-          </button>
-        </div>
-      </div>
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       {/* Forensic Verification Notice */}
-      <div className="p-4 rounded-xl bg-surface border border-border flex items-start space-x-3 text-xs font-mono text-foreground-muted">
+      <div className="p-4 rounded-card bg-surface border border-border flex items-start space-x-3 text-xs font-mono text-foreground-muted">
         <Shield className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <p className="leading-relaxed">
           <strong className="text-foreground">Evidence Integrity Guarantee:</strong> Ingested emails are immutably hashed (SHA-256) upon upload. All authentication evaluations (SPF, DKIM, DMARC), network routing hops, and indicator extractions are derived exclusively from actual email content without synthetic fallbacks.
@@ -252,3 +336,4 @@ export const AnalyzeEmail: React.FC = () => {
     </div>
   );
 };
+

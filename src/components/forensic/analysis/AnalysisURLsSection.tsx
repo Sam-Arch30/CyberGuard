@@ -174,7 +174,7 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
                     key={item.uniqueKey}
                     className={`rounded-xl border transition-all ${
                       isExpanded
-                        ? 'bg-surface border-primary/40 shadow-xs'
+                        ? 'bg-surface border-primary/40 shadow-xs entity-selected'
                         : 'bg-surface-secondary/40 border border-border hover:border-border-hover'
                     }`}
                   >
@@ -251,7 +251,7 @@ export const AnalysisURLsSection: React.FC<AnalysisURLsSectionProps> = ({ email 
 
                     {/* Level 2: Expanded Redirect Chains & Syntactic Details */}
                     {isExpanded && (
-                      <div className="p-4 border-t border-border bg-surface-secondary/20 space-y-4 text-xs animate-in fade-in duration-150">
+                      <div className="p-4 border-t border-border bg-surface-secondary/20 space-y-4 text-xs accordion-expand">
                         {/* Redirect Chain Visualization */}
                         <div className="p-3 rounded-xl bg-surface border border-border space-y-2">
                           <div className="flex items-center justify-between">
