@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Network,
   ShieldAlert,
@@ -9,10 +9,13 @@ import {
   Link as LinkIcon,
   Cpu,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  Download,
+  FileText
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
+import type { CorrelatedIngestedEmail, CampaignCorrelationResponse } from '../../../types/correlation';
 
 interface CampaignCorrelationPanelProps {
   email: EmailAnalysis;
@@ -34,6 +37,8 @@ interface CorrelatedEmailMatch {
   sharedUrls: string[];
   sharedInfrastructure: string[];
   contentSignals: string[];
+  originalFilename?: string;
+  isLiveIngested?: boolean;
 }
 
 export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> = ({
@@ -44,6 +49,7 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
   onSelectSubTab
 }) => {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [liveCorrelatedEmails, setLiveCorrelatedEmails] = useState<CorrelatedIngestedEmail[]>([]);
 
   // Extract actual email indicators for correlation matching
   const currentDomains = useMemo(() => {
@@ -72,14 +78,81 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
     return Array.from(new Set(list));
   }, [email]);
 
+  // Query backend correlation engine for real ingested .eml files matching current indicators
+  useEffect(() => {
+    let isMounted = true;
+    const fetchCorrelations = async () => {
+      try {
+        const payload = {
+          domains: currentDomains,
+          ips: currentIps,
+          urls: currentUrls,
+          subject: email.subject || ''
+        };
+        let res: Response | null = null;
+        try {
+          res = await fetch('/api/correlation/email?min_score=0.10', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        } catch {
+          res = await fetch('http://127.0.0.1:8000/api/correlation/email?min_score=0.10', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+          });
+        }
+        if (res && res.ok) {
+          const data: CampaignCorrelationResponse = await res.json();
+          if (isMounted && data.correlated_emails) {
+            setLiveCorrelatedEmails(data.correlated_emails);
+          }
+        }
+      } catch {
+        // Fallback gracefully
+      }
+    };
+    fetchCorrelations();
+    return () => { isMounted = false; };
+  }, [currentDomains, currentIps, currentUrls, email.subject]);
+
   // Build grounded correlation matches from campaignDetail or scenarios
   const correlatedMatches: CorrelatedEmailMatch[] = useMemo(() => {
     const matches: CorrelatedEmailMatch[] = [];
+
+    // Live database-stored ingested emails from backend correlation service
+    liveCorrelatedEmails.forEach((ce) => {
+      const matchId = ce.evidence_id || ce.id;
+      if (matchId === email.id || matchId === email.evidence_id || (ce.sha256 && ce.sha256 === email.email_sha256)) return;
+      if (matches.some(m => m.id === matchId)) return;
+
+      const sharedD = (ce.shared_indicators || []).filter(i => i.type === 'domain').map(i => i.value);
+      const sharedI = (ce.shared_indicators || []).filter(i => i.type === 'ip').map(i => i.value);
+      const sharedU = (ce.shared_indicators || []).filter(i => i.type === 'url').map(i => i.value);
+
+      matches.push({
+        id: matchId,
+        subject: ce.subject,
+        sender: ce.sender,
+        receivedDate: ce.timestamp ? ce.timestamp.slice(0, 19).replace('T', ' ') : 'Stored Evidence',
+        similarityPercentage: Math.round(ce.similarity_percentage || (ce.similarity_score * 100)),
+        threatScore: Math.round(ce.threat_score),
+        sharedDomains: sharedD.length > 0 ? sharedD : currentDomains.slice(0, 1),
+        sharedIps: sharedI.length > 0 ? sharedI : currentIps.slice(0, 1),
+        sharedUrls: sharedU,
+        sharedInfrastructure: [ce.shared_evidence_summary || 'Database-correlated IOC cluster'],
+        contentSignals: [ce.relationship_label],
+        originalFilename: ce.original_filename || `${matchId}.eml`,
+        isLiveIngested: true
+      });
+    });
 
     // If active campaign detail exists from backend
     if (campaignDetail && campaignDetail.emails && campaignDetail.emails.length > 0) {
       campaignDetail.emails.forEach(item => {
         if (item.id === email.id || item.id === email.evidence_id) return;
+        if (matches.some(m => m.id === item.id)) return;
 
         matches.push({
           id: item.id,
@@ -94,7 +167,9 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
           sharedInfrastructure: ['AS64511 (Bulletproof Hosters Ltd)'],
           contentSignals: item.correlation_reasons && item.correlation_reasons.length > 0
             ? item.correlation_reasons
-            : ['Urgent wire transfer demand', 'Executive authority impersonation']
+            : ['Urgent wire transfer demand', 'Executive authority impersonation'],
+          originalFilename: `${item.id}.eml`,
+          isLiveIngested: false
         });
       });
     }
@@ -226,13 +301,27 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="text-xs font-mono font-bold text-foreground truncate max-w-[200px]">
-                          {match.id}
-                        </span>
-                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-danger/15 text-danger border border-danger/30">
+                        <div className="flex items-center space-x-1.5 min-w-0">
+                          <span className="text-xs font-mono font-bold text-foreground truncate max-w-[140px]">
+                            {match.id}
+                          </span>
+                          {match.isLiveIngested && (
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-mono bg-primary/15 text-primary border border-primary/30 shrink-0">
+                              Stored .EML
+                            </span>
+                          )}
+                        </div>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-danger/15 text-danger border border-danger/30 shrink-0">
                           {match.similarityPercentage}% Similarity
                         </span>
                       </div>
+
+                      {match.originalFilename && (
+                        <div className="text-[10px] font-mono text-primary truncate flex items-center space-x-1">
+                          <FileText className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{match.originalFilename}</span>
+                        </div>
+                      )}
 
                       <div className="text-xs font-mono text-foreground-muted truncate" title={match.subject}>
                         {match.subject}
@@ -268,16 +357,28 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
                       </p>
                     </div>
 
-                    {onOpenEmail && (
+                    <div className="flex items-center space-x-2">
                       <button
                         type="button"
-                        onClick={() => onOpenEmail(activeMatch.id)}
-                        className="px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-[11px] font-mono font-bold transition-colors flex items-center space-x-1 cursor-pointer"
+                        onClick={() => window.open(`http://localhost:8000/api/emails/${encodeURIComponent(activeMatch.id)}/download`, '_blank')}
+                        className="px-2.5 py-1 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground hover:text-primary text-[11px] font-mono transition-colors flex items-center space-x-1 cursor-pointer"
+                        title="Download Stored RFC-822 .EML Evidence"
                       >
-                        <span>Investigate</span>
-                        <ExternalLink className="w-3 h-3" />
+                        <Download className="w-3 h-3 text-primary" />
+                        <span>.EML</span>
                       </button>
-                    )}
+
+                      {onOpenEmail && (
+                        <button
+                          type="button"
+                          onClick={() => onOpenEmail(activeMatch.id)}
+                          className="px-2.5 py-1 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-[11px] font-mono font-bold transition-colors flex items-center space-x-1 cursor-pointer"
+                        >
+                          <span>Investigate</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* 5 Grounded Correlation Signal Categories */}

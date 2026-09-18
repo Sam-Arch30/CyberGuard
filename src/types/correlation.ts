@@ -24,9 +24,30 @@ export interface RelatedCaseItem {
   matching_signals: Record<string, MatchedSignalDetail>;
 }
 
+export interface CorrelatedIngestedEmail {
+  id: string;
+  evidence_id: string;
+  sha256?: string | null;
+  original_filename?: string;
+  subject: string;
+  sender: string;
+  recipient?: string | null;
+  timestamp?: string;
+  threat_score: number;
+  severity: string;
+  similarity_score: number;
+  similarity_percentage: number;
+  relationship_label: string;
+  shared_evidence_summary: string;
+  shared_indicators: SharedIndicator[];
+  has_eml_file?: boolean;
+}
+
 export interface CampaignCorrelationResponse {
   related_cases: RelatedCaseItem[];
   correlation_score: number;
   relationship_label: string;
   shared_indicators: SharedIndicator[];
+  correlated_emails?: CorrelatedIngestedEmail[];
 }
+

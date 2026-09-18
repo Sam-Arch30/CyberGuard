@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   SearchCode,
@@ -6,7 +6,12 @@ import {
   Upload,
   FileText,
   Shield,
-  ArrowRight
+  ArrowRight,
+  Clock,
+  Download,
+  Network,
+  ExternalLink,
+  History
 } from 'lucide-react';
 import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
@@ -65,6 +70,35 @@ export const AnalyzeEmail: React.FC = () => {
   const [activeFileSize, setActiveFileSize] = useState<number>(0);
   const [analysisData, setAnalysisData] = useState<any>(null);
   const [targetAnalysisId, setTargetAnalysisId] = useState<string | null>(null);
+  const [recentIngested, setRecentIngested] = useState<any[]>([]);
+
+  const fetchRecent = async () => {
+    try {
+      const res = await fetch('/api/dashboard/emails?limit=5');
+      if (res.ok) {
+        const data = await res.json();
+        if (data && data.items) {
+          setRecentIngested(data.items);
+        }
+      }
+    } catch {
+      try {
+        const fallbackRes = await fetch('http://127.0.0.1:8000/api/dashboard/emails?limit=5');
+        if (fallbackRes.ok) {
+          const data = await fallbackRes.json();
+          if (data && data.items) {
+            setRecentIngested(data.items);
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
+  };
+
+  useEffect(() => {
+    fetchRecent();
+  }, []);
 
   const processEmailContent = async (fileOrBlob: Blob, filename: string, rawText?: string) => {
     setActiveFilename(filename);
@@ -322,6 +356,98 @@ export const AnalyzeEmail: React.FC = () => {
               </button>
             </div>
           </div>
+
+          {/* Recently Ingested .EML Files Quick-Access Section */}
+          {recentIngested.length > 0 && (
+            <div className="bg-surface border border-border rounded-card p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <h3 className="text-xs font-mono font-bold text-foreground uppercase tracking-wider">
+                    Recently Ingested .EML Files in Storage ({recentIngested.length})
+                  </h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/history')}
+                  className="text-xs font-mono text-primary hover:text-primary-hover flex items-center space-x-1 cursor-pointer"
+                >
+                  <History className="w-3.5 h-3.5" />
+                  <span>View All Ingested Evidence &rarr;</span>
+                </button>
+              </div>
+
+              <div className="divide-y divide-border">
+                {recentIngested.map((item) => {
+                  const evId = item.evidence_id || item.id;
+                  const threatScore = Math.round(item.threat_score || 0);
+                  const isHigh = threatScore >= 70;
+                  const isMed = threatScore >= 40 && threatScore < 70;
+                  return (
+                    <div
+                      key={item.id}
+                      className="py-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2 hover:bg-surface-secondary/50 px-2 rounded-lg transition-colors"
+                    >
+                      <div className="flex items-start space-x-2.5 min-w-0">
+                        <FileText className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center space-x-2 flex-wrap">
+                            <span className="text-xs font-mono font-semibold text-foreground truncate max-w-xs sm:max-w-md">
+                              {item.original_filename || `${evId}.eml`}
+                            </span>
+                            <span
+                              className={`text-[10px] font-mono px-1.5 py-0.5 rounded border ${
+                                isHigh
+                                  ? 'bg-danger-surface text-danger border-danger-border font-bold'
+                                  : isMed
+                                  ? 'bg-warning-surface text-warning border-warning-border'
+                                  : 'bg-surface-secondary text-foreground-muted border-border'
+                              }`}
+                            >
+                              Score: {threatScore}
+                            </span>
+                          </div>
+                          <p className="text-[11px] font-mono text-foreground-muted truncate max-w-sm sm:max-w-lg">
+                            {item.subject || 'No Subject'} &middot; <span className="text-foreground">{item.sender}</span>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/investigate/${encodeURIComponent(evId)}/investigation?subtab=campaigns`)}
+                          className="px-2.5 py-1 rounded-md bg-surface-secondary border border-border hover:border-primary/40 text-foreground hover:text-primary text-[11px] font-mono flex items-center space-x-1 cursor-pointer transition-colors"
+                          title="Correlate this .EML across Campaigns"
+                        >
+                          <Network className="w-3 h-3 text-primary" />
+                          <span>Correlate</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => window.open(`http://localhost:8000/api/emails/${encodeURIComponent(evId)}/download`, '_blank')}
+                          className="px-2.5 py-1 rounded-md bg-surface-secondary border border-border hover:border-primary/40 text-foreground hover:text-primary text-[11px] font-mono flex items-center space-x-1 cursor-pointer transition-colors"
+                          title="Download RFC-822 .EML"
+                        >
+                          <Download className="w-3 h-3 text-primary" />
+                          <span>.EML</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/investigate/${encodeURIComponent(evId)}`)}
+                          className="px-2.5 py-1 rounded-md bg-primary/10 border border-primary/25 hover:bg-primary hover:text-primary-foreground text-primary text-[11px] font-mono flex items-center space-x-1 cursor-pointer transition-colors font-medium"
+                          title="Open in Workspace"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Open</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
 

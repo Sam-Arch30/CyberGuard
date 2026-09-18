@@ -15,6 +15,7 @@ from backend.schemas.correlation import (
     SharedIndicator,
     MatchedSignalDetail,
     RelatedCaseItem,
+    CorrelatedIngestedEmail,
     CampaignCorrelationResponse,
     DirectCompareResponse,
     InfrastructureFingerprint,
@@ -1585,10 +1586,101 @@ class CampaignCorrelator:
         related_cases.sort(key=lambda c: c.correlation_score, reverse=True)
         related_cases = related_cases[:limit]
 
+        # ---------------------------------------------------------------------
+        # Correlate against all stored ingested .eml files in database
+        # ---------------------------------------------------------------------
+        from backend.db.models import EmailAnalysisModel
+        from backend.services.analysis_repository import load_analysis
+
+        current_evd = email_data.get("evidence_id") or email_data.get("id") or ""
+        current_sha = (email_data.get("email_sha256") or "").lower()
+
+        stored_emails = db.query(EmailAnalysisModel).all()
+        correlated_emails: List[CorrelatedIngestedEmail] = []
+        seen_cand_ids: Set[str] = set()
+
+        for row in stored_emails:
+            cand_id = row.evidence_id or row.id
+            cand_sha = (row.email_sha256 or "").lower()
+
+            # Skip self
+            if (current_evd and (cand_id == current_evd or row.id == current_evd)) or (current_sha and cand_sha == current_sha):
+                continue
+
+            if cand_id in seen_cand_ids or cand_sha in seen_cand_ids:
+                continue
+            seen_cand_ids.add(cand_id)
+            if cand_sha:
+                seen_cand_ids.add(cand_sha)
+
+            try:
+                candidate_data = load_analysis(db, cand_id)
+            except Exception:
+                candidate_data = {
+                    "id": cand_id,
+                    "evidence_id": row.evidence_id,
+                    "email_sha256": row.email_sha256,
+                    "subject": row.subject,
+                    "from": row.sender,
+                    "domains": json.loads(row.domains_json) if row.domains_json else [],
+                    "threat_score": {"score": row.threat_score, "severity": row.severity}
+                }
+                if row.indicators_json:
+                    try:
+                        ind = json.loads(row.indicators_json)
+                        candidate_data["ips"] = ind.get("ips", [])
+                        candidate_data["urls"] = ind.get("urls", [])
+                    except Exception:
+                        pass
+
+            cand_profile = self.extract_profile_from_email_dict(candidate_data)
+            score, shared_inds, match_signals = self.compare_profiles(email_profile, cand_profile)
+
+            # Accept if meets min_score or shares at least 1 concrete IOC
+            if score >= min_score or (shared_inds and len(shared_inds) > 0):
+                if score > highest_score:
+                    highest_score = score
+
+                summary_str = self.generate_shared_evidence_summary(shared_inds)
+                rel_label = self.get_relationship_label(score)
+
+                fname = candidate_data.get("original_filename") or f"{row.evidence_id or 'email'}.eml"
+                if not fname.endswith(".eml"):
+                    fname = f"{fname}.eml"
+
+                correlated_emails.append(
+                    CorrelatedIngestedEmail(
+                        id=cand_id,
+                        evidence_id=row.evidence_id,
+                        sha256=row.email_sha256,
+                        original_filename=fname,
+                        subject=row.subject or "Untitled Email",
+                        sender=row.sender or "unknown",
+                        threat_score=float(row.threat_score or 0.0),
+                        severity=row.severity or "low",
+                        timestamp=row.analyzed_at.isoformat() if row.analyzed_at else "",
+                        similarity_score=score,
+                        similarity_percentage=max(5, round(score * 100)),
+                        relationship_label=rel_label,
+                        shared_evidence_summary=summary_str,
+                        shared_indicators=shared_inds
+                    )
+                )
+
+                for ind in shared_inds:
+                    key = (ind.type, ind.value)
+                    if key not in seen_indicators:
+                        seen_indicators.add(key)
+                        all_shared_indicators.append(ind)
+
+        correlated_emails.sort(key=lambda x: x.similarity_score, reverse=True)
+        correlated_emails = correlated_emails[:limit]
+
         top_label = self.get_relationship_label(highest_score) if highest_score > 0 else "Inconclusive / No significant relationship"
 
         return CampaignCorrelationResponse(
             related_cases=related_cases,
+            correlated_emails=correlated_emails,
             correlation_score=highest_score,
             relationship_label=top_label,
             shared_indicators=all_shared_indicators

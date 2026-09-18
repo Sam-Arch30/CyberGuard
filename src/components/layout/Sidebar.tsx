@@ -109,7 +109,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'INTAKE'
     },
     {
-      name: 'Triage Queue',
+      name: 'Ingested .EML History',
       path: '/history',
       icon: Clock,
       badge: undefined

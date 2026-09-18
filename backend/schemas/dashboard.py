@@ -60,6 +60,8 @@ class DashboardEmailItem(BaseModel):
     threat_score: float
     severity: str
     timestamp: str
+    has_eml_file: bool = True
+    original_filename: Optional[str] = None
 
 
 class DashboardSummaryResponse(BaseModel):

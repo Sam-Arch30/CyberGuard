@@ -1,7 +1,8 @@
 import asyncio
 import json
+import re
 from typing import Optional
-from fastapi import APIRouter, File, UploadFile, HTTPException, Header, Depends, status
+from fastapi import APIRouter, File, UploadFile, HTTPException, Header, Depends, status, Response
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 
@@ -211,6 +212,18 @@ async def analyze_email(
         uploader=uploader_identity
     )
 
+    # Persist authentic raw .eml bytes to disk storage
+    try:
+        from backend.services.eml_storage_service import EMLStorageService
+        EMLStorageService.save_eml(
+            evidence_id=evidence_record.evidence_id,
+            sha256=raw_sha256,
+            original_filename=safe_filename,
+            content_bytes=content_bytes
+        )
+    except Exception:
+        pass
+
     # Log EMAIL_UPLOADED audit event
     AuditService.log_audit(
         db=db,
@@ -417,6 +430,19 @@ async def analyze_email(
             else:
                 existing_payload.analysis_json = payload_json
             db.commit()
+
+            # Register with dynamic Campaign Service and Cross-Email Inverted Index
+            try:
+                from backend.services.campaign_service import CampaignService
+                analysis_dict = json.loads(payload_json)
+                CampaignService.register_new_ingested_email(
+                    db=db,
+                    evidence_id=evidence_record.evidence_id,
+                    email_sha256=raw_sha256,
+                    analysis_dict=analysis_dict
+                )
+            except Exception:
+                pass
         except Exception:
             db.rollback()
 
@@ -459,4 +485,78 @@ def get_email_investigation_timeline(
     db: Session = Depends(get_db)
 ):
     return AuditService.get_timeline(db, identifier=sha256)
+
+
+@router.get(
+    "/{id}/download",
+    summary="Download original raw .eml file",
+    description="Streams the authentic, cryptographically verified .eml file stored during ingestion."
+)
+def download_eml_file(
+    id: str,
+    db: Session = Depends(get_db)
+):
+    from backend.services.eml_storage_service import EMLStorageService
+    from backend.db.models import EvidenceModel, EmailAnalysisModel
+
+    clean_id = id.strip()
+    EMLStorageService.ensure_all_evidence_stored(db)
+
+    eml_path = EMLStorageService.get_eml_path(clean_id)
+    if not eml_path or not eml_path.exists():
+        raise HTTPException(status_code=404, detail=f"No stored .eml file found for '{clean_id}'.")
+
+    # Determine original filename
+    filename = f"{clean_id}.eml"
+    evd = db.query(EvidenceModel).filter(
+        (EvidenceModel.evidence_id == clean_id) | (EvidenceModel.sha256 == clean_id)
+    ).first()
+    if evd and evd.original_filename:
+        filename = evd.original_filename if evd.original_filename.endswith(".eml") else f"{evd.original_filename}.eml"
+    else:
+        ea = db.query(EmailAnalysisModel).filter(
+            (EmailAnalysisModel.evidence_id == clean_id) | (EmailAnalysisModel.id == clean_id)
+        ).first()
+        if ea and ea.subject:
+            safe_sub = re.sub(r'[^a-zA-Z0-9_\-]', '_', ea.subject)[:32]
+            filename = f"{safe_sub}.eml"
+
+    content_bytes = EMLStorageService.get_eml_bytes(clean_id)
+    return Response(
+        content=content_bytes,
+        media_type="message/rfc822",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "X-Evidence-ID": clean_id
+        }
+    )
+
+
+@router.get(
+    "/{id}/raw-eml",
+    summary="Get raw RFC-822 plain text content",
+    description="Returns the unparsed RFC-822 raw email string."
+)
+def get_raw_eml_text(
+    id: str,
+    db: Session = Depends(get_db)
+):
+    from backend.services.eml_storage_service import EMLStorageService
+    EMLStorageService.ensure_all_evidence_stored(db)
+    text = EMLStorageService.get_eml_text(id)
+    if not text:
+        raise HTTPException(status_code=404, detail=f"Raw .eml text unavailable for '{id}'.")
+    return Response(content=text, media_type="text/plain; charset=utf-8")
+
+
+@router.get(
+    "/stored-emls/inventory",
+    summary="List all stored raw .eml files on disk",
+    description="Returns filesystem inventory of preserved .eml evidence files."
+)
+def list_stored_emls_endpoint(db: Session = Depends(get_db)):
+    from backend.services.eml_storage_service import EMLStorageService
+    EMLStorageService.ensure_all_evidence_stored(db)
+    return EMLStorageService.list_stored_emls()
+
 

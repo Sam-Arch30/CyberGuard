@@ -15,7 +15,9 @@ import {
   Search,
   FolderLock,
   Layers,
-  X
+  X,
+  Download,
+  Network
 } from 'lucide-react';
 import type { DashboardSummary } from '../types/dashboard';
 import type { EmailAnalysis } from '../types/forensic';
@@ -29,6 +31,8 @@ import {
 
 interface RecentRowItem {
   id: string;
+  evidenceId?: string;
+  originalFilename?: string;
   subject: string;
   sender: string;
   timestamp?: string;
@@ -114,6 +118,8 @@ export const Dashboard: React.FC = () => {
             if (!rowsMap.has(be.id)) {
               rowsMap.set(be.id, {
                 id: be.id,
+                evidenceId: be.evidence_id || be.id,
+                originalFilename: be.original_filename || `${be.evidence_id || be.id}.eml`,
                 subject: be.subject || 'Incident Target EML',
                 sender: be.sender || 'Unknown',
                 timestamp: be.timestamp,
@@ -622,6 +628,33 @@ export const Dashboard: React.FC = () => {
                         </span>
                       )}
 
+                      {/* Quick Actions: Correlate & Download .EML */}
+                      <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate(`/investigate/${encodeURIComponent(row.evidenceId || row.id)}/investigation?subtab=campaigns`);
+                          }}
+                          className="p-1 rounded bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-primary transition-colors cursor-pointer"
+                          title="Correlate this .EML across Campaigns & Cases"
+                        >
+                          <Network className="w-3 h-3 text-primary" />
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            window.open(`http://localhost:8000/api/emails/${encodeURIComponent(row.evidenceId || row.id)}/download`, '_blank');
+                          }}
+                          className="p-1 rounded bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-primary transition-colors cursor-pointer"
+                          title="Download Stored RFC-822 .EML File"
+                        >
+                          <Download className="w-3 h-3 text-primary" />
+                        </button>
+                      </div>
+
                       {/* Open Action Arrow */}
                       <span className="text-foreground-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all">
                         <ArrowRight className="w-3.5 h-3.5" />
@@ -641,7 +674,7 @@ export const Dashboard: React.FC = () => {
               onClick={() => navigate('/history')}
               className="text-xs font-mono text-foreground-muted hover:text-primary flex items-center space-x-1 transition-colors cursor-pointer"
             >
-              <span>View complete queue in Triage History</span>
+              <span>View complete queue in Ingested .EML History</span>
               <ArrowRight className="w-3 h-3" />
             </button>
           </div>

@@ -33,6 +33,8 @@ ENV/
 *.sqlite3
 backend/data/*.db
 backend/data/reports/
+backend/data/eml_store/*.eml
+!backend/data/eml_store/.gitkeep
 
 # Editor directories and files
 .vscode/*

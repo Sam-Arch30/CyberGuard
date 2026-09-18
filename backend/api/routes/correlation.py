@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from backend.db.session import get_db
 from backend.db.models import CaseModel, CaseEmailModel, CampaignModel, CampaignEmailModel
 from backend.services.campaign_correlator import CampaignCorrelator
+from backend.services.campaign_service import CampaignService
 from backend.services.graph_service import global_graph_service
 from backend.schemas.correlation import (
     CampaignCorrelationResponse,
@@ -29,6 +30,7 @@ correlator = CampaignCorrelator()
 # -----------------------------------------------------------------------------
 def _load_campaign_details_from_db(db: Session) -> List[CampaignDetailResponse]:
     """Loads all real persisted campaigns from database."""
+    CampaignService.ensure_campaigns_initialized(db)
     db_campaigns = db.query(CampaignModel).all()
     results: List[CampaignDetailResponse] = []
     for db_c in db_campaigns:
@@ -88,6 +90,7 @@ def list_campaigns_endpoint(
     min_confidence: Optional[float] = Query(None, ge=0.0, le=100.0, description="Minimum confidence percentage"),
     db: Session = Depends(get_db)
 ):
+    CampaignService.ensure_campaigns_initialized(db)
     # Retrieve from database if populated
     db_campaigns = db.query(CampaignModel).all()
     results: List[CampaignClusterItem] = []
@@ -144,6 +147,7 @@ def get_campaign_detail_endpoint(
     campaign_id: str = Path(..., description="Campaign ID (e.g. C-042)"),
     db: Session = Depends(get_db)
 ):
+    CampaignService.ensure_campaigns_initialized(db)
     clean_id = campaign_id.upper().strip()
     db_c = db.query(CampaignModel).filter(CampaignModel.campaign_id == clean_id).first()
 

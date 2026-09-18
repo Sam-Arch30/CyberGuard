@@ -29,7 +29,8 @@ import {
   Layers,
   Network,
   Globe,
-  Radio
+  Radio,
+  Download
 } from 'lucide-react';
 import { saveAnalysisResult, getAllAvailableAnalyses } from '../utils/forensicStore';
 import { resolveEmailIndicators } from '../utils/indicatorHelper';
@@ -442,6 +443,17 @@ export const InvestigationHistory: React.FC = () => {
     });
   };
 
+  /* ── Download Stored .EML File ─── */
+  const handleDownloadEml = (id: string, _filename?: string) => {
+    const cleanId = encodeURIComponent(id);
+    window.open(`http://localhost:8000/api/emails/${cleanId}/download`, '_blank');
+  };
+
+  /* ── Correlate Ingested Email across Campaigns ─── */
+  const handleCorrelate = (evidenceId: string) => {
+    navigate(`/investigate/${encodeURIComponent(evidenceId)}/investigation?subtab=campaigns`);
+  };
+
   /* ── Add to Case ─── */
   const handleAddToCase = (run: AnalysisRunItem) => {
     if (run.fullAnalysis) {
@@ -490,13 +502,13 @@ export const InvestigationHistory: React.FC = () => {
           <div className="space-y-1">
             <div className="flex items-center space-x-2 text-primary font-mono text-xs font-bold uppercase tracking-wider">
               <History className="w-4 h-4" />
-              <span>FORENSIC EVIDENCE & INVESTIGATION ARCHIVE</span>
+              <span>INGESTED .EML STORE & EVIDENCE REPOSITORY</span>
             </div>
             <h1 className="text-2xl font-bold text-foreground font-sans tracking-tight">
-              Analysis History & Evidence Hierarchy
+              Ingested .EML History & Triage Queue
             </h1>
             <p className="text-xs text-foreground-muted font-mono max-w-2xl leading-relaxed">
-              Canonical hierarchy of ingested emails, cryptographic SHA-256 evidence identities, and iterative analysis runs stored in the persistent database.
+              Canonical repository of ingested .EML files, cryptographic SHA-256 evidence records, and iterative forensic analyses stored in the system for campaign correlation and investigation triage.
             </p>
           </div>
 
@@ -760,21 +772,44 @@ export const InvestigationHistory: React.FC = () => {
                         </span>
                       </div>
 
-                      {/* 1-Click Reopen Latest Run in Unified Workspace */}
+                      {/* Action buttons */}
                       {group.runs[0] && (
-                        <button
-                          type="button"
-                          onClick={() => openAnalysis(group.runs[0])}
-                          disabled={openingId === group.runs[0].id}
-                          className="px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
-                        >
-                          {openingId === group.runs[0].id ? (
-                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                          ) : (
-                            <ExternalLink className="w-3.5 h-3.5" />
-                          )}
-                          <span>Reopen in Workspace</span>
-                        </button>
+                        <div className="flex items-center space-x-2">
+                          <button
+                            type="button"
+                            onClick={() => handleCorrelate(group.runs[0].evidence_id || group.runs[0].id)}
+                            className="px-3 py-2 rounded-xl bg-surface-secondary border border-border hover:border-primary/40 text-foreground hover:text-primary text-xs font-mono font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
+                            title="Correlate this .EML across Campaigns & Cases"
+                          >
+                            <Network className="w-3.5 h-3.5 text-primary" />
+                            <span className="hidden sm:inline">Correlate</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadEml(group.runs[0].evidence_id || group.runs[0].id, group.originalFilename)}
+                            className="px-3 py-2 rounded-xl bg-surface-secondary border border-border hover:border-primary/40 text-foreground hover:text-primary text-xs font-mono font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
+                            title="Download Stored RFC-822 .EML Evidence File"
+                          >
+                            <Download className="w-3.5 h-3.5 text-primary" />
+                            <span className="hidden sm:inline">.EML</span>
+                          </button>
+
+                          {/* 1-Click Reopen Latest Run in Unified Workspace */}
+                          <button
+                            type="button"
+                            onClick={() => openAnalysis(group.runs[0])}
+                            disabled={openingId === group.runs[0].id}
+                            className="px-3.5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
+                          >
+                            {openingId === group.runs[0].id ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            )}
+                            <span>Reopen</span>
+                          </button>
+                        </div>
                       )}
                     </div>
                   </div>
@@ -902,6 +937,26 @@ export const InvestigationHistory: React.FC = () => {
                                     title="Add to Investigation Case"
                                   >
                                     <Briefcase className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Correlate */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleCorrelate(run.evidence_id || run.id)}
+                                    className="p-1.5 rounded-lg bg-surface border border-border hover:text-primary text-foreground-muted transition-colors cursor-pointer"
+                                    title="Correlate this Run across Campaigns"
+                                  >
+                                    <Network className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  {/* Download .EML */}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDownloadEml(run.evidence_id || run.id, group.originalFilename)}
+                                    className="p-1.5 rounded-lg bg-surface border border-border hover:text-primary text-foreground-muted transition-colors cursor-pointer"
+                                    title="Download Stored RFC-822 .EML Evidence"
+                                  >
+                                    <Download className="w-3.5 h-3.5" />
                                   </button>
 
                                   {/* Reopen this specific run */}
