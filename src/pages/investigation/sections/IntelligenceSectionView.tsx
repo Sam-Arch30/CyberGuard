@@ -1,46 +1,74 @@
 import React, { useState } from 'react';
 import {
-  Globe2,
   Server,
+  Globe,
   MapPin,
-  Network,
   Search,
-  Loader2
+  Loader2,
+  Layers,
+  ArrowRight
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import { useInvestigation } from '../../../context/InvestigationContext';
-import { IPIntelligenceSection } from '../../../components/forensic/IPIntelligenceSection';
-import { DomainIntelligenceSection } from '../../../components/forensic/DomainIntelligenceSection';
-import { InvestigationMapTab } from '../../../components/forensic/InvestigationMapTab';
-import { InfrastructureAttributionSection } from '../../../components/forensic/InfrastructureAttributionSection';
-import { resolveAttribution } from '../../../utils/indicatorHelper';
+import {
+  IntelligenceSummaryCard,
+  InfrastructureIPSection,
+  DomainRelationshipsSection,
+  GeographicSummarySection
+} from '../../../components/forensic/intelligence';
 
 interface IntelligenceSectionViewProps {
   email: EmailAnalysis;
 }
 
-type IntelligenceSubTab = 'ip_intel' | 'domain_intel' | 'map' | 'attribution' | 'osint';
+type IntelligenceFilterGroup = 'all' | 'infrastructure' | 'domains' | 'geography' | 'osint';
 
 export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = ({ email }) => {
-  const { subTabs, setSubTab, focusGraphNode, stepGuidance } = useInvestigation();
-  const currentSubTab = (subTabs.intelligence || 'ip_intel') as IntelligenceSubTab;
+  const { subTabs, setSubTab, stepGuidance } = useInvestigation();
+  
+  // Normalize legacy sub-tab keys to the 3 primary groups
+  const rawSubTab = (subTabs.intelligence || 'all').toLowerCase();
+  const currentSubTab: IntelligenceFilterGroup = 
+    rawSubTab === 'ip_intel' || rawSubTab === 'attribution'
+      ? 'infrastructure'
+      : rawSubTab === 'domain_intel'
+      ? 'domains'
+      : rawSubTab === 'map'
+      ? 'geography'
+      : (['all', 'infrastructure', 'domains', 'geography', 'osint'].includes(rawSubTab)
+          ? (rawSubTab as IntelligenceFilterGroup)
+          : 'all');
 
-  // OSINT query state
+  // Cross-entity linkage states
+  const [selectedIpForDrawer, setSelectedIpForDrawer] = useState<string | null>(null);
+  const [selectedDomainForFocus, setSelectedDomainForFocus] = useState<string | null>(null);
+
+  // OSINT on-demand lookup state
   const [queryInput, setQueryInput] = useState('');
   const [isQuerying, setIsQuerying] = useState(false);
   const [queryResult, setQueryResult] = useState<any>(null);
   const [queryError, setQueryError] = useState<string | null>(null);
 
+  // Counts for tabs
   const ipCount = (email.ips?.length || 0) + (email.indicators?.ips?.length || 0);
   const domainCount = (email.domains?.length || 0) + (email.indicators?.domains?.length || 0);
 
-  const subTabItems: { id: IntelligenceSubTab; label: string; icon: React.FC<{ className?: string }>; count?: number }[] = [
-    { id: 'ip_intel', label: 'IP Intelligence', icon: Server, count: ipCount },
-    { id: 'domain_intel', label: 'Domain & DNS Intelligence', icon: Globe2, count: domainCount },
-    { id: 'map', label: 'Geolocation & GeoTrace Map', icon: MapPin },
-    { id: 'attribution', label: 'Infrastructure Attribution', icon: Network },
+  const subTabItems: { id: IntelligenceFilterGroup; label: string; icon: React.FC<{ className?: string }>; count?: number }[] = [
+    { id: 'all', label: 'All Groups', icon: Layers },
+    { id: 'infrastructure', label: 'Infrastructure', icon: Server, count: ipCount },
+    { id: 'domains', label: 'Domains', icon: Globe, count: domainCount },
+    { id: 'geography', label: 'Geography', icon: MapPin },
     { id: 'osint', label: 'OSINT Query Console', icon: Search }
   ];
+
+  const handleSelectGroup = (group: 'infrastructure' | 'domains' | 'geography') => {
+    setSubTab(group);
+    // Smooth scroll to group if in 'all' view
+    const el = document.getElementById(`group-${group}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
 
   const handleRunOSINT = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,126 +95,111 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
     }
   };
 
-  const attribution = email.attribution || resolveAttribution(email);
-
   return (
     <div className="space-y-6">
-      {/* 1. CONTEXTUAL SUB-NAVIGATION */}
-      <div className="bg-surface rounded-xl border border-border p-1.5 flex flex-wrap items-center gap-1 shadow-xs">
-        {subTabItems.map((tab) => {
-          const isActive = currentSubTab === tab.id;
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSubTab(tab.id)}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-              {typeof tab.count === 'number' && tab.count > 0 && (
-                <span
-                  className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                    isActive ? 'bg-black/20 text-white' : 'bg-surface-secondary text-foreground-subtle border border-border'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* 1. SUB-NAVIGATION FILTER BAR */}
+      <div className="bg-surface rounded-xl border border-border p-1.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1">
+          {subTabItems.map((tab) => {
+            const isActive = currentSubTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSubTab(tab.id)}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+                {typeof tab.count === 'number' && tab.count > 0 && (
+                  <span
+                    className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                      isActive ? 'bg-black/20 text-white' : 'bg-surface-secondary text-foreground-subtle border border-border'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="hidden sm:flex items-center space-x-2 text-[11px] font-mono text-foreground-muted pr-2">
+          <span>Infrastructure Investigation Workspace</span>
+        </div>
       </div>
 
-      {/* 2. SUB-TAB VIEW CONTAINER */}
-      <div className="bg-surface rounded-xl border border-border p-5 shadow-xs">
-        {/* IP Intelligence */}
-        {currentSubTab === 'ip_intel' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <Server className="w-4 h-4 text-primary" />
-                <span>Internet Protocol (IP) Intelligence & Telemetry</span>
-              </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                Bogon check, ISP/ASN ownership, proxy detection & reputation
-              </span>
-            </div>
-            <IPIntelligenceSection email={email} />
-          </div>
-        )}
+      {/* 2. TOP TRIAGE SUMMARY CARD */}
+      <IntelligenceSummaryCard
+        email={email}
+        onSelectGroup={handleSelectGroup}
+      />
 
-        {/* Domain Intelligence */}
-        {currentSubTab === 'domain_intel' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <Globe2 className="w-4 h-4 text-primary" />
-                <span>Domain WHOIS, DNS Records & Registration Age</span>
-              </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                A, MX, NS, TXT record resolution & newly registered domain warnings
-              </span>
-            </div>
-            <DomainIntelligenceSection email={email} />
-          </div>
-        )}
-
-        {/* Geolocation & Map */}
-        {currentSubTab === 'map' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <MapPin className="w-4 h-4 text-primary" />
-                <span>Geographic Route Trace & Infrastructure Map</span>
-              </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                Physical transit hops, origin country coordinates & Leaflet trajectory
-              </span>
-            </div>
-            <InvestigationMapTab email={email} />
-          </div>
-        )}
-
-        {/* Infrastructure Attribution */}
-        {currentSubTab === 'attribution' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <Network className="w-4 h-4 text-primary" />
-                <span>Hostile Infrastructure Attribution Engine</span>
-              </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                Autonomous System (ASN) clustering, subnet CIDRs & threat actor correlation
-              </span>
-            </div>
-            <InfrastructureAttributionSection
-              attribution={attribution}
-              conclusions={email.forensic_conclusions}
-              onFocusGraphNode={focusGraphNode}
+      {/* 3. PRIMARY GROUPS CONTAINER */}
+      <div className="space-y-6">
+        {/* GROUP 1: INFRASTRUCTURE */}
+        {(currentSubTab === 'all' || currentSubTab === 'infrastructure') && (
+          <div id="group-infrastructure" className="bg-surface rounded-xl border border-border p-5 shadow-xs">
+            <InfrastructureIPSection
+              email={email}
+              selectedIpExternal={selectedIpForDrawer}
+              onClearSelectedIp={() => setSelectedIpForDrawer(null)}
+              onSelectDomain={(domain) => {
+                setSelectedDomainForFocus(domain);
+                handleSelectGroup('domains');
+              }}
             />
           </div>
         )}
 
-        {/* OSINT Query Console */}
+        {/* GROUP 2: DOMAINS */}
+        {(currentSubTab === 'all' || currentSubTab === 'domains') && (
+          <div id="group-domains" className="bg-surface rounded-xl border border-border p-5 shadow-xs">
+            <DomainRelationshipsSection
+              email={email}
+              selectedDomainExternal={selectedDomainForFocus}
+              onClearSelectedDomain={() => setSelectedDomainForFocus(null)}
+              onSelectIp={(ip) => {
+                setSelectedIpForDrawer(ip);
+                handleSelectGroup('infrastructure');
+              }}
+            />
+          </div>
+        )}
+
+        {/* GROUP 3: GEOGRAPHY */}
+        {(currentSubTab === 'all' || currentSubTab === 'geography') && (
+          <div id="group-geography" className="bg-surface rounded-xl border border-border p-5 shadow-xs">
+            <GeographicSummarySection
+              email={email}
+              onSelectIp={(ip) => {
+                setSelectedIpForDrawer(ip);
+                handleSelectGroup('infrastructure');
+              }}
+            />
+          </div>
+        )}
+
+        {/* ACCESSORY TOOL: OSINT QUERY CONSOLE */}
         {currentSubTab === 'osint' && (
-          <div className="space-y-5">
+          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
                 <Search className="w-4 h-4 text-primary" />
                 <span>On-Demand OSINT Threat Intelligence Query Console</span>
               </div>
               <span className="text-[11px] font-mono text-foreground-muted">
-                Query external threat feeds, WHOIS databases & DNS records
+                Direct lookup against external RDAP, WHOIS, and DNS resolvers
               </span>
             </div>
 
-            {/* Query Input Bar */}
+            {/* Query Form */}
             <form onSubmit={handleRunOSINT} className="flex gap-2">
               <div className="relative flex-1">
                 <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -194,7 +207,7 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
                   type="text"
                   value={queryInput}
                   onChange={(e) => setQueryInput(e.target.value)}
-                  placeholder="Enter IP address (e.g., 203.0.113.88) or Domain (e.g., secure-update.com)..."
+                  placeholder="Enter IP address (e.g. 198.51.100.22) or domain (e.g. micros0ft-support.example)..."
                   className="w-full pl-9 pr-3 py-2 bg-surface-secondary border border-border rounded-lg text-xs font-mono text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary"
                 />
               </div>
@@ -208,16 +221,16 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
               </button>
             </form>
 
-            {/* Quick Pivot Buttons from Current Email */}
+            {/* Quick Pivot Chips */}
             <div className="flex flex-wrap items-center gap-2 text-xs font-mono text-foreground-muted">
-              <span>Quick Pivot:</span>
-              {attribution?.probable_origin_ip && (
+              <span>Quick Pivots:</span>
+              {email.relay_analysis?.earliest_observable_node?.earliest_observable_ip && (
                 <button
                   type="button"
-                  onClick={() => setQueryInput(attribution.probable_origin_ip!)}
+                  onClick={() => setQueryInput(email.relay_analysis!.earliest_observable_node!.earliest_observable_ip!)}
                   className="px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface border border-border text-primary cursor-pointer"
                 >
-                  Origin IP: {attribution.probable_origin_ip}
+                  Origin IP: {email.relay_analysis.earliest_observable_node.earliest_observable_ip}
                 </button>
               )}
               {email.authentication?.alignment?.from_domain && (
@@ -231,7 +244,7 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
               )}
             </div>
 
-            {/* Query Results Display */}
+            {/* Query Results */}
             {queryError && (
               <div className="p-3.5 rounded-lg bg-danger/10 border border-danger/30 text-danger text-xs font-mono">
                 {queryError}
@@ -242,7 +255,7 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
               <div className="p-4 rounded-lg bg-surface-secondary border border-border space-y-3 font-mono text-xs">
                 <div className="flex items-center justify-between border-b border-border pb-2">
                   <span className="font-bold text-foreground">Query Result: {queryInput}</span>
-                  <span className="text-[10px] text-success">Verified Live Lookup</span>
+                  <span className="text-[10px] text-success">Live External Lookup Verified</span>
                 </div>
                 <pre className="p-3 bg-surface rounded border border-border text-[11px] overflow-x-auto text-foreground max-h-72">
                   {JSON.stringify(queryResult, null, 2)}
@@ -253,7 +266,7 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
         )}
       </div>
 
-      {/* 3. NEXT INVESTIGATION STEP CTA */}
+      {/* 4. NEXT INVESTIGATION STEP CTA */}
       <div className="p-4 rounded-xl bg-surface border border-border flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
         <div className="flex items-center space-x-3">
           <div className="w-8 h-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold font-mono text-xs border border-primary/20">
@@ -261,10 +274,10 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
           </div>
           <div>
             <h4 className="text-xs font-bold text-foreground font-sans">
-              Completed Threat Intelligence Correlation?
+              Completed Infrastructure Intelligence Investigation?
             </h4>
             <p className="text-xs font-mono text-foreground-muted">
-              Open the interactive investigation graph, identify campaign clusters, compare related emails, and query the copilot.
+              Pivot into the interactive knowledge graph, uncover campaign correlation clusters, and engage the AI copilot.
             </p>
           </div>
         </div>
@@ -275,6 +288,7 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
           className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-bold flex items-center justify-center space-x-2 transition-all shadow-xs cursor-pointer"
         >
           <span>{stepGuidance.buttonLabel}</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
     </div>

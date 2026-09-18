@@ -52,8 +52,8 @@ export const INVESTIGATION_SECTIONS: SectionMetadata[] = [
     number: '04',
     label: 'Intelligence',
     shortLabel: 'Intelligence',
-    description: 'IP & domain intelligence, WHOIS, DNS, map & infrastructure',
-    defaultSubTab: 'ip_intel'
+    description: 'Infrastructure, domains, WHOIS, DNS & geographic telemetry',
+    defaultSubTab: 'all'
   },
   {
     id: 'investigation',
@@ -137,7 +137,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     overview: 'executive',
     email: 'body',
     analysis: 'scoring',
-    intelligence: 'ip_intel',
+    intelligence: 'all',
     investigation: 'graph',
     report: 'generate'
   });
