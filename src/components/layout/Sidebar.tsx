@@ -48,7 +48,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       step: '01',
       id: 'overview',
       name: 'Overview',
-      path: `/investigate/${activeEmailId}/overview`,
+      path: activeEmailId ? `/investigate/${activeEmailId}/overview` : '/overview',
       matchPrefixes: ['/overview', `/investigate/${activeEmailId}/overview`, '/investigate/overview'],
       icon: Compass,
       description: 'Threat score & major findings'
@@ -57,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       step: '02',
       id: 'email',
       name: 'Email',
-      path: `/investigate/${activeEmailId}/email`,
+      path: activeEmailId ? `/investigate/${activeEmailId}/email` : '/email',
       matchPrefixes: ['/email', `/investigate/${activeEmailId}/email`, '/investigate/email'],
       icon: FileText,
       description: 'Headers, auth & relay trace'
@@ -66,7 +66,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       step: '03',
       id: 'analysis',
       name: 'Analysis',
-      path: `/investigate/${activeEmailId}/analysis`,
+      path: activeEmailId ? `/investigate/${activeEmailId}/analysis` : '/analysis',
       matchPrefixes: ['/analysis', `/investigate/${activeEmailId}/analysis`, '/investigate/analysis'],
       icon: Cpu,
       description: 'IOCs, URLs, lookalikes & NLP'
@@ -75,7 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       step: '04',
       id: 'intelligence',
       name: 'Intelligence',
-      path: `/investigate/${activeEmailId}/intelligence`,
+      path: activeEmailId ? `/investigate/${activeEmailId}/intelligence` : '/intelligence',
       matchPrefixes: ['/intelligence', `/investigate/${activeEmailId}/intelligence`, '/investigate/intelligence'],
       icon: Globe2,
       description: 'IP & domain intel, map & ASN'
@@ -84,7 +84,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       step: '05',
       id: 'investigation',
       name: 'Investigation',
-      path: `/investigate/${activeEmailId}/investigation`,
+      path: activeEmailId ? `/investigate/${activeEmailId}/investigation` : '/investigation',
       matchPrefixes: ['/investigation', `/investigate/${activeEmailId}/investigation`, '/investigate/investigation', '/cross-investigation', '/campaigns'],
       icon: FolderLock,
       description: 'Graph, campaigns & copilot'
@@ -93,7 +93,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       step: '06',
       id: 'report',
       name: 'Report',
-      path: `/investigate/${activeEmailId}/report`,
+      path: activeEmailId ? `/investigate/${activeEmailId}/report` : '/report',
       matchPrefixes: ['/report', `/investigate/${activeEmailId}/report`, '/investigate/report', '/reports'],
       icon: FileCheck,
       description: 'Executive briefing & PDF export'
@@ -124,7 +124,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       name: 'Incident Cases',
       path: '/cases',
       icon: Briefcase,
-      badge: '3 Active'
+      badge: undefined
     },
     {
       name: 'Evaluation Benchmark',
@@ -165,7 +165,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       <div className="flex-1 overflow-y-auto">
         {/* Top Header Logo */}
         <div className="h-16 px-4 flex items-center justify-between border-b border-sidebar-border sticky top-0 bg-sidebar-bg/95 backdrop-blur-xs z-10">
-          <NavLink to={`/investigate/${activeEmailId}/overview`} className="flex items-center space-x-3 overflow-hidden group cursor-pointer">
+          <NavLink to={activeEmailId ? `/investigate/${activeEmailId}/overview` : '/'} className="flex items-center space-x-3 overflow-hidden group cursor-pointer">
             <div className="relative flex-shrink-0">
               <div className="w-8 h-8 rounded-control bg-surface border border-border flex items-center justify-center text-primary shadow-xs group-hover:border-primary/50 transition-colors">
                 <ShieldCheck className="w-4 h-4" />

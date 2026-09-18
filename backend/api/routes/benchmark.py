@@ -97,6 +97,18 @@ async def get_sih_demo_scenarios() -> Dict[str, Any]:
     }
 
 
+from pathlib import Path
+from fastapi import APIRouter, HTTPException, status, Depends
+from sqlalchemy.orm import Session
+from backend.db.session import get_db
+from backend.db.models import (
+    CaseEmailModel, CaseNoteModel, CaseFindingModel, CaseModel,
+    ReportModel, CampaignEmailModel, CampaignModel,
+    EmailAnalysisModel, EvidenceModel, AnalystDecisionModel,
+    CopilotAuditLogModel, AuditLogModel, AnalysisPayloadModel
+)
+
+
 @router.post("/demo-reset", summary="Restore synthetic demo state to clean defaults")
 async def reset_demo_state() -> Dict[str, Any]:
     """
@@ -119,4 +131,48 @@ async def reset_demo_state() -> Dict[str, Any]:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Demo reset error: {str(exc)}"
+        )
+
+
+@router.post("/workspace-reset", summary="Reset workspace and purge all ingested email data")
+@router.post("/clean-reset", summary="Reset workspace and purge all ingested email data")
+def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    """
+    Wipes all ingested emails, analysis records, cases, and temporary .eml files.
+    Returns database to pure zero-evidence clean state.
+    """
+    try:
+        from backend.db.session import engine
+        from sqlalchemy import text
+        with engine.begin() as conn:
+            for tbl in [
+                "case_emails", "case_notes", "case_findings", "reports",
+                "campaign_emails", "analyst_decisions", "evidence",
+                "analysis_payloads", "email_analyses", "cases", "campaigns",
+                "copilot_audit_logs", "audit_logs", "email_iocs",
+                "email_relationships", "analysis_runs", "emails", "iocs"
+            ]:
+                try:
+                    conn.execute(text(f"DELETE FROM {tbl};"))
+                except Exception:
+                    pass
+
+        eml_store_dir = Path(__file__).resolve().parent.parent.parent / "data" / "eml_store"
+        if eml_store_dir.exists():
+            for f in eml_store_dir.glob("*.eml"):
+                try:
+                    f.unlink()
+                except Exception:
+                    pass
+
+        return {
+            "status": "success",
+            "message": "Workspace successfully reset to clean state without any .eml file data."
+        }
+    except Exception as exc:
+        db.rollback()
+        logger.error(f"Failed to reset workspace: {exc}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Workspace reset error: {str(exc)}"
         )

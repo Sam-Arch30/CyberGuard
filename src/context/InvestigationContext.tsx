@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { EmailAnalysis } from '../types/forensic';
-import { getAnalysisResult, saveAnalysisResult, getAllAvailableAnalyses } from '../utils/forensicStore';
+import { getAnalysisResult, saveAnalysisResult, getAllAvailableAnalyses, resetDemoStore, clearForensicStore } from '../utils/forensicStore';
 import { resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHelper';
 import { resolveConfidenceConclusions } from '../utils/confidenceResolver';
 
@@ -99,6 +99,8 @@ interface InvestigationContextType {
   stepGuidance: StepGuidance;
   reloadActiveEmail: () => Promise<void>;
   reanalyzeActiveEmail: () => Promise<void>;
+  ingestEmail: (fileOrBlob: Blob, filename: string, rawText?: string) => Promise<EmailAnalysis>;
+  resetToCleanWorkspace: () => Promise<void>;
   // Contextual AI Copilot Drawer
   isCopilotDrawerOpen: boolean;
   copilotContextData: { prompt?: string; entity?: { type: string; identifier: string; details?: string } } | null;
@@ -109,27 +111,28 @@ interface InvestigationContextType {
 
 const InvestigationContext = createContext<InvestigationContextType | null>(null);
 
-const DEFAULT_EMAIL_ID = 'scenario-3-campaign';
 const LAST_INVESTIGATED_KEY = 'mailtrace_active_investigation_id';
 
 export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Determine active email ID
+  // Determine active email ID (strictly real investigations only)
   const [activeEmailId, setActiveEmailIdState] = useState<string>(() => {
     // Check URL first
     const pathParts = location.pathname.split('/').filter(Boolean);
     if (pathParts[0] === 'investigate' && pathParts[1] && !INVESTIGATION_SECTIONS.some(s => s.id === pathParts[1])) {
-      return pathParts[1];
+      return pathParts[1].startsWith('scenario-') ? '' : pathParts[1];
     }
     if (pathParts[0] === 'analysis' && pathParts[1]) {
-      return pathParts[1];
+      return pathParts[1].startsWith('scenario-') ? '' : pathParts[1];
     }
     // Check localStorage
     const saved = localStorage.getItem(LAST_INVESTIGATED_KEY);
-    if (saved) return saved;
-    return DEFAULT_EMAIL_ID;
+    if (saved && !saved.startsWith('scenario-') && !INVESTIGATION_SECTIONS.some(s => s.id === saved)) {
+      return saved;
+    }
+    return '';
   });
 
   const [activeEmail, setActiveEmail] = useState<EmailAnalysis | null>(null);
@@ -180,9 +183,9 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   const activeSection = determineActiveSection();
   const activeSubTab = subTabs[activeSection] || INVESTIGATION_SECTIONS.find(s => s.id === activeSection)?.defaultSubTab || 'overview';
 
-  // Load available analyses list
+  // Load available analyses list (strictly real analyses)
   const refreshAnalyses = useCallback(() => {
-    const items = getAllAvailableAnalyses(true);
+    const items = getAllAvailableAnalyses(false);
     setAvailableAnalyses(items);
   }, []);
 
@@ -195,13 +198,13 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     const pathParts = location.pathname.split('/').filter(Boolean);
     if (pathParts[0] === 'investigate') {
       if (pathParts[1] && !INVESTIGATION_SECTIONS.some(s => s.id === pathParts[1])) {
-        if (pathParts[1] !== activeEmailId) {
+        if (!pathParts[1].startsWith('scenario-') && pathParts[1] !== activeEmailId) {
           setActiveEmailIdState(pathParts[1]);
           localStorage.setItem(LAST_INVESTIGATED_KEY, pathParts[1]);
         }
       }
     } else if (pathParts[0] === 'analysis' && pathParts[1]) {
-      if (pathParts[1] !== activeEmailId) {
+      if (!pathParts[1].startsWith('scenario-') && pathParts[1] !== activeEmailId) {
         setActiveEmailIdState(pathParts[1]);
         localStorage.setItem(LAST_INVESTIGATED_KEY, pathParts[1]);
       }
@@ -209,176 +212,226 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   }, [location.pathname, activeEmailId]);
 
   // Load and enrich active email
-  const loadEmailData = useCallback(async (targetId: string) => {
+  const loadEmailData = useCallback(async (targetId?: string) => {
     setLoading(true);
     setError(null);
 
-    try {
-      let resolved = getAnalysisResult(targetId);
+    let effectiveId = (targetId || '').trim();
+    if (effectiveId.startsWith('scenario-')) {
+      effectiveId = '';
+    }
 
-      // Check all available analyses by ID, evidence_id, or SHA-256
-      if (!resolved && targetId) {
-        const all = getAllAvailableAnalyses(true);
-        const match = all.find(a =>
-          a.id === targetId ||
-          a.evidence_id === targetId ||
-          a.email_sha256 === targetId ||
-          (a.email_sha256 && a.email_sha256.startsWith(targetId))
-        );
-        if (match) {
-          resolved = match;
-        }
+    if (!effectiveId || INVESTIGATION_SECTIONS.some(s => s.id === effectiveId) || effectiveId === 'latest') {
+      const saved = localStorage.getItem(LAST_INVESTIGATED_KEY);
+      if (saved && !saved.startsWith('scenario-') && !INVESTIGATION_SECTIONS.some(s => s.id === saved)) {
+        effectiveId = saved;
+      } else {
+        effectiveId = '';
       }
+    }
 
-      // If not in local/demo store, try backend API
-      if (!resolved && targetId && targetId !== 'latest') {
-        const endpoints = [
-          `/api/emails/${targetId}/analysis`,
-          `http://127.0.0.1:8000/api/emails/${targetId}/analysis`
-        ];
-        for (const ep of endpoints) {
-          try {
-            const res = await fetch(ep);
-            if (res.ok) {
-              const apiData = await res.json();
-              resolved = resolveEmailIndicators(apiData);
-              saveAnalysisResult(targetId, resolved);
-              break;
+    try {
+      let resolved: EmailAnalysis | null = null;
+
+      // 1. If we have a specific candidate ID, check local real store and backend
+      if (effectiveId) {
+        resolved = getAnalysisResult(effectiveId);
+
+        if (!resolved) {
+          const all = getAllAvailableAnalyses(false);
+          const match = all.find(a =>
+            a.id === effectiveId ||
+            a.evidence_id === effectiveId ||
+            a.email_sha256 === effectiveId ||
+            (a.email_sha256 && a.email_sha256.startsWith(effectiveId))
+          );
+          if (match) {
+            resolved = match;
+          }
+        }
+
+        if (!resolved) {
+          const endpoints = [
+            `/api/emails/${effectiveId}/analysis`,
+            `http://127.0.0.1:8000/api/emails/${effectiveId}/analysis`
+          ];
+          for (const ep of endpoints) {
+            try {
+              const res = await fetch(ep);
+              if (res.ok) {
+                const apiData = await res.json();
+                resolved = resolveEmailIndicators(apiData);
+                saveAnalysisResult(effectiveId, resolved);
+                break;
+              }
+            } catch {
+              // Try next endpoint
             }
-          } catch {
-            // Try next endpoint
           }
         }
       }
 
-      // If still not found, fallback to default scenario
+      // 2. If no specific ID resolved, check for the MOST RECENT real ingested email
       if (!resolved) {
-        resolved = getAnalysisResult(DEFAULT_EMAIL_ID);
+        const localReal = getAllAvailableAnalyses(false);
+        if (localReal.length > 0) {
+          resolved = localReal[0];
+        } else {
+          // Check backend for latest analyzed email
+          const latestEndpoints = [
+            '/api/emails/latest/analysis',
+            'http://127.0.0.1:8000/api/emails/latest/analysis'
+          ];
+          for (const ep of latestEndpoints) {
+            try {
+              const res = await fetch(ep);
+              if (res.ok) {
+                const apiData = await res.json();
+                resolved = resolveEmailIndicators(apiData);
+                const k = resolved.evidence_id || resolved.id || 'latest';
+                saveAnalysisResult(k, resolved);
+                break;
+              }
+            } catch {
+              // Safe fallback
+            }
+          }
+        }
       }
 
-      if (!resolved) {
-        setError(`Unable to locate email analysis for ID: ${targetId}`);
+      // 3. If a real ingested email was found, activate it and initiate dynamic enrichments
+      if (resolved) {
+        if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
+          resolved.attribution = resolveAttribution(resolved);
+        }
+        if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
+          resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
+        }
+
+        const realId = resolved.evidence_id || resolved.id || 'email-analysis';
+        setActiveEmail(resolved);
+        setActiveEmailIdState(realId);
+        localStorage.setItem(LAST_INVESTIGATED_KEY, realId);
         setLoading(false);
-        return;
-      }
 
-      // Ensure attribution and conclusions exist
-      if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
-        resolved.attribution = resolveAttribution(resolved);
-      }
-      if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
-        resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
-      }
+        const currentTargetId = realId;
 
-      setActiveEmail(resolved);
-      setLoading(false);
+        // Dynamic asynchronous enrichments in background:
+        // 1. ML classification
+        const hasML = resolved.ml_phishing_probability !== undefined &&
+                      resolved.ml_phishing_probability !== null &&
+                      Boolean(resolved.ml_assessment);
+        if (!hasML) {
+          const textToAnalyze = resolved.plain_text_body || (resolved.html_body ? resolved.html_body.replace(/<[^>]+>/g, ' ') : '');
+          if (resolved.subject || textToAnalyze) {
+            fetch('/api/emails/ml-classify', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                subject: resolved.subject || '',
+                body: textToAnalyze || ''
+              })
+            })
+              .then(res => (res.ok ? res.json() : null))
+              .then(mlData => {
+                if (mlData && mlData.available) {
+                  setActiveEmail(prev => {
+                    if (!prev) return prev;
+                    const updated: EmailAnalysis = {
+                      ...prev,
+                      ml_phishing_probability: mlData.probability,
+                      ml_assessment: mlData
+                    };
+                    saveAnalysisResult(currentTargetId, updated);
+                    return updated;
+                  });
+                }
+              })
+              .catch(() => {});
+          }
+        }
 
-      // Dynamic asynchronous enrichments in background:
-      // 1. ML classification
-      const hasML = resolved.ml_phishing_probability !== undefined &&
-                    resolved.ml_phishing_probability !== null &&
-                    Boolean(resolved.ml_assessment);
-      if (!hasML) {
-        const textToAnalyze = resolved.plain_text_body || (resolved.html_body ? resolved.html_body.replace(/<[^>]+>/g, ' ') : '');
-        if (resolved.subject || textToAnalyze) {
-          fetch('/api/emails/ml-classify', {
+        // 2. AI Analyst
+        if (!resolved.ai_analyst) {
+          fetch('/api/emails/ai-analyst', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              subject: resolved.subject || '',
-              body: textToAnalyze || ''
-            })
+            body: JSON.stringify(resolved)
           })
             .then(res => (res.ok ? res.json() : null))
-            .then(mlData => {
-              if (mlData && mlData.available) {
+            .then(aiData => {
+              if (aiData) {
                 setActiveEmail(prev => {
                   if (!prev) return prev;
                   const updated: EmailAnalysis = {
                     ...prev,
-                    ml_phishing_probability: mlData.probability,
-                    ml_assessment: mlData
+                    ai_analyst: aiData
                   };
-                  saveAnalysisResult(targetId, updated);
+                  saveAnalysisResult(currentTargetId, updated);
                   return updated;
                 });
               }
             })
             .catch(() => {});
         }
+
+        // 3. Investigation Graph
+        if (!resolved.investigation_graph) {
+          fetch('/api/emails/investigation-graph', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resolved)
+          })
+            .then(res => (res.ok ? res.json() : null))
+            .then(graphData => {
+              if (graphData && graphData.nodes) {
+                setActiveEmail(prev => {
+                  if (!prev) return prev;
+                  const updated: EmailAnalysis = {
+                    ...prev,
+                    investigation_graph: graphData
+                  };
+                  saveAnalysisResult(currentTargetId, updated);
+                  return updated;
+                });
+              }
+            })
+            .catch(() => {});
+        }
+
+        // 4. Threat Score with audit metadata
+        if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
+          fetch('/api/emails/calculate-threat-score', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(resolved)
+          })
+            .then(res => (res.ok ? res.json() : null))
+            .then(scoreData => {
+              if (scoreData) {
+                setActiveEmail(prev => {
+                  if (!prev) return prev;
+                  const updated: EmailAnalysis = {
+                    ...prev,
+                    threat_score: scoreData
+                  };
+                  saveAnalysisResult(currentTargetId, updated);
+                  return updated;
+                });
+              }
+            })
+            .catch(() => {});
+        }
+
+        return;
       }
 
-      // 2. AI Analyst
-      if (!resolved.ai_analyst) {
-        fetch('/api/emails/ai-analyst', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(resolved)
-        })
-          .then(res => (res.ok ? res.json() : null))
-          .then(aiData => {
-            if (aiData) {
-              setActiveEmail(prev => {
-                if (!prev) return prev;
-                const updated: EmailAnalysis = {
-                  ...prev,
-                  ai_analyst: aiData
-                };
-                saveAnalysisResult(targetId, updated);
-                return updated;
-              });
-            }
-          })
-          .catch(() => {});
-      }
-
-      // 3. Investigation Graph
-      if (!resolved.investigation_graph) {
-        fetch('/api/emails/investigation-graph', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(resolved)
-        })
-          .then(res => (res.ok ? res.json() : null))
-          .then(graphData => {
-            if (graphData && graphData.nodes) {
-              setActiveEmail(prev => {
-                if (!prev) return prev;
-                const updated: EmailAnalysis = {
-                  ...prev,
-                  investigation_graph: graphData
-                };
-                saveAnalysisResult(targetId, updated);
-                return updated;
-              });
-            }
-          })
-          .catch(() => {});
-      }
-
-      // 4. Threat Score with audit metadata
-      if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
-        fetch('/api/emails/calculate-threat-score', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(resolved)
-        })
-          .then(res => (res.ok ? res.json() : null))
-          .then(scoreData => {
-            if (scoreData) {
-              setActiveEmail(prev => {
-                if (!prev) return prev;
-                const updated: EmailAnalysis = {
-                  ...prev,
-                  threat_score: scoreData
-                };
-                saveAnalysisResult(targetId, updated);
-                return updated;
-              });
-            }
-          })
-          .catch(() => {});
-      }
+      // 4. Clean empty state: No emails ingested yet
+      setActiveEmail(null);
+      setActiveEmailIdState('');
+      localStorage.removeItem(LAST_INVESTIGATED_KEY);
+      setError(null);
+      setLoading(false);
     } catch (err: any) {
       console.error('Error loading investigation email:', err);
       setError(err?.message || 'Failed to load analysis record');
@@ -515,6 +568,92 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsCopilotDrawerOpen(prev => !prev);
   }, []);
 
+  const resetToCleanWorkspace = useCallback(async () => {
+    setLoading(true);
+    try {
+      // 1. Backend database & file purge
+      try {
+        await fetch('/api/workspace/reset', { method: 'POST' });
+      } catch {
+        try {
+          await fetch('http://127.0.0.1:8000/api/workspace/reset', { method: 'POST' });
+        } catch {
+          // Ignore network error
+        }
+      }
+
+      // 2. Clear frontend forensic store & caches
+      clearForensicStore();
+      await resetDemoStore();
+
+      // 3. Clear active investigation and available analyses
+      setActiveEmail(null);
+      setActiveEmailIdState('');
+      setAvailableAnalyses([]);
+      setError(null);
+
+      // 4. Clear storage
+      localStorage.removeItem(LAST_INVESTIGATED_KEY);
+      sessionStorage.clear();
+
+      // 5. Navigate to clean root
+      navigate('/');
+    } catch (err) {
+      console.error('Error during workspace reset:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [navigate]);
+
+  const ingestEmail = useCallback(async (fileOrBlob: Blob, filename: string, rawText?: string): Promise<EmailAnalysis> => {
+    setLoading(true);
+    setError(null);
+    const analysisId = `analysis-${Date.now()}`;
+    const formData = new FormData();
+    formData.append('file', fileOrBlob, filename);
+
+    let res: Response | null = null;
+    try {
+      res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
+    } catch {
+      res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
+    }
+
+    if (!res || !res.ok) {
+      const errText = res ? await res.text() : 'Analysis service unreachable.';
+      setLoading(false);
+      throw new Error(`Forensic analysis failed: ${errText || 'Unprocessable email format'}`);
+    }
+
+    const data = await res.json();
+    const parsedAnalysis: EmailAnalysis = {
+      ...data,
+      id: analysisId,
+      evidence_id: data.evidence_id || (data.email_sha256 ? `EVD-${data.email_sha256.slice(0, 10).toUpperCase()}` : `EVD-${analysisId.slice(-8).toUpperCase()}`),
+      original_filename: data.original_filename || filename,
+      upload_timestamp: data.upload_timestamp || new Date().toISOString(),
+      raw_email: rawText || data.raw_email || '',
+    };
+
+    const resolved = resolveEmailIndicators(parsedAnalysis);
+    if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
+      resolved.attribution = resolveAttribution(resolved);
+    }
+    if (!resolved.forensic_conclusions || resolved.forensic_conclusions.length === 0) {
+      resolved.forensic_conclusions = resolveConfidenceConclusions(resolved);
+    }
+
+    saveAnalysisResult(analysisId, resolved);
+    const realId = resolved.evidence_id || analysisId;
+    setActiveEmail(resolved);
+    setActiveEmailIdState(realId);
+    localStorage.setItem(LAST_INVESTIGATED_KEY, realId);
+    refreshAnalyses();
+    setLoading(false);
+    navigate(`/investigate/${analysisId}/overview`);
+    return resolved;
+  }, [navigate, refreshAnalyses]);
+
   const stepGuidance = getStepGuidance();
 
   return (
@@ -537,6 +676,8 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         stepGuidance,
         reloadActiveEmail: () => loadEmailData(activeEmailId),
         reanalyzeActiveEmail,
+        ingestEmail,
+        resetToCleanWorkspace,
         isCopilotDrawerOpen,
         copilotContextData,
         openCopilotDrawer,

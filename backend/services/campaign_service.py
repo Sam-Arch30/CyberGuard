@@ -21,11 +21,7 @@ class CampaignService:
         Seeds baseline campaign C-042 and creates dynamic clusters from stored ingested emails
         if the campaigns table is empty or missing data.
         """
-        existing_count = db.query(CampaignModel).count()
-        if existing_count == 0:
-            cls._seed_baseline_c042(db)
-
-        # Cluster any existing ingested emails that aren't yet in any campaign
+        # Only cluster real ingested emails into campaigns
         cls.cluster_ingested_emails(db)
 
     @classmethod

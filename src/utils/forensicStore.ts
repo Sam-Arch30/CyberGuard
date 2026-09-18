@@ -192,3 +192,28 @@ export const resetDemoStore = async (): Promise<boolean> => {
     return false;
   }
 };
+
+export const clearForensicStore = (): void => {
+  memoryStore.clear();
+  try {
+    const toRemove: string[] = [];
+    for (let i = 0; i < sessionStorage.length; i++) {
+      const k = sessionStorage.key(i);
+      if (k && (k.startsWith(STORAGE_KEY_PREFIX) || k.includes('mailtrace') || k.includes('scenario-') || k.includes('DH-') || k.includes('sih_demo'))) {
+        toRemove.push(k);
+      }
+    }
+    toRemove.forEach(k => sessionStorage.removeItem(k));
+
+    const localToRemove: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(STORAGE_KEY_PREFIX) || k.includes('mailtrace') || k.includes('scenario-'))) {
+        localToRemove.push(k);
+      }
+    }
+    localToRemove.forEach(k => localStorage.removeItem(k));
+  } catch (e) {
+    console.warn('Error clearing forensicStore', e);
+  }
+};

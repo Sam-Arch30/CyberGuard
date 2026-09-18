@@ -71,6 +71,9 @@ app.include_router(copilot_router)
 app.include_router(benchmark_router)
 app.include_router(intelligence_router)
 
+from backend.api.routes.benchmark import reset_workspace_state
+app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])
+
 
 
 @app.exception_handler(Exception)

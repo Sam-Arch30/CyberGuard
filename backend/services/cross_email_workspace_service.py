@@ -658,6 +658,9 @@ class CrossEmailWorkspaceService:
             # In normal mode, strictly exclude synthetic records
             if cand_data.get("is_synthetic") and not is_demo_context:
                 continue
+            # In demo mode, only evaluate against the canonical 16 synthetic emails
+            if is_demo_context and not cand_data.get("is_synthetic"):
+                continue
 
             cand_profile = self.correlator.extract_profile_from_email_dict(cand_data)
             score, shared_inds, match_signals = self.correlator.compare_profiles(current_profile, cand_profile)

@@ -12,6 +12,8 @@ import { IntelligenceSectionView } from './sections/IntelligenceSectionView';
 import { InvestigationSectionView } from './sections/InvestigationSectionView';
 import { ReportSectionView } from './sections/ReportSectionView';
 
+import { CleanWorkspaceEmptyState } from './CleanWorkspaceEmptyState';
+
 export const InvestigationWorkspace: React.FC = () => {
   const {
     activeEmail,
@@ -24,21 +26,24 @@ export const InvestigationWorkspace: React.FC = () => {
   } = useInvestigation();
   const navigate = useNavigate();
 
-  if (loading && !activeEmail) {
-    return (
-      <LoadingState
-        message="Loading investigation telemetry..."
-        subtext="Reconstructing envelope provenance, hops, and indicators"
-        fullHeight
-      />
-    );
+  if (!activeEmail) {
+    if (loading) {
+      return (
+        <LoadingState
+          message="Checking forensic workspace..."
+          subtext="Verifying active email telemetry"
+          fullHeight
+        />
+      );
+    }
+    return <CleanWorkspaceEmptyState />;
   }
 
-  if (error || !activeEmail) {
+  if (error) {
     return (
       <ErrorState
         title="Investigation Record Not Found"
-        message={error || 'Unable to locate forensic evidence for the requested ID.'}
+        message={error}
         onRetry={reloadActiveEmail}
         action={
           <Button

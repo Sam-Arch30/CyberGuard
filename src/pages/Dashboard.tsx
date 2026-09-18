@@ -82,22 +82,24 @@ export const Dashboard: React.FC = () => {
   const loadRecentData = useCallback(async () => {
     setLoading(true);
 
-    // 1. Local stored & demo analyses
-    const localAnalyses = getAllAvailableAnalyses(true);
+    // 1. Local stored analyses (strictly real ingested emails)
+    const localAnalyses = getAllAvailableAnalyses(false);
     const rowsMap = new Map<string, RecentRowItem>();
 
-    localAnalyses.forEach((a) => {
-      const rowId = a.id || a.evidence_id || 'unknown';
-      rowsMap.set(rowId, {
-        id: rowId,
-        subject: a.subject || a.original_filename || 'Untitled Investigation',
-        sender: a.from || 'Unknown sender',
-        timestamp: a.upload_timestamp || a.date,
-        threatScore: a.threat_score?.score,
-        severity: a.threat_score?.severity || (a.threat_score?.score !== undefined ? (a.threat_score.score >= 80 ? 'critical' : a.threat_score.score >= 50 ? 'high' : 'low') : undefined),
-        status: 'Analyzed'
+    localAnalyses
+      .filter((a) => !a.id?.startsWith('scenario-'))
+      .forEach((a) => {
+        const rowId = a.id || a.evidence_id || 'unknown';
+        rowsMap.set(rowId, {
+          id: rowId,
+          subject: a.subject || a.original_filename || 'Untitled Investigation',
+          sender: a.from || 'Unknown sender',
+          timestamp: a.upload_timestamp || a.date,
+          threatScore: a.threat_score?.score,
+          severity: a.threat_score?.severity || (a.threat_score?.score !== undefined ? (a.threat_score.score >= 80 ? 'critical' : a.threat_score.score >= 50 ? 'high' : 'low') : undefined),
+          status: 'Analyzed'
+        });
       });
-    });
 
     // 2. Fetch backend summary if available
     try {
@@ -112,23 +114,25 @@ export const Dashboard: React.FC = () => {
         const liveSummary: DashboardSummary = await res.json();
         setSummary(liveSummary);
 
-        // Merge any recent backend emails not already in local store
+        // Merge any recent backend emails not already in local store (filter out synthetic scenarios)
         if (liveSummary.recent_emails) {
-          liveSummary.recent_emails.forEach((be) => {
-            if (!rowsMap.has(be.id)) {
-              rowsMap.set(be.id, {
-                id: be.id,
-                evidenceId: be.evidence_id || be.id,
-                originalFilename: be.original_filename || `${be.evidence_id || be.id}.eml`,
-                subject: be.subject || 'Incident Target EML',
-                sender: be.sender || 'Unknown',
-                timestamp: be.timestamp,
-                threatScore: be.threat_score,
-                severity: be.severity,
-                status: 'Analyzed'
-              });
-            }
-          });
+          liveSummary.recent_emails
+            .filter((be) => !be.id.startsWith('scenario-'))
+            .forEach((be) => {
+              if (!rowsMap.has(be.id)) {
+                rowsMap.set(be.id, {
+                  id: be.id,
+                  evidenceId: be.evidence_id || be.id,
+                  originalFilename: be.original_filename || `${be.evidence_id || be.id}.eml`,
+                  subject: be.subject || 'Incident Target EML',
+                  sender: be.sender || 'Unknown',
+                  timestamp: be.timestamp,
+                  threatScore: be.threat_score,
+                  severity: be.severity,
+                  status: 'Analyzed'
+                });
+              }
+            });
         }
       }
     } catch {
