@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Share2,
   Network,
@@ -7,7 +8,8 @@ import {
   Briefcase,
   Sparkles,
   Plus,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
@@ -43,6 +45,22 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
   const [caseModalOpen, setCaseModalOpen] = useState(false);
   const [campaignAlert, setCampaignAlert] = useState<CampaignAlertData | null>(null);
   const [campaignDetail, setCampaignDetail] = useState<CampaignDetail | null>(null);
+  const [allCases, setAllCases] = useState<any[]>([]);
+  const [loadingCases, setLoadingCases] = useState<boolean>(false);
+
+  useEffect(() => {
+    // Fetch cases to associate with this email
+    setLoadingCases(true);
+    fetch('http://localhost:8000/api/cases?limit=50')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data && data.cases) {
+          setAllCases(data.cases);
+        }
+      })
+      .catch(() => {})
+      .finally(() => setLoadingCases(false));
+  }, [email, caseModalOpen]);
 
   useEffect(() => {
     // Check if current email triggers a campaign alert
@@ -251,70 +269,82 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
                 <Briefcase className="w-4 h-4 text-primary" />
-                <span>Case Relationships & Incident Association</span>
+                <span>Incident Case Association & Workspace Integration</span>
               </div>
               <button
                 type="button"
                 onClick={() => setCaseModalOpen(true)}
-                className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Link to Incident Case</span>
               </button>
             </div>
 
-            {/* Linked Case Information */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold text-foreground uppercase">
-                    Primary Associated Case:
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-warning/10 text-warning border border-warning/30 font-bold">
-                    ACTIVE INVESTIGATION
-                  </span>
-                </div>
-                <div className="space-y-1">
-                  <h4 className="text-sm font-bold text-foreground font-sans">
-                    CASE-2026-089: Targeted CFO Wire Transfer Phishing Attack
-                  </h4>
-                  <p className="text-xs font-mono text-foreground-muted">
-                    Opened Sep 17, 2026 · Assigned to SOC Incident Responder · Priority High
-                  </p>
-                </div>
-                <div className="pt-2 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => handlePivotToSection('report')}
-                    className="px-3 py-1.5 rounded-lg bg-surface border border-border text-foreground font-mono text-xs hover:bg-surface-secondary transition-colors cursor-pointer"
-                  >
-                    View Case Dossier
-                  </button>
-                </div>
+            {loadingCases ? (
+              <div className="p-8 text-center font-mono text-xs text-foreground-muted">
+                <RefreshCw className="w-5 h-5 text-primary animate-spin mx-auto mb-2" />
+                <span>Checking incident case associations in persistent database...</span>
               </div>
+            ) : allCases.length === 0 ? (
+              <div className="p-8 text-center rounded-xl bg-surface-secondary/40 border border-border space-y-3 font-mono text-xs">
+                <Briefcase className="w-8 h-8 text-foreground-muted mx-auto" />
+                <p className="text-foreground-muted">No investigation cases created yet in the database.</p>
+                <button
+                  type="button"
+                  onClick={() => setCaseModalOpen(true)}
+                  className="px-4 py-2 rounded-xl bg-primary text-primary-foreground font-semibold cursor-pointer"
+                >
+                  Create Case & Link This Email
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-4 font-mono text-xs">
+                <div className="text-[11px] text-foreground-muted flex items-center justify-between">
+                  <span>Active SOC incident cases in database ({allCases.length}):</span>
+                  <Link to="/cases" className="text-primary hover:underline font-semibold flex items-center space-x-1">
+                    <span>View All Cases</span>
+                    <ArrowRight className="w-3 h-3" />
+                  </Link>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {allCases.slice(0, 6).map((c: any) => (
+                    <div
+                      key={c.id}
+                      className="p-3.5 rounded-xl bg-surface-secondary/40 border border-border hover:border-primary/40 transition-all flex flex-col justify-between gap-3"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between">
+                          <span className="font-bold text-primary">{c.case_number}</span>
+                          <span className={`px-2 py-0.2 rounded text-[10px] uppercase font-bold ${
+                            c.severity === 'critical' ? 'bg-danger/10 text-danger border border-danger/30' :
+                            c.severity === 'high' ? 'bg-warning/10 text-warning border border-warning/30' :
+                            'bg-surface border border-border text-foreground-muted'
+                          }`}>
+                            {c.severity} · {c.status}
+                          </span>
+                        </div>
+                        <h4 className="font-bold text-foreground text-xs">{c.title}</h4>
+                        {c.description && (
+                          <p className="text-[11px] text-foreground-muted line-clamp-2">{c.description}</p>
+                        )}
+                      </div>
 
-              <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-3">
-                <span className="text-xs font-mono font-bold text-foreground uppercase block">
-                  Connected Threat Incidents:
-                </span>
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="p-2.5 rounded bg-surface border border-border flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-foreground block">CASE-2026-042</span>
-                      <span className="text-foreground-muted text-[11px]">DarkHydra Executive Impersonation</span>
+                      <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[10px] text-foreground-muted">
+                        <span>{c.email_count ?? 0} linked emails</span>
+                        <Link
+                          to={`/cases/${c.id}`}
+                          className="inline-flex items-center space-x-1 text-primary hover:underline font-semibold"
+                        >
+                          <span>Open Case Workspace</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </Link>
+                      </div>
                     </div>
-                    <span className="text-danger font-bold text-[10px]">94% SIMILARITY</span>
-                  </div>
-                  <div className="p-2.5 rounded bg-surface border border-border flex items-center justify-between">
-                    <div>
-                      <span className="font-bold text-foreground block">CASE-2026-015</span>
-                      <span className="text-foreground-muted text-[11px]">Bulletproof Host Bulletins AS64511</span>
-                    </div>
-                    <span className="text-warning font-bold text-[10px]">INFRASTRUCTURE OVERLAP</span>
-                  </div>
+                  ))}
                 </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 
