@@ -6,17 +6,21 @@ import {
   ShieldCheck,
   Briefcase,
   Sparkles,
-  Plus
+  Plus,
+  ArrowRight
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
 import { useInvestigation } from '../../../context/InvestigationContext';
-import { InvestigationGraphTab } from '../../../components/forensic/InvestigationGraphTab';
+import {
+  InvestigationRelationshipSummary,
+  ProgressiveInvestigationGraph,
+  CampaignCorrelationPanel
+} from '../../../components/forensic/investigation';
 import { CrossEmailWorkspace } from '../../../components/forensic/CrossEmailWorkspace';
 import { EvidenceIntegritySection } from '../../../components/forensic/EvidenceIntegritySection';
 import { InvestigationCopilot } from '../../../components/copilot/InvestigationCopilot';
 import { AddToCaseModal } from '../../../components/case/AddToCaseModal';
-import { CampaignAlertBanner } from '../../../components/campaign/CampaignAlertBanner';
 import { CampaignGraphView } from '../../../components/campaign/CampaignGraphView';
 import { CampaignTimeline } from '../../../components/campaign/CampaignTimeline';
 
@@ -30,8 +34,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
   const {
     subTabs,
     setSubTab,
-    focusedGraphNodeId,
-    focusGraphNode,
+    setSection,
     setActiveEmailId,
     stepGuidance
   } = useInvestigation();
@@ -66,7 +69,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
   }, [email]);
 
   const subTabItems: { id: InvestigationSubTab; label: string; icon: React.FC<{ className?: string }>; count?: number | string; badgeColor?: string }[] = [
-    { id: 'graph', label: 'Investigation Graph', icon: Share2 },
+    { id: 'graph', label: 'Relationship Graph', icon: Share2 },
     { id: 'campaigns', label: 'Campaign Correlation', icon: Network, count: 'CLUSTERS' },
     { id: 'cross_email', label: 'Related Emails Workspace', icon: GitMerge, count: 16 },
     { id: 'evidence', label: 'Evidence & Audit Chain', icon: ShieldCheck },
@@ -74,84 +77,115 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
     { id: 'copilot', label: 'Investigation Copilot', icon: Sparkles, count: 'AI', badgeColor: 'text-primary bg-primary/10 border-primary/30' }
   ];
 
+  const handlePivotToSection = (sectionId: string, subTabId?: string) => {
+    setSection(sectionId as any);
+    if (subTabId) {
+      setSubTab(subTabId);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* 1. CONTEXTUAL SUB-NAVIGATION */}
-      <div className="bg-surface rounded-xl border border-border p-1.5 flex flex-wrap items-center gap-1 shadow-xs">
-        {subTabItems.map((tab) => {
-          const isActive = currentSubTab === tab.id;
-          const Icon = tab.icon;
-          return (
-            <button
-              key={tab.id}
-              type="button"
-              onClick={() => setSubTab(tab.id)}
-              className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
-                isActive
-                  ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
-              }`}
-            >
-              <Icon className="w-3.5 h-3.5" />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && (
-                <span
-                  className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono ${
-                    isActive
-                      ? 'bg-black/20 text-white'
-                      : tab.badgeColor || 'bg-surface-secondary text-foreground-subtle border border-border'
-                  }`}
-                >
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      <div className="bg-surface rounded-xl border border-border p-1.5 flex flex-wrap items-center justify-between gap-2 shadow-xs">
+        <div className="flex flex-wrap items-center gap-1">
+          {subTabItems.map((tab) => {
+            const isActive = currentSubTab === tab.id;
+            const Icon = tab.icon;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setSubTab(tab.id)}
+                className={`flex items-center space-x-2 px-3 py-1.5 rounded-lg text-xs font-mono transition-all cursor-pointer ${
+                  isActive
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
+                }`}
+              >
+                <Icon className="w-3.5 h-3.5" />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span
+                    className={`ml-1 px-1.5 py-0.2 rounded text-[10px] font-mono ${
+                      isActive
+                        ? 'bg-black/20 text-white'
+                        : tab.badgeColor || 'bg-surface-secondary text-foreground-subtle border border-border'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="hidden sm:flex items-center space-x-2 text-[11px] font-mono text-foreground-muted pr-2">
+          <span>Relationship Investigation Workspace</span>
+        </div>
       </div>
 
       {/* 2. SUB-TAB VIEW CONTAINER */}
-      <div className="bg-surface rounded-xl border border-border p-5 shadow-xs">
-        {/* Force-directed Investigation Graph */}
+      <div>
+        {/* Unified Relationship Workspace (Graph + Progressive Controls + Correlation) */}
         {currentSubTab === 'graph' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <Share2 className="w-4 h-4 text-primary" />
-                <span>Multi-Entity Forensic Investigation Graph</span>
+          <div className="space-y-6">
+            {/* Top Relationship Summary */}
+            <InvestigationRelationshipSummary
+              email={email}
+              campaignAlert={campaignAlert}
+              visibleNodeCount={5}
+              totalNodeCount={11}
+            />
+
+            {/* Main Progressive Investigation Graph */}
+            <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-border">
+                <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
+                  <Share2 className="w-4 h-4 text-primary" />
+                  <span>Progressive Entity Relationship Graph</span>
+                </div>
+                <span className="text-[11px] font-mono text-foreground-muted">
+                  Simplified core entities initially · Click controls to progressively expand topology
+                </span>
               </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                Cytoscape force-directed mapping of emails, IPs, domains, payloads & cases
-              </span>
+
+              <ProgressiveInvestigationGraph
+                email={email}
+                campaignData={campaignAlert || campaignDetail}
+                onPivotToSection={handlePivotToSection}
+                onAddToCase={() => setCaseModalOpen(true)}
+              />
             </div>
-            <InvestigationGraphTab email={email} focusNodeId={focusedGraphNodeId} />
+
+            {/* Explainable Campaign Correlation Section Below Graph */}
+            <div className="bg-surface rounded-xl border border-border p-5 shadow-xs">
+              <CampaignCorrelationPanel
+                email={email}
+                campaignAlert={campaignAlert}
+                campaignDetail={campaignDetail}
+                onOpenEmail={(targetId) => setActiveEmailId(targetId)}
+                onSelectSubTab={(sub) => setSubTab(sub)}
+              />
+            </div>
           </div>
         )}
 
-        {/* Campaign Correlation */}
+        {/* Dedicated Campaign Correlation SubTab */}
         {currentSubTab === 'campaigns' && (
-          <div className="space-y-6">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <Network className="w-4 h-4 text-primary" />
-                <span>Automated Campaign Correlation & Clustering</span>
-              </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                Threat actor fingerprinting, shared infrastructure & timing patterns
-              </span>
-            </div>
+          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-6">
+            <CampaignCorrelationPanel
+              email={email}
+              campaignAlert={campaignAlert}
+              campaignDetail={campaignDetail}
+              onOpenEmail={(targetId) => setActiveEmailId(targetId)}
+              onSelectSubTab={(sub) => setSubTab(sub)}
+            />
 
-            {/* Campaign Alert & Cluster Overview */}
-            {campaignAlert && (
-              <CampaignAlertBanner
-                alertData={campaignAlert}
-                onViewCampaign={() => setSubTab('cross_email')}
-              />
-            )}
-
-            {/* Campaign Graph View & Timeline */}
-            {campaignDetail ? (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Campaign Multi-Target Cluster Graph & Timeline */}
+            {campaignDetail && (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-4 border-t border-border">
                 <div className="space-y-3">
                   <h4 className="text-xs font-mono font-bold text-foreground uppercase">
                     Campaign Multi-Target Cluster Graph ({campaignDetail.campaign_id}):
@@ -170,17 +204,13 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
                   </div>
                 </div>
               </div>
-            ) : (
-              <div className="p-8 text-center text-xs font-mono text-foreground-muted bg-surface-secondary rounded-xl border border-border">
-                Loading campaign infrastructure topology...
-              </div>
             )}
           </div>
         )}
 
         {/* Cross-Email Related Emails Workspace */}
         {currentSubTab === 'cross_email' && (
-          <div className="space-y-4">
+          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
                 <GitMerge className="w-4 h-4 text-primary" />
@@ -201,7 +231,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
 
         {/* Evidence & Chain of Custody */}
         {currentSubTab === 'evidence' && (
-          <div className="space-y-4">
+          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
                 <ShieldCheck className="w-4 h-4 text-primary" />
@@ -217,7 +247,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
 
         {/* Case Relationships */}
         {currentSubTab === 'cases' && (
-          <div className="space-y-5">
+          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-5">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
                 <Briefcase className="w-4 h-4 text-primary" />
@@ -248,33 +278,39 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
                   <h4 className="text-sm font-bold text-foreground font-sans">
                     CASE-2026-089: Targeted CFO Wire Transfer Phishing Attack
                   </h4>
-                  <p className="text-xs font-mono text-foreground-muted leading-relaxed">
-                    Lead incident tracking the malicious invoice manipulation and lookalike domain activity targeting finance officers.
+                  <p className="text-xs font-mono text-foreground-muted">
+                    Opened Sep 17, 2026 · Assigned to SOC Incident Responder · Priority High
                   </p>
                 </div>
-                <div className="flex items-center space-x-3 text-xs font-mono text-foreground-subtle pt-2 border-t border-border">
-                  <span>Assigned: Senior Analyst</span>
-                  <span>·</span>
-                  <span>Priority: P1 High</span>
+                <div className="pt-2 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handlePivotToSection('report')}
+                    className="px-3 py-1.5 rounded-lg bg-surface border border-border text-foreground font-mono text-xs hover:bg-surface-secondary transition-colors cursor-pointer"
+                  >
+                    View Case Dossier
+                  </button>
                 </div>
               </div>
 
               <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-3">
-                <span className="text-xs font-mono font-bold text-foreground uppercase">
-                  Associated IOCs in Case:
+                <span className="text-xs font-mono font-bold text-foreground uppercase block">
+                  Connected Threat Incidents:
                 </span>
-                <div className="space-y-1.5 text-xs font-mono">
-                  <div className="flex items-center justify-between p-2 rounded bg-surface border border-border">
-                    <span className="text-foreground-muted">Originating IP:</span>
-                    <span className="text-primary font-semibold">203.0.113.88</span>
+                <div className="space-y-2 text-xs font-mono">
+                  <div className="p-2.5 rounded bg-surface border border-border flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-foreground block">CASE-2026-042</span>
+                      <span className="text-foreground-muted text-[11px]">DarkHydra Executive Impersonation</span>
+                    </div>
+                    <span className="text-danger font-bold text-[10px]">94% SIMILARITY</span>
                   </div>
-                  <div className="flex items-center justify-between p-2 rounded bg-surface border border-border">
-                    <span className="text-foreground-muted">C2 Lookalike:</span>
-                    <span className="text-danger font-semibold">financial-partners-bank.com</span>
-                  </div>
-                  <div className="flex items-center justify-between p-2 rounded bg-surface border border-border">
-                    <span className="text-foreground-muted">Attached Binary:</span>
-                    <span className="text-warning font-semibold">wire_instructions.pdf.exe</span>
+                  <div className="p-2.5 rounded bg-surface border border-border flex items-center justify-between">
+                    <div>
+                      <span className="font-bold text-foreground block">CASE-2026-015</span>
+                      <span className="text-foreground-muted text-[11px]">Bulletproof Host Bulletins AS64511</span>
+                    </div>
+                    <span className="text-warning font-bold text-[10px]">INFRASTRUCTURE OVERLAP</span>
                   </div>
                 </div>
               </div>
@@ -282,28 +318,21 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
           </div>
         )}
 
-        {/* Investigation Copilot */}
+        {/* AI Investigation Copilot */}
         {currentSubTab === 'copilot' && (
-          <div className="space-y-4">
+          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
                 <Sparkles className="w-4 h-4 text-primary" />
-                <span>Evidence-Grounded Investigation Assistant Copilot</span>
+                <span>AI Forensic Copilot Assistant</span>
               </div>
               <span className="text-[11px] font-mono text-foreground-muted">
-                Hallucination-resistant reasoning quoting specific headers, hashes, and ASNs
+                Zero data leakage model grounded in current investigation evidence
               </span>
             </div>
             <InvestigationCopilot
-              mode="email"
-              contextId={email.evidence_id || email.id || 'E-1042'}
-              emailPayload={email}
-              onOpenGraph={focusGraphNode}
-              onCompareEmails={() => setSubTab('cross_email')}
-              onOpenEvidence={() => setSubTab('evidence')}
-              onSelectEmail={(selected) => {
-                if (selected.id) setActiveEmailId(selected.id);
-              }}
+              contextId={email.id || email.evidence_id}
+              emailPayload={email as any}
             />
           </div>
         )}
@@ -317,10 +346,10 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
           </div>
           <div>
             <h4 className="text-xs font-bold text-foreground font-sans">
-              Completed Evidence Correlation & Graph Analysis?
+              Completed Relationship & Campaign Investigation?
             </h4>
             <p className="text-xs font-mono text-foreground-muted">
-              Produce the final executive briefing, review MITRE ATT&CK techniques, and export audit-ready PDF reports.
+              Generate the executive forensic dossier, compile MITRE ATT&CK technique alignments, and export court-admissible PDF reports.
             </p>
           </div>
         </div>
@@ -331,17 +360,16 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
           className="w-full sm:w-auto px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-bold flex items-center justify-center space-x-2 transition-all shadow-xs cursor-pointer"
         >
           <span>{stepGuidance.buttonLabel}</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Add to Case Modal */}
-      {caseModalOpen && (
-        <AddToCaseModal
-          email={email}
-          isOpen={caseModalOpen}
-          onClose={() => setCaseModalOpen(false)}
-        />
-      )}
+      {/* Add To Case Modal */}
+      <AddToCaseModal
+        isOpen={caseModalOpen}
+        onClose={() => setCaseModalOpen(false)}
+        email={email}
+      />
     </div>
   );
 };
