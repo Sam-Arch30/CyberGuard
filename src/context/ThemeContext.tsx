@@ -19,9 +19,9 @@ export const THEME_OPTIONS: ThemeOption[] = [
     name: 'Obsidian',
     description: 'Deep stone dark theme with subtle olive green accents',
     accentLabel: 'Olive Green',
-    previewBg: '#0d0f0e',
-    previewSurface: '#151916',
-    previewAccent: '#7e945c',
+    previewBg: '#0c0e0d',
+    previewSurface: '#141715',
+    previewAccent: '#7d9456',
     isDark: true,
   },
   {

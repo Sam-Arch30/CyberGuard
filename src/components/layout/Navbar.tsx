@@ -1,16 +1,22 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Search, Bell, ShieldAlert, Cpu, Palette, Check, Sparkles, RotateCcw } from 'lucide-react';
+import { Search, Bell, ShieldAlert, Cpu, Palette, Check, Sparkles, RotateCcw, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../../context/ThemeContext';
 import { useDemoTour } from '../../context/DemoTourContext';
+import { useInvestigation } from '../../context/InvestigationContext';
 
-export const Navbar: React.FC = () => {
+export interface NavbarProps {
+  onToggleMobileSidebar?: () => void;
+}
+
+export const Navbar: React.FC<NavbarProps> = ({ onToggleMobileSidebar }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
   const { theme, setTheme, themeMeta } = useTheme();
   const { isTourActive, startTour, endTour, resetDemo, isResetting } = useDemoTour();
+  const { activeEmail, activeEmailId } = useInvestigation();
 
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -55,23 +61,52 @@ export const Navbar: React.FC = () => {
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/analyze?search=${encodeURIComponent(searchQuery)}`);
+      navigate(`/history?search=${encodeURIComponent(searchQuery)}`);
     }
   };
 
   return (
-    <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-border px-6 h-16 flex items-center justify-between transition-colors">
-      {/* Global Search Box */}
-      <form onSubmit={handleSearchSubmit} className="relative w-72 md:w-96">
-        <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search IP, Domain, Message-ID or Hash..."
-          className="w-full pl-9 pr-3.5 py-1.5 bg-surface-secondary border border-border rounded-control text-xs font-mono text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
-        />
-      </form>
+    <header className="sticky top-0 z-30 bg-surface/85 backdrop-blur-md border-b border-border px-3 sm:px-6 h-16 flex items-center justify-between transition-colors">
+      {/* Left: Hamburger (mobile), Global Search Box & Active Investigation Chip */}
+      <div className="flex items-center space-x-2 sm:space-x-3 min-w-0">
+        {onToggleMobileSidebar && (
+          <button
+            type="button"
+            onClick={onToggleMobileSidebar}
+            className="p-1.5 rounded-control text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-border md:hidden cursor-pointer shrink-0"
+            aria-label="Toggle navigation menu"
+            title="Toggle Navigation Sidebar"
+          >
+            <Menu className="w-4 h-4 text-foreground" />
+          </button>
+        )}
+
+        <form onSubmit={handleSearchSubmit} className="relative w-36 sm:w-64 md:w-80">
+          <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search Subject, Sender, or Hash..."
+            className="w-full pl-9 pr-3.5 py-1.5 bg-surface-secondary border border-border rounded-control text-xs font-mono text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
+          />
+        </form>
+
+        {activeEmail && (
+          <button
+            type="button"
+            onClick={() => navigate(`/investigate/${activeEmailId}/overview`)}
+            className="hidden xl:flex items-center space-x-2 px-2.5 py-1 rounded-control bg-surface-secondary/80 hover:bg-surface-secondary border border-border text-xs font-mono transition-colors cursor-pointer"
+            title="Jump to current active investigation"
+          >
+            <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+            <span className="text-foreground-muted">Target:</span>
+            <span className="text-foreground font-semibold truncate max-w-[150px]">
+              {activeEmail.subject || activeEmailId}
+            </span>
+          </button>
+        )}
+      </div>
 
       {/* Right Navbar Utility Controls */}
       <div className="flex items-center space-x-2.5">

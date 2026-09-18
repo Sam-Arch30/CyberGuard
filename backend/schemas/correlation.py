@@ -33,10 +33,32 @@ class RelatedCaseItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CorrelatedIngestedEmail(BaseModel):
+    """An ingested .eml email identified as sharing IOCs or infrastructure with the target email."""
+    id: str = Field(..., description="Evidence ID or unique email identifier")
+    evidence_id: Optional[str] = Field(None, description="Deterministic evidence ID (e.g. EVD-73D3AA17A2)")
+    sha256: Optional[str] = Field(None, description="Cryptographic SHA-256 hash")
+    original_filename: Optional[str] = Field(None, description="Original .eml filename")
+    subject: str = Field(..., description="Email subject line")
+    sender: str = Field(..., description="Sender address or RFC-5322 From header")
+    recipient: Optional[str] = Field(None, description="Recipient address")
+    threat_score: float = Field(0.0, description="Calculated threat score (0-100)")
+    severity: str = Field("low", description="Severity classification (critical, high, medium, low)")
+    timestamp: str = Field("", description="Ingestion or message timestamp")
+    similarity_score: float = Field(0.0, description="Pairwise similarity score (0.0 to 1.0)")
+    similarity_percentage: int = Field(0, description="Formatted similarity percentage (0-100%)")
+    relationship_label: str = Field("Shared IOCs", description="Explainable relationship label")
+    shared_evidence_summary: str = Field("", description="Human-readable summary of shared IOCs")
+    shared_indicators: List[SharedIndicator] = Field(default_factory=list, description="List of shared forensic indicators")
+
+    model_config = ConfigDict(from_attributes=True)
+
+
 class CampaignCorrelationResponse(BaseModel):
     """Correlation analysis output comparing an email or case against existing investigations."""
     related_cases: List[RelatedCaseItem] = Field(default_factory=list, description="Cases exhibiting shared infrastructure or behavioral overlap")
-    correlation_score: float = Field(0.0, description="Highest correlation score among related cases, or pairwise comparison score")
+    correlated_emails: List[CorrelatedIngestedEmail] = Field(default_factory=list, description="Other ingested .eml emails exhibiting shared IOCs")
+    correlation_score: float = Field(0.0, description="Highest correlation score among related cases/emails, or pairwise comparison score")
     relationship_label: str = Field("Inconclusive / No significant relationship", description="Highest relationship confidence label")
     shared_indicators: List[SharedIndicator] = Field(default_factory=list, description="Aggregated list of all shared indicators across related investigations")
 

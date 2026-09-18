@@ -3,7 +3,7 @@ import { CopyButton } from './CopyButton';
 
 interface MetadataRowProps {
   label: string;
-  value?: string | string[] | null;
+  value?: React.ReactNode;
   allowCopy?: boolean;
   isMonospace?: boolean;
 }
@@ -14,17 +14,19 @@ export const MetadataRow: React.FC<MetadataRowProps> = ({
   allowCopy = false,
   isMonospace = true
 }) => {
-  const formatValue = (): string | null => {
-    if (!value) return null;
+  const getDisplayValue = () => {
+    if (value === null || value === undefined) return null;
     if (Array.isArray(value)) {
       return value.length > 0 ? value.join(', ') : null;
     }
-    return value.trim() ? value : null;
+    if (typeof value === 'string') {
+      return value.trim() ? value : null;
+    }
+    return value;
   };
 
-  const formattedVal = formatValue();
-  const displayVal = formattedVal || 'Not available';
-  const isAvailable = formattedVal !== null;
+  const displayVal = getDisplayValue();
+  const isAvailable = displayVal !== null && displayVal !== undefined;
 
   return (
     <div className="flex flex-col sm:flex-row sm:items-start justify-between py-2.5 px-3 rounded-control border border-border bg-surface-secondary/40 hover:bg-surface-secondary/70 transition-colors gap-2">
@@ -42,10 +44,10 @@ export const MetadataRow: React.FC<MetadataRowProps> = ({
               : 'text-foreground-subtle italic font-mono'
           }`}
         >
-          {displayVal}
+          {isAvailable ? displayVal : 'Not available'}
         </span>
 
-        {isAvailable && allowCopy && (
+        {isAvailable && allowCopy && typeof displayVal === 'string' && (
           <CopyButton text={displayVal} iconOnly className="shrink-0" />
         )}
       </div>

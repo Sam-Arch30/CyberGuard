@@ -52,6 +52,8 @@ export interface DashboardEmailItem {
   threat_score: number;
   severity: string;
   timestamp: string;
+  original_filename?: string;
+  has_eml_file?: boolean;
 }
 
 export interface DashboardSummary {

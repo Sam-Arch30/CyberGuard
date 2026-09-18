@@ -87,7 +87,7 @@ export const Modal: React.FC<ModalProps> = ({
         ref={modalRef}
         className={cn(
           'relative w-full bg-surface border border-border rounded-card shadow-popover z-10 flex flex-col',
-          'animate-in fade-in zoom-in-95 duration-150',
+          'modal-enter',
           sizeClasses[size],
           className
         )}

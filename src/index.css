@@ -54,14 +54,14 @@
   --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 
-  /* Standard Restrained Radius Tokens */
-  --radius-badge: 5px;
-  --radius-control-sm: 6px;
-  --radius-control: 7px;
+  /* Standard Restrained Radius Tokens (4px / 6px / 8px) */
+  --radius-badge: 4px;
+  --radius-control-sm: 4px;
+  --radius-control: 6px;
   --radius-control-lg: 8px;
-  --radius-card-sm: 8px;
-  --radius-card: 10px;
-  --radius-card-lg: 12px;
+  --radius-card-sm: 6px;
+  --radius-card: 8px;
+  --radius-card-lg: 10px;
 
   /* Semantic Shadows */
   --shadow-xs: var(--shadow-xs);
@@ -86,14 +86,14 @@
   --sidebar-width-collapsed: 5rem;
   --navbar-height: 4rem;
 
-  /* Restrained Border Radii (controls: 6-8px, cards: 8-12px) */
-  --radius-badge: 5px;
-  --radius-control-sm: 6px;
-  --radius-control: 7px;
+  /* Restrained Border Radii (badge: 4px, controls: 6px, cards: 8px) */
+  --radius-badge: 4px;
+  --radius-control-sm: 4px;
+  --radius-control: 6px;
   --radius-control-lg: 8px;
-  --radius-card-sm: 8px;
-  --radius-card: 10px;
-  --radius-card-lg: 12px;
+  --radius-card-sm: 6px;
+  --radius-card: 8px;
+  --radius-card-lg: 10px;
 
   /* Border Widths */
   --border-width: 1px;
@@ -452,11 +452,91 @@
   text-transform: uppercase;
 }
 
-.typography-tech {
+.typography-page-title {
+  font-family: var(--font-sans);
+  font-size: 1.25rem;
+  line-height: 1.3;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--foreground);
+}
+@media (min-width: 768px) {
+  .typography-page-title {
+    font-size: 1.5rem;
+  }
+}
+
+.typography-section-title {
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--foreground);
+}
+
+.typography-metadata {
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--foreground-muted);
+}
+
+.typography-label {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.35;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--foreground-subtle);
+}
+
+.typography-forensic {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   line-height: 1.4;
+  color: var(--foreground);
   font-feature-settings: "tnum";
+  word-break: break-all;
+}
+
+/* Forensic Data Tables */
+.table-forensic {
+  width: 100%;
+  text-align: left;
+  font-size: 0.75rem;
+  border-collapse: collapse;
+}
+
+.table-forensic th {
+  padding: 0.5rem 0.75rem;
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--foreground-subtle);
+  background-color: var(--surface-secondary);
+  border-bottom: 1px solid var(--border);
+  user-select: none;
+}
+
+.table-forensic td {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  border-bottom: 1px solid var(--border-subtle);
+  color: var(--foreground);
+  vertical-align: middle;
+}
+
+.table-forensic tr {
+  transition: background-color var(--duration-fast) ease;
+}
+
+.table-forensic tbody tr:hover {
+  background-color: rgba(255, 255, 255, 0.02);
 }
 
 /* =========================================================================
@@ -509,19 +589,87 @@ div[class*="w-"] > svg:only-child {
   height: 100%;
 }
 
-/* Page fade transition */
+/* Page fade transition (Restrained 150ms) */
 .page-enter {
-  animation: pageFadeIn var(--duration-slow) var(--ease-default) forwards;
+  animation: pageFadeIn var(--duration-base) var(--ease-default) forwards;
 }
 
 @keyframes pageFadeIn {
   from {
     opacity: 0;
-    transform: translateY(3px);
+    transform: translateY(2px);
   }
   to {
     opacity: 1;
     transform: translateY(0);
+  }
+}
+
+/* Restrained Accordion Expansion Transition */
+.accordion-expand {
+  animation: accordionExpand var(--duration-base) var(--ease-default) forwards;
+}
+
+@keyframes accordionExpand {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Forensic Entity Selection Transition */
+.entity-selected {
+  transition: background-color var(--duration-fast) var(--ease-default),
+              border-color var(--duration-fast) var(--ease-default),
+              box-shadow var(--duration-fast) var(--ease-default);
+}
+
+/* Restrained Drawer Slide-in */
+.drawer-enter,
+.animate-slideLeft {
+  animation: drawerSlideIn var(--duration-base) var(--ease-default) forwards;
+}
+
+@keyframes drawerSlideIn {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+/* Restrained Modal Dialog Scale-in */
+.modal-enter {
+  animation: modalScaleIn var(--duration-base) var(--ease-default) forwards;
+}
+
+@keyframes modalScaleIn {
+  from {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Pipeline Step Pulse for active forensic processing */
+.pipeline-step-pulse {
+  animation: pipelinePulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pipelinePulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
   }
 }
 
@@ -554,6 +702,22 @@ div[class*="w-"] > svg:only-child {
   }
   .page-enter {
     animation: none !important;
+  }
+  .accordion-expand {
+    animation: none !important;
+  }
+  .drawer-enter,
+  .animate-slideLeft {
+    animation: none !important;
+    transform: none !important;
+  }
+  .modal-enter {
+    animation: none !important;
+    transform: none !important;
+  }
+  .pipeline-step-pulse {
+    animation: none !important;
+    opacity: 1 !important;
   }
   .panel-interactive:hover {
     transform: none !important;

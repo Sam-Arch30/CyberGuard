@@ -1,19 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { Globe, Server, Calendar, Shield, Clock, CheckCircle2, XCircle, Info, AlertTriangle, ShieldAlert } from 'lucide-react';
+import { Globe, Server, Calendar, Shield, Clock, Info, AlertTriangle, ShieldAlert } from 'lucide-react';
 import type { EmailAnalysis, DomainIntelligence } from '../../types/forensic';
 import { resolveDomainIntelligence } from '../../utils/indicatorHelper';
 import { resolveConfidenceConclusions } from '../../utils/confidenceResolver';
 import { ConfidenceBadge } from '../common/ConfidenceBadge';
 import { CopyButton } from './CopyButton';
+import { StatusRow, DetailDrawer, MetadataRow, ExpandableSection } from '../common/progressive';
 
 interface DomainIntelligenceSectionProps {
   email: EmailAnalysis;
 }
 
 export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps> = ({ email }) => {
-  const [activeDnsTab, setActiveDnsTab] = useState<Record<string, 'A' | 'MX' | 'NS' | 'TXT'>>({});
   const [filter, setFilter] = useState<'all' | 'lookalike' | 'new' | 'resolvable'>('all');
   const [liveDomainIntel, setLiveDomainIntel] = useState<Record<string, DomainIntelligence>>({});
+  const [selectedRawDomain, setSelectedRawDomain] = useState<DomainIntelligence | null>(null);
 
   const conclusions =
     email.forensic_conclusions && email.forensic_conclusions.length > 0
@@ -102,22 +103,14 @@ export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps>
     return map[tech] || tech.replace(/_/g, ' ');
   };
 
-  const getActiveTab = (domain: string): 'A' | 'MX' | 'NS' | 'TXT' => {
-    return activeDnsTab[domain] || 'A';
-  };
-
-  const setActiveTabForDomain = (domain: string, tab: 'A' | 'MX' | 'NS' | 'TXT') => {
-    setActiveDnsTab(prev => ({ ...prev, [domain]: tab }));
-  };
-
   return (
     <div className="space-y-6">
-      {/* Security & Forensic Limitation Notice */}
+      {/* Security Notice */}
       <div className="p-4 rounded-xl bg-surface-secondary/70 border border-border flex items-start gap-3 backdrop-blur-sm shadow-xs">
         <Info className="w-5 h-5 text-primary shrink-0 mt-0.5" />
         <div className="text-xs leading-relaxed text-foreground-muted">
           <span className="font-semibold text-foreground">Domain Intelligence Safety Notice:</span>{' '}
-          All domain intelligence is resolved strictly via server-side DNS queries and RDAP registration endpoints. Target domain web servers are never contacted, website content is never loaded, and remote scripts are never executed.
+          All domain intelligence is resolved strictly via server-side DNS queries and RDAP registration endpoints. Target web servers are never contacted.
         </div>
       </div>
 
@@ -128,401 +121,278 @@ export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps>
           <div className="text-xs leading-relaxed text-foreground space-y-1">
             <div>
               <span className="font-bold text-danger uppercase tracking-wider">Potential Brand Impersonation Alert:</span>{' '}
-              Found <strong className="text-danger font-bold">{lookalikeCount}</strong> domain{lookalikeCount !== 1 ? 's' : ''} exhibiting deceptive similarity or brand keyword abuse (e.g. character substitution, extra hyphens, or suspicious subdomains).
+              Found <strong className="text-danger font-bold">{lookalikeCount}</strong> domain{lookalikeCount !== 1 ? 's' : ''} exhibiting deceptive similarity or brand keyword abuse.
             </div>
-            <div className="text-[11px] text-foreground-muted italic">
-              Confidence Notice: Similarity observations indicate potential lookalike indicators and do not establish malicious intent as fact.
-            </div>
+            {lookalikeConclusion && (
+              <div className="pt-1">
+                <ConfidenceBadge conclusion={lookalikeConclusion} allConclusions={conclusions} size="sm" />
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Header Bar with Filters */}
-      <div className="bg-surface p-5 rounded-card border border-border shadow-xs space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-2.5">
-            <div className="p-2 rounded-lg bg-primary/10 border border-primary/20 text-primary">
-              <Globe className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider flex items-center gap-2">
-                Domain Infrastructure & Registration Intelligence
-                <span className="text-xs px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary font-normal">
-                  {domainList.length} Domain{domainList.length !== 1 ? 's' : ''}
-                </span>
-              </h3>
-              <p className="text-xs font-mono text-foreground-muted">DNS record sets, authoritative registration metadata, and brand lookalike detection</p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 bg-surface-secondary p-1 rounded-control border border-border text-xs font-mono flex-wrap">
+      {/* Progressive Domains Section */}
+      <ExpandableSection
+        title={`Domain Infrastructure & Lookalike Heuristics (${filteredDomains.length})`}
+        subtitle="Registration timelines, brand homoglyph checks, and authoritative DNS records"
+        icon={Globe}
+        defaultExpanded={true}
+        actions={
+          <div className="flex items-center gap-1 bg-surface-secondary p-1 rounded-control border border-border text-xs font-mono">
             <button
               onClick={() => setFilter('all')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                filter === 'all' ? 'bg-surface text-foreground border border-border shadow-xs' : 'text-foreground-muted hover:text-foreground'
+              className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                filter === 'all'
+                  ? 'bg-surface text-foreground font-bold border border-border shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
               }`}
             >
               All ({domainList.length})
             </button>
-            {lookalikeCount > 0 && (
-              <button
-                onClick={() => setFilter('lookalike')}
-                className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                  filter === 'lookalike' ? 'bg-danger text-white shadow-xs' : 'text-danger hover:bg-danger-surface border border-danger/20'
-                }`}
-              >
-                Impersonation ({lookalikeCount})
-              </button>
-            )}
             <button
-              onClick={() => setFilter('new')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                filter === 'new' ? 'bg-surface text-foreground border border-border shadow-xs' : 'text-foreground-muted hover:text-foreground'
+              onClick={() => setFilter('lookalike')}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                filter === 'lookalike'
+                  ? 'bg-danger-surface text-danger font-bold border border-danger-border shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
               }`}
             >
-              New &lt; 30d ({domainList.filter(d => d.newly_registered_domain).length})
+              Lookalike ({lookalikeCount})
+            </button>
+            <button
+              onClick={() => setFilter('new')}
+              className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                filter === 'new'
+                  ? 'bg-warning-surface text-warning font-bold border border-warning-border shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              }`}
+            >
+              New (&lt; 30d)
             </button>
             <button
               onClick={() => setFilter('resolvable')}
-              className={`px-3 py-1.5 rounded-lg font-bold transition-colors cursor-pointer ${
-                filter === 'resolvable' ? 'bg-surface text-foreground border border-border shadow-xs' : 'text-foreground-muted hover:text-foreground'
+              className={`px-3 py-1 rounded-lg font-medium transition-colors cursor-pointer ${
+                filter === 'resolvable'
+                  ? 'bg-surface text-foreground font-bold border border-border shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
               }`}
             >
-              Resolvable ({domainList.filter(d => d.is_resolvable).length})
+              Resolvable
             </button>
           </div>
-        </div>
-      </div>
-
-      {/* Domain Cards Grid */}
-      {filteredDomains.length === 0 ? (
-        <div className="p-8 text-center border border-dashed border-border rounded-xl space-y-2 bg-surface-secondary/40">
-          <Globe className="w-8 h-8 text-foreground-subtle mx-auto" />
-          <p className="text-xs font-mono text-foreground-muted font-semibold">
+        }
+      >
+        {filteredDomains.length === 0 ? (
+          <div className="p-8 rounded-xl bg-surface-secondary/40 border border-border text-center text-foreground-muted font-mono text-xs">
             No domains match the selected filter.
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-4">
-          {filteredDomains.map(item => {
-            const currentTab = getActiveTab(item.domain);
-            const ageDisplay = item.domain_age_days !== undefined && item.domain_age_days !== null
-              ? `${item.domain_age_days} days`
-              : 'Registration date unavailable';
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {filteredDomains.map(item => {
+              const ageDisplay = item.domain_age_days !== undefined && item.domain_age_days !== null
+                ? `${item.domain_age_days} days`
+                : 'Registration age unavailable';
 
-            const hasMx = item.dns.mx && item.dns.mx.length > 0;
-            const hasA = (item.dns.a && item.dns.a.length > 0) || (item.dns.aaaa && item.dns.aaaa.length > 0);
-            const hasNs = item.dns.ns && item.dns.ns.length > 0;
-            const hasTxt = item.dns.txt && item.dns.txt.length > 0;
+              const isLookalike = Boolean(item.lookalike);
+              const statusState = isLookalike ? 'CRITICAL' : !item.is_resolvable ? 'FAIL' : item.newly_registered_domain ? 'WARN' : 'PASS';
+              const statusLabel = isLookalike
+                ? `IMPERSONATION (${Math.round(item.lookalike!.similarity * 100)}%)`
+                : item.newly_registered_domain
+                ? 'NEW REGISTRATION'
+                : item.is_resolvable
+                ? 'ACTIVE'
+                : 'NXDOMAIN';
 
-            return (
-              <div
-                key={item.domain}
-                className="bg-surface p-5 rounded-card border border-border hover:border-primary/40 transition-all shadow-xs space-y-4"
-              >
-                {/* Domain Card Header */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-3 border-b border-border">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-base font-mono font-bold text-foreground break-all">
-                        {item.domain}
-                      </span>
-                      {item.punycode && (
-                        <span className="text-[11px] font-mono text-foreground-muted bg-surface-secondary px-2 py-0.5 rounded border border-border">
-                          Punycode: {item.punycode}
-                        </span>
-                      )}
+              const subtitle = isLookalike
+                ? `Mimics "${item.lookalike!.suspected_brand || item.lookalike!.brand_name}" · ${ageDisplay}`
+                : `${ageDisplay}${item.registration.registrar ? ` · ${item.registration.registrar}` : ''}`;
 
-                      {/* Resolvable Status Badge */}
-                      <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
-                          item.is_resolvable
-                            ? 'bg-success/10 text-success border-success/30'
-                            : 'bg-danger/10 text-danger border-danger/30'
-                        }`}
-                      >
-                        {item.is_resolvable ? (
-                          <>
-                            <CheckCircle2 className="w-3 h-3" />
-                            <span>Active / Resolvable</span>
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-3 h-3" />
-                            <span>{item.status_message || 'NXDOMAIN'}</span>
-                          </>
-                        )}
-                      </span>
-
-                      {/* Newly Registered Domain Observation Badge */}
-                      {item.newly_registered_domain && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-warning/15 text-warning border border-warning/30"
-                          title="Neutral forensic observation: Domain registered within 30 days"
-                        >
-                          <Clock className="w-3 h-3" />
-                          <span>Newly Registered (&lt; 30d)</span>
-                        </span>
-                      )}
-
-                      {/* Potential Brand Impersonation Badge */}
-                      {item.lookalike && (
-                        <span
-                          className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-danger/10 text-danger border border-danger/30"
-                          title={`Potential ${item.lookalike.brand_name} brand impersonation`}
-                        >
-                          <ShieldAlert className="w-3 h-3 text-danger" />
-                          <span>Potential {item.lookalike.brand_name} Impersonation</span>
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <CopyButton text={item.domain} label="Copy Domain" />
-                </div>
-
-                {/* Brand Impersonation Finding Card */}
-                {item.lookalike && (
-                  <div className="p-4 rounded-xl bg-danger-surface border border-danger-border space-y-3">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-danger-border/60 pb-2">
-                      <div className="flex items-center space-x-2">
-                        <ShieldAlert className="w-4 h-4 text-danger shrink-0" />
-                        <span className="text-xs font-mono font-bold text-danger uppercase tracking-wider">
-                          Potential {item.lookalike.brand_name} Impersonation
-                        </span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        {lookalikeConclusion && (
-                          <ConfidenceBadge
-                            conclusion={lookalikeConclusion}
-                            allConclusions={conclusions}
-                            size="sm"
-                          />
-                        )}
-                        <div className="flex items-center space-x-1.5 text-xs font-mono bg-surface px-2.5 py-1 rounded-lg border border-danger-border">
-                          <span className="text-foreground-muted text-[11px]">Similarity:</span>
-                          <span className="text-danger font-bold">{Math.round(item.lookalike.similarity * 100)}%</span>
+              return (
+                <StatusRow
+                  key={item.domain}
+                  title={item.domain}
+                  status={statusState}
+                  statusLabel={statusLabel}
+                  subtitle={subtitle}
+                  defaultExpanded={false}
+                  onViewRaw={() => setSelectedRawDomain(item)}
+                  rawButtonLabel="View DNS records & RDAP"
+                >
+                  <div className="space-y-3">
+                    {/* Lookalike Detailed Card */}
+                    {item.lookalike && (
+                      <div className="p-3.5 rounded-xl bg-danger-surface border border-danger-border space-y-2">
+                        <div className="flex items-center space-x-2 text-danger font-bold text-xs">
+                          <ShieldAlert className="w-4 h-4 text-danger" />
+                          <span>Brand Impersonation Heuristics: {item.lookalike.brand_name}</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-mono">
+                          <div className="bg-surface p-2 rounded border border-border">
+                            <span className="text-[10px] text-foreground-muted uppercase block">Observed Domain</span>
+                            <span className="text-danger font-bold">{item.lookalike.domain}</span>
+                          </div>
+                          <div className="bg-surface p-2 rounded border border-border">
+                            <span className="text-[10px] text-foreground-muted uppercase block">Target Brand Reference</span>
+                            <span className="text-success font-bold">{item.lookalike.suspected_brand || item.lookalike.brand_name}</span>
+                          </div>
+                          <div className="bg-surface p-2 rounded border border-border">
+                            <span className="text-[10px] text-foreground-muted uppercase block">Similarity Score</span>
+                            <span className="text-warning font-bold">{Math.round(item.lookalike.similarity * 100)}% Match</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {item.lookalike.techniques.map((tech, tIdx) => (
+                            <span key={tIdx} className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-danger/10 text-danger border border-danger/30">
+                              {formatTechniqueName(tech)}
+                            </span>
+                          ))}
                         </div>
                       </div>
-                    </div>
+                    )}
 
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs font-mono">
-                      <div className="bg-surface p-2.5 rounded-lg border border-danger-border/40">
-                        <span className="text-[10px] uppercase text-foreground-muted font-bold block mb-0.5">Observed domain</span>
-                        <span className="text-danger font-semibold break-all">{item.lookalike.domain}</span>
-                      </div>
-                      <div className="bg-surface p-2.5 rounded-lg border border-danger-border/40">
-                        <span className="text-[10px] uppercase text-foreground-muted font-bold block mb-0.5">Reference domain</span>
-                        <span className="text-success font-semibold break-all">{item.lookalike.suspected_brand}</span>
-                      </div>
-                      <div className="bg-surface p-2.5 rounded-lg border border-danger-border/40">
-                        <span className="text-[10px] uppercase text-foreground-muted font-bold block mb-0.5">Similarity</span>
-                        <span className="text-warning font-semibold">{Math.round(item.lookalike.similarity * 100)}%</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <span className="text-[10px] uppercase text-foreground-muted font-bold block mb-1.5">Detected techniques</span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {item.lookalike.techniques.map((tech, idx) => (
-                          <span key={idx} className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-danger/10 text-danger border border-danger/30">
-                            {formatTechniqueName(tech)}
+                    {/* Registration Details */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                      <MetadataRow
+                        label="Domain Age"
+                        value={
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3 text-primary" />
+                            <span>{ageDisplay}</span>
                           </span>
-                        ))}
-                      </div>
+                        }
+                      />
+                      <MetadataRow
+                        label="Registrar"
+                        value={
+                          <span className="flex items-center gap-1">
+                            <Shield className="w-3 h-3 text-primary" />
+                            <span>{item.registration.registrar || 'Unavailable'}</span>
+                          </span>
+                        }
+                      />
+                      <MetadataRow
+                        label="Registration Date"
+                        value={
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-primary" />
+                            <span>{formatDate(item.registration.registration_date)}</span>
+                          </span>
+                        }
+                      />
+                      <MetadataRow
+                        label="Expiration Date"
+                        value={
+                          <span className="flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-primary" />
+                            <span>{formatDate(item.registration.expiration_date)}</span>
+                          </span>
+                        }
+                      />
                     </div>
 
-                    {item.lookalike.details && (
-                      <p className="text-[11px] font-mono text-foreground-muted italic">
-                        {item.lookalike.details}
-                      </p>
-                    )}
-                  </div>
-                )}
-
-                {/* Registration Metadata Overview */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs font-mono">
-                  {/* Domain Age */}
-                  <div className="bg-surface-secondary/50 p-3 rounded-xl border border-border space-y-1">
-                    <span className="text-foreground-muted text-[10px] uppercase font-bold flex items-center gap-1">
-                      <Clock className="w-3 h-3 text-primary" /> Domain Age
-                    </span>
-                    <p className={`font-semibold ${item.domain_age_days !== undefined && item.domain_age_days !== null ? 'text-primary text-sm font-bold' : 'text-foreground-muted italic'}`}>
-                      {ageDisplay}
-                    </p>
-                  </div>
-
-                  {/* Registrar */}
-                  <div className="bg-surface-secondary/50 p-3 rounded-xl border border-border space-y-1">
-                    <span className="text-foreground-muted text-[10px] uppercase font-bold flex items-center gap-1">
-                      <Shield className="w-3 h-3 text-primary" /> Registrar
-                    </span>
-                    <p className="text-foreground font-semibold truncate" title={item.registration.registrar || 'Unavailable'}>
-                      {item.registration.registrar || 'Unavailable'}
-                    </p>
-                    <span className="text-[10px] text-foreground-muted block">
-                      Source: {item.registration.registration_source || 'unavailable'}
-                    </span>
-                  </div>
-
-                  {/* Registration Date */}
-                  <div className="bg-surface-secondary/50 p-3 rounded-xl border border-border space-y-1">
-                    <span className="text-foreground-muted text-[10px] uppercase font-bold flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-primary" /> Registration Date
-                    </span>
-                    <p className="text-foreground font-semibold">
-                      {formatDate(item.registration.registration_date)}
-                    </p>
-                  </div>
-
-                  {/* Expiration Date */}
-                  <div className="bg-surface-secondary/50 p-3 rounded-xl border border-border space-y-1">
-                    <span className="text-foreground-muted text-[10px] uppercase font-bold flex items-center gap-1">
-                      <Calendar className="w-3 h-3 text-primary" /> Expiration Date
-                    </span>
-                    <p className="text-foreground font-semibold">
-                      {formatDate(item.registration.expiration_date)}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Delegated Nameservers */}
-                {item.registration.nameservers && item.registration.nameservers.length > 0 && (
-                  <div className="p-3 rounded-xl bg-surface-secondary/30 border border-border text-xs font-mono flex flex-wrap items-center gap-2">
-                    <span className="text-foreground-muted text-[11px] font-bold">Nameservers:</span>
-                    {item.registration.nameservers.map((ns, idx) => (
-                      <span key={idx} className="px-2 py-0.5 rounded bg-surface text-foreground border border-border text-[11px]">
-                        {ns}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* DNS Records Section with Tabs */}
-                <div className="bg-surface-secondary/40 rounded-xl border border-border p-4 space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2 border-b border-border pb-2">
-                    <span className="text-xs font-mono font-bold text-foreground uppercase tracking-wider flex items-center gap-1.5">
-                      <Server className="w-3.5 h-3.5 text-primary" />
-                      Resolved DNS Records
-                    </span>
-
-                    <div className="flex items-center gap-1 bg-surface p-1 rounded-control border border-border text-[11px] font-mono">
-                      <button
-                        onClick={() => setActiveTabForDomain(item.domain, 'A')}
-                        className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                          currentTab === 'A' ? 'bg-surface-secondary text-foreground border border-border' : 'text-foreground-muted hover:text-foreground'
-                        }`}
-                      >
-                        A / AAAA ({item.dns.a.length + item.dns.aaaa.length})
-                      </button>
-                      <button
-                        onClick={() => setActiveTabForDomain(item.domain, 'MX')}
-                        className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                          currentTab === 'MX' ? 'bg-surface-secondary text-foreground border border-border' : 'text-foreground-muted hover:text-foreground'
-                        }`}
-                      >
-                        MX ({item.dns.mx.length})
-                      </button>
-                      <button
-                        onClick={() => setActiveTabForDomain(item.domain, 'NS')}
-                        className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                          currentTab === 'NS' ? 'bg-surface-secondary text-foreground border border-border' : 'text-foreground-muted hover:text-foreground'
-                        }`}
-                      >
-                        NS ({item.dns.ns.length})
-                      </button>
-                      <button
-                        onClick={() => setActiveTabForDomain(item.domain, 'TXT')}
-                        className={`px-2.5 py-1 rounded font-bold transition-colors cursor-pointer ${
-                          currentTab === 'TXT' ? 'bg-surface-secondary text-foreground border border-border' : 'text-foreground-muted hover:text-foreground'
-                        }`}
-                      >
-                        TXT ({item.dns.txt.length})
-                      </button>
+                    {/* DNS Records Snapshot */}
+                    <div className="p-2.5 rounded-lg bg-surface border border-border flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                      <div className="flex items-center space-x-2">
+                        <Server className="w-3.5 h-3.5 text-primary" />
+                        <span className="font-bold text-foreground">Authoritative DNS Records:</span>
+                      </div>
+                      <div className="flex items-center space-x-2 text-[11px]">
+                        <span className="px-2 py-0.5 rounded bg-surface-secondary border border-border">
+                          {item.dns.a.length + item.dns.aaaa.length} A/AAAA
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-secondary border border-border">
+                          {item.dns.mx.length} MX
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-secondary border border-border">
+                          {item.dns.ns.length} NS
+                        </span>
+                        <span className="px-2 py-0.5 rounded bg-surface-secondary border border-border">
+                          {item.dns.txt.length} TXT
+                        </span>
+                      </div>
                     </div>
                   </div>
+                </StatusRow>
+              );
+            })}
+          </div>
+        )}
+      </ExpandableSection>
 
-                  {/* Tab Contents */}
-                  <div className="font-mono text-xs">
-                    {currentTab === 'A' && (
-                      <div className="space-y-2">
-                        {!hasA ? (
-                          <p className="text-foreground-subtle italic text-[11px]">No A or AAAA records returned.</p>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {item.dns.a.map((ip, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-foreground">
-                                <span><strong className="text-primary">A:</strong> {ip}</span>
-                                <CopyButton text={ip} iconOnly />
-                              </div>
-                            ))}
-                            {item.dns.aaaa.map((ip, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-foreground">
-                                <span><strong className="text-primary">AAAA:</strong> {ip}</span>
-                                <CopyButton text={ip} iconOnly />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+      {/* Level 3 Raw Drawer */}
+      {selectedRawDomain && (
+        <DetailDrawer
+          isOpen={Boolean(selectedRawDomain)}
+          onClose={() => setSelectedRawDomain(null)}
+          title={`Domain Forensic Dossier — ${selectedRawDomain.domain}`}
+          subtitle="DNS zone records, RDAP registration records, and lookalike metrics"
+          data={{
+            domain: selectedRawDomain.domain,
+            punycode: selectedRawDomain.punycode,
+            is_resolvable: selectedRawDomain.is_resolvable,
+            domain_age_days: selectedRawDomain.domain_age_days,
+            registration: selectedRawDomain.registration,
+            dns_records: selectedRawDomain.dns,
+            lookalike_determination: selectedRawDomain.lookalike
+          }}
+          format="json"
+        >
+          {/* Formatted DNS table inside drawer */}
+          <div className="space-y-3 pb-3 border-b border-border font-mono text-xs">
+            <h4 className="font-bold text-foreground uppercase tracking-wider text-[11px] flex items-center gap-1.5">
+              <Server className="w-3.5 h-3.5 text-primary" />
+              <span>Resolved DNS Answers</span>
+            </h4>
 
-                    {currentTab === 'MX' && (
-                      <div className="space-y-2">
-                        {!hasMx ? (
-                          <p className="text-foreground-subtle italic text-[11px]">No MX mail exchanger records returned.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {item.dns.mx.map((mx, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-foreground">
-                                <span className="break-all"><strong className="text-primary">MX:</strong> {mx}</span>
-                                <CopyButton text={mx} iconOnly />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {currentTab === 'NS' && (
-                      <div className="space-y-2">
-                        {!hasNs ? (
-                          <p className="text-foreground-subtle italic text-[11px]">No authoritative NS records returned.</p>
-                        ) : (
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                            {item.dns.ns.map((ns, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-foreground">
-                                <span><strong className="text-primary">NS:</strong> {ns}</span>
-                                <CopyButton text={ns} iconOnly />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {currentTab === 'TXT' && (
-                      <div className="space-y-2">
-                        {!hasTxt ? (
-                          <p className="text-foreground-subtle italic text-[11px]">No TXT records returned.</p>
-                        ) : (
-                          <div className="space-y-1.5">
-                            {item.dns.txt.map((txt, idx) => (
-                              <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-surface border border-border text-foreground gap-2">
-                                <span className="break-all text-[11px]"><strong className="text-primary">TXT:</strong> {txt}</span>
-                                <CopyButton text={txt} iconOnly />
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
+            {/* A/AAAA */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-foreground-muted uppercase font-bold">A / AAAA Records:</span>
+              <div className="flex flex-wrap gap-1.5">
+                {[...selectedRawDomain.dns.a, ...selectedRawDomain.dns.aaaa].map((ip, i) => (
+                  <div key={i} className="flex items-center space-x-1.5 px-2 py-0.5 rounded bg-surface-secondary border border-border">
+                    <span>{ip}</span>
+                    <CopyButton text={ip} iconOnly />
                   </div>
-                </div>
+                ))}
+                {selectedRawDomain.dns.a.length === 0 && selectedRawDomain.dns.aaaa.length === 0 && (
+                  <span className="text-foreground-subtle italic text-[11px]">No A records returned.</span>
+                )}
               </div>
-            );
-          })}
-        </div>
+            </div>
+
+            {/* MX */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-foreground-muted uppercase font-bold">MX Mail Exchangers:</span>
+              <div className="space-y-1">
+                {selectedRawDomain.dns.mx.map((mx, i) => (
+                  <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface-secondary border border-border">
+                    <span className="break-all">{mx}</span>
+                    <CopyButton text={mx} iconOnly />
+                  </div>
+                ))}
+                {selectedRawDomain.dns.mx.length === 0 && (
+                  <span className="text-foreground-subtle italic text-[11px]">No MX records returned.</span>
+                )}
+              </div>
+            </div>
+
+            {/* TXT */}
+            <div className="space-y-1">
+              <span className="text-[10px] text-foreground-muted uppercase font-bold">TXT Records (SPF, DKIM, DMARC, Verification):</span>
+              <div className="space-y-1 max-h-40 overflow-y-auto">
+                {selectedRawDomain.dns.txt.map((txt, i) => (
+                  <div key={i} className="p-1.5 rounded bg-surface-secondary border border-border text-[11px] break-all select-all">
+                    {txt}
+                  </div>
+                ))}
+                {selectedRawDomain.dns.txt.length === 0 && (
+                  <span className="text-foreground-subtle italic text-[11px]">No TXT records returned.</span>
+                )}
+              </div>
+            </div>
+          </div>
+        </DetailDrawer>
       )}
     </div>
   );

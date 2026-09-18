@@ -5,7 +5,7 @@ from typing import List, Tuple, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_
 
-from backend.db.models import CaseModel, CaseEmailModel, EvidenceModel, AuditLogModel, EmailAnalysisModel
+from backend.db.models import CaseModel, CaseEmailModel, EvidenceModel, AuditLogModel, EmailAnalysisModel, AnalysisPayloadModel
 from backend.schemas.dashboard import (
     DashboardMetrics,
     SeverityDistributionItem,
@@ -340,8 +340,19 @@ class DashboardService:
             .limit(recent_limit)
             .all()
         )
-        recent_emails = [
-            DashboardEmailItem(
+        recent_emails = []
+        for em in recent_emails_db:
+            orig_name = None
+            if em.evidence_id:
+                p_rec = db.query(AnalysisPayloadModel).filter(AnalysisPayloadModel.evidence_id == em.evidence_id).first()
+                if p_rec and p_rec.analysis_json:
+                    try:
+                        orig_name = json.loads(p_rec.analysis_json).get("original_filename")
+                    except Exception:
+                        pass
+            if not orig_name:
+                orig_name = f"{(em.subject or 'evidence')[:25].strip().lower().replace(' ', '_')}.eml"
+            recent_emails.append(DashboardEmailItem(
                 id=em.id,
                 evidence_id=em.evidence_id,
                 sha256=em.email_sha256,
@@ -349,10 +360,10 @@ class DashboardService:
                 sender=em.sender,
                 threat_score=em.threat_score,
                 severity=em.severity,
-                timestamp=em.analyzed_at.isoformat() if em.analyzed_at else datetime.now(timezone.utc).isoformat()
-            )
-            for em in recent_emails_db
-        ]
+                timestamp=em.analyzed_at.isoformat() if em.analyzed_at else datetime.now(timezone.utc).isoformat(),
+                has_eml_file=True,
+                original_filename=orig_name
+            ))
 
         return DashboardSummaryResponse(
             metrics=top_metrics,
@@ -384,8 +395,19 @@ class DashboardService:
             .limit(limit)
             .all()
         )
-        items = [
-            DashboardEmailItem(
+        items = []
+        for em in rows:
+            orig_name = None
+            if em.evidence_id:
+                p_rec = db.query(AnalysisPayloadModel).filter(AnalysisPayloadModel.evidence_id == em.evidence_id).first()
+                if p_rec and p_rec.analysis_json:
+                    try:
+                        orig_name = json.loads(p_rec.analysis_json).get("original_filename")
+                    except Exception:
+                        pass
+            if not orig_name:
+                orig_name = f"{(em.subject or 'evidence')[:25].strip().lower().replace(' ', '_')}.eml"
+            items.append(DashboardEmailItem(
                 id=em.id,
                 evidence_id=em.evidence_id,
                 sha256=em.email_sha256,
@@ -393,8 +415,9 @@ class DashboardService:
                 sender=em.sender,
                 threat_score=em.threat_score,
                 severity=em.severity,
-                timestamp=em.analyzed_at.isoformat() if em.analyzed_at else datetime.now(timezone.utc).isoformat()
-            )
-            for em in rows
-        ]
+                timestamp=em.analyzed_at.isoformat() if em.analyzed_at else datetime.now(timezone.utc).isoformat(),
+                has_eml_file=True,
+                original_filename=orig_name
+            ))
         return items, total
+

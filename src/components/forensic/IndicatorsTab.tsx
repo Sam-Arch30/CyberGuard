@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type {
   EmailAnalysis,
   EmailAddressIndicator,
@@ -9,12 +9,19 @@ import { IPIntelligenceSection } from './IPIntelligenceSection';
 import { DomainIntelligenceSection } from './DomainIntelligenceSection';
 import { URLAnalysisSection } from './URLAnalysisSection';
 import { Mail, Hash, Paperclip, Shield } from 'lucide-react';
+import { StatusRow, ExpandableSection, DetailDrawer, MetadataRow } from '../common/progressive';
 
 interface IndicatorsTabProps {
   email: EmailAnalysis;
 }
 
 export const IndicatorsTab: React.FC<IndicatorsTabProps> = ({ email }) => {
+  const [selectedRawEvidence, setSelectedRawEvidence] = useState<{
+    title: string;
+    subtitle?: string;
+    data: any;
+  } | null>(null);
+
   const indicators = email.indicators || {};
 
   // Resolve Email indicators
@@ -29,7 +36,8 @@ export const IndicatorsTab: React.FC<IndicatorsTabProps> = ({ email }) => {
         filename: att.filename,
         mime_type: att.mime_type,
         size: att.size,
-        sha256: att.sha256 || 'N/A'
+        sha256: att.sha256 || 'N/A',
+        static_analysis: att.static_analysis
       }));
 
   const evidenceSha256 = email.email_sha256 || 'Not available';
@@ -50,7 +58,7 @@ export const IndicatorsTab: React.FC<IndicatorsTabProps> = ({ email }) => {
           <div className="flex items-center space-x-2">
             <Hash className="w-4 h-4 text-primary" />
             <h3 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
-              Evidence SHA-256 Hash
+              Evidence Cryptographic Root Digest
             </h3>
           </div>
           {email.email_sha256 && (
@@ -77,96 +85,115 @@ export const IndicatorsTab: React.FC<IndicatorsTabProps> = ({ email }) => {
       {/* Static URL Forensic Analysis */}
       <URLAnalysisSection email={email} />
 
-      {/* Email Addresses */}
-      <div className="bg-surface p-5 rounded-2xl border border-border space-y-3 shadow-xs">
-        <div className="flex items-center space-x-2 pb-2 border-b border-border">
-          <Mail className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
-            Email Addresses ({emailList.length})
-          </h3>
-        </div>
-
+      {/* Extracted Email Addresses */}
+      <ExpandableSection
+        title={`Extracted Email Identities (${emailList.length})`}
+        subtitle="Participant and routing email addresses discovered in message headers and content"
+        icon={Mail}
+        defaultExpanded={false}
+      >
         {emailList.length === 0 ? (
           <p className="text-xs font-mono text-foreground-subtle italic p-2">
             No email addresses detected.
           </p>
         ) : (
-          <div className="space-y-2">
+          <div className="space-y-2.5">
             {emailList.map((emailObj, idx) => (
-              <div
+              <StatusRow
                 key={idx}
-                className="flex items-center justify-between p-2.5 rounded-lg border border-border bg-surface-secondary/40 hover:bg-surface-secondary transition-colors gap-3"
+                title={emailObj.value}
+                status="INFO"
+                statusLabel={emailObj.source?.toUpperCase() || 'EXTRACTED'}
+                subtitle={`Extracted from message ${emailObj.source || 'headers'}`}
+                defaultExpanded={false}
+                onViewRaw={() =>
+                  setSelectedRawEvidence({
+                    title: `Email Identity Evidence — ${emailObj.value}`,
+                    subtitle: `Observed context in ${emailObj.source || 'headers'}`,
+                    data: emailObj
+                  })
+                }
               >
-                <div className="flex items-center space-x-2.5 min-w-0 flex-1">
-                  <span className="px-1.5 py-0.5 rounded text-[10px] font-mono bg-surface text-foreground-muted border border-border shrink-0">
-                    Extracted Indicator
-                  </span>
-                  <span className="text-xs font-mono text-foreground break-all select-all">
-                    {emailObj.value}
-                  </span>
-                  {emailObj.source && (
-                    <span className="text-[10px] font-mono text-foreground-subtle hidden sm:inline-block truncate">
-                      ({emailObj.source})
-                    </span>
-                  )}
+                <div className="space-y-2">
+                  <MetadataRow label="Email Address" value={emailObj.value} allowCopy={true} />
+                  <MetadataRow label="Extraction Source" value={emailObj.source || 'Header metadata'} />
+                  <MetadataRow
+                    label="Domain"
+                    value={emailObj.value.split('@')[1] || 'Unknown domain'}
+                  />
                 </div>
-                <CopyButton text={emailObj.value} iconOnly className="shrink-0" />
-              </div>
+              </StatusRow>
             ))}
           </div>
         )}
-      </div>
+      </ExpandableSection>
 
-      {/* Attachment Hashes */}
-      <div className="bg-surface p-5 rounded-2xl border border-border space-y-3 shadow-xs">
-        <div className="flex items-center space-x-2 pb-2 border-b border-border">
-          <Paperclip className="w-4 h-4 text-primary" />
-          <h3 className="text-sm font-mono font-bold text-foreground uppercase tracking-wider">
-            Attachment Hashes ({attachmentList.length})
-          </h3>
-        </div>
-
+      {/* Attachment Hashes & Static Inspection */}
+      <ExpandableSection
+        title={`File Attachments & Cryptographic Hashes (${attachmentList.length})`}
+        subtitle="Static file heuristics, mime-type verification, and cryptographic digest verification"
+        icon={Paperclip}
+        defaultExpanded={false}
+      >
         {attachmentList.length === 0 ? (
           <p className="text-xs font-mono text-foreground-subtle italic p-2">
             No attachments detected.
           </p>
         ) : (
-          <div className="space-y-3">
-            {attachmentList.map((att, idx) => (
-              <div
-                key={idx}
-                className="p-3.5 rounded-xl border border-border bg-surface-secondary/40 space-y-2 font-mono text-xs"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-foreground font-bold">
-                    {att.filename || 'Unnamed Attachment'} ({formatFileSize(att.size)})
-                  </span>
-                  {att.sha256 && <CopyButton text={att.sha256} label="Copy SHA-256" />}
-                </div>
+          <div className="space-y-2.5">
+            {attachmentList.map((att, idx) => {
+              const threatLevel = att.static_analysis?.threat_level || 'LOW';
+              const statusState = threatLevel === 'CRITICAL' ? 'FAIL' : threatLevel === 'HIGH' ? 'WARN' : 'PASS';
 
-                <div className="space-y-1 pt-1 text-[11px]">
-                  <div className="flex items-center justify-between text-foreground">
-                    <span className="text-foreground-muted">SHA-256:</span>
-                    <span className="break-all select-all font-semibold">{att.sha256 || 'N/A'}</span>
+              return (
+                <StatusRow
+                  key={idx}
+                  title={att.filename || 'Unnamed Attachment'}
+                  status={statusState}
+                  statusLabel={threatLevel}
+                  subtitle={`${formatFileSize(att.size)} · ${att.mime_type || 'Unknown MIME'}`}
+                  defaultExpanded={false}
+                  onViewRaw={() =>
+                    setSelectedRawEvidence({
+                      title: `Attachment Dossier — ${att.filename || 'Attachment'}`,
+                      subtitle: `Static inspection and cryptographic digests`,
+                      data: att
+                    })
+                  }
+                >
+                  <div className="space-y-2">
+                    <MetadataRow label="Filename" value={att.filename || 'N/A'} />
+                    <MetadataRow label="File Size" value={formatFileSize(att.size)} />
+                    <MetadataRow label="MIME Type" value={att.mime_type || 'unspecified'} />
+                    <MetadataRow label="SHA-256 Digest" value={att.sha256 || 'N/A'} allowCopy={true} />
+                    {att.md5 && <MetadataRow label="MD5 Digest" value={att.md5} allowCopy={true} />}
+                    {att.sha1 && <MetadataRow label="SHA-1 Digest" value={att.sha1} allowCopy={true} />}
+                    {att.static_analysis?.threat_level && (
+                      <MetadataRow
+                        label="Static Heuristics"
+                        value={`${att.static_analysis.threat_level} threat level — ${att.static_analysis.extension_mismatch ? 'Extension mismatch detected!' : 'No extension mismatch'}`}
+                        isMonospace={false}
+                      />
+                    )}
                   </div>
-                  {att.md5 && (
-                    <div className="flex items-center justify-between text-foreground">
-                      <span className="text-foreground-muted">MD5:</span>
-                      <span className="break-all select-all">{att.md5}</span>
-                    </div>
-                  )}
-                  {att.sha1 && (
-                    <div className="flex items-center justify-between text-foreground">
-                      <span className="text-foreground-muted">SHA-1:</span>
-                      <span className="break-all select-all">{att.sha1}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
+                </StatusRow>
+              );
+            })}
           </div>
         )}
-      </div>
+      </ExpandableSection>
+
+      {/* Level 3 Raw Drawer */}
+      {selectedRawEvidence && (
+        <DetailDrawer
+          isOpen={Boolean(selectedRawEvidence)}
+          onClose={() => setSelectedRawEvidence(null)}
+          title={selectedRawEvidence.title}
+          subtitle={selectedRawEvidence.subtitle}
+          data={selectedRawEvidence.data}
+          format="json"
+        />
+      )}
     </div>
   );
 };
