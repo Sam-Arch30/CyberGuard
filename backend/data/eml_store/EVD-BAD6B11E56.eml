@@ -1,0 +1,18 @@
+Received: from edge-relay.security-gateway.net (194.165.16.88) by mx01.enterprise.corp with ESMTPS id p4102 for <security.ops@enterprise.corp>; Tue, 15 Sep 2026 10:41:45 +0000
+Received: from smtp-origin.shadow-node.ru (185.220.101.42) by edge-relay.security-gateway.net with ESMTP id r9182; Tue, 15 Sep 2026 10:41:02 +0000
+From: IT Security Team <security-alert@m1crosoft-auth-verify.com>
+To: security.ops@enterprise.corp
+Subject: Urgent: Password Expiration Notification Required
+Date: Tue, 15 Sep 2026 10:40:55 +0000
+Message-ID: <20260915104055.8921@m1crosoft-auth-verify.com>
+Authentication-Results: mx01.enterprise.corp; spf=fail smtp.mailfrom=m1crosoft-auth-verify.com; dkim=fail; dmarc=fail
+Content-Type: text/plain; charset="UTF-8"
+
+Your enterprise account credentials are set to expire within 24 hours.
+Please authenticate your identity immediately at:
+https://login.m1crosoft-auth-verify.com/portal/login?id=8829
+
+Failure to re-verify will result in administrative account revocation.
+
+Internal IT Helpdesk
+Support ID: 9812-B

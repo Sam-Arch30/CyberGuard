@@ -1,0 +1,9 @@
+From: Security Team <security@cloud-infra.org>
+To: SOC Team <soc@enterprise.local>
+Subject: Account Verification Notification
+Date: Thu, 17 Sep 2026 14:30:00 +0000
+Message-ID: <test-live-ipv6-check@cloud-infra.org>
+Received: from mail-pj1-x230.google.com (mail-pj1-x230.google.com [2607:f8b0:4864:20::230]) by mx.google.com with ESMTPS id abc; Thu, 17 Sep 2026 14:30:01 +0000
+Content-Type: text/plain
+
+Please verify your credentials at http://alert-security.com

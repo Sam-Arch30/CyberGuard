@@ -1,0 +1,30 @@
+Received: from mail.attacker-domain.example (mail.attacker-domain.example [203.0.113.19])
+    by mx.target-corp.example (Postfix) with ESMTP id 4X9kL82Z
+    for <victim@target-corp.example>; Tue, 16 Sep 2026 14:22:10 +0000
+Received: from internal-node.local (10.0.0.5)
+    by mail.attacker-domain.example with SMTP id 99A12BC;
+    Tue, 16 Sep 2026 14:21:45 +0000
+From: "Executive Support" <support@micros0ft-update.example>
+Reply-To: <collector@untrusted-drop.example>
+To: <victim@target-corp.example>
+Subject: CRITICAL: Immediate Wire Transfer & Password Verification Required #8821
+Date: Tue, 16 Sep 2026 14:21:30 +0000
+Message-ID: <threat-8821@micros0ft-update.example>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="BOUNDARY-INT-TEST"
+
+--BOUNDARY-INT-TEST
+Content-Type: text/plain; charset="utf-8"
+
+URGENT: Please verify your account credentials immediately at http://login-security.micros0ft-update.example/verify
+Failure to respond within 24 hours will result in wire transfer suspension.
+
+--BOUNDARY-INT-TEST
+Content-Type: application/octet-stream; name="invoice_document.pdf.exe"
+Content-Disposition: attachment; filename="invoice_document.pdf.exe"
+Content-Transfer-Encoding: base64
+
+TVqQAAMAAAAEAAAA//8AALgAAAAAAAAAQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAA4AAAAA4fug4AtAnNIbgBTM0hVGhpcyBwcm9ncmFtIGNhbm5vdCBiZSBydW4gaW4gRE9TIG1v
+ZGUuDQ0KJAAAAAAAAABQRQAATAEDAAAAAAAAAAAAAAAAAAAAAAAA
+--BOUNDARY-INT-TEST--

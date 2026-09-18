@@ -1,0 +1,9 @@
+From: Security Alert <security@it-service.corp>
+To: Incident Response <soc@company.org>
+Subject: Verification Notice
+Date: Thu, 17 Sep 2026 15:00:00 +0000
+Message-ID: <test-alert-ipv6@it-service.corp>
+Received: from mail-pj1-x230.google.com (mail-pj1-x230.google.com [2607:f8b0:4864:20::230]) by mx.google.com with ESMTPS id 998877; Thu, 17 Sep 2026 15:00:01 +0000
+Content-Type: text/plain
+
+Suspicious email sample for forensic evaluation.

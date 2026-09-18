@@ -1,0 +1,17 @@
+Received: from mail.benign-partner.org (mail.benign-partner.org [198.51.100.44])
+    by mx.target-corp.example (Postfix) with ESMTP id 5Y0kM93A
+    for <analyst@target-corp.example>; Tue, 16 Sep 2026 15:00:00 +0000
+From: "Partner Logistics" <notifications@benign-partner.org>
+To: <analyst@target-corp.example>
+Subject: Weekly Shipping Schedule Update - Q3
+Date: Tue, 16 Sep 2026 15:00:00 +0000
+Message-ID: <shipping-9901@benign-partner.org>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hello Team,
+
+Attached please find the schedule for Q3 deliveries. No action is required.
+
+Best regards,
+Logistics Team
