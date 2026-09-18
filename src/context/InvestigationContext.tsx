@@ -36,8 +36,8 @@ export const INVESTIGATION_SECTIONS: SectionMetadata[] = [
     number: '02',
     label: 'Email',
     shortLabel: 'Email',
-    description: 'Original content, metadata, headers, authentication & relay',
-    defaultSubTab: 'body'
+    description: 'Email identity, authentication, relay path, headers & evidence',
+    defaultSubTab: 'all'
   },
   {
     id: 'analysis',
