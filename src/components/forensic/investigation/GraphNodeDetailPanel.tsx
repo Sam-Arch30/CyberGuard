@@ -14,9 +14,11 @@ import {
   AlertTriangle,
   ExternalLink,
   ArrowRight,
-  Database
+  Database,
+  Sparkles
 } from 'lucide-react';
 import type { GraphNode, GraphEdge, NodeType } from '../../../types/graph';
+import { useInvestigation } from '../../../context/InvestigationContext';
 import { CopyButton } from '../CopyButton';
 
 interface GraphNodeDetailPanelProps {
@@ -68,6 +70,7 @@ export const GraphNodeDetailPanel: React.FC<GraphNodeDetailPanelProps> = ({
   onPivotToSection,
   onAddToCase
 }) => {
+  const { openCopilotDrawer } = useInvestigation();
   const meta = node.metadata || {};
 
   // Build connected adjacent entities
@@ -318,6 +321,26 @@ export const GraphNodeDetailPanel: React.FC<GraphNodeDetailPanelProps> = ({
         </span>
 
         <div className="grid grid-cols-1 gap-1.5">
+          {/* Ask AI Contextual Action */}
+          <button
+            type="button"
+            onClick={() => {
+              const identifier = node.metadata?.url || node.metadata?.domain || node.metadata?.ip || node.label;
+              openCopilotDrawer(
+                `Explain entity [${node.type}] '${identifier}' and how it relates to the attack vectors in this email investigation.`,
+                {
+                  type: node.type,
+                  identifier: identifier,
+                  details: node.label
+                }
+              );
+            }}
+            className="w-full px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 font-mono text-xs font-semibold transition-colors flex items-center justify-center space-x-1.5 cursor-pointer"
+            title="Ask AI Copilot about this entity"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>Ask AI About This Entity</span>
+          </button>
           {node.type === 'IP' && onPivotToSection && (
             <button
               type="button"

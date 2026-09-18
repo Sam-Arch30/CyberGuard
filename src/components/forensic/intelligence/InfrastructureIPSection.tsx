@@ -6,9 +6,11 @@ import {
   MapPin,
   Search,
   ExternalLink,
-  AlertTriangle
+  AlertTriangle,
+  Sparkles
 } from 'lucide-react';
 import type { EmailAnalysis, IPIntelligence } from '../../../types/forensic';
+import { useInvestigation } from '../../../context/InvestigationContext';
 import { resolveIPIntelligence } from '../../../utils/indicatorHelper';
 import { CopyButton } from '../CopyButton';
 import { DetailDrawer, MetadataRow } from '../../common/progressive';
@@ -37,6 +39,7 @@ export const InfrastructureIPSection: React.FC<InfrastructureIPSectionProps> = (
   selectedIpExternal,
   onClearSelectedIp
 }) => {
+  const { openCopilotDrawer } = useInvestigation();
   const [filter, setFilter] = useState<'all' | 'public' | 'private' | 'suspicious'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedIpForDrawer, setSelectedIpForDrawer] = useState<IPEntityItem | null>(null);
@@ -416,6 +419,26 @@ export const InfrastructureIPSection: React.FC<InfrastructureIPSectionProps> = (
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
+                      openCopilotDrawer(
+                        `Explain infrastructure IP observable '${entity.ip}' (${entity.role}). What is its ASN reputation (${entity.intel.asn || 'N/A'}), hosting provider (${providerStr}), and risk level in this incident?`,
+                        {
+                          type: 'IP',
+                          identifier: entity.ip,
+                          details: `${entity.role} · ${entity.intel.asn || 'ASN'} ${providerStr}`
+                        }
+                      );
+                    }}
+                    className="px-2 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-mono font-semibold transition-colors flex items-center space-x-1 cursor-pointer"
+                    title="Ask AI about this IP"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span className="hidden sm:inline">Ask AI</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
                       setSelectedIpForDrawer(entity);
                     }}
                     className="px-3 py-1.5 rounded-lg bg-surface-secondary group-hover:bg-primary group-hover:text-primary-foreground border border-border text-xs font-mono text-foreground-muted transition-colors flex items-center space-x-1 cursor-pointer"
@@ -532,6 +555,25 @@ export const InfrastructureIPSection: React.FC<InfrastructureIPSectionProps> = (
                 </div>
               </div>
             )}
+
+            {/* Contextual Ask AI Button inside Drawer */}
+            <button
+              type="button"
+              onClick={() => {
+                openCopilotDrawer(
+                  `Explain infrastructure IP '${selectedIpForDrawer.ip}' (${selectedIpForDrawer.role}). What is its ASN reputation (${selectedIpForDrawer.intel.asn || 'N/A'}), hosting provider (${selectedIpForDrawer.intel.organization || selectedIpForDrawer.intel.isp || 'N/A'}), and security implications?`,
+                  {
+                    type: 'IP',
+                    identifier: selectedIpForDrawer.ip,
+                    details: `${selectedIpForDrawer.role} · ${selectedIpForDrawer.intel.asn || 'ASN'}`
+                  }
+                );
+              }}
+              className="w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-mono font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Ask AI About This IP Address</span>
+            </button>
           </div>
         </DetailDrawer>
       )}

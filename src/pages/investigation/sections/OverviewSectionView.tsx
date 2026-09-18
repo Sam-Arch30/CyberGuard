@@ -38,7 +38,7 @@ const defang = (val?: string): string => {
 };
 
 export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email }) => {
-  const { setSection } = useInvestigation();
+  const { setSection, openCopilotDrawer } = useInvestigation();
   const [copiedIndicator, setCopiedIndicator] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState<boolean>(false);
 
@@ -486,18 +486,40 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
                   </div>
                 </div>
 
-                {/* Direct Jump Button */}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setSection(finding.targetSection, finding.targetSubTab);
-                  }}
-                  className="self-end sm:self-center px-3 py-1 rounded-lg bg-surface-secondary group-hover:bg-primary group-hover:text-primary-foreground border border-border text-foreground text-xs font-mono font-medium flex items-center space-x-1.5 transition-all shrink-0 cursor-pointer"
-                >
-                  <span>{finding.actionLabel}</span>
-                  <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                </button>
+                {/* Action Buttons: Ask AI & Direct Jump */}
+                <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCopilotDrawer(
+                        `Explain this finding: "${finding.title}" - ${finding.description}. What evidence supports it and what are the security implications?`,
+                        {
+                          type: 'Finding',
+                          identifier: finding.title,
+                          details: `${finding.severity} severity`
+                        }
+                      );
+                    }}
+                    className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-mono font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
+                    title="Ask AI about this finding"
+                  >
+                    <Sparkles className="w-3 h-3" />
+                    <span>Ask AI</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSection(finding.targetSection, finding.targetSubTab);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-surface-secondary group-hover:bg-primary group-hover:text-primary-foreground border border-border text-foreground text-xs font-mono font-medium flex items-center space-x-1.5 transition-all cursor-pointer"
+                  >
+                    <span>{finding.actionLabel}</span>
+                    <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -558,14 +580,34 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setSection('email', 'auth')}
-            className="w-full py-1.5 rounded-lg bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-foreground text-xs font-mono font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
-          >
-            <span>Inspect Full Headers & Auth Matrix</span>
-            <ArrowRight className="w-3 h-3 text-primary" />
-          </button>
+          <div className="flex items-center space-x-2 pt-1">
+            <button
+              type="button"
+              onClick={() =>
+                openCopilotDrawer(
+                  'Explain the SPF, DKIM, and DMARC authentication results, why alignment passed or failed, and how the p=reject policy was enforced.',
+                  {
+                    type: 'Authentication',
+                    identifier: `SPF:${spfState} DKIM:${dkimState} DMARC:${dmarcState}`
+                  }
+                )
+              }
+              className="px-2.5 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-mono font-medium flex items-center space-x-1.5 transition-colors cursor-pointer shrink-0"
+              title="Ask AI to explain authentication failures"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Ask AI</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSection('email', 'auth')}
+              className="flex-1 py-1.5 rounded-lg bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-foreground text-xs font-mono font-medium flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+            >
+              <span>Inspect Full Headers & Auth Matrix</span>
+              <ArrowRight className="w-3 h-3 text-primary" />
+            </button>
+          </div>
         </section>
 
         {/* SECTION 4 — Important Indicators (Highest Priority IOCs) */}

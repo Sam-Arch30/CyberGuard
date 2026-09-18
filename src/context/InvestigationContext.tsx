@@ -99,6 +99,12 @@ interface InvestigationContextType {
   stepGuidance: StepGuidance;
   reloadActiveEmail: () => Promise<void>;
   reanalyzeActiveEmail: () => Promise<void>;
+  // Contextual AI Copilot Drawer
+  isCopilotDrawerOpen: boolean;
+  copilotContextData: { prompt?: string; entity?: { type: string; identifier: string; details?: string } } | null;
+  openCopilotDrawer: (initialPrompt?: string, entityContext?: { type: string; identifier: string; details?: string }) => void;
+  closeCopilotDrawer: () => void;
+  toggleCopilotDrawer: () => void;
 }
 
 const InvestigationContext = createContext<InvestigationContextType | null>(null);
@@ -131,6 +137,13 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [error, setError] = useState<string | null>(null);
   const [availableAnalyses, setAvailableAnalyses] = useState<EmailAnalysis[]>([]);
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
+
+  // Copilot Drawer State
+  const [isCopilotDrawerOpen, setIsCopilotDrawerOpen] = useState<boolean>(false);
+  const [copilotContextData, setCopilotContextData] = useState<{
+    prompt?: string;
+    entity?: { type: string; identifier: string; details?: string };
+  } | null>(null);
 
   // Sub-tabs state per section
   const [subTabs, setSubTabs] = useState<Record<InvestigationSection, string>>({
@@ -489,6 +502,19 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   }, [activeEmail, activeEmailId, loadEmailData]);
 
+  const openCopilotDrawer = useCallback((initialPrompt?: string, entityContext?: { type: string; identifier: string; details?: string }) => {
+    setCopilotContextData(initialPrompt || entityContext ? { prompt: initialPrompt, entity: entityContext } : null);
+    setIsCopilotDrawerOpen(true);
+  }, []);
+
+  const closeCopilotDrawer = useCallback(() => {
+    setIsCopilotDrawerOpen(false);
+  }, []);
+
+  const toggleCopilotDrawer = useCallback(() => {
+    setIsCopilotDrawerOpen(prev => !prev);
+  }, []);
+
   const stepGuidance = getStepGuidance();
 
   return (
@@ -510,7 +536,12 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         focusGraphNode,
         stepGuidance,
         reloadActiveEmail: () => loadEmailData(activeEmailId),
-        reanalyzeActiveEmail
+        reanalyzeActiveEmail,
+        isCopilotDrawerOpen,
+        copilotContextData,
+        openCopilotDrawer,
+        closeCopilotDrawer,
+        toggleCopilotDrawer
       }}
     >
       {children}

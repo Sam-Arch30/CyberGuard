@@ -1,8 +1,9 @@
 import React from 'react';
-import { Loader2, AlertCircle, ArrowLeft } from 'lucide-react';
+import { Loader2, AlertCircle, ArrowLeft, Sparkles } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useInvestigation } from '../../context/InvestigationContext';
 import { ActiveInvestigationHeader } from '../../components/layout/ActiveInvestigationHeader';
+import { InvestigationAIDrawer } from '../../components/copilot/InvestigationAIDrawer';
 import { OverviewSectionView } from './sections/OverviewSectionView';
 import { EmailSectionView } from './sections/EmailSectionView';
 import { AnalysisSectionView } from './sections/AnalysisSectionView';
@@ -16,7 +17,9 @@ export const InvestigationWorkspace: React.FC = () => {
     loading,
     error,
     activeSection,
-    reloadActiveEmail
+    reloadActiveEmail,
+    openCopilotDrawer,
+    isCopilotDrawerOpen
   } = useInvestigation();
   const navigate = useNavigate();
 
@@ -65,7 +68,7 @@ export const InvestigationWorkspace: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 pb-16 page-enter">
+    <div className="space-y-6 pb-16 page-enter relative">
       {/* 1. PERSISTENT ACTIVE INVESTIGATION CONTEXT HEADER */}
       <ActiveInvestigationHeader />
 
@@ -78,6 +81,24 @@ export const InvestigationWorkspace: React.FC = () => {
         {activeSection === 'investigation' && <InvestigationSectionView email={activeEmail} />}
         {activeSection === 'report' && <ReportSectionView email={activeEmail} />}
       </div>
+
+      {/* 3. CONTEXTUAL INVESTIGATION AI DRAWER */}
+      <InvestigationAIDrawer />
+
+      {/* 4. PERSISTENT FLOATING QUICK-ACCESS BUTTON (Accessible throughout workspace) */}
+      {!isCopilotDrawerOpen && (
+        <div className="fixed bottom-6 right-6 z-40 animate-fadeIn">
+          <button
+            type="button"
+            onClick={() => openCopilotDrawer()}
+            className="group flex items-center space-x-2 px-3.5 py-2.5 rounded-full bg-primary hover:bg-primary-hover text-primary-foreground shadow-lg hover:shadow-primary/25 border border-primary-border transition-all duration-200 cursor-pointer text-xs font-mono font-semibold"
+            title="Open Investigation AI Copilot Drawer"
+          >
+            <Sparkles className="w-4 h-4 animate-pulse group-hover:scale-110 transition-transform" />
+            <span>Ask Copilot</span>
+          </button>
+        </div>
+      )}
     </div>
   );
 };

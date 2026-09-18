@@ -19,7 +19,8 @@ import {
   Globe2,
   FolderLock,
   FileCheck,
-  CheckCircle2
+  CheckCircle2,
+  Sparkles
 } from 'lucide-react';
 import { useInvestigation, INVESTIGATION_SECTIONS, type InvestigationSection } from '../../context/InvestigationContext';
 import { AddToCaseModal } from '../case/AddToCaseModal';
@@ -55,7 +56,8 @@ export const ActiveInvestigationHeader: React.FC = () => {
     setActiveEmailId,
     setSection,
     stepGuidance,
-    reanalyzeActiveEmail
+    reanalyzeActiveEmail,
+    openCopilotDrawer
   } = useInvestigation();
 
   const navigate = useNavigate();
@@ -344,6 +346,17 @@ export const ActiveInvestigationHeader: React.FC = () => {
               </div>
             </div>
 
+            {/* Primary Action 0: Ask AI Copilot */}
+            <button
+              type="button"
+              onClick={() => openCopilotDrawer()}
+              className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-mono font-semibold transition-colors cursor-pointer shadow-xs"
+              title="Open contextual investigation AI drawer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Ask AI</span>
+            </button>
+
             {/* Primary Action 1: Add to Case */}
             <button
               type="button"
@@ -414,6 +427,17 @@ export const ActiveInvestigationHeader: React.FC = () => {
 
               {overflowMenuOpen && (
                 <div className="absolute right-0 top-full mt-1.5 w-56 bg-surface-elevated border border-border rounded-xl shadow-xl z-50 p-1 animate-fadeIn text-xs font-mono">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setOverflowMenuOpen(false);
+                      openCopilotDrawer();
+                    }}
+                    className="w-full text-left px-3 py-2 rounded-lg hover:bg-surface-secondary text-foreground flex items-center space-x-2 transition-colors cursor-pointer"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    <span>Ask AI Assistant</span>
+                  </button>
                   <button
                     type="button"
                     onClick={handleTriggerReanalyze}

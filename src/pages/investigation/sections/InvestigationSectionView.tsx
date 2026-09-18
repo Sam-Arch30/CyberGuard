@@ -19,7 +19,6 @@ import {
 } from '../../../components/forensic/investigation';
 import { CrossEmailWorkspace } from '../../../components/forensic/CrossEmailWorkspace';
 import { EvidenceIntegritySection } from '../../../components/forensic/EvidenceIntegritySection';
-import { InvestigationCopilot } from '../../../components/copilot/InvestigationCopilot';
 import { AddToCaseModal } from '../../../components/case/AddToCaseModal';
 import { CampaignGraphView } from '../../../components/campaign/CampaignGraphView';
 import { CampaignTimeline } from '../../../components/campaign/CampaignTimeline';
@@ -36,7 +35,8 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
     setSubTab,
     setSection,
     setActiveEmailId,
-    stepGuidance
+    stepGuidance,
+    openCopilotDrawer
   } = useInvestigation();
 
   const currentSubTab = (subTabs.investigation || 'graph') as InvestigationSubTab;
@@ -318,22 +318,51 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
           </div>
         )}
 
-        {/* AI Investigation Copilot */}
+        {/* AI Investigation Copilot Drawer Launcher */}
         {currentSubTab === 'copilot' && (
-          <div className="bg-surface rounded-xl border border-border p-5 shadow-xs space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-border">
-              <div className="flex items-center space-x-2 text-xs font-mono font-bold uppercase text-foreground">
-                <Sparkles className="w-4 h-4 text-primary" />
-                <span>AI Forensic Copilot Assistant</span>
-              </div>
-              <span className="text-[11px] font-mono text-foreground-muted">
-                Zero data leakage model grounded in current investigation evidence
-              </span>
+          <div className="bg-surface rounded-xl border border-border p-8 shadow-xs space-y-6 text-center max-w-2xl mx-auto my-6">
+            <div className="w-14 h-14 rounded-2xl bg-primary/10 border border-primary/25 text-primary flex items-center justify-center mx-auto shadow-xs">
+              <Sparkles className="w-7 h-7" />
             </div>
-            <InvestigationCopilot
-              contextId={email.id || email.evidence_id}
-              emailPayload={email as any}
-            />
+
+            <div className="space-y-2">
+              <h3 className="text-base font-bold font-sans text-foreground">
+                Contextual Investigation AI Copilot
+              </h3>
+              <p className="text-xs font-mono text-foreground-muted max-w-md mx-auto leading-relaxed">
+                The AI assistant operates as a non-intrusive, persistent slide-over drawer accessible across all sections of the workspace.
+              </p>
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <button
+                type="button"
+                onClick={() => openCopilotDrawer()}
+                className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold flex items-center space-x-2 transition-colors cursor-pointer shadow-xs"
+              >
+                <Sparkles className="w-4 h-4" />
+                <span>Open AI Copilot Drawer</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSubTab('graph')}
+                className="px-4 py-2 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground text-xs font-mono transition-colors cursor-pointer"
+              >
+                <span>Return to Relationship Graph</span>
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-border grid grid-cols-1 sm:grid-cols-2 gap-2 text-left text-xs font-mono">
+              <div className="p-3 rounded-lg bg-surface-secondary/40 border border-border/60">
+                <span className="font-bold text-foreground block mb-1">Persistent Context</span>
+                <span className="text-[11px] text-foreground-muted">Always pinned to target {email.evidence_id || email.id} with calibrated confidence tiers.</span>
+              </div>
+              <div className="p-3 rounded-lg bg-surface-secondary/40 border border-border/60">
+                <span className="font-bold text-foreground block mb-1">Contextual Triggers</span>
+                <span className="text-[11px] text-foreground-muted">Click "Ask AI about this" on any finding, IOC, IP, domain, or graph node.</span>
+              </div>
+            </div>
           </div>
         )}
       </div>

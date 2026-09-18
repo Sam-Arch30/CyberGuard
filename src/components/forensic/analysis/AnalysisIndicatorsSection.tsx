@@ -10,8 +10,10 @@ import {
   Link2,
   Mail,
   Paperclip,
-  Filter
+  Filter,
+  Sparkles
 } from 'lucide-react';
+import { useInvestigation } from '../../../context/InvestigationContext';
 import { ExpandableSection, DetailDrawer } from '../../common/progressive';
 import { CopyButton } from '../CopyButton';
 
@@ -39,6 +41,7 @@ const defang = (val: string): string => {
 };
 
 export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps> = ({ email }) => {
+  const { openCopilotDrawer } = useInvestigation();
   const [selectedType, setSelectedType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [onlySuspicious, setOnlySuspicious] = useState<boolean>(false);
@@ -435,17 +438,38 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
 
                           {/* Action */}
                           <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedIOC(ioc);
-                              }}
-                              className="px-2 py-1 rounded text-[11px] font-bold text-primary hover:bg-primary/10 transition-colors flex items-center justify-end space-x-1 ml-auto cursor-pointer"
-                            >
-                              <span>Inspect</span>
-                              <ExternalLink className="w-3 h-3" />
-                            </button>
+                            <div className="flex items-center justify-end space-x-1 ml-auto">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  openCopilotDrawer(
+                                    `Explain this ${ioc.type.toUpperCase()} observable: '${ioc.value}'. What is its reputation, forensic role, and threat context in this investigation?`,
+                                    {
+                                      type: ioc.type.toUpperCase(),
+                                      identifier: ioc.value,
+                                      details: ioc.statusLabel
+                                    }
+                                  );
+                                }}
+                                className="px-1.5 py-1 rounded text-[11px] font-bold text-primary/80 hover:text-primary hover:bg-primary/10 transition-colors flex items-center space-x-1 cursor-pointer"
+                                title="Ask AI about this observable"
+                              >
+                                <Sparkles className="w-3 h-3" />
+                                <span className="hidden sm:inline">Ask AI</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedIOC(ioc);
+                                }}
+                                className="px-2 py-1 rounded text-[11px] font-bold text-primary hover:bg-primary/10 transition-colors flex items-center space-x-1 cursor-pointer"
+                              >
+                                <span>Inspect</span>
+                                <ExternalLink className="w-3 h-3" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -495,6 +519,25 @@ export const AnalysisIndicatorsSection: React.FC<AnalysisIndicatorsSectionProps>
                 </p>
               </div>
             )}
+
+            {/* Contextual Ask AI Button inside Drawer */}
+            <button
+              type="button"
+              onClick={() => {
+                openCopilotDrawer(
+                  `Explain this ${selectedIOC.type.toUpperCase()} observable: '${selectedIOC.value}'. What is its reputation, forensic role, and threat context?`,
+                  {
+                    type: selectedIOC.type.toUpperCase(),
+                    identifier: selectedIOC.value,
+                    details: selectedIOC.statusLabel
+                  }
+                );
+              }}
+              className="w-full py-2 rounded-xl bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-mono font-bold flex items-center justify-center space-x-1.5 transition-colors cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Ask AI About This Indicator</span>
+            </button>
           </div>
         </DetailDrawer>
       )}
