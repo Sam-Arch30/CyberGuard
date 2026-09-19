@@ -16,6 +16,7 @@ import {
   Filter
 } from 'lucide-react';
 import type { CaseListItem, CaseStatus, CaseSeverity, CaseCreatePayload } from '../types/case';
+import { apiUrl } from '../utils/apiClient';
 
 const STATUS_CONFIG: Record<CaseStatus, { label: string; badge: string; border: string }> = {
   open: { label: 'Open', badge: 'bg-surface-secondary text-foreground border-border', border: 'border-border' },
@@ -57,7 +58,7 @@ export const Cases: React.FC = () => {
     if (selectedSeverity !== 'ALL') params.append('severity', selectedSeverity);
     if (searchQuery.trim()) params.append('search', searchQuery.trim());
 
-    fetch(`http://localhost:8000/api/cases?${params.toString()}`)
+    fetch(apiUrl(`/api/cases?${params.toString()}`))
       .then(res => (res.ok ? res.json() : null))
       .then(data => {
         if (data && Array.isArray(data.cases)) {
@@ -94,7 +95,7 @@ export const Cases: React.FC = () => {
     };
 
     try {
-      const res = await fetch('http://localhost:8000/api/cases', {
+      const res = await fetch(apiUrl('/api/cases'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

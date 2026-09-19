@@ -23,6 +23,7 @@ import type { DashboardSummary } from '../types/dashboard';
 import type { EmailAnalysis } from '../types/forensic';
 import { getAllAvailableAnalyses, saveAnalysisResult } from '../utils/forensicStore';
 import { decodeRfc2047 } from '../utils/indicatorHelper';
+import { apiUrl } from '../utils/apiClient';
 import {
   SCENARIO_1_LEGITIMATE,
   SCENARIO_2_PHISHING,
@@ -103,12 +104,7 @@ export const Dashboard: React.FC = () => {
 
     // 2. Fetch backend summary if available
     try {
-      let res: Response | null = null;
-      try {
-        res = await fetch('/api/dashboard/summary?days=30&recent_limit=10');
-      } catch {
-        res = await fetch('http://127.0.0.1:8000/api/dashboard/summary?days=30&recent_limit=10');
-      }
+      const res = await fetch(apiUrl('/api/dashboard/summary?days=30&recent_limit=10'));
 
       if (res && res.ok) {
         const liveSummary: DashboardSummary = await res.json();
@@ -157,12 +153,7 @@ export const Dashboard: React.FC = () => {
       const formData = new FormData();
       formData.append('file', fileOrBlob, filename);
 
-      let res: Response | null = null;
-      try {
-        res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
-      } catch {
-        res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
-      }
+      const res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
 
       if (res && res.ok) {
         const data = await res.json();
@@ -650,7 +641,7 @@ export const Dashboard: React.FC = () => {
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            window.open(`http://localhost:8000/api/emails/${encodeURIComponent(row.evidenceId || row.id)}/download`, '_blank');
+                            window.open(apiUrl(`/api/emails/${encodeURIComponent(row.evidenceId || row.id)}/download`), '_blank');
                           }}
                           className="p-1 rounded bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-primary transition-colors cursor-pointer"
                           title="Download Stored RFC-822 .EML File"

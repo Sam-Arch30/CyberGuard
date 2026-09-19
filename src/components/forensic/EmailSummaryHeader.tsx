@@ -4,6 +4,7 @@ import { ArrowLeft, Shield, Mail, Calendar, User, CornerDownLeft, Repeat, Hash, 
 import type { EmailAnalysis } from '../../types/forensic';
 import { CopyButton } from './CopyButton';
 import { AddToCaseModal } from '../case/AddToCaseModal';
+import { apiUrl } from '../../utils/apiClient';
 
 interface EmailSummaryHeaderProps {
   email: EmailAnalysis;
@@ -18,7 +19,7 @@ export const EmailSummaryHeader: React.FC<EmailSummaryHeaderProps> = ({ email })
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const res = await fetch('http://localhost:8000/api/reports/generate', {
+      const res = await fetch(apiUrl('/api/reports/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

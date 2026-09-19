@@ -18,15 +18,20 @@ DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DB_PATH}")
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-# Connection args
-connect_args = {"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+engine_kwargs = {
+    "pool_pre_ping": True,
+    "echo": False,
+}
 
-engine = create_engine(
-    DATABASE_URL,
-    connect_args=connect_args,
-    pool_pre_ping=True,
-    echo=False
-)
+if "sqlite" in DATABASE_URL:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # Production PostgreSQL connection pool optimization
+    engine_kwargs["pool_size"] = int(os.getenv("DB_POOL_SIZE", "10"))
+    engine_kwargs["max_overflow"] = int(os.getenv("DB_MAX_OVERFLOW", "20"))
+    engine_kwargs["pool_recycle"] = int(os.getenv("DB_POOL_RECYCLE", "1800"))
+
+engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
@@ -71,12 +76,3 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
             )
             time.sleep(retry_delay)
     return False
-
-
-# For local SQLite development/testing, initialize tables immediately.
-# For remote databases (e.g. PostgreSQL in Docker), initialization runs during application lifespan.
-if "sqlite" in DATABASE_URL:
-    try:
-        init_db(max_retries=1, retry_delay=0.1)
-    except Exception as exc:
-        logger.warning(f"Initial local SQLite setup notice: {exc}")

@@ -1,6 +1,6 @@
 # MailTraceAI — Enterprise Email Forensics & Threat Attribution Platform
 
-[![Build & Test Status](https://img.shields.io/badge/tests-242%20passed-brightgreen.svg)]()
+[![Build & Test Status](https://img.shields.io/badge/tests-264%20passed-brightgreen.svg)]()
 [![Backend](https://img.shields.io/badge/backend-FastAPI%20%2F%20Python%203.11-blue.svg)]()
 [![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2F%20TypeScript%20%2F%20Vite-61dafb.svg)]()
 [![Security](https://img.shields.io/badge/forensics-Air--Gapped%20%2F%20Offline%20First-orange.svg)]()
@@ -21,12 +21,20 @@
 6. [SIH Guided Demo & Empirical Benchmark Suite](#sih-guided-demo--empirical-benchmark-suite)
 7. [Installation & Setup](#installation--setup)
    - [Local Development Setup](#local-development-setup)
-   - [Docker Production Deployment](#docker-production-deployment)
-8. [Environment Configuration Reference](#environment-configuration-reference)
-9. [Geolocation / Map Configuration](#geolocation--map-configuration)
-10. [Security Architecture & Threat Model](#security-architecture--threat-model)
-11. [Feature Matrix: Implemented vs Planned](#feature-matrix-implemented-vs-planned)
-12. [Known Limitations & Air-Gapped Fallback](#known-limitations--air-gapped-fallback)
+   - [Docker Multi-Container Deployment](#docker-multi-container-deployment)
+8. [Production Deployment Guide (Section 22)](#8-production-deployment-guide-section-22)
+   - [Frontend Deployment (Vercel / Cloudflare / Netlify)](#1-frontend-deployment-vercel--cloudflare-pages--netlify)
+   - [Backend Deployment (Render / Railway / Container Hosting)](#2-backend-deployment-render--railway--container-hosting)
+   - [Managed PostgreSQL Database](#3-managed-postgresql-database)
+   - [CORS Security & Origin Policy](#4-cors-security--strict-origin-policy)
+   - [Health Check & Monitoring Probes](#5-health-check--monitoring-probes)
+   - [Production-Safe Logging & Secret Redaction](#6-production-safe-logging--secret-redaction)
+9. [Database Migrations & Schema Safety](#9-database-migrations--schema-safety)
+10. [Environment Configuration Reference](#10-environment-configuration-reference)
+11. [Geolocation / Map Configuration](#11-geolocation--map-configuration)
+12. [Security Architecture & Threat Model](#12-security-architecture--threat-model)
+13. [Feature Matrix: Implemented vs Planned](#13-feature-matrix-implemented-vs-planned)
+14. [Known Limitations & Air-Gapped Fallback](#14-known-limitations--air-gapped-fallback)
 
 ---
 
@@ -200,9 +208,148 @@ docker compose down
 
 ---
 
-## 8. Environment Configuration Reference
+## 8. Production Deployment Guide (Section 22)
 
-Copy `.env.example` to `.env` to configure optional external threat intelligence and LLM services:
+MailTraceAI is engineered for enterprise production cloud architectures with decoupled frontend, containerized backend services, and managed PostgreSQL databases.
+
+```text
+┌────────────────────────────────────────┐
+│     Production Frontend (Vercel)       │
+│  - Static React 19 SPA (Vite compiled) │
+│  - VITE_API_BASE_URL injected at build │
+└───────────────────┬────────────────────┘
+                    │ HTTPS API Requests (with CORS credentials)
+                    ▼
+┌────────────────────────────────────────┐
+│     Production Backend (Render/Railway) │
+│  - FastAPI / Uvicorn container engine  │
+│  - Strict CORS_ORIGINS whitelist       │
+│  - Secret Redaction Logging Filter     │
+│  - Proactive Health Probes (/health)   │
+└───────────────────┬────────────────────┘
+                    │ Pooled TCP / SSL Connection
+                    ▼
+┌────────────────────────────────────────┐
+│    Managed PostgreSQL (Neon/Supabase)  │
+│  - Production Alembic Migrations       │
+│  - Connection Pool (10 base, 20 max)   │
+│  - Append-Only Immutable Audit Logs    │
+└────────────────────────────────────────┘
+```
+
+### 1. Frontend Deployment (Vercel / Cloudflare Pages / Netlify)
+
+1. **Connect Repository**: Import the repository into Vercel or your chosen static hosting platform.
+2. **Build Settings**:
+   - **Framework Preset**: Vite
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+   - **Install Command**: `npm install`
+3. **Environment Variables**:
+   | Variable | Value | Description |
+   | :--- | :--- | :--- |
+   | `VITE_API_BASE_URL` | `https://your-backend.onrender.com` | Production backend API endpoint. **Never hardcode `localhost`**. |
+
+> [!NOTE]
+> When `VITE_API_BASE_URL` is configured, the frontend automatically routes all API requests and download links (`.EML`, forensic PDF reports) to the production backend. When unset (local development), it falls back seamlessly to `/api` (proxied by the local Vite dev server).
+
+---
+
+### 2. Backend Deployment (Render / Railway / Container Hosting)
+
+1. **Deployment Mode**: Deploy using Docker (`backend/Dockerfile`) or Python Native environment.
+2. **Build & Start Commands** (if deploying native Python):
+   - **Build Command**: `pip install -r backend/requirements.txt`
+   - **Pre-Deploy / Release Command**: `alembic upgrade head`
+   - **Start Command**: `uvicorn backend.main:app --host 0.0.0.0 --port $PORT`
+3. **Required Environment Variables**:
+   | Variable | Example Value | Purpose |
+   | :--- | :--- | :--- |
+   | `DATABASE_URL` | `postgresql://user:pass@ep-xyz.aws.neon.tech/mailtrace` | Managed PostgreSQL connection string (auto-normalized) |
+   | `CORS_ORIGINS` | `https://mailtrace.vercel.app,https://your-domain.com` | Allowed production frontend origins (comma-separated) |
+   | `LOG_LEVEL` | `INFO` | Production logging level (`INFO`, `WARNING`, `ERROR`) |
+   | `LLM_PROVIDER` | `gemini` (or `openai`, `mock`) | AI Copilot model provider |
+   | `LLM_API_KEY` | `AIzaSy...` | Unified API key for Copilot and AI Analyst |
+   | `IP_INTELLIGENCE_PROVIDER` | `ipapi` (or `ipinfo`, `mock`) | Threat intelligence provider |
+   | `IP_INTELLIGENCE_API_KEY` | `your_ipapi_pro_key` | Secret provider API key (kept strictly server-side) |
+
+---
+
+### 3. Managed PostgreSQL Database
+
+MailTraceAI supports managed PostgreSQL on platforms such as **Neon**, **Supabase**, **Render Postgres**, **Railway**, and **AWS RDS**:
+- **Automatic SSL & Protocol Normalization**: The backend accepts both `postgres://` and `postgresql://` connection strings and normalizes them automatically.
+- **Connection Pool Tuning**:
+  ```bash
+  DB_POOL_SIZE=10          # Base connection pool size
+  DB_MAX_OVERFLOW=20       # Burst connection limit
+  DB_POOL_RECYCLE=1800     # Recycle connections every 30 minutes to prevent stale connections
+  ```
+- **Connection Health Checks**: `pool_pre_ping=True` ensures disconnected pool connections are automatically detected and recycled without throwing 500 errors.
+
+---
+
+### 4. CORS Security & Strict Origin Policy
+
+MailTraceAI implements strict production CORS controls in `backend/main.py`:
+- **Origin Restriction**: Configured dynamically via `CORS_ORIGINS`. Only designated frontend domains are permitted.
+- **No Wildcard with Credentials**: The CORS specification explicitly forbids `Access-Control-Allow-Origin: *` when `Access-Control-Allow-Credentials` is `true`. MailTraceAI dynamically enforces `allow_credentials=False` if a wildcard is detected, and allows credentials only for explicit whitelisted origins.
+
+---
+
+### 5. Health Check & Monitoring Probes
+
+MailTraceAI exposes automated health probes for container orchestrators and uptime monitors:
+- **`GET /health`** (and alias **`GET /api/health`**):
+  - Actively executes `SELECT 1` against the database.
+  - Returns `200 OK` with JSON `{"status": "ok", "service": "cybersecurity-email-parser", "database": "ok"}` when healthy.
+  - Returns `503 Service Unavailable` with degraded diagnostics if database connectivity drops.
+
+---
+
+### 6. Production-Safe Logging & Secret Redaction
+
+All backend services run through `SensitiveLogFilter` (`backend/services/log_sanitizer.py`):
+- **Credential Redaction**: Automatically intercepts and masks:
+  - Authorization bearer tokens (`Bearer [REDACTED]`)
+  - API keys (`api_key=[REDACTED]`)
+  - Query parameters (`?key=[REDACTED]`)
+  - Database connection strings (`postgresql://[REDACTED_USER]:[REDACTED_PASSWORD]@...`)
+- **Type Safety**: Preserves integer/numeric format parameters in structured logging libraries (`httpx`, `uvicorn`).
+- **Configurable Severity**: Controlled via `LOG_LEVEL` environment variable (defaults to `INFO`).
+
+---
+
+## 9. Database Migrations & Schema Safety
+
+MailTraceAI utilizes **Alembic** for schema migrations, supporting zero-downtime upgrades against managed PostgreSQL databases.
+
+### Migration History Chain
+1. `ae5ff3420a0a`: Creates core case management tables (`cases`, `case_emails`, `case_notes`, `case_findings`, `audit_logs`).
+2. `64a0d89a8460`: Adds immutable evidence tracking (`evidence`), resource-oriented audit fields, and severity indexes.
+3. `8f1e92d3b45a` (Head): Creates production tables for official reports (`reports`), email analysis records (`email_analyses`), coordinated campaign intelligence (`campaigns`, `campaign_emails`), analyst decisions (`analyst_decisions`), Copilot audit telemetry (`copilot_audit_logs`), and canonical evidence payloads (`analysis_payloads`).
+
+### Running Migrations in Production
+
+```bash
+# Apply all pending migrations up to latest head:
+alembic upgrade head
+
+# Check current database revision:
+alembic current
+
+# Rollback one revision if needed:
+alembic downgrade -1
+```
+
+> [!TIP]
+> On platforms like Render or Railway, set `alembic upgrade head` as your service **Release Command** / **Pre-Deploy Command**. This guarantees that database tables and schema modifications are applied before the new web service containers begin receiving traffic.
+
+---
+
+## 10. Environment Configuration Reference
+
+Copy `.env.example` to `.env` to configure external threat intelligence and LLM services:
 
 ```bash
 cp .env.example .env
@@ -210,25 +357,32 @@ cp .env.example .env
 
 | Parameter | Default | Purpose |
 | :--- | :--- | :--- |
-| `DATABASE_URL` | `sqlite:///backend/data/mailtrace.db` | Database connection string (auto-set in Docker to PostgreSQL) |
+| `VITE_API_BASE_URL` | *(empty)* | Frontend API URL for production deployments (e.g., Vercel) |
+| `DATABASE_URL` | `sqlite:///backend/data/mailtrace.db` | PostgreSQL (production) or SQLite (development/offline) |
+| `CORS_ORIGINS` | `http://localhost:5173,...` | Allowed production frontend origins (comma-separated) |
+| `LOG_LEVEL` | `INFO` | Production logging level (`DEBUG`, `INFO`, `WARNING`, `ERROR`) |
+| `DB_POOL_SIZE` | `10` | SQLAlchemy base connection pool size for PostgreSQL |
+| `DB_MAX_OVERFLOW` | `20` | SQLAlchemy maximum burst connections for PostgreSQL |
 | `MAX_UPLOAD_SIZE_MB` | `10` | Maximum email upload payload size in megabytes |
-| `IP_INTELLIGENCE_PROVIDER` | `ipapi` | IP provider (`ipapi`, `ipinfo`, or local offline `mock`) |
-| `IPAPI_KEY` | - | IP-API Pro secret commercial API key |
-| `IP_INTELLIGENCE_API_KEY` | - | Legacy/Alternative IP-API Pro key |
-| `IPINFO_TOKEN` / `IPINFO_API_KEY` | - | IPInfo.io secret access token |
-| `GEOLOCATION_API_KEY` | - | Generic provider credential fallback |
-| `GEOLOCATION_REQUIRE_API_KEY` | `false` | Enforces strict API key requirements across providers |
 | `LLM_PROVIDER` | `gemini` | Copilot model provider (`gemini`, `openai`, or local `mock`) |
+| `LLM_API_KEY` | - | Unified LLM API key (Gemini / OpenAI) |
 | `GEMINI_API_KEY` | - | Google Gemini API key |
 | `OPENAI_API_KEY` | - | OpenAI API key |
 | `LLM_MODEL` | `gemini-1.5-flash` | Selected LLM model identifier |
+| `IP_INTELLIGENCE_PROVIDER` | `ipapi` | IP provider (`ipapi`, `ipinfo`, or local offline `mock`) |
+| `IPAPI_KEY` / `IP_INTELLIGENCE_API_KEY` | - | IP-API Pro secret commercial API key |
+| `IPINFO_TOKEN` / `IPINFO_API_KEY` | - | IPInfo.io secret access token |
+| `GEOLOCATION_API_KEY` | - | Generic provider credential fallback |
+| `GEOLOCATION_REQUIRE_API_KEY` | `false` | Enforces strict API key requirements across providers |
 | `RATE_LIMIT_ENABLED` | `true` | Enables token bucket rate limiting middleware |
 | `RATE_LIMIT_ANALYSIS_PER_MIN` | `20` | Max email analysis requests per client IP per minute |
 | `RATE_LIMIT_LLM_PER_MIN` | `10` | Max Copilot queries per client IP per minute |
+| `RATE_LIMIT_INTEL_PER_MIN` | `60` | Max IP/Domain lookups per client IP per minute |
+| `RATE_LIMIT_GENERAL_PER_MIN` | `120` | Max general API queries per client IP per minute |
 
 ---
 
-## 9. Geolocation / Map Configuration
+## 11. Geolocation / Map Configuration
 
 MailTraceAI features an interactive Geolocation and Infrastructure Transmission Map powered by Leaflet and enriched by enterprise IP intelligence providers.
 
@@ -301,20 +455,19 @@ docker compose --env-file .env up -d
 The `docker-compose.yml` passes `${IPAPI_KEY}`, `${IPINFO_TOKEN}`, and `${GEOLOCATION_API_KEY}` into the backend container dynamically.
 
 ### 7. Production Deployment Configuration
-In production environments (Kubernetes, AWS ECS, GCP Cloud Run, Azure Container Apps):
-- Store credentials in your platform's secret manager (e.g., AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault).
-- Inject as container environment variables: `IPAPI_KEY` or `IPINFO_TOKEN`.
-- Do NOT build images with `ENV IPAPI_KEY=...` or commit credentials to deployment manifests.
+In production environments (e.g. Render, Railway, AWS ECS, Kubernetes), configure secrets as platform environment variables:
+- Never commit `.env` files to git repositories.
+- Use native secret managers (AWS Secrets Manager, Doppler, Vault, or hosting platform secret injection).
 
 ### 8. Recommended Provider-Side Restrictions
-To maximize security and control quotas on the provider dashboard:
-- **IP / CIDR Restrictions**: Restrict your API key or token to query only from your MailTraceAI backend server's static egress IP addresses.
+To maximize security for your commercial keys:
+- **IP Restrictions**: Bind keys to your production backend static egress IP where supported by the provider.
 - **Quota Alerts**: Enable notification thresholds (e.g., at 80% monthly quota) to avoid unexpected service interruptions.
 - **Forensic Accuracy**: MailTraceAI enforces standardized forensic terminology (`Observed Infrastructure Location`, `Probable Origin Infrastructure`) and displays the mandated forensic notice: *"IP geolocation represents the estimated location of observed network infrastructure and does not establish the physical location of the threat actor."*
 
 ---
 
-## 10. Security Architecture & Threat Model
+## 12. Security Architecture & Threat Model
 
 MailTraceAI is engineered specifically to handle hostile, malicious payloads safely:
 
@@ -328,7 +481,7 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 
 ---
 
-## 11. Feature Matrix: Implemented vs Planned
+## 13. Feature Matrix: Implemented vs Planned
 
 ### Currently Implemented & Verified
 - RFC-822 / `.eml` multipart parsing and header normalization
@@ -347,6 +500,7 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 - Turnkey SIH 3-scenario demo system and 10-step guided tour
 - Live empirical benchmark engine with wall-clock latency percentiles and confusion matrix
 - Docker Compose multi-container stack with PostgreSQL and Nginx
+- Production Cloud Deployment configs (Vercel, Render/Railway, Managed PostgreSQL, Alembic migrations)
 
 ### Planned Roadmap
 - YARA rule compilation engine for custom SOC static signatures
@@ -356,7 +510,7 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 
 ---
 
-## 12. Known Limitations & Air-Gapped Fallback
+## 14. Known Limitations & Air-Gapped Fallback
 
 1. **Air-Gapped Operation**: When external WHOIS/DNS/IP APIs are unreachable or offline, MailTraceAI automatically falls back to its local Public Suffix List, internal RFC definitions, and local IP intelligence without error.
 2. **Deterministic Copilot Fallback**: If external LLM APIs (Gemini/OpenAI) are unavailable, the Investigation Copilot automatically switches to its local template retrieval engine, generating structured answers directly from the email's JSON evidence.
@@ -364,10 +518,10 @@ MailTraceAI is engineered specifically to handle hostile, malicious payloads saf
 
 ---
 
-## 13. Running Tests & Quality Verification
+## 15. Running Tests & Quality Verification
 
 ```bash
-# 1. Run all backend tests
+# 1. Run full backend test suite (264 tests including migrations)
 PYTHONPATH=. backend/venv/bin/pytest backend/tests/ -v
 
 # 2. Run frontend production build
@@ -379,7 +533,7 @@ npm run lint
 
 ---
 
-## 14. License
+## 16. License
 
 Developed for the **Smart India Hackathon (SIH 2024)** — Problem Statement 106.  
 All demo artifacts use reserved test infrastructure under RFC 2606 and RFC 5737.

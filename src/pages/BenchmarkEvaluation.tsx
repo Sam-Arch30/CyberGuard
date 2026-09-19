@@ -17,6 +17,7 @@ import {
   ArrowRight
 } from 'lucide-react';
 import { useDemoTour } from '../context/DemoTourContext';
+import { apiUrl } from '../utils/apiClient';
 
 interface LatencyStats {
   mean: number;
@@ -83,7 +84,7 @@ export const BenchmarkEvaluation: React.FC = () => {
 
   const fetchLatestBenchmark = async () => {
     try {
-      const res = await fetch('http://127.0.0.1:8000/api/benchmark/latest');
+      const res = await fetch(apiUrl('/api/benchmark/latest'));
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -103,7 +104,7 @@ export const BenchmarkEvaluation: React.FC = () => {
     try {
       setRunningBenchmark(true);
       setStatusMessage({ text: 'Executing live benchmark across 60 labelled SAFE samples...', type: 'info' });
-      const res = await fetch('http://127.0.0.1:8000/api/benchmark/run', { method: 'POST' });
+      const res = await fetch(apiUrl('/api/benchmark/run'), { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -121,7 +122,7 @@ export const BenchmarkEvaluation: React.FC = () => {
   const handleResetDemo = async () => {
     try {
       setResetting(true);
-      const res = await fetch('http://127.0.0.1:8000/api/benchmark/demo-reset', { method: 'POST' });
+      const res = await fetch(apiUrl('/api/benchmark/demo-reset'), { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       setStatusMessage({

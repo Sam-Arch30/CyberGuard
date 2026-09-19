@@ -22,6 +22,7 @@ import type { EmailAnalysis } from '../../../types/forensic';
 import { useInvestigation } from '../../../context/InvestigationContext';
 import { resolveAttribution } from '../../../utils/indicatorHelper';
 import { ExpandableSection } from '../../../components/common/progressive';
+import { apiUrl } from '../../../utils/apiClient';
 
 interface ReportSectionViewProps {
   email: EmailAnalysis;
@@ -73,12 +74,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
   const fetchReports = async () => {
     setLoadingReports(true);
     try {
-      let res: Response;
-      try {
-        res = await fetch('/api/reports?limit=50');
-      } catch {
-        res = await fetch('http://localhost:8000/api/reports?limit=50');
-      }
+      const res = await fetch(apiUrl('/api/reports?limit=50'));
       if (res.ok) {
         const data = await res.json();
         setBackendReports(data.reports || []);
@@ -98,26 +94,17 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
   const handleGenerateOfficialReport = async () => {
     setIsGenerating(true);
     try {
-      let res: Response;
       const payload = {
         analysis: email,
         analyst_name: 'Lead SOC Forensic Investigator',
         notes: 'Forensic evidence analysis generated from MailTraceAI Investigation Workspace.'
       };
 
-      try {
-        res = await fetch('/api/reports/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      } catch {
-        res = await fetch('http://localhost:8000/api/reports/generate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-      }
+      const res = await fetch(apiUrl('/api/reports/generate'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
 
       if (!res.ok) {
         // Fallback to client print preview if backend server-side generator encounters issues
@@ -167,12 +154,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
   /* ── Supported Action 3: Download Existing Archived PDF ─── */
   const handleDownloadArchivedPDF = async (reportItem: BackendReportItem) => {
     try {
-      let res: Response;
-      try {
-        res = await fetch(`/api/reports/${reportItem.id}/download`);
-      } catch {
-        res = await fetch(`http://localhost:8000/api/reports/${reportItem.id}/download`);
-      }
+      const res = await fetch(apiUrl(`/api/reports/${reportItem.id}/download`));
       if (!res.ok) throw new Error(`Download failed (${res.status})`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

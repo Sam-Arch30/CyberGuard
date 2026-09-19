@@ -4,6 +4,7 @@ import type { Core, EventObject } from 'cytoscape';
 import type { EmailAnalysis } from '../../types/forensic';
 import type { GraphNode, GraphEdge, NodeType, InvestigationGraphData } from '../../types/graph';
 import { useTheme } from '../../context/ThemeContext';
+import { apiUrl } from '../../utils/apiClient';
 import {
   ZoomIn,
   ZoomOut,
@@ -108,7 +109,7 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
     }
 
     setLoading(true);
-    fetch('http://localhost:8000/api/emails/investigation-graph', {
+    fetch(apiUrl('/api/emails/investigation-graph'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)

@@ -16,6 +16,7 @@ import {
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
 import type { CorrelatedIngestedEmail, CampaignCorrelationResponse } from '../../../types/correlation';
+import { apiUrl } from '../../../utils/apiClient';
 
 interface CampaignCorrelationPanelProps {
   email: EmailAnalysis;
@@ -89,20 +90,11 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
           urls: currentUrls,
           subject: email.subject || ''
         };
-        let res: Response | null = null;
-        try {
-          res = await fetch('/api/correlation/email?min_score=0.10', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-        } catch {
-          res = await fetch('http://127.0.0.1:8000/api/correlation/email?min_score=0.10', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-        }
+        const res = await fetch(apiUrl('/api/correlation/email?min_score=0.10'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
         if (res && res.ok) {
           const data: CampaignCorrelationResponse = await res.json();
           if (isMounted && data.correlated_emails) {
@@ -360,7 +352,7 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
-                        onClick={() => window.open(`http://localhost:8000/api/emails/${encodeURIComponent(activeMatch.id)}/download`, '_blank')}
+                        onClick={() => window.open(apiUrl(`/api/emails/${encodeURIComponent(activeMatch.id)}/download`), '_blank')}
                         className="px-2.5 py-1 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground hover:text-primary text-[11px] font-mono transition-colors flex items-center space-x-1 cursor-pointer"
                         title="Download Stored RFC-822 .EML Evidence"
                       >

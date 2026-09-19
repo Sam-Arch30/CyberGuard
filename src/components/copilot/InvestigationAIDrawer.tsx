@@ -26,6 +26,7 @@ import type {
   CopilotAction
 } from '../../types/copilot';
 import { deriveFilename } from '../../utils/forensicStore';
+import { apiUrl } from '../../utils/apiClient';
 
 const CONFIDENCE_BADGES: Record<UncertaintyLevel, { bg: string; border: string; text: string }> = {
   'CONFIRMED': {
@@ -186,7 +187,7 @@ export const InvestigationAIDrawer: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/copilot/query', {
+      const response = await fetch(apiUrl('/api/copilot/query'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -334,7 +335,7 @@ export const InvestigationAIDrawer: React.FC = () => {
 
   const handleAddToReport = async (msgId: string, response: CopilotQueryResponse) => {
     try {
-      await fetch('http://localhost:8000/api/copilot/add-to-report', {
+      await fetch(apiUrl('/api/copilot/add-to-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

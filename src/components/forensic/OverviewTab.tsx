@@ -17,6 +17,7 @@ import { EvidenceConfidencePanel } from './EvidenceConfidencePanel';
 import { CampaignAlertBanner } from '../campaign/CampaignAlertBanner';
 import type { CampaignAlertData } from '../../types/campaign';
 import { User, Info, Layers, Activity, ShieldCheck, AlertTriangle, CheckCircle2, HelpCircle, ShieldAlert, ArrowRight, GitMerge } from 'lucide-react';
+import { apiUrl } from '../../utils/apiClient';
 
 interface OverviewTabProps {
   email: EmailAnalysis;
@@ -41,7 +42,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
   useEffect(() => {
     if (!emailKey || !email) return;
     setLoadingCorrelations(true);
-    fetch('http://localhost:8000/api/correlation/email?min_score=0.15', {
+    fetch(apiUrl('/api/correlation/email?min_score=0.15'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)
@@ -54,7 +55,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
       .finally(() => setLoadingCorrelations(false));
 
     // Proactive Campaign Detection Alert
-    fetch('http://localhost:8000/api/campaigns/detect-alert?threshold=0.45', {
+    fetch(apiUrl('/api/campaigns/detect-alert?threshold=0.45'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)

@@ -16,6 +16,10 @@ COPY src/ ./src/
 COPY public/ ./public/
 COPY index.html vite.config.ts tsconfig*.json ./
 
+# Build-time API base URL configuration for production deployments
+ARG VITE_API_BASE_URL=""
+ENV VITE_API_BASE_URL=$VITE_API_BASE_URL
+
 # Compile TypeScript and Vite production assets
 RUN npm run build
 

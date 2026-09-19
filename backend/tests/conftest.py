@@ -10,6 +10,9 @@ os.environ['BENCHMARK_RESULTS_PATH'] = str(TEST_ROOT / 'benchmark_results.json')
 os.environ['RATE_LIMIT_ENABLED'] = 'false'
 os.environ.pop('LLM_PROVIDER', None)
 
+from backend.db.session import init_db
+init_db(max_retries=1, retry_delay=0.1)
+
 @pytest.fixture
 def stored_analysis():
     """Explicit persisted fixtures for API unit tests, never production bootstrap."""

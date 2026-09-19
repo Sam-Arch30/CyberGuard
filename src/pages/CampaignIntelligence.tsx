@@ -20,6 +20,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import type { CampaignClusterItem, CampaignDetail } from '../types/campaign';
+import { apiUrl } from '../utils/apiClient';
 import { CampaignTimeline } from '../components/campaign/CampaignTimeline';
 import { CampaignGraphView } from '../components/campaign/CampaignGraphView';
 import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
@@ -49,7 +50,7 @@ export const CampaignIntelligence: React.FC = () => {
   // Fetch campaign cards list
   useEffect(() => {
     setLoadingList(true);
-    fetch('http://localhost:8000/api/campaigns')
+    fetch(apiUrl('/api/campaigns'))
       .then(res => (res.ok ? res.json() : []))
       .then((data: CampaignClusterItem[]) => {
         if (data && data.length > 0) {
@@ -67,7 +68,7 @@ export const CampaignIntelligence: React.FC = () => {
   useEffect(() => {
     if (!selectedCampId) return;
     setLoadingDetail(true);
-    fetch(`http://localhost:8000/api/campaigns/${selectedCampId}`)
+    fetch(apiUrl(`/api/campaigns/${selectedCampId}`))
       .then(res => (res.ok ? res.json() : null))
       .then((detail: CampaignDetail) => {
         if (detail) {

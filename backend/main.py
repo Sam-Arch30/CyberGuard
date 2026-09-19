@@ -17,13 +17,14 @@ from backend.api.routes.copilot import router as copilot_router
 from backend.api.routes.benchmark import router as benchmark_router
 from backend.api.routes.intelligence import router as intelligence_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
+import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
-from backend.services.log_sanitizer import install_log_sanitizer
+from backend.services.log_sanitizer import configure_production_logging
 from backend.db.session import engine, Base, init_db
 import backend.db.models  # Register models
 
-# Initialize logging privacy filter
-install_log_sanitizer()
+# Initialize production-safe logging with secret redaction
+configure_production_logging()
 
 
 @asynccontextmanager
@@ -47,11 +48,28 @@ app = FastAPI(
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimiterMiddleware)
 
-# Enable CORS for frontend integration
+# CORS configuration: Allow only known origins, forbid wildcard with credentials
+cors_origins_env = os.getenv("CORS_ORIGINS", "").strip()
+if cors_origins_env:
+    allowed_origins = [orig.strip() for orig in cors_origins_env.split(",") if orig.strip()]
+else:
+    allowed_origins = [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8080",
+        "http://127.0.0.1:8080",
+        "http://localhost:4173",
+        "http://127.0.0.1:4173",
+    ]
+
+has_wildcard = "*" in allowed_origins
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=allowed_origins,
+    allow_credentials=not has_wildcard,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -85,6 +103,7 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 
 @app.get("/health", tags=["Health"])
+@app.get("/api/health", tags=["Health"])
 async def health_check():
     """
     Service health check endpoint.

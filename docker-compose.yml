@@ -26,6 +26,8 @@ services:
     restart: unless-stopped
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-mailtrace}:${POSTGRES_PASSWORD:-mailtrace_password}@postgresql:5432/${POSTGRES_DB:-mailtrace}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
       IP_INTELLIGENCE_PROVIDER: ${IP_INTELLIGENCE_PROVIDER:-ipapi}
       IP_INTELLIGENCE_API_KEY: ${IP_INTELLIGENCE_API_KEY:-}
       IPAPI_KEY: ${IPAPI_KEY:-}
@@ -33,6 +35,7 @@ services:
       IPINFO_TOKEN: ${IPINFO_TOKEN:-}
       GEOLOCATION_API_KEY: ${GEOLOCATION_API_KEY:-}
       LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-gemini-1.5-flash}
@@ -58,6 +61,8 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
     container_name: mailtrace-frontend
     restart: unless-stopped
     ports:

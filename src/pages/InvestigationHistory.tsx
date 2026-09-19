@@ -33,6 +33,7 @@ import {
   Download
 } from 'lucide-react';
 import { saveAnalysisResult, getAllAvailableAnalyses } from '../utils/forensicStore';
+import { apiUrl } from '../utils/apiClient';
 import { resolveEmailIndicators } from '../utils/indicatorHelper';
 import type { EmailAnalysis } from '../types/forensic';
 import { EvidenceIntegrityModal, type EvidenceRecordData } from '../components/history/EvidenceIntegrityModal';
@@ -191,9 +192,9 @@ export const InvestigationHistory: React.FC = () => {
       let url = `/api/dashboard/emails?skip=${skip}&limit=${pageSize}`;
       let res: Response;
       try {
-        res = await fetch(url);
-      } catch {
-        res = await fetch(`http://127.0.0.1:8000${url}`);
+        res = await fetch(apiUrl(url));
+      } catch (err: unknown) {
+        throw new Error(`Failed to connect to API: ${err instanceof Error ? err.message : 'Network error'}`);
       }
 
       if (!res.ok) {
@@ -357,9 +358,9 @@ export const InvestigationHistory: React.FC = () => {
     try {
       let res: Response;
       try {
-        res = await fetch(`/api/emails/${lookupId}/analysis`);
+        res = await fetch(apiUrl(`/api/emails/${lookupId}/analysis`));
       } catch {
-        res = await fetch(`http://127.0.0.1:8000/api/emails/${lookupId}/analysis`);
+        res = await fetch(apiUrl(`/api/emails/${lookupId}/analysis`));
       }
 
       if (res.ok) {
@@ -446,7 +447,7 @@ export const InvestigationHistory: React.FC = () => {
   /* ── Download Stored .EML File ─── */
   const handleDownloadEml = (id: string, _filename?: string) => {
     const cleanId = encodeURIComponent(id);
-    window.open(`http://localhost:8000/api/emails/${cleanId}/download`, '_blank');
+    window.open(apiUrl(`/api/emails/${cleanId}/download`), '_blank');
   };
 
   /* ── Correlate Ingested Email across Campaigns ─── */

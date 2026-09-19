@@ -17,6 +17,7 @@ import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
 import { decodeRfc2047 } from '../utils/indicatorHelper';
 import { AnalysisPipelineProgress, type PipelineOverallStatus } from '../components/forensic/AnalysisPipelineProgress';
+import { apiUrl } from '../utils/apiClient';
 
 const SAMPLE_PHISHING = `Received: from edge-relay.security-gateway.net (194.165.16.88) by mx01.enterprise.corp with ESMTPS id p4102 for <security.ops@enterprise.corp>; Tue, 15 Sep 2026 10:41:45 +0000
 Received: from smtp-origin.shadow-node.ru (185.220.101.42) by edge-relay.security-gateway.net with ESMTP id r9182; Tue, 15 Sep 2026 10:41:02 +0000
@@ -74,7 +75,7 @@ export const AnalyzeEmail: React.FC = () => {
 
   const fetchRecent = async () => {
     try {
-      const res = await fetch('/api/dashboard/emails?limit=5');
+      const res = await fetch(apiUrl('/api/dashboard/emails?limit=5'));
       if (res.ok) {
         const data = await res.json();
         if (data && data.items) {
@@ -82,17 +83,7 @@ export const AnalyzeEmail: React.FC = () => {
         }
       }
     } catch {
-      try {
-        const fallbackRes = await fetch('http://127.0.0.1:8000/api/dashboard/emails?limit=5');
-        if (fallbackRes.ok) {
-          const data = await fallbackRes.json();
-          if (data && data.items) {
-            setRecentIngested(data.items);
-          }
-        }
-      } catch {
-        // ignore
-      }
+      // ignore
     }
   };
 
@@ -115,12 +106,7 @@ export const AnalyzeEmail: React.FC = () => {
       // Server in-flight processing
       setPipelineStatus('processing');
 
-      let res: Response | null = null;
-      try {
-        res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
-      } catch {
-        res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
-      }
+      const res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
 
       if (res && res.ok) {
         const data = await res.json();
@@ -425,7 +411,7 @@ export const AnalyzeEmail: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => window.open(`http://localhost:8000/api/emails/${encodeURIComponent(evId)}/download`, '_blank')}
+                          onClick={() => window.open(apiUrl(`/api/emails/${encodeURIComponent(evId)}/download`), '_blank')}
                           className="px-2.5 py-1 rounded-md bg-surface-secondary border border-border hover:border-primary/40 text-foreground hover:text-primary text-[11px] font-mono flex items-center space-x-1 cursor-pointer transition-colors"
                           title="Download RFC-822 .EML"
                         >

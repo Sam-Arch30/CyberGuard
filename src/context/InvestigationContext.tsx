@@ -4,6 +4,7 @@ import type { EmailAnalysis } from '../types/forensic';
 import { getAnalysisResult, saveAnalysisResult, getAllAvailableAnalyses, resetDemoStore, clearForensicStore } from '../utils/forensicStore';
 import { resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHelper';
 import { resolveConfidenceConclusions } from '../utils/confidenceResolver';
+import { apiUrl } from '../utils/apiClient';
 
 export type InvestigationSection =
   | 'overview'
@@ -252,8 +253,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
         if (!resolved) {
           const endpoints = [
-            `/api/emails/${effectiveId}/analysis`,
-            `http://127.0.0.1:8000/api/emails/${effectiveId}/analysis`
+            apiUrl(`/api/emails/${effectiveId}/analysis`)
           ];
           for (const ep of endpoints) {
             try {
@@ -279,8 +279,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         } else {
           // Check backend for latest analyzed email
           const latestEndpoints = [
-            '/api/emails/latest/analysis',
-            'http://127.0.0.1:8000/api/emails/latest/analysis'
+            apiUrl('/api/emails/latest/analysis')
           ];
           for (const ep of latestEndpoints) {
             try {
@@ -530,12 +529,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         const formData = new FormData();
         formData.append('file', blob, activeEmail.original_filename || `${activeEmailId}.eml`);
         
-        let res: Response | null = null;
-        try {
-          res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
-        } catch {
-          res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
-        }
+        const res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
 
         if (res && res.ok) {
           const freshData = await res.json();
@@ -573,13 +567,9 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // 1. Backend database & file purge
       try {
-        await fetch('/api/workspace/reset', { method: 'POST' });
+        await fetch(apiUrl('/api/workspace/reset'), { method: 'POST' });
       } catch {
-        try {
-          await fetch('http://127.0.0.1:8000/api/workspace/reset', { method: 'POST' });
-        } catch {
-          // Ignore network error
-        }
+        // Ignore network error
       }
 
       // 2. Clear frontend forensic store & caches
@@ -614,9 +604,9 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     let res: Response | null = null;
     try {
-      res = await fetch('/api/emails/analyze', { method: 'POST', body: formData });
+      res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
     } catch {
-      res = await fetch('http://127.0.0.1:8000/api/emails/analyze', { method: 'POST', body: formData });
+      // Handled below if !res
     }
 
     if (!res || !res.ok) {

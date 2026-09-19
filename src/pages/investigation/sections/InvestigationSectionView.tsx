@@ -14,6 +14,7 @@ import {
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
 import { useInvestigation } from '../../../context/InvestigationContext';
+import { apiUrl } from '../../../utils/apiClient';
 import {
   InvestigationRelationshipSummary,
   ProgressiveInvestigationGraph,
@@ -51,7 +52,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
   useEffect(() => {
     // Fetch cases to associate with this email
     setLoadingCases(true);
-    fetch('http://localhost:8000/api/cases?limit=50')
+    fetch(apiUrl('/api/cases?limit=50'))
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && data.cases) {
@@ -64,7 +65,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
 
   useEffect(() => {
     // Check if current email triggers a campaign alert
-    fetch('http://localhost:8000/api/campaigns/detect-alert?threshold=0.45', {
+    fetch(apiUrl('/api/campaigns/detect-alert?threshold=0.45'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)
@@ -78,7 +79,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
       .catch(() => {});
 
     // Fetch active campaign detail
-    fetch('http://localhost:8000/api/campaigns/C-042')
+    fetch(apiUrl('/api/campaigns/C-042'))
       .then(res => (res.ok ? res.json() : null))
       .then((data: CampaignDetail | null) => {
         if (data) setCampaignDetail(data);

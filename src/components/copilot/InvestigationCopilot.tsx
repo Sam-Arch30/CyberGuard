@@ -34,6 +34,7 @@ import type {
 } from '../../types/copilot';
 import type { EmailAnalysis } from '../../types/forensic';
 import { deriveFilename, getAllAvailableAnalyses, saveAnalysisResult } from '../../utils/forensicStore';
+import { apiUrl } from '../../utils/apiClient';
 
 interface InvestigationCopilotProps {
   mode?: CopilotMode;
@@ -144,7 +145,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   const refreshAvailableEmails = async () => {
     const localAnalyses = getAllAvailableAnalyses();
     try {
-      const res = await fetch('http://localhost:8000/api/dashboard/emails?limit=50');
+      const res = await fetch(apiUrl('/api/dashboard/emails?limit=50'));
       if (res.ok) {
         const data = await res.json();
         if (data && data.items) {
@@ -234,7 +235,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch('http://localhost:8000/api/emails/analyze', {
+      const res = await fetch(apiUrl('/api/emails/analyze'), {
         method: 'POST',
         body: formData
       });
@@ -282,7 +283,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
 
   // Fetch suggested questions for active mode
   useEffect(() => {
-    fetch(`http://localhost:8000/api/copilot/suggested-questions?mode=${activeMode}`)
+    fetch(apiUrl(`/api/copilot/suggested-questions?mode=${activeMode}`))
       .then((res) => res.json())
       .then((data: SuggestedQuestion[]) => {
         setSuggestedQuestions(data);
@@ -368,7 +369,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await fetch('http://localhost:8000/api/copilot/query', {
+      const response = await fetch(apiUrl('/api/copilot/query'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -477,7 +478,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
 
   const handleAddToReport = async (msgId: string, response: CopilotQueryResponse) => {
     try {
-      await fetch('http://localhost:8000/api/copilot/add-to-report', {
+      await fetch(apiUrl('/api/copilot/add-to-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import type { EmailAnalysis, InvestigationTimelineItem } from '../../types/forensic';
 import { StatusRow, ExpandableSection, DetailDrawer, MetadataRow } from '../common/progressive';
+import { apiUrl } from '../../utils/apiClient';
 
 interface EvidenceIntegritySectionProps {
   email: EmailAnalysis;
@@ -81,12 +82,8 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
       if (remoteSucceeded) break;
 
       const endpoints = [
-        `http://localhost:8000/api/evidence/${encodeURIComponent(cid)}/timeline`,
-        `/api/evidence/${encodeURIComponent(cid)}/timeline`,
-        `http://127.0.0.1:8000/api/evidence/${encodeURIComponent(cid)}/timeline`,
-        `http://localhost:8000/api/audit/timeline/${encodeURIComponent(cid)}`,
-        `/api/audit/timeline/${encodeURIComponent(cid)}`,
-        `http://127.0.0.1:8000/api/audit/timeline/${encodeURIComponent(cid)}`
+        apiUrl(`/api/evidence/${encodeURIComponent(cid)}/timeline`),
+        apiUrl(`/api/audit/timeline/${encodeURIComponent(cid)}`)
       ];
 
       for (const url of endpoints) {

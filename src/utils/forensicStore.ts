@@ -2,6 +2,7 @@ import type { EmailAnalysis } from '../types/forensic';
 import { resolveEmailIndicators, resolveAttribution } from './indicatorHelper';
 import { resolveConfidenceConclusions } from './confidenceResolver';
 import { SCENARIO_1_LEGITIMATE, SCENARIO_2_PHISHING, SCENARIO_3_PRIMARY_EMAIL } from '../data/sihScenariosData';
+import { apiUrl } from './apiClient';
 
 const STORAGE_KEY_PREFIX = 'mailtrace_forensic_';
 const memoryStore = new Map<string, EmailAnalysis>();
@@ -181,7 +182,7 @@ export const resetDemoStore = async (): Promise<boolean> => {
 
     // 3. Notify backend demo reset endpoint if reachable
     try {
-      await fetch('http://127.0.0.1:8000/api/benchmark/demo-reset', { method: 'POST' });
+      await fetch(apiUrl('/api/benchmark/demo-reset'), { method: 'POST' });
     } catch {
       // Safe fallback
     }
