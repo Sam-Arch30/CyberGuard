@@ -12,4 +12,5 @@ numpy>=1.24.0
 sqlalchemy>=2.0.0
 alembic>=1.13.0
 psycopg2-binary>=2.9.9
-
+reportlab>=4.0.0
+pillow>=10.0.0
