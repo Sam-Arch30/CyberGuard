@@ -575,3 +575,69 @@ def list_stored_emls_endpoint(db: Session = Depends(get_db)):
     return EMLStorageService.list_stored_emls()
 
 
+@router.post(
+    "/analyze-artifact/{artifact_id}",
+    response_model=EmailAnalysisResponse,
+    summary="Execute full email intelligence pipeline on an ingested email artifact",
+    description="Loads persistent RFC-822 bytes from evidence storage for the given artifact_id, runs modular analyzers, records canonical findings/evidence, and returns structured forensic telemetry."
+)
+async def analyze_email_artifact_endpoint(
+    artifact_id: str,
+    user: Optional[str] = Header(None, alias="X-User"),
+    db: Session = Depends(get_db)
+):
+    from backend.services.email_intelligence_pipeline import EmailIntelligencePipeline
+    uploader = (user or "SOC Analyst").strip()
+    try:
+        legacy_res, analysis_run = await EmailIntelligencePipeline.analyze_artifact(
+            db=db,
+            artifact_id=artifact_id,
+            uploader=uploader
+        )
+        return legacy_res
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+
+
+@router.post(
+    "/pipeline/analyze",
+    response_model=EmailAnalysisResponse,
+    summary="Directly upload and run orchestrated email intelligence pipeline",
+    description="Accepts an .eml file, runs modular analyzers (auth, identity, relay, attachments, IOCs, NLP, impersonation), records canonical findings/evidence, and returns structured telemetry."
+)
+async def analyze_email_pipeline_endpoint(
+    file: UploadFile = File(...),
+    user: Optional[str] = Header(None, alias="X-User"),
+    db: Session = Depends(get_db)
+):
+    from backend.services.email_intelligence_pipeline import EmailIntelligencePipeline
+    uploader = (user or "SOC Analyst").strip()
+    raw_filename = file.filename or "uploaded.eml"
+    safe_filename = UploadSecurityService.sanitize_filename(raw_filename)
+
+    try:
+        content_bytes = await file.read()
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to read file stream: {str(e)}")
+
+    UploadSecurityService.validate_email_upload(
+        filename=safe_filename,
+        content_type=file.content_type,
+        content_bytes=content_bytes
+    )
+
+    try:
+        legacy_res, analysis_run = await EmailIntelligencePipeline.analyze_email_bytes(
+            db=db,
+            content_bytes=content_bytes,
+            filename=safe_filename,
+            uploader=uploader
+        )
+        return legacy_res
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+
+
+

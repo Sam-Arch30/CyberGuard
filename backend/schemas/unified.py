@@ -88,6 +88,7 @@ class AnalysisTriggerEnum(str, Enum):
 
 
 class FindingMethodEnum(str, Enum):
+    DETERMINISTIC = "DETERMINISTIC"
     RULE = "RULE"
     HEURISTIC = "HEURISTIC"
     ML = "ML"
@@ -112,6 +113,7 @@ class IndicatorTypeEnum(str, Enum):
     USER_AGENT = "USER_AGENT"
     PROCESS = "PROCESS"
     REGISTRY_KEY = "REGISTRY_KEY"
+    FILENAME = "FILENAME"
     OTHER = "OTHER"
 
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm import relationship
 from backend.db.session import Base
 
 
-def generate_uuid() -> str:
+def generate_uuid(prefix: Optional[str] = None) -> str:
     return str(uuid.uuid4())
 
 
