@@ -18,6 +18,7 @@ from backend.api.routes.benchmark import router as benchmark_router
 from backend.api.routes.intelligence import router as intelligence_router
 from backend.api.routes.unified import router as unified_router
 from backend.api.routes.ingest import router as ingest_router
+from backend.api.routes.urls import router as urls_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -92,6 +93,7 @@ app.include_router(benchmark_router)
 app.include_router(intelligence_router)
 app.include_router(unified_router)
 app.include_router(ingest_router)
+app.include_router(urls_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

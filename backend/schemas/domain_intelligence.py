@@ -22,6 +22,7 @@ class DomainRegistration(BaseModel):
     status: List[str] = Field(default_factory=list, description="Domain status codes (e.g., clientTransferProhibited)")
     country: Optional[str] = Field(None, description="Registrant country if available")
     registration_source: str = Field("unavailable", description="Data source: RDAP, WHOIS, or unavailable")
+    is_redacted: bool = Field(False, description="True if registrant data is redacted for privacy")
 
 
 class DomainIntelligence(BaseModel):

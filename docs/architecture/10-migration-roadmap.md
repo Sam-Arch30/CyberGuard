@@ -263,5 +263,50 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - 37 comprehensive unit, integration, and false-positive tests in `backend/tests/test_email_intelligence_pipeline.py`.
    - Full regression suite execution: **369 passed, 0 failed** across the entire repository.
 
+---
+
+## 8. Section 7 Progress & Implementation Summary
+
+**Section 7 Status: COMPLETED**
+
+1. **Centralized Network Safety Gateway (`SafeHttpClient`)**:
+   - Strictly defends against SSRF attacks targeting localhost, loopback (`127.0.0.0/8`, `::1`), private RFC-1918 networks (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `fc00::/7`), link-local (`169.254.0.0/16`, `fe80::/10`), cloud metadata (`169.254.169.254`, `fd00:ec2::254`, `metadata.google.internal`), multicast, reserved, and Carrier-Grade NAT (`100.64.0.0/10`).
+   - Enforces per-hop redirect validation with strict maximum limit (`max_redirects=5`) and zero blind redirect following.
+   - Streams payloads up to 1 MB max size with automatic truncation detection (`is_truncated`).
+   - Conducts safe read-only TLS handshake extracting subject CN, issuer, dates, SANs, and distinguishing configuration errors from malicious signals.
+
+2. **Passive-First URL Analyzer (`PassiveURLAnalyzer`)**:
+   - Standards-aware decomposition: scheme, hostname, port, path, query, fragment, userinfo.
+   - Signals: `URL_USERINFO_PRESENT`, `IP_LITERAL_HOST`, `NON_STANDARD_PORT`, `EXCESSIVE_SUBDOMAINS`, `DECEPTIVE_SUBDOMAIN_HIERARCHY`, `PUNYCODE_DOMAIN`, `SUSPICIOUS_PATH_TOKENS`, `SUSPICIOUS_DOWNLOAD_EXTENSION`, `KNOWN_URL_SHORTENER`, `NON_HTTP_SCHEME`.
+
+3. **Domain Infrastructure Intelligence (`DomainIntelligenceAnalyzer`)**:
+   - Public Suffix List aware domain and subdomain extraction using `tldextract`.
+   - Homoglyph and lookalike detection (`LookalikeDetectorService`) against protected reference targets.
+   - DNS infrastructure resolution (`DNSService`) mapping `A`, `AAAA`, `MX`, `NS`, `TXT` records to security graph relationships (`RESOLVES_TO`, `MAIL_EXCHANGER`, `USES_NAMESERVER`).
+   - RDAP / WHOIS registration metadata (`RDAPService`) computing domain age (`RECENTLY_REGISTERED_DOMAIN`) and handling privacy redactions neutrally (`REGISTRATION_DATA_REDACTED`).
+   - Cached threat intelligence (`ThreatIntelligenceService`) with TTL caching and explicit rate-limit handling (`THREAT_INTEL_RATE_LIMITED`).
+
+4. **Safe Website Static Inspector (`SafeWebsiteAnalyzer` & `WebsiteInspector`)**:
+   - Observational static HTML parsing with standard library `HTMLParser`.
+   - Zero JavaScript execution; zero form submission.
+   - Extracted indicators: `PASSWORD_FIELD_DETECTED`, `LOGIN_FORM_DETECTED`, `CROSS_DOMAIN_FORM_ACTION`, `CREDENTIAL_HARVESTING_INDICATORS`.
+   - Discovered download URLs recorded as indicators and linked via `REFERENCES` relationships.
+
+5. **Canonical Persistence & Re-Analysis Lineage**:
+   - Durable persistence across `ArtifactModel`, `AnalysisRunModel`, `FindingModel`, `FindingEvidenceModel`, `IndicatorModel`, `RelationshipModel`, and `ThreatEventModel`.
+   - Append-only re-analysis: re-analyzing an existing artifact generates a new independent `AnalysisRunModel` preserving historical observation changes.
+
+6. **FastAPI Endpoints**:
+   - `POST /api/urls/analyze`: Complete URL investigation with passive + active analysis.
+   - `POST /api/urls/analyze-domain`: Direct domain intelligence analysis.
+   - `POST /api/urls/analyze-artifact/{artifact_id}`: Re-analysis of durable stored artifacts.
+   - `GET /api/urls/config`: Engine configuration and network safety parameters.
+
+7. **Requirements for Section 8 (Attachment & File Security Engine)**:
+   - Dynamic sandbox execution of attachments extracted from emails and URLs.
+   - Safe static and dynamic behavioral analysis for discovered downloadable files.
+   - YARA / heuristic rule execution on stored artifact bytes.
+
+
 
 

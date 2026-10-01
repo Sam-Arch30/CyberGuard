@@ -134,3 +134,8 @@ class DNSService:
         )
 
         return dns_records, is_resolvable, status_message, punycode
+
+    async def resolve_all(self, domain: str) -> DNSRecords:
+        """Convenience method resolving all record types and returning DNSRecords directly."""
+        dns_records, _, _, _ = await self.resolve_records(domain)
+        return dns_records
