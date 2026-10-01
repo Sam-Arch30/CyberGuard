@@ -46,12 +46,37 @@ class ArtifactTypeEnum(str, Enum):
 
 
 class AnalysisStatusEnum(str, Enum):
+    INGESTED = "INGESTED"
     QUEUED = "QUEUED"
     RUNNING = "RUNNING"
+    ANALYZING = "ANALYZING"
     COMPLETED = "COMPLETED"
     PARTIAL = "PARTIAL"
     FAILED = "FAILED"
+    UNSUPPORTED = "UNSUPPORTED"
     CANCELLED = "CANCELLED"
+
+
+class InputModeEnum(str, Enum):
+    FILE_UPLOAD = "FILE_UPLOAD"
+    TEXT_INPUT = "TEXT_INPUT"
+    STRUCTURED_EVENT = "STRUCTURED_EVENT"
+    ENDPOINT_TELEMETRY = "ENDPOINT_TELEMETRY"
+    CONNECTOR_INPUT = "CONNECTOR_INPUT"
+    BATCH_IMPORT = "BATCH_IMPORT"
+
+
+class SupportStatusEnum(str, Enum):
+    SUPPORTED = "SUPPORTED"
+    PARTIALLY_SUPPORTED = "PARTIALLY_SUPPORTED"
+    UNSUPPORTED_FOR_ANALYSIS = "UNSUPPORTED_FOR_ANALYSIS"
+
+
+class CapabilityStatusEnum(str, Enum):
+    AVAILABLE = "AVAILABLE"
+    DISABLED = "DISABLED"
+    NOT_CONFIGURED = "NOT_CONFIGURED"
+    NOT_IMPLEMENTED = "NOT_IMPLEMENTED"
 
 
 class AnalysisTriggerEnum(str, Enum):
@@ -250,14 +275,16 @@ def normalize_domain(domain: str) -> str:
 
 def normalize_ip(ip_str: str) -> str:
     """Canonical IP normalization for IPv4/IPv6 using standard library."""
-    clean = ip_str.strip().lower()
+    clean = ip_str.strip().lower().replace("[.]", ".").replace("(.)", ".")
+    if clean.startswith("ipv6:"):
+        clean = clean[5:].strip()
     try:
         return str(ipaddress.ip_address(clean))
     except ValueError:
         # Handle leading zeros in IPv4 octets (e.g. 192.002.001.001 -> 192.2.1.1)
         if "." in clean and ":" not in clean:
             parts = clean.split(".")
-            if len(parts) == 4 and all(p.isdigit() for p in parts):
+            if len(parts) == 4 and all(p.isdigit() and 0 <= int(p) <= 255 for p in parts):
                 try:
                     clean_octets = ".".join(str(int(p)) for p in parts)
                     return str(ipaddress.ip_address(clean_octets))
@@ -704,3 +731,78 @@ class OrphanReport(BaseModel):
     untracked_files: List[Dict[str, Any]] = Field(default_factory=list)
     stale_temp_files: List[Dict[str, Any]] = Field(default_factory=list)
     scan_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# ============================================================================
+# SECTION 4: UNIVERSAL INGESTION SCHEMAS
+# ============================================================================
+
+class DetectedInput(BaseModel):
+    input_mode: InputModeEnum
+    artifact_type: ArtifactTypeEnum
+    detected_mime: Optional[str] = None
+    reported_mime: Optional[str] = None
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    detector: str = Field(default="heuristic")
+    support_status: SupportStatusEnum = SupportStatusEnum.SUPPORTED
+    warnings: List[str] = Field(default_factory=list)
+    candidate_analyzers: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class AnalyzerCapabilityRead(BaseModel):
+    name: str
+    version: str
+    supported_artifact_types: List[ArtifactTypeEnum]
+    status: CapabilityStatusEnum
+    description: str
+
+
+class IngestTextRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=1000000, description="Raw text, URL, domain, IP, or JSON")
+    source: str = Field(default="TEXT_INPUT", max_length=50)
+    submitted_by: Optional[str] = None
+    notes: Optional[str] = None
+    case_id: Optional[str] = None
+    incident_id: Optional[str] = None
+    request_id: Optional[str] = None
+
+
+class IngestEventRequest(BaseModel):
+    event: Dict[str, Any] = Field(..., description="Structured JSON security event")
+    source_type: Optional[str] = Field(default="SECURITY_EVENT", max_length=50)
+    source: str = Field(default="STRUCTURED_EVENT", max_length=50)
+    submitted_by: Optional[str] = None
+    notes: Optional[str] = None
+    case_id: Optional[str] = None
+    incident_id: Optional[str] = None
+    request_id: Optional[str] = None
+
+
+class DetectInputRequest(BaseModel):
+    text: Optional[str] = None
+    filename: Optional[str] = None
+    content_type: Optional[str] = None
+
+
+class IngestionResult(BaseModel):
+    ingestion_id: str
+    artifact_id: str
+    artifact_type: ArtifactTypeEnum
+    input_mode: InputModeEnum
+    name: str
+    original_value: Optional[str] = None
+    normalized_value: Optional[str] = None
+    sha256: Optional[str] = None
+    size: Optional[int] = None
+    mime_type: Optional[str] = None
+    classification: DetectedInput
+    storage_status: str = Field(default="STORED")
+    storage_key: Optional[str] = None
+    analysis_status: AnalysisStatusEnum = AnalysisStatusEnum.INGESTED
+    candidate_analyzers: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    model_config = ConfigDict(from_attributes=True)
