@@ -8,7 +8,8 @@ from sqlalchemy import (
     Float,
     DateTime,
     ForeignKey,
-    Index
+    Index,
+    Boolean
 )
 from sqlalchemy.orm import relationship
 from backend.db.session import Base
@@ -159,6 +160,11 @@ class ReportModel(Base):
     ai_summary_json = Column(Text, nullable=True, default=None)
     file_path = Column(String(255), nullable=True)
     file_size_bytes = Column(Integer, nullable=True, default=0)
+    artifact_id = Column(String(36), ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    sha256 = Column(String(64), nullable=True, index=True)
+    format = Column(String(20), default="PDF", nullable=False)
+    generator_version = Column(String(50), default="1.0.0", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
 
 
@@ -310,6 +316,58 @@ class ArtifactModel(Base):
     child_artifacts = relationship("ArtifactModel", back_populates="parent_artifact", cascade="all, delete-orphan")
     analysis_runs = relationship("AnalysisRunModel", back_populates="artifact", cascade="all, delete-orphan", lazy="selectin")
     threat_events = relationship("ThreatEventModel", back_populates="source_artifact")
+    storage_records = relationship("ArtifactStorageRecordModel", back_populates="artifact", cascade="all, delete-orphan", lazy="selectin")
+    ingestions = relationship("IngestionRecordModel", back_populates="artifact", cascade="all, delete-orphan", lazy="selectin")
+
+
+class ArtifactStorageRecordModel(Base):
+    """
+    Physical storage and integrity tracking for an Artifact across storage backends
+    (e.g., LOCAL, S3, GCS, AZURE). Tracks verified SHA-256 and retention policy.
+    """
+    __tablename__ = "artifact_storage_records"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    artifact_id = Column(String(36), ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False, index=True)
+    storage_backend = Column(String(50), nullable=False, default="LOCAL", index=True)  # LOCAL, S3, GCS, AZURE
+    storage_key = Column(String(500), nullable=False, index=True)
+    sha256 = Column(String(64), nullable=False, index=True)
+    size = Column(Integer, nullable=False)
+    mime_type = Column(String(100), nullable=True)
+    original_filename = Column(String(255), nullable=True)
+    stored_at = Column(DateTime, default=get_utc_now, nullable=False)
+    verified_at = Column(DateTime, nullable=True)
+    integrity_status = Column(String(30), nullable=False, default="UNVERIFIED", index=True)  # UNVERIFIED, VERIFIED, MISMATCH, MISSING
+    retention_policy = Column(String(50), nullable=False, default="INDEFINITE")  # INDEFINITE, 30_DAYS, 90_DAYS, 1_YEAR, LEGAL_HOLD
+    retain_until = Column(DateTime, nullable=True)
+    legal_hold = Column(Boolean, default=False, nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    artifact = relationship("ArtifactModel", back_populates="storage_records")
+
+
+class IngestionRecordModel(Base):
+    """
+    Tracks discrete ingestion events. Distinguishes immutable content identity (Artifact)
+    from submission contexts (submitter, timestamp, request_id, source channel).
+    """
+    __tablename__ = "ingestions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    artifact_id = Column(String(36), ForeignKey("artifacts.id", ondelete="CASCADE"), nullable=False, index=True)
+    source = Column(String(50), nullable=False, default="UPLOAD", index=True)  # UPLOAD, API, EMAIL_CONNECTOR, ENDPOINT_AGENT, SYSTEM, IMPORT, EXTRACTION, OTHER
+    submitted_by = Column(String(100), nullable=True)
+    received_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    original_filename = Column(String(255), nullable=True)
+    request_id = Column(String(100), nullable=True, index=True)
+    context_json = Column(Text, default="{}", nullable=False)
+    status = Column(String(30), nullable=False, default="COMPLETED", index=True)  # RECEIVED, PROCESSING, COMPLETED, FAILED
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    artifact = relationship("ArtifactModel", back_populates="ingestions")
 
 
 class AnalysisRunModel(Base):

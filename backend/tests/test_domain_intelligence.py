@@ -372,8 +372,9 @@ def test_robust_date_formats():
     assert age2 is not None and age2 > 7000
     assert new2 is False
 
-    # Date only
-    age3, new3 = service._calculate_domain_age("2026-08-25")
+    # Date only (recent within 30 days)
+    recent_date = (datetime.now(timezone.utc) - timedelta(days=5)).strftime("%Y-%m-%d")
+    age3, new3 = service._calculate_domain_age(recent_date)
     assert age3 is not None and age3 >= 0
     assert new3 is True  # Within 30 days
 

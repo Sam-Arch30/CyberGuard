@@ -1,12 +1,13 @@
 import os
 import uuid
+import hashlib
 from typing import Optional
 from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
-from backend.db.models import ReportModel, CaseModel, CaseEmailModel
+from backend.db.models import ReportModel, CaseModel, CaseEmailModel, ArtifactModel
 from backend.schemas.report import (
     ReportGenerateRequest,
     ReportListResponse,
@@ -14,6 +15,7 @@ from backend.schemas.report import (
 )
 from backend.services.report_service import ReportService
 from backend.services.audit_service import AuditService
+from backend.services.evidence_storage import evidence_storage
 
 router = APIRouter(prefix="/api/reports", tags=["Forensic Reports"])
 
@@ -101,11 +103,29 @@ def generate_forensic_report(
     pdf_filename = f"{report_id}.pdf"
     pdf_path = os.path.join(ReportService.REPORTS_DIR, pdf_filename)
 
+    report_sha = hashlib.sha256(pdf_bytes).hexdigest().lower()
     try:
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
     except Exception:
         pass
+
+    # Persist in evidence_storage abstraction
+    try:
+        evidence_storage.store_bytes(
+            data=pdf_bytes,
+            original_filename=f"{report_number}.pdf",
+            mime_type="application/pdf",
+            custom_key=f"reports/{report_id}.pdf"
+        )
+    except Exception:
+        pass
+
+    # Relate to canonical Artifact if available
+    art = db.query(ArtifactModel).filter(
+        (ArtifactModel.sha256 == sha256.lower()) |
+        (ArtifactModel.id == evidence_id)
+    ).first()
 
     report_record = ReportModel(
         id=report_id,
@@ -113,7 +133,11 @@ def generate_forensic_report(
         title=f"Forensic Report: {subject[:80]}",
         case_id=request.case_id,
         evidence_id=evidence_id,
+        artifact_id=art.id if art else None,
         email_sha256=sha256,
+        sha256=report_sha,
+        format="PDF",
+        generator_version="ReportService-1.0",
         threat_score=score,
         severity=severity,
         analyst_name=request.analyst_name or "SOC Lead Analyst",

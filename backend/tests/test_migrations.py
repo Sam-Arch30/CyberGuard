@@ -61,6 +61,8 @@ def test_alembic_migrations_from_scratch():
                 "attack_paths",
                 "attack_stages",
                 "attack_edges",
+                "artifact_storage_records",
+                "ingestions",
                 "alembic_version"
             }
 

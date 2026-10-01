@@ -23,6 +23,7 @@ Validates:
 """
 import io
 import json
+import hashlib
 import pytest
 from datetime import datetime, timezone
 from fastapi.testclient import TestClient
@@ -495,10 +496,9 @@ def test_17_new_normalized_records_produced_from_eml(db):
     Artifact(EMAIL) -> Artifact(ATTACHMENT) -> AnalysisRun -> Findings -> Evidence -> Indicators -> Relationships
     """
     # 1. Check Artifact
-    email_artifacts = db.query(ArtifactModel).filter(ArtifactModel.artifact_type == "EMAIL").all()
-    assert len(email_artifacts) >= 1
-    art = email_artifacts[0]
-    assert art.sha256 is not None
+    sample_sha = hashlib.sha256(SAMPLE_SAFE_RFC822_EML).hexdigest().lower()
+    art = db.query(ArtifactModel).filter(ArtifactModel.sha256 == sample_sha).first()
+    assert art is not None
     assert art.storage_reference is not None
 
     # 2. Check Child Attachment Artifact
@@ -566,7 +566,10 @@ def test_18_existing_report_generation_still_works(client: TestClient, db):
 
 def test_19_unified_inspection_endpoints(client: TestClient, db):
     """Verifies minimal API endpoints for inspecting the unified data model."""
-    art = db.query(ArtifactModel).filter(ArtifactModel.artifact_type == "EMAIL").first()
+    art = db.query(ArtifactModel).filter(
+        ArtifactModel.artifact_type == "EMAIL",
+        ArtifactModel.analysis_runs.any(AnalysisRunModel.findings.any())
+    ).first()
     assert art is not None
 
     # GET /api/unified/artifacts/{id}

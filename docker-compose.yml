@@ -40,11 +40,16 @@ services:
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-gemini-1.5-flash}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
+      CYBERGUARD_STORAGE_ROOT: ${CYBERGUARD_STORAGE_ROOT:-/app/backend/data/storage}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       RATE_LIMIT_ANALYSIS_PER_MIN: ${RATE_LIMIT_ANALYSIS_PER_MIN:-20}
       RATE_LIMIT_LLM_PER_MIN: ${RATE_LIMIT_LLM_PER_MIN:-10}
       RATE_LIMIT_INTEL_PER_MIN: ${RATE_LIMIT_INTEL_PER_MIN:-60}
       RATE_LIMIT_GENERAL_PER_MIN: ${RATE_LIMIT_GENERAL_PER_MIN:-120}
+    volumes:
+      - cyberguard_storage:/app/backend/data/storage
+      - eml_evidence_data:/app/backend/data/eml_store
+      - reports_data:/app/backend/data/reports
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     depends_on:
@@ -80,3 +85,10 @@ services:
 volumes:
   postgres_data:
     driver: local
+  cyberguard_storage:
+    driver: local
+  eml_evidence_data:
+    driver: local
+  reports_data:
+    driver: local
+

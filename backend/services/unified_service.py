@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+import hashlib
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -18,6 +19,7 @@ from sqlalchemy.orm import Session
 from backend.db.models import (
     AnalysisRunModel,
     ArtifactModel,
+    ArtifactStorageRecordModel,
     AttackEdgeModel,
     AttackPathModel,
     AttackStageModel,
@@ -29,12 +31,18 @@ from backend.db.models import (
     FindingModel,
     IncidentModel,
     IndicatorModel,
+    IngestionRecordModel,
     ModelVersionModel,
     RelationshipModel,
     ResponseActionModel,
     ThreatEventModel,
     generate_uuid,
     get_utc_now,
+)
+from backend.services.evidence_storage import (
+    evidence_storage,
+    IntegrityStatus,
+    StorageResult,
 )
 from backend.schemas.unified import (
     AnalysisStatusEnum,
@@ -44,10 +52,13 @@ from backend.schemas.unified import (
     FindingMethodEnum,
     IncidentStatusEnum,
     IndicatorTypeEnum,
+    IntegrityStatusEnum,
     ModelStatusEnum,
     RelationshipTypeEnum,
     ResponseStatusEnum,
+    RetentionPolicyEnum,
     SeverityEnum,
+    StorageBackendEnum,
     normalize_confidence,
     normalize_domain,
     normalize_email_address,
@@ -90,14 +101,15 @@ class ArtifactService:
         clean_type = artifact_type.value if isinstance(artifact_type, ArtifactTypeEnum) else str(artifact_type).upper()
 
         if clean_sha256:
-            existing = (
-                db.query(ArtifactModel)
-                .filter(
-                    ArtifactModel.artifact_type == clean_type,
-                    ArtifactModel.sha256 == clean_sha256,
-                )
-                .first()
+            query = db.query(ArtifactModel).filter(
+                ArtifactModel.artifact_type == clean_type,
+                ArtifactModel.sha256 == clean_sha256,
             )
+            if parent_artifact_id is not None:
+                query = query.filter(ArtifactModel.parent_artifact_id == parent_artifact_id)
+            else:
+                query = query.filter(ArtifactModel.parent_artifact_id.is_(None))
+            existing = query.first()
             if existing:
                 return existing
 
@@ -241,6 +253,172 @@ class AnalysisService:
             .order_by(AnalysisRunModel.started_at.desc())
             .all()
         )
+
+    @classmethod
+    def list_analysis_history(cls, db: Session, artifact_id: str) -> List[AnalysisRunModel]:
+        return cls.list_runs_for_artifact(db=db, artifact_id=artifact_id)
+
+    @staticmethod
+    def get_latest_analysis_run(db: Session, artifact_id: str) -> Optional[AnalysisRunModel]:
+        """Returns the most recent completed analysis run for an artifact."""
+        return (
+            db.query(AnalysisRunModel)
+            .filter(
+                AnalysisRunModel.artifact_id == artifact_id,
+                AnalysisRunModel.status == AnalysisStatusEnum.COMPLETED.value,
+            )
+            .order_by(AnalysisRunModel.started_at.desc())
+            .first()
+        )
+
+    @staticmethod
+    def reanalyze_artifact(
+        db: Session,
+        artifact_id: str,
+        trigger: str = "REANALYSIS",
+        pipeline_version: str = "1.1.0",
+        force: bool = False,
+    ) -> AnalysisRunModel:
+        """
+        Re-analyzes an existing Artifact:
+        1. Retrieves existing evidence bytes via storage abstraction
+        2. Verifies cryptographic integrity
+        3. Creates NEW AnalysisRun (preserving all previous runs)
+        4. Executes current analyzers
+        5. Attaches new Findings, Evidence, and Indicators
+        6. Logs chain-of-custody audit event
+        """
+        artifact = db.get(ArtifactModel, artifact_id)
+        if not artifact:
+            raise ValueError(f"Artifact '{artifact_id}' not found.")
+
+        # Retrieve bytes
+        storage_key = artifact.storage_reference or (f"artifacts/{artifact.sha256[:2]}/{artifact.sha256}/original" if artifact.sha256 else None)
+        if not storage_key:
+            raise ValueError(f"Artifact '{artifact_id}' has no storage reference or SHA-256.")
+
+        content_bytes = evidence_storage.retrieve_bytes(storage_key)
+
+        # Integrity check
+        if artifact.sha256:
+            integ_status, actual_sha = evidence_storage.verify_integrity(storage_key, artifact.sha256)
+            if integ_status != IntegrityStatus.VERIFIED and not force:
+                StorageRecordService.update_integrity_status(db, artifact.id, integ_status.value, actual_sha)
+                raise ValueError(
+                    f"Integrity verification failed for artifact '{artifact_id}': status={integ_status.value}, expected={artifact.sha256}, actual={actual_sha}"
+                )
+
+        # Create NEW AnalysisRun
+        new_run = AnalysisService.create_analysis_run(
+            db=db,
+            artifact_id=artifact.id,
+            status=AnalysisStatusEnum.RUNNING,
+            trigger=trigger,
+            pipeline_version=pipeline_version,
+            metadata={"reanalysis_of": artifact.id, "previous_runs_count": len(artifact.analysis_runs)},
+        )
+
+        # Run analyzers based on artifact_type
+        clean_type = (artifact.artifact_type or "").upper()
+        if clean_type in (ArtifactTypeEnum.EMAIL.value, "EMAIL"):
+            from backend.services.email_parser import EmailParserService
+            parsed = EmailParserService.parse_eml_bytes(content_bytes, artifact.name)
+
+            # Authentication Finding
+            auth = getattr(parsed, "authentication", None)
+            if auth:
+                spf_obj = getattr(auth, "spf", None)
+                spf_val = getattr(spf_obj, "result", str(spf_obj or "none"))
+                dkim_obj = getattr(auth, "dkim", None)
+                dkim_val = getattr(dkim_obj, "result", str(dkim_obj or "none"))
+                dmarc_obj = getattr(auth, "dmarc", None)
+                dmarc_val = getattr(dmarc_obj, "result", str(dmarc_obj or "none"))
+                has_fail = any(str(v).lower() == "fail" for v in (spf_val, dkim_val, dmarc_val))
+                f_auth = FindingService.create_finding(
+                    db=db,
+                    analysis_run_id=new_run.id,
+                    analyzer="EmailAuthenticationService",
+                    finding_type="email_authentication",
+                    title="Email Authentication & Alignment (Re-analysis)",
+                    description=f"Re-analysis verification: SPF={spf_val}, DKIM={dkim_val}, DMARC={dmarc_val}.",
+                    severity=SeverityEnum.HIGH if has_fail else SeverityEnum.SAFE,
+                    confidence=1.0,
+                    risk_contribution=20.0 if has_fail else 0.0,
+                    method=FindingMethodEnum.RULE,
+                    rule_id="RULE-AUTH-RFC7489-V2",
+                )
+                FindingService.attach_evidence(db, f_auth.id, "SPF_RESULT", "SPF_VERIFIER", "result", str(spf_val), artifact_id=artifact.id)
+                FindingService.attach_evidence(db, f_auth.id, "DKIM_RESULT", "DKIM_VERIFIER", "result", str(dkim_val), artifact_id=artifact.id)
+                FindingService.attach_evidence(db, f_auth.id, "DMARC_RESULT", "DMARC_VERIFIER", "result", str(dmarc_val), artifact_id=artifact.id)
+
+            # Lookalike Finding
+            lookalikes = getattr(parsed, "lookalike_domains", []) or []
+            for lk in lookalikes:
+                dom = getattr(lk, "domain", "")
+                target = getattr(lk, "target_brand", "") or getattr(lk, "closest_brand", "")
+                sim = getattr(lk, "similarity", 0.0) or getattr(lk, "confidence_score", 0.8)
+                f_lk = FindingService.create_finding(
+                    db=db,
+                    analysis_run_id=new_run.id,
+                    analyzer="LookalikeDetector",
+                    finding_type="lookalike_impersonation",
+                    title=f"Lookalike Domain (Re-analysis): {dom}",
+                    description=f"Lookalike evaluation targeting {target} with similarity {sim:.2f}.",
+                    severity=SeverityEnum.HIGH,
+                    confidence=normalize_confidence(sim),
+                    risk_contribution=35.0,
+                    method=FindingMethodEnum.HEURISTIC,
+                    rule_id="HEUR-LOOKALIKE-LEVENSHTEIN-V2",
+                )
+                FindingService.attach_evidence(db, f_lk.id, "OBSERVED_DOMAIN", "LOOKALIKE_MATCHER", "domain", dom, artifact_id=artifact.id)
+
+            # Score & Complete
+            ts = getattr(parsed, "threat_score", None)
+            score_val = ts.score if ts else 0.0
+            sev_val = ts.severity if ts else "low"
+            AnalysisService.complete_analysis_run(
+                db=db,
+                run_id=new_run.id,
+                overall_risk_score=score_val,
+                overall_severity=sev_val,
+                confidence=1.0,
+                metadata={"analyzer_count": 4}
+            )
+        else:
+            # File / Generic Artifact inspection
+            f_gen = FindingService.create_finding(
+                db=db,
+                analysis_run_id=new_run.id,
+                analyzer="StaticFileInspector",
+                finding_type="static_file_inspection",
+                title=f"Static File Integrity Inspection: {artifact.name}",
+                description=f"Artifact size {len(content_bytes)} bytes verified with SHA-256 {artifact.sha256}.",
+                severity=SeverityEnum.SAFE,
+                confidence=1.0,
+                method=FindingMethodEnum.RULE,
+            )
+            FindingService.attach_evidence(db, f_gen.id, "FILE_SIZE", "FILESYSTEM", "bytes", len(content_bytes), artifact_id=artifact.id)
+            if artifact.sha256:
+                FindingService.attach_evidence(db, f_gen.id, "FILE_SHA256", "CRYPTO", "sha256", artifact.sha256, artifact_id=artifact.id)
+            AnalysisService.complete_analysis_run(
+                db=db,
+                run_id=new_run.id,
+                overall_risk_score=0.0,
+                overall_severity=SeverityEnum.SAFE,
+                confidence=1.0
+            )
+
+        # Audit Event for chain-of-custody
+        AuditService.log_event(
+            db=db,
+            actor="SYSTEM",
+            action="ARTIFACT_REANALYZED",
+            resource_type="ARTIFACT",
+            resource_id=artifact.id,
+            details={"new_run_id": new_run.id, "trigger": trigger, "pipeline_version": pipeline_version},
+        )
+
+        return new_run
 
 
 # ============================================================================
@@ -769,7 +947,306 @@ class ModelVersionService:
 
 
 # ============================================================================
-# 10. UNIFIED INGESTION ADAPTER (LEGACY EML COMPATIBILITY)
+# 9b. AUDIT SERVICE (CANONICAL CHAIN-OF-CUSTODY)
+# ============================================================================
+
+class AuditService:
+    @staticmethod
+    def log_event(
+        db: Session,
+        action: str,
+        resource_type: str,
+        resource_id: str,
+        actor: Optional[str] = "SYSTEM",
+        details: Optional[Dict[str, Any]] = None,
+        request_id: Optional[str] = None,
+    ) -> AuditLogModel:
+        now = get_utc_now()
+        details_dict = details or {}
+        sanitized = {
+            k: v for k, v in details_dict.items()
+            if not any(s in k.lower() for s in ("password", "secret", "token", "key", "body"))
+        }
+        event = AuditLogModel(
+            id=generate_uuid(),
+            timestamp=now,
+            user=actor or "SYSTEM",
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            metadata_json=json.dumps(sanitized),
+            details=json.dumps(sanitized),
+            request_id=request_id,
+        )
+        db.add(event)
+        db.commit()
+        db.refresh(event)
+        return event
+
+    @staticmethod
+    def list_events_for_resource(
+        db: Session,
+        resource_type: str,
+        resource_id: str,
+        limit: int = 50,
+    ) -> List[AuditLogModel]:
+        return (
+            db.query(AuditLogModel)
+            .filter(
+                AuditLogModel.resource_type == resource_type,
+                AuditLogModel.resource_id == resource_id,
+            )
+            .order_by(AuditLogModel.timestamp.desc())
+            .limit(limit)
+            .all()
+        )
+
+
+# ============================================================================
+# 10. STORAGE RECORD SERVICE (SECTION 3)
+# ============================================================================
+
+class StorageRecordService:
+    @staticmethod
+    def create_or_get_storage_record(
+        db: Session,
+        artifact_id: str,
+        storage_key: str,
+        sha256: str,
+        size: int,
+        mime_type: Optional[str] = None,
+        original_filename: Optional[str] = None,
+        storage_backend: str = "LOCAL",
+        retention_policy: str = "INDEFINITE",
+        integrity_status: str = "VERIFIED",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> ArtifactStorageRecordModel:
+        existing = (
+            db.query(ArtifactStorageRecordModel)
+            .filter(
+                ArtifactStorageRecordModel.artifact_id == artifact_id,
+                ArtifactStorageRecordModel.storage_key == storage_key,
+            )
+            .first()
+        )
+        if existing:
+            return existing
+
+        now = get_utc_now()
+        rec = ArtifactStorageRecordModel(
+            id=generate_uuid(),
+            artifact_id=artifact_id,
+            storage_backend=storage_backend,
+            storage_key=storage_key,
+            sha256=sha256.strip().lower(),
+            size=max(0, size),
+            mime_type=mime_type,
+            original_filename=original_filename,
+            stored_at=now,
+            verified_at=now if integrity_status == "VERIFIED" else None,
+            integrity_status=integrity_status,
+            retention_policy=retention_policy,
+            metadata_json=json.dumps(metadata or {}),
+            created_at=now,
+            updated_at=now,
+        )
+        db.add(rec)
+        db.commit()
+        db.refresh(rec)
+        return rec
+
+    @staticmethod
+    def update_integrity_status(
+        db: Session,
+        artifact_id: str,
+        status: str,
+        verified_sha256: Optional[str] = None,
+    ) -> Optional[ArtifactStorageRecordModel]:
+        rec = (
+            db.query(ArtifactStorageRecordModel)
+            .filter(ArtifactStorageRecordModel.artifact_id == artifact_id)
+            .order_by(ArtifactStorageRecordModel.created_at.desc())
+            .first()
+        )
+        if rec:
+            rec.integrity_status = status
+            rec.verified_at = get_utc_now()
+            if verified_sha256:
+                rec.sha256 = verified_sha256.strip().lower()
+            rec.updated_at = get_utc_now()
+            db.commit()
+            db.refresh(rec)
+        return rec
+
+    @staticmethod
+    def get_storage_records(db: Session, artifact_id: str) -> List[ArtifactStorageRecordModel]:
+        return (
+            db.query(ArtifactStorageRecordModel)
+            .filter(ArtifactStorageRecordModel.artifact_id == artifact_id)
+            .order_by(ArtifactStorageRecordModel.created_at.desc())
+            .all()
+        )
+
+
+# ============================================================================
+# 11. INGESTION SERVICE (SECTION 3)
+# ============================================================================
+
+class IngestionService:
+    @staticmethod
+    def record_ingestion(
+        db: Session,
+        artifact_id: str,
+        source: str = "UPLOAD",
+        submitted_by: Optional[str] = None,
+        original_filename: Optional[str] = None,
+        request_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None,
+        status: str = "COMPLETED",
+        metadata: Optional[Dict[str, Any]] = None,
+    ) -> IngestionRecordModel:
+        now = get_utc_now()
+        ingestion = IngestionRecordModel(
+            id=generate_uuid(),
+            artifact_id=artifact_id,
+            source=source,
+            submitted_by=submitted_by,
+            received_at=now,
+            original_filename=original_filename,
+            request_id=request_id or f"REQ-{uuid.uuid4().hex[:12].upper()}",
+            context_json=json.dumps(context or {}),
+            status=status,
+            metadata_json=json.dumps(metadata or {}),
+            created_at=now,
+        )
+        db.add(ingestion)
+        db.commit()
+        db.refresh(ingestion)
+        return ingestion
+
+    @staticmethod
+    def list_ingestions(db: Session, artifact_id: str) -> List[IngestionRecordModel]:
+        return (
+            db.query(IngestionRecordModel)
+            .filter(IngestionRecordModel.artifact_id == artifact_id)
+            .order_by(IngestionRecordModel.received_at.desc())
+            .all()
+        )
+
+
+# ============================================================================
+# 12. STORAGE MAINTENANCE SERVICE (SECTION 3)
+# ============================================================================
+
+class StorageMaintenanceService:
+    @staticmethod
+    def scan_orphans(db: Session) -> Dict[str, Any]:
+        """
+        Scans for:
+        1. DB artifacts whose physical storage file is missing.
+        2. Files on disk in content-addressed storage not registered in artifacts table.
+        3. Stale temporary staging files in tmp/.
+        """
+        missing_files = []
+        artifacts = db.query(ArtifactModel).all()
+        for art in artifacts:
+            key = art.storage_reference or (f"artifacts/{art.sha256[:2]}/{art.sha256}/original" if art.sha256 else None)
+            if key and not evidence_storage.exists(key):
+                missing_files.append({
+                    "artifact_id": art.id,
+                    "name": art.name,
+                    "sha256": art.sha256,
+                    "storage_key": key,
+                })
+
+        untracked_files = []
+        all_db_shas = {art.sha256.lower() for art in artifacts if art.sha256}
+        if hasattr(evidence_storage, "artifacts_dir") and evidence_storage.artifacts_dir.exists():
+            for orig_file in evidence_storage.artifacts_dir.glob("*/*/original"):
+                sha = orig_file.parent.name.lower()
+                if sha not in all_db_shas:
+                    untracked_files.append({
+                        "path": str(orig_file),
+                        "sha256": sha,
+                        "size": orig_file.stat().st_size,
+                    })
+
+        stale_temp = []
+        if hasattr(evidence_storage, "tmp_dir") and evidence_storage.tmp_dir.exists():
+            now_ts = datetime.now(timezone.utc).timestamp()
+            for tmp_file in evidence_storage.tmp_dir.glob(".tmp_*"):
+                age_seconds = now_ts - tmp_file.stat().st_mtime
+                if age_seconds > 3600:
+                    stale_temp.append({
+                        "path": str(tmp_file),
+                        "size": tmp_file.stat().st_size,
+                        "age_seconds": round(age_seconds, 1),
+                    })
+
+        return {
+            "missing_files": missing_files,
+            "untracked_files": untracked_files,
+            "stale_temp_files": stale_temp,
+            "scan_timestamp": datetime.now(timezone.utc).isoformat(),
+        }
+
+    @staticmethod
+    def backfill_legacy_evidence(db: Session, dry_run: bool = False) -> Dict[str, Any]:
+        """
+        Backfills unindexed legacy evidence files from eml_store into canonical storage
+        and registers ArtifactModel, ArtifactStorageRecordModel, and IngestionRecordModel.
+        """
+        backfilled = []
+        if not hasattr(evidence_storage, "legacy_eml_dir") or not evidence_storage.legacy_eml_dir.exists():
+            return {"backfilled": [], "count": 0, "dry_run": dry_run}
+
+        for eml_file in evidence_storage.legacy_eml_dir.glob("*.eml"):
+            try:
+                content = eml_file.read_bytes()
+                sha = hashlib.sha256(content).hexdigest().lower()
+                existing = db.query(ArtifactModel).filter(ArtifactModel.sha256 == sha).first()
+                if not existing:
+                    if not dry_run:
+                        st_res = evidence_storage.store_bytes(
+                            data=content,
+                            original_filename=eml_file.name,
+                            mime_type="message/rfc822",
+                        )
+                        art = ArtifactService.create_or_get_artifact(
+                            db=db,
+                            artifact_type=ArtifactTypeEnum.EMAIL,
+                            name=eml_file.name,
+                            source="LEGACY_BACKFILL",
+                            mime_type="message/rfc822",
+                            size=len(content),
+                            sha256=sha,
+                            storage_reference=st_res.storage_key,
+                        )
+                        StorageRecordService.create_or_get_storage_record(
+                            db=db,
+                            artifact_id=art.id,
+                            storage_key=st_res.storage_key,
+                            sha256=sha,
+                            size=len(content),
+                            mime_type="message/rfc822",
+                            original_filename=eml_file.name,
+                            integrity_status="VERIFIED",
+                        )
+                        IngestionService.record_ingestion(
+                            db=db,
+                            artifact_id=art.id,
+                            source="LEGACY_BACKFILL",
+                            original_filename=eml_file.name,
+                        )
+                    backfilled.append({"filename": eml_file.name, "sha256": sha, "size": len(content)})
+            except Exception as exc:
+                logger.warning("Failed backfilling legacy file %s: %s", eml_file, exc)
+
+        return {"backfilled": backfilled, "count": len(backfilled), "dry_run": dry_run}
+
+
+# ============================================================================
+# 13. UNIFIED INGESTION ADAPTER (LEGACY EML COMPATIBILITY)
 # ============================================================================
 
 class UnifiedIngestionAdapter:
@@ -800,9 +1277,23 @@ class UnifiedIngestionAdapter:
         """
         try:
             # 1. Register canonical Artifact for the Email
-            filename = getattr(analysis_result, "original_filename", "email.eml") or "email.eml"
+            filename = (
+                getattr(evidence_record, "original_filename", None)
+                or getattr(analysis_result, "original_filename", None)
+                or "email.eml"
+            )
             file_size = getattr(evidence_record, "size", len(content_bytes) if content_bytes else 0)
             storage_ref = f"eml_store/{evidence_record.evidence_id}_{raw_sha256[:16]}.eml"
+
+            # Store in content-addressed evidence storage if bytes provided
+            if content_bytes:
+                st_res = evidence_storage.store_bytes(
+                    data=content_bytes,
+                    original_filename=filename,
+                    mime_type="message/rfc822",
+                )
+                storage_ref = st_res.storage_key
+                file_size = st_res.size
 
             email_artifact = ArtifactService.create_or_get_artifact(
                 db=db,
@@ -820,6 +1311,26 @@ class UnifiedIngestionAdapter:
                 },
             )
 
+            # Record storage & ingestion records
+            StorageRecordService.create_or_get_storage_record(
+                db=db,
+                artifact_id=email_artifact.id,
+                storage_key=storage_ref,
+                sha256=raw_sha256,
+                size=file_size,
+                mime_type="message/rfc822",
+                original_filename=filename,
+                integrity_status="VERIFIED",
+            )
+            IngestionService.record_ingestion(
+                db=db,
+                artifact_id=email_artifact.id,
+                source="UPLOAD",
+                submitted_by=getattr(evidence_record, "uploader", "SOC Analyst"),
+                original_filename=filename,
+                request_id=getattr(evidence_record, "evidence_id", None),
+            )
+
             # 2. Register child Artifacts for attachments
             attachment_artifacts: List[Tuple[Any, ArtifactModel]] = []
             attachments = getattr(analysis_result, "attachments", []) or []
@@ -828,6 +1339,20 @@ class UnifiedIngestionAdapter:
                 att_sha256 = getattr(att, "sha256", None)
                 att_size = getattr(att, "size", None)
                 att_mime = getattr(att, "mime_type", None) or getattr(att, "content_type", None)
+                att_storage_ref = None
+
+                # Store attachment bytes in content-addressed storage if available
+                att_bytes = getattr(att, "raw_bytes", None) or getattr(att, "content", None)
+                if att_bytes and isinstance(att_bytes, bytes):
+                    att_res = evidence_storage.store_bytes(
+                        data=att_bytes,
+                        original_filename=att_name,
+                        mime_type=att_mime,
+                    )
+                    att_storage_ref = att_res.storage_key
+                    if not att_sha256:
+                        att_sha256 = att_res.sha256
+                    att_size = att_res.size
 
                 child_art = ArtifactService.create_or_get_artifact(
                     db=db,
@@ -837,8 +1362,26 @@ class UnifiedIngestionAdapter:
                     mime_type=att_mime,
                     size=att_size,
                     sha256=att_sha256,
+                    storage_reference=att_storage_ref,
                     parent_artifact_id=email_artifact.id,
                     metadata={"email_artifact_id": email_artifact.id},
+                )
+                if att_storage_ref and att_sha256:
+                    StorageRecordService.create_or_get_storage_record(
+                        db=db,
+                        artifact_id=child_art.id,
+                        storage_key=att_storage_ref,
+                        sha256=att_sha256,
+                        size=att_size or 0,
+                        mime_type=att_mime,
+                        original_filename=att_name,
+                        integrity_status="VERIFIED",
+                    )
+                IngestionService.record_ingestion(
+                    db=db,
+                    artifact_id=child_art.id,
+                    source="EXTRACTION",
+                    original_filename=att_name,
                 )
                 attachment_artifacts.append((att, child_art))
 

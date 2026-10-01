@@ -603,3 +603,104 @@ class ModelVersionRead(ModelVersionBase):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+# ============================================================================
+# SECTION 3: STORAGE & INGESTION SCHEMAS
+# ============================================================================
+
+class StorageBackendEnum(str, Enum):
+    LOCAL = "LOCAL"
+    S3 = "S3"
+    GCS = "GCS"
+    AZURE = "AZURE"
+
+
+class IntegrityStatusEnum(str, Enum):
+    UNVERIFIED = "UNVERIFIED"
+    VERIFIED = "VERIFIED"
+    MISMATCH = "MISMATCH"
+    MISSING = "MISSING"
+
+
+class RetentionPolicyEnum(str, Enum):
+    INDEFINITE = "INDEFINITE"
+    THIRTY_DAYS = "30_DAYS"
+    NINETY_DAYS = "90_DAYS"
+    ONE_YEAR = "1_YEAR"
+    LEGAL_HOLD = "LEGAL_HOLD"
+
+
+class ArtifactStorageRecordBase(BaseModel):
+    artifact_id: str
+    storage_backend: StorageBackendEnum = StorageBackendEnum.LOCAL
+    storage_key: str = Field(..., max_length=500)
+    sha256: str = Field(..., max_length=64)
+    size: int = Field(..., ge=0)
+    mime_type: Optional[str] = None
+    original_filename: Optional[str] = None
+    stored_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    verified_at: Optional[datetime] = None
+    integrity_status: IntegrityStatusEnum = IntegrityStatusEnum.UNVERIFIED
+    retention_policy: RetentionPolicyEnum = RetentionPolicyEnum.INDEFINITE
+    retain_until: Optional[datetime] = None
+    legal_hold: bool = False
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class ArtifactStorageRecordCreate(ArtifactStorageRecordBase):
+    pass
+
+
+class ArtifactStorageRecordRead(ArtifactStorageRecordBase):
+    id: str
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IngestionRecordBase(BaseModel):
+    artifact_id: str
+    source: str = Field(default="UPLOAD", max_length=50)
+    submitted_by: Optional[str] = None
+    received_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    original_filename: Optional[str] = None
+    request_id: Optional[str] = None
+    context: Dict[str, Any] = Field(default_factory=dict)
+    status: str = Field(default="COMPLETED", max_length=30)
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+
+class IngestionRecordCreate(IngestionRecordBase):
+    pass
+
+
+class IngestionRecordRead(IngestionRecordBase):
+    id: str
+    created_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class IntegrityCheckResult(BaseModel):
+    artifact_id: str
+    storage_key: Optional[str] = None
+    expected_sha256: str
+    actual_sha256: Optional[str] = None
+    status: IntegrityStatusEnum
+    verified_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    details: Optional[str] = None
+
+
+class ReanalyzeRequest(BaseModel):
+    trigger: str = Field(default="REANALYSIS", max_length=50)
+    pipeline_version: str = Field(default="1.1.0", max_length=50)
+    force: bool = False
+
+
+class OrphanReport(BaseModel):
+    missing_files: List[Dict[str, Any]] = Field(default_factory=list)
+    untracked_files: List[Dict[str, Any]] = Field(default_factory=list)
+    stale_temp_files: List[Dict[str, Any]] = Field(default_factory=list)
+    scan_timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

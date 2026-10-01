@@ -1,9 +1,8 @@
-"""
-Minimal API endpoints to inspect the Unified CyberGuard Data Model.
-Provides inspection for Artifacts, AnalysisRuns, Findings, Indicators, Relationships, and Incidents.
-"""
+import os
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
@@ -15,6 +14,13 @@ from backend.db.models import (
     RelationshipModel,
     IncidentModel,
     ThreatEventModel,
+    ArtifactStorageRecordModel,
+    IngestionRecordModel,
+)
+from backend.services.evidence_storage import (
+    evidence_storage,
+    StoragePathTraversalError,
+    IntegrityStatus,
 )
 from backend.services.unified_service import (
     ArtifactService,
@@ -23,9 +29,15 @@ from backend.services.unified_service import (
     IndicatorService,
     RelationshipService,
     IncidentService,
+    StorageRecordService,
+    IngestionService,
+    StorageMaintenanceService,
+    AuditService,
 )
+from backend.schemas.unified import ReanalyzeRequest
 
 router = APIRouter(tags=["Unified Data Model"])
+
 
 
 @router.get(
@@ -261,3 +273,271 @@ def list_relationships_endpoint(
         }
         for r in rels
     ]
+
+
+# ============================================================================
+# SECTION 3: PERSISTENT STORAGE, RETRIEVAL, INTEGRITY & RE-ANALYSIS ENDPOINTS
+# ============================================================================
+
+@router.get(
+    "/api/unified/artifacts/{id}/download",
+    summary="Download original immutable evidence file",
+    description="Securely streams the raw forensic evidence without exposing backend filesystem paths."
+)
+@router.get("/api/artifacts/{id}/download", include_in_schema=False)
+def download_artifact_endpoint(id: str, db: Session = Depends(get_db)):
+    artifact = ArtifactService.get_artifact(db, id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{id}' not found."
+        )
+
+    storage_key = artifact.storage_reference
+    if not storage_key and artifact.sha256:
+        storage_key = f"artifacts/{artifact.sha256[:2]}/{artifact.sha256}/original"
+
+    if not storage_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No storage reference associated with artifact '{id}'."
+        )
+
+    try:
+        stream = evidence_storage.retrieve_stream(storage_key)
+    except StoragePathTraversalError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid storage key detected."
+        )
+    except FileNotFoundError:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Forensic evidence file is missing from storage for artifact '{id}'."
+        )
+
+    safe_name = os.path.basename(artifact.name or "evidence.bin").replace('"', '')
+    media_type = artifact.mime_type or "application/octet-stream"
+
+    # Log chain of custody event
+    AuditService.log_event(
+        db=db,
+        actor="API_USER",
+        action="ARTIFACT_RETRIEVED",
+        resource_type="ARTIFACT",
+        resource_id=artifact.id,
+        details={"name": safe_name, "storage_key": storage_key},
+    )
+
+    return StreamingResponse(
+        stream,
+        media_type=media_type,
+        headers={"Content-Disposition": f'attachment; filename="{safe_name}"'}
+    )
+
+
+@router.get(
+    "/api/unified/artifacts/{id}/integrity",
+    summary="Verify cryptographic integrity of stored evidence",
+    description="Computes SHA-256 over stored bytes and validates against canonical identity."
+)
+@router.get("/api/artifacts/{id}/integrity", include_in_schema=False)
+def verify_artifact_integrity_endpoint(id: str, db: Session = Depends(get_db)):
+    artifact = ArtifactService.get_artifact(db, id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{id}' not found."
+        )
+
+    storage_key = artifact.storage_reference or (f"artifacts/{artifact.sha256[:2]}/{artifact.sha256}/original" if artifact.sha256 else None)
+    if not storage_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No storage key found for artifact '{id}'."
+        )
+
+    expected = artifact.sha256 or ""
+    integ_status, actual_sha = evidence_storage.verify_integrity(storage_key, expected)
+
+    StorageRecordService.update_integrity_status(
+        db, artifact.id, integ_status.value, actual_sha
+    )
+
+    AuditService.log_event(
+        db=db,
+        actor="API_USER",
+        action="ARTIFACT_INTEGRITY_VERIFIED",
+        resource_type="ARTIFACT",
+        resource_id=artifact.id,
+        details={"status": integ_status.value, "expected": expected, "actual": actual_sha},
+    )
+
+    return {
+        "artifact_id": artifact.id,
+        "storage_key": storage_key,
+        "expected_sha256": expected,
+        "actual_sha256": actual_sha,
+        "status": integ_status.value,
+        "verified_at": datetime.now(timezone.utc).isoformat(),
+        "details": "Integrity verified successfully" if integ_status.value == "VERIFIED" else f"Integrity status is {integ_status.value}",
+    }
+
+
+@router.post(
+    "/api/unified/artifacts/{id}/reanalyze",
+    summary="Re-analyze an existing Artifact",
+    description="Retrieves persisted evidence, verifies integrity, and executes a new AnalysisRun without overwriting historical runs."
+)
+@router.post("/api/artifacts/{id}/reanalyze", include_in_schema=False)
+def reanalyze_artifact_endpoint(
+    id: str,
+    req: Optional[ReanalyzeRequest] = None,
+    db: Session = Depends(get_db)
+):
+    trigger = req.trigger if req else "REANALYSIS"
+    pipeline_ver = req.pipeline_version if req else "1.1.0"
+    force = req.force if req else False
+
+    try:
+        new_run = AnalysisService.reanalyze_artifact(
+            db=db,
+            artifact_id=id,
+            pipeline_version=pipeline_ver,
+            trigger=trigger,
+            force=force,
+        )
+    except FileNotFoundError as e:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Re-analysis failed: {str(e)}")
+
+    return {
+        "id": new_run.id,
+        "artifact_id": new_run.artifact_id,
+        "status": new_run.status,
+        "trigger": new_run.trigger,
+        "pipeline_version": new_run.pipeline_version,
+        "overall_risk_score": new_run.overall_risk_score,
+        "overall_severity": new_run.overall_severity,
+        "confidence": new_run.confidence,
+        "started_at": new_run.started_at.isoformat() if new_run.started_at else None,
+        "completed_at": new_run.completed_at.isoformat() if new_run.completed_at else None,
+        "findings_count": len(new_run.findings),
+    }
+
+
+@router.get(
+    "/api/unified/artifacts/{id}/runs",
+    summary="Get all historical AnalysisRuns for an Artifact",
+    description="Returns chronological analysis pipeline execution runs."
+)
+def list_artifact_runs_endpoint(id: str, db: Session = Depends(get_db)):
+    artifact = ArtifactService.get_artifact(db, id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{id}' not found."
+        )
+    runs = AnalysisService.list_runs_for_artifact(db, artifact.id)
+    return [
+        {
+            "id": r.id,
+            "artifact_id": r.artifact_id,
+            "status": r.status,
+            "trigger": r.trigger,
+            "pipeline_version": r.pipeline_version,
+            "overall_risk_score": r.overall_risk_score,
+            "overall_severity": r.overall_severity,
+            "confidence": r.confidence,
+            "started_at": r.started_at.isoformat() if r.started_at else None,
+            "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+            "findings_count": len(r.findings),
+            "error": r.error,
+        }
+        for r in runs
+    ]
+
+
+@router.get(
+    "/api/unified/artifacts/{id}/ingestions",
+    summary="Get ingestion provenance records for an Artifact",
+    description="Returns all submission/ingestion events associated with this artifact."
+)
+def list_artifact_ingestions_endpoint(id: str, db: Session = Depends(get_db)):
+    artifact = ArtifactService.get_artifact(db, id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{id}' not found."
+        )
+    ingestions = IngestionService.list_ingestions(db, artifact.id)
+    return [
+        {
+            "id": ing.id,
+            "artifact_id": ing.artifact_id,
+            "source": ing.source,
+            "submitted_by": ing.submitted_by,
+            "received_at": ing.received_at.isoformat() if ing.received_at else None,
+            "original_filename": ing.original_filename,
+            "request_id": ing.request_id,
+            "status": ing.status,
+            "context_json": ing.context_json,
+        }
+        for ing in ingestions
+    ]
+
+
+@router.get(
+    "/api/unified/artifacts/{id}/storage",
+    summary="Get storage physical records for an Artifact",
+    description="Returns physical storage backend details, storage keys, and integrity status."
+)
+def list_artifact_storage_records_endpoint(id: str, db: Session = Depends(get_db)):
+    artifact = ArtifactService.get_artifact(db, id)
+    if not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Artifact '{id}' not found."
+        )
+    records = StorageRecordService.get_storage_records(db, artifact.id)
+    return [
+        {
+            "id": rec.id,
+            "artifact_id": rec.artifact_id,
+            "storage_backend": rec.storage_backend,
+            "storage_key": rec.storage_key,
+            "sha256": rec.sha256,
+            "size": rec.size,
+            "mime_type": rec.mime_type,
+            "original_filename": rec.original_filename,
+            "stored_at": rec.stored_at.isoformat() if rec.stored_at else None,
+            "verified_at": rec.verified_at.isoformat() if rec.verified_at else None,
+            "integrity_status": rec.integrity_status,
+            "retention_policy": rec.retention_policy,
+        }
+        for rec in records
+    ]
+
+
+@router.get(
+    "/api/unified/maintenance/orphans",
+    summary="Scan for storage orphans and missing evidence",
+    description="Identifies database artifacts with missing files, untracked storage files, and stale temp staging."
+)
+def scan_orphans_endpoint(db: Session = Depends(get_db)):
+    report = StorageMaintenanceService.scan_orphans(db)
+    return report
+
+
+@router.post(
+    "/api/unified/maintenance/backfill",
+    summary="Backfill legacy evidence into content-addressed storage",
+    description="Migrates legacy eml_store evidence into content-addressed storage and registers unified models."
+)
+def backfill_legacy_endpoint(dry_run: bool = Query(True), db: Session = Depends(get_db)):
+    result = StorageMaintenanceService.backfill_legacy_evidence(db, dry_run=dry_run)
+    return result
+

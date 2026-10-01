@@ -35,6 +35,8 @@ backend/data/*.db
 backend/data/reports/
 backend/data/eml_store/*.eml
 !backend/data/eml_store/.gitkeep
+backend/data/storage/*
+!backend/data/storage/.gitkeep
 
 # Editor directories and files
 .vscode/*
