@@ -47,6 +47,20 @@ def test_alembic_migrations_from_scratch():
                 "analyst_decisions",
                 "copilot_audit_logs",
                 "analysis_payloads",
+                "artifacts",
+                "analysis_runs",
+                "model_versions",
+                "findings",
+                "finding_evidence",
+                "indicators",
+                "entities",
+                "relationships",
+                "incidents",
+                "threat_events",
+                "response_actions",
+                "attack_paths",
+                "attack_stages",
+                "attack_edges",
                 "alembic_version"
             }
 

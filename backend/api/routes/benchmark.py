@@ -146,11 +146,15 @@ def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
         from sqlalchemy import text
         with engine.begin() as conn:
             for tbl in [
+                "attack_edges", "attack_stages", "attack_paths", "response_actions",
+                "threat_events", "finding_evidence", "findings", "relationships",
+                "entities", "indicators", "model_versions", "analysis_runs",
+                "incidents", "artifacts",
                 "case_emails", "case_notes", "case_findings", "reports",
                 "campaign_emails", "analyst_decisions", "evidence",
                 "analysis_payloads", "email_analyses", "cases", "campaigns",
                 "copilot_audit_logs", "audit_logs", "email_iocs",
-                "email_relationships", "analysis_runs", "emails", "iocs"
+                "email_relationships", "emails", "iocs"
             ]:
                 try:
                     conn.execute(text(f"DELETE FROM {tbl};"))

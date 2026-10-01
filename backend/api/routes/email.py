@@ -443,6 +443,19 @@ async def analyze_email(
                 )
             except Exception:
                 pass
+
+            # Section 2: Dual-write to Unified CyberGuard Canonical Data Model
+            try:
+                from backend.services.unified_service import UnifiedIngestionAdapter
+                UnifiedIngestionAdapter.ingest_email_analysis(
+                    db=db,
+                    evidence_record=evidence_record,
+                    analysis_result=analysis_result,
+                    raw_sha256=raw_sha256,
+                    content_bytes=content_bytes
+                )
+            except Exception:
+                pass
         except Exception:
             db.rollback()
 

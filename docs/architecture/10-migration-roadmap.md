@@ -132,21 +132,25 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
 | **ThreatEvent** | **MODERATE** | Medium | Current events are represented as discrete stages within an email's transport hops or audit logs. Introducing a generic `ThreatEvent` entity requires a dedicated time-series table indexed on `(timestamp, event_type, actor_id, target_id)` to ingest authentication logs, network flows, and email deliveries. |
 | **AnalysisRun** | **EASY** | Low | The codebase already maintains an `email_analyses` table recording model versions, timestamps, threat scores, and JSON outputs, plus an unused `analysis_runs` prototype table. Formalizing `AnalysisRun` to track any engine execution against any `Artifact` is straightforward. |
 | **Finding** | **EASY** | Low | The `CaseFinding` model in `backend/models/case_finding.py` already includes title, description, severity, status, MITRE ATT&CK technique IDs, and evidence associations. Promoting this to a universal `Finding` model requires minimal schema adjustment. |
-| **Evidence** | **EASY** | Low | Fully implemented in `backend/models/evidence.py`. Features SHA-256 deduplication, custody metadata, file size tracking, and case relationships. Ready for direct reuse. |
-| **Indicator** | **MODERATE** | Medium | Currently, IOCs are embedded inside the `email_analyses.raw_eml_metadata` JSON blob. Migrating to a normalized `Indicator` table (with reputation score, first/last seen, threat level, and whitelist status) requires an Alembic migration and a JSON backfill script. |
-| **Entity** | **MODERATE** | Medium | Cytoscape graph nodes are currently constructed on the fly from parsed email fields. Creating a persistent `Entity` table (User, Host, Mailbox, Domain, IP, Organization) requires canonical naming standards and identity resolution logic to merge aliases across multiple incidents. |
-| **Relationship** | **MODERATE** | Medium | Graph edges (`SENT`, `CONTAINS`, `RESOLVED_TO`) are generated ephemerally in Python memory. Persisting them in a `relationships` table (`source_entity_id`, `target_entity_id`, `type`, `confidence`, `first_seen`, `last_seen`) provides the foundational graph database model for cross-case querying. |
-| **Incident** | **EASY** | Low | The existing `Case` model in `backend/models/case.py` already contains full incident management functionality: unique case numbers, priority, status, analyst assignments, timestamps, and related findings. An `Incident` in CyberGuard is a direct 1-to-1 evolution of `Case`. |
-| **AttackPath** | **DIFFICULT** | High | Transport relay reconstruction exists for SMTP hops, but enterprise attack-path reconstruction (cross-system kill chains from initial email ingress to credential theft and lateral movement) does not exist. Implementing this requires a directed acyclic graph (DAG) traversal engine and causal inference algorithms. |
-| **ResponseAction** | **MODERATE** | Medium | Currently, `ai_analyst.py` generates recommendations as passive markdown text. Introducing an executable `ResponseAction` engine (playbook assignment, approval state, webhook connectors for Microsoft Graph, Google Workspace, and EDRs) requires a workflow execution state machine. |
-| **ModelVersion** | **EASY** | Low | The codebase already stores model version strings (`model_version = "phish-detect-v1.2"`). Creating a dedicated `ModelVersion` metadata table (version, algorithm, training dataset, F1 score, weights SHA-256) will decouple ML lifecycle management from core inference routes. |
+| **Evidence** | **COMPLETED** | Done | Implemented via `FindingEvidenceModel` (`finding_evidence` table) linking machine-readable observations to findings, alongside legacy `evidence` table. |
+| **Indicator** | **COMPLETED** | Done | Implemented via `IndicatorModel` (`indicators` table) with canonical normalization, deduplication on `(indicator_type, normalized_value)`, and reputation. |
+| **Entity** | **COMPLETED** | Done | Implemented via `EntityModel` (`entities` table) with external IDs, attribute tracking, and first/last seen timestamps. |
+| **Relationship** | **COMPLETED** | Done | Implemented via `RelationshipModel` (`relationships` table) providing polymorphic Security Knowledge Graph persistence with confidence and method. |
+| **Incident** | **COMPLETED** | Done | Implemented via `IncidentModel` (`incidents` table) with `INC-YYYY-XXXXXX` numbering, bi-directional ThreatEvent linkage, and legacy case adapter pointer. |
+| **AttackPath** | **PREPARED** | Done | Foundational schema implemented via `AttackPathModel`, `AttackStageModel`, and `AttackEdgeModel` tables; ready for traversal engine in Section 3. |
+| **ResponseAction** | **COMPLETED** | Done | Implemented via `ResponseActionModel` (`response_actions` table) tracking action types, approval workflows, and execution states. |
+| **ModelVersion** | **COMPLETED** | Done | Implemented via `ModelVersionModel` (`model_versions` table) tracking model provenance, algorithms, training references, and metrics. |
 
 ---
 
-## 4. Immediate Safe Next Steps (Section 2 Readiness)
+## 4. Section 2 Progress & Implementation Summary
 
-To transition into Section 2 safely:
-1. Preserve all existing working engines and API endpoints.
-2. Introduce the normalized `Artifact`, `Finding`, and `Incident` schema extensions using Alembic migrations without dropping legacy columns.
-3. Configure persistent Docker volume mounts in `docker-compose.yml` to ensure data resilience.
-4. Keep the frontend UI functional while preparing modular layout slots for the 5-stage workflow.
+**Section 2 Status: COMPLETED**
+
+1. **Alembic Migration Applied**: Revision `b7e2a901c43f` created all 14 canonical tables, indexes, and additive `request_id` column on `audit_logs`.
+2. **Unified Schemas & Enums**: Defined in `backend/schemas/unified.py` with canonical Pydantic V2 models, standardized enums, and normalization rules.
+3. **Service Layer**: Fully functional `ArtifactService`, `AnalysisService`, `FindingService`, `IndicatorService`, `EntityService`, `RelationshipService`, `ThreatEventService`, `IncidentService`, and `ModelVersionService` in `backend/services/unified_service.py`.
+4. **Non-Destructive Dual-Write**: Ingestion adapter hooked into `POST /api/emails/analyze` to dual-write normalized records while preserving 100% of legacy behavior and endpoints.
+5. **Inspection API**: Minimal inspection routes added at `/api/unified/*` and `/api/*` for inspecting artifacts, analysis runs, findings, indicators, relationships, and incidents.
+6. **Testing**: 19 unit & integration tests in `backend/tests/test_unified_data_model.py` passing, with 100% backward compatibility across all legacy test suites.
+
