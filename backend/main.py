@@ -24,6 +24,7 @@ from backend.api.routes.auth_security import router as auth_security_router
 from backend.api.routes.network_security import router as network_security_router
 from backend.api.routes.api_security import router as api_security_router
 from backend.api.routes.impersonation import router as impersonation_router
+from backend.api.routes.multimedia import router as multimedia_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -104,6 +105,7 @@ app.include_router(auth_security_router)
 app.include_router(network_security_router)
 app.include_router(api_security_router)
 app.include_router(impersonation_router)
+app.include_router(multimedia_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

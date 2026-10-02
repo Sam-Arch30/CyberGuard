@@ -306,6 +306,13 @@ class CapabilityRegistry:
             status=CapabilityStatusEnum.AVAILABLE,
             description="Analyzes email, domain, and website evidence for digital impersonation, lookalike domains, display-name spoofing, and credential harvesting.",
         ))
+        self.register(AnalyzerCapability(
+            name="multimedia_authenticity_analyzer",
+            version="1.0.0",
+            supported_artifact_types=[ArtifactTypeEnum.IMAGE, ArtifactTypeEnum.AUDIO, ArtifactTypeEnum.VIDEO],
+            status=CapabilityStatusEnum.AVAILABLE,
+            description="Analyzes images, audio, and video for AI-generation, synthetic speech, deepfake frames, and metadata/provenance tampering.",
+        ))
 
 
 global_capability_registry = CapabilityRegistry()
