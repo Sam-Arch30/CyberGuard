@@ -442,8 +442,37 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - Verified with 34 comprehensive tests in `backend/tests/test_api_abuse_analyzer.py` and benchmarked at >11,000 events/second. Full test suite passing: **557 passed, 0 failed**.
    - **Architectural Boundary Note**: Section 11 implements deterministic and statistical API telemetry analysis. Full adaptive behavioral baseline ML is reserved for **Section 21 (Behavioral Baseline Engine)**.
 
-7. **Requirements & Prerequisites for Section 12**:
-   - Ready for Section 12 engine development.
-   - Continuous preservation of graph relationships, canonical evidence models, and cross-module correlations across email, URL, file, auth, network, and API domains.
+7. **Section 12 — Digital Impersonation Detection Engine (COMPLETED)**:
+   - Architecture document: [`21-digital-impersonation-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/21-digital-impersonation-engine.md).
+   - Core Schema & Types: `backend/schemas/impersonation.py` with canonical `IdentityClaim`, `ProtectedIdentityProfile`, `ImpersonationFinding`, `ImpersonationAssessment`, and scoped classifications (`NO_IMPERSONATION_EVIDENCE`, `INSUFFICIENT_EVIDENCE`, `IDENTITY_MISMATCH`, `IMPERSONATION_SUSPECTED`, `STRONG_IMPERSONATION_INDICATORS`).
+   - Database Persistence: `ProtectedIdentityModel` in `backend/db/models.py` with revision tracking, JSON fields for trusted domains, authorized delegated senders, and strict provenance tracking.
+   - Core Engine Service: `backend/services/impersonation_service.py` implementing:
+     - `ProtectedIdentityManager`: System baseline profiles (Microsoft, Google, PayPal, Apple, GitHub, Acme), CRUD, revision bumps, and immutable audit logs (`PROTECTED_IDENTITY_CREATED`, `PROTECTED_IDENTITY_UPDATED`, etc.).
+     - `IdentityClaimExtractor`: Multi-channel extraction from email display names/headers, website HTML titles/forms, and deceptive subdomains.
+     - `IdentityComparisonService`: Levenshtein distance, Unicode/Cyrillic homoglyph mappings, digit substitutions, base label normalization, and delegated sender matching.
+     - Analytical engines:
+       - `EmailImpersonationEngine`: Display-name deception (`IMP_NAME_001`), Reply-To divergence (`IMP_RT_001`), unauthorized sender domains (`IMP_SND_001`).
+       - `DomainImpersonationEngine`: Lookalike typosquatting (`IMP_DOM_001`), homoglyph IDN (`IMP_HOM_001`), deceptive brand subdomains (`IMP_SUB_001`).
+       - `WebsiteImpersonationEngine`: Brand claim mismatch (`IMP_WEB_001`, `IMP_WEB_002`), credential harvesting fake login portals (`IMP_HARV_001`).
+       - `AuthorityExecutiveEngine`: Authority role claims (`IMP_AUTH_001`), executive impersonation (`IMP_EXEC_001`), BEC financial wire fraud (`IMP_BEC_001`).
+     - `ImpersonationAggregator`: Evidence-based synthesis weighing supporting vs. contradicting signals (DMARC/DKIM alignment, authorized ESPs, authentic hosting).
+     - `DigitalImpersonationPipeline`: Universal graph integration with `EntityModel` and relationships (`CLAIMS_IDENTITY`, `TARGETS`).
+   - Universal Ingestion Gateway: Registered `digital_impersonation_analyzer` in `CapabilityRegistry` for `EMAIL`, `URL`, and `DOMAIN`.
+   - REST API Endpoints: `backend/api/routes/impersonation.py`:
+     - `GET /api/impersonation/profiles`
+     - `POST /api/impersonation/profiles`
+     - `GET /api/impersonation/profiles/{id}`
+     - `PUT /api/impersonation/profiles/{id}`
+     - `DELETE /api/impersonation/profiles/{id}`
+     - `POST /api/impersonation/analyze`
+     - `POST /api/impersonation/reanalyze/{artifact_id}`
+     - `GET /api/impersonation/audit-logs`
+   - Verified with 27 comprehensive tests in `backend/tests/test_digital_impersonation.py`.
+
+8. **Requirements & Prerequisites for Section 13 (Visual, Image & Multimedia Intelligence)**:
+   - Ready for Section 13 engine development.
+   - Screenshot rendering, image attachment parsing, visual logo/favicon comparison, and QR code extraction.
+   - Visual brand matching without unconstrained biometric assumptions.
+   - Preserving multi-modal evidence and correlating visual findings with Section 6 (Email), Section 7 (URL/Web), Section 8 (Attachments), and Section 12 (Impersonation).
 
 

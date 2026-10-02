@@ -687,4 +687,30 @@ class AttackEdgeModel(Base):
     attack_path = relationship("AttackPathModel", back_populates="edges")
 
 
+class ProtectedIdentityModel(Base):
+    """
+    Authoritative reference identity profiles (organizations, brands, executives, institutions)
+    used for digital impersonation comparison.
+    """
+    __tablename__ = "protected_identities"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    display_name = Column(String(255), nullable=False, index=True)
+    entity_type = Column(String(50), nullable=False, default="ORGANIZATION", index=True)  # ORGANIZATION, BRAND, INSTITUTION, EXECUTIVE, SERVICE
+    source = Column(String(50), nullable=False, default="USER_CONFIGURED", index=True)  # USER_CONFIGURED, ORGANIZATION_CONFIGURED, SYSTEM_CONFIGURED, etc.
+    verification_status = Column(String(30), nullable=False, default="VERIFIED", index=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    revision = Column(Integer, nullable=False, default=1)
+    trusted_domains_json = Column(Text, default="[]", nullable=False)
+    trusted_emails_json = Column(Text, default="[]", nullable=False)
+    known_names_json = Column(Text, default="[]", nullable=False)
+    known_roles_json = Column(Text, default="[]", nullable=False)
+    known_brand_terms_json = Column(Text, default="[]", nullable=False)
+    authorized_delegated_senders_json = Column(Text, default="[]", nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+
+
 

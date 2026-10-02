@@ -299,6 +299,13 @@ class CapabilityRegistry:
             status=CapabilityStatusEnum.AVAILABLE,
             description="Analyzes defensive API telemetry for rate anomalies, endpoint/resource enumeration, authz failures, scraping, and exfiltration.",
         ))
+        self.register(AnalyzerCapability(
+            name="digital_impersonation_analyzer",
+            version="1.0.0",
+            supported_artifact_types=[ArtifactTypeEnum.EMAIL, ArtifactTypeEnum.URL, ArtifactTypeEnum.DOMAIN],
+            status=CapabilityStatusEnum.AVAILABLE,
+            description="Analyzes email, domain, and website evidence for digital impersonation, lookalike domains, display-name spoofing, and credential harvesting.",
+        ))
 
 
 global_capability_registry = CapabilityRegistry()
