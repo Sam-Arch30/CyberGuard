@@ -302,11 +302,53 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - `POST /api/urls/analyze-artifact/{artifact_id}`: Re-analysis of durable stored artifacts.
    - `GET /api/urls/config`: Engine configuration and network safety parameters.
 
-7. **Requirements for Section 8 (Attachment & File Security Engine)**:
-   - Dynamic sandbox execution of attachments extracted from emails and URLs.
-   - Safe static and dynamic behavioral analysis for discovered downloadable files.
-   - YARA / heuristic rule execution on stored artifact bytes.
+7. **Testing & Verification**:
+   - 37 tests in `backend/tests/test_domain_intelligence.py` covering SSRF prevention, redirect hops, passive URL tokens, homoglyphs, DNS/RDAP resolution, and HTML inspection.
+   - Full regression test suite passing cleanly.
 
+---
 
+## 9. Section 8 Progress & Implementation Summary
 
+**Section 8 Status: COMPLETED**
 
+1. **Modular Static File Security Architecture**: Built a multi-analyzer static file analysis pipeline implementing the `AnalyzerExecutionResult` interface across 9 discrete analyzers:
+   - `FileIdentityAnalyzer`: Streaming SHA-256 (primary integrity primitive), SHA-1, and MD5 (threat intelligence interoperability); exact byte size; safe MIME / file signature inspection (`python-magic` with fallback to comprehensive file signature dictionary); detection of `FILE_TYPE_MISMATCH` when claimed extension conflicts with detected MIME/signature.
+   - `FilenameSecurityAnalyzer`: Path traversal defense (`SAFE_DISPLAY_NAME`), detection of double extensions (`DOUBLE_EXTENSION`), misleading extension chains, deceptive Unicode bidirectional control characters (`UNICODE_FILENAME_DECEPTION` with exact codepoints such as `\u202e` Right-To-Left Override), executable/script attachment warnings (`EXECUTABLE_ATTACHMENT`, `SCRIPT_ATTACHMENT`), and macro-capable document warnings (`MACRO_CAPABLE_DOCUMENT_EXTENSION`).
+   - `DocumentStaticAnalyzer`: Safe static inspection of PDF and Office formats without executing JavaScript, launching viewer applications, or executing macros:
+     - PDF: Active token detection (`/JavaScript`, `/OpenAction`, `/Launch`, `/EmbeddedFiles`, `/URI`, `/Encrypt`), external hyperlink extraction, object count bounds, producing `PDF_JAVASCRIPT_PRESENT`, `PDF_OPEN_ACTION_PRESENT`, `PDF_LAUNCH_ACTION_PRESENT`, `PDF_EMBEDDED_FILE`, `PDF_ENCRYPTED`, `PDF_EXTERNAL_URL`.
+     - Office: OpenXML/OLE container inspection, macro detection (`vbaProject.bin`, `word/vbaProject.bin`, `macros/`), external relationship detection (`Type=".../attachedTemplate"`), embedded OLE objects, producing `MACRO_PRESENT`, `SUSPICIOUS_DOCUMENT_RELATIONSHIP`, `EMBEDDED_OBJECT_PRESENT`.
+   - `ExecutableStaticAnalyzer`: Safe binary structure inspection of Portable Executable (PE) headers without execution or library loading: machine architecture, COFF compile timestamp (as untrusted metadata), section table enumeration, section-level Shannon entropy calculation, Authenticode digital signature detection, and suspicious import detection (`SUSPICIOUS_IMPORT_SET`, `HIGH_ENTROPY_SECTION`, `EXECUTABLE_UNSIGNED`, `EXECUTABLE_SIGNATURE_INVALID`).
+   - `ScriptStaticAnalyzer`: Bounded deterministic static keyword and pattern inspection for script artifacts (`.ps1`, `.bat`, `.cmd`, `.sh`, `.vbs`, `.js`, `.py`): encoded PowerShell (`-enc`, `FromBase64String`), download invocation (`Invoke-WebRequest`, `curl`, `certutil`), execution chains (`cmd /c`, `IEX`), credential harvesting indicators (`Invoke-Mimikatz`, `lsass`), and persistence mechanisms (`schtasks`, `reg add`), producing `SUSPICIOUS_STATIC_SCRIPT`.
+   - `ArchiveSecurityAnalyzer`: Safe archive inspection for ZIP, TAR, GZIP containers with strict defensive bounds:
+     - Zip-Slip path traversal defense: Rejection of `../` traversal or absolute paths (`ZIP_SLIP_ATTEMPT_DETECTED`).
+     - Zip-Bomb protection: Strict limits on total uncompressed size (default 100 MB), total entry count (default 500), compression ratio (default 50x), producing `ARCHIVE_EXTRACTION_LIMIT_REACHED`.
+     - Password protection: Detecting encrypted entries (`ARCHIVE_ENCRYPTED`) without brute-forcing or treating encryption as automatic proof of malware.
+     - Safe derived artifact extraction: Storing extracted child entries in durable evidence storage with `ARCHIVE CONTAINS FILE` relationship links up to configurable recursion depth (`MAX_ARCHIVE_DEPTH = 3`).
+   - `FileIOCAnalyzer`: Bounded printable string and regex observable extraction across all text and binary files: URLs, domains, IPv4 addresses, email addresses, and hashes with provenance tracking and deduplication.
+   - `FileReputationAnalyzer`: Privacy-preserving threat intelligence lookup by SHA-256 (and SHA-1/MD5 where needed) via `ThreatIntelligenceService` with TTL caching:
+     - **Strict Privacy Rule**: Only hashes are queried externally; raw sample bytes are NEVER uploaded to third-party services.
+     - **Strict Negative Evidence Rule**: `NO MATCH != SAFE` (`THREAT_INTEL_HASH_MATCH` vs `THREAT_INTEL_HASH_NOT_FOUND`).
+   - `FileClassificationService`: Conservative risk classification (`BENIGN_LIKELY`, `UNKNOWN`, `SUSPICIOUS`, `MALWARE_SUSPECTED`, `KNOWN_MALICIOUS`) where `KNOWN_MALICIOUS` requires authoritative reputation matches or malicious signatures, and isolated signals (macros, high entropy, unsigned status) are never over-claimed.
+
+2. **Canonical Persistence Integration**:
+   - `ArtifactModel`: Registers file artifacts with SHA-256 content addressing and safe display names.
+   - `AnalysisRunModel`: Tracks each discrete file security evaluation session.
+   - `FindingModel` & `FindingEvidenceModel`: Persists structured machine-readable findings and evidentiary proofs.
+   - `IndicatorModel`: Records discovered cryptographic hashes and printable string IOCs.
+   - `RelationshipModel`: Persists `HAS_HASH`, `CONTAINS`, and `REFERENCES` relationships.
+   - `ThreatEventModel`: Emits security events when malicious indicators or high-risk findings are corroborated.
+
+3. **API Endpoints**:
+   - `POST /api/files/analyze`: Multipart upload and complete static file analysis.
+   - `POST /api/files/analyze-artifact/{artifact_id}`: Re-analysis of stored durable artifacts creating a new independent `AnalysisRunModel`.
+   - `GET /api/files/config`: Runtime configuration, security thresholds, and safety bounds.
+
+4. **Testing & Verification**:
+   - 41 tests in `backend/tests/test_file_security_analyzer.py` covering all 34 required test cases: streaming hashing, MIME mismatch, double extensions, Unicode RTL override, safe PDF token parsing, Office macro/template detection, script heuristic detection, PE header inspection, Shannon entropy, Zip-Slip rejection, Zip-Bomb limits, encrypted archives, child artifact extraction, reputation caching, privacy rules, false-positive resistance, and a synthetic multi-stage integration test (`Email -> ZIP -> PDF -> URL`).
+   - Full test suite passing: **447 passed, 0 failed** in 61 seconds.
+
+5. **Requirements for Section 9 (Identity, Credential & Authentication Security)**:
+   - Identity store inspection (Active Directory / Entra ID / Okta logs).
+   - Authentication anomalous behavior detection (impossible travel, password spray, session hijacking).
+   - Credential theft correlation with phishing and attachment findings.

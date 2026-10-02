@@ -157,6 +157,7 @@ class RelationshipTypeEnum(str, Enum):
     SUBMITS_TO = "SUBMITS_TO"
     USES_NAMESERVER = "USES_NAMESERVER"
     MAIL_EXCHANGER = "MAIL_EXCHANGER"
+    HAS_HASH = "HAS_HASH"
     OTHER = "OTHER"
 
 

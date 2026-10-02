@@ -248,6 +248,13 @@ class CapabilityRegistry:
             status=CapabilityStatusEnum.AVAILABLE,
             description="Extracts cryptographic SHA-256/SHA-1/MD5 hashes, byte sizes, and file container metadata.",
         ))
+        self.register(AnalyzerCapability(
+            name="file_security_analyzer",
+            version="2.0.0",
+            supported_artifact_types=[ArtifactTypeEnum.FILE, ArtifactTypeEnum.ATTACHMENT],
+            status=CapabilityStatusEnum.AVAILABLE,
+            description="Safe static file analysis: cryptographic identity, format verification, PE, PDF, Office, scripts, archives, and reputation.",
+        ))
 
         # 2. Future / Architectural Placeholders (Explicitly NOT_IMPLEMENTED)
         self.register(AnalyzerCapability(

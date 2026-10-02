@@ -48,4 +48,4 @@ backend/data/storage/*
 *.njsproj
 *.sln
 *.sw?
-
+.freebuff/
