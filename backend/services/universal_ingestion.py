@@ -242,6 +242,13 @@ class CapabilityRegistry:
             description="Normalizes structured authentication logs and produces ThreatEvents.",
         ))
         self.register(AnalyzerCapability(
+            name="auth_security_analyzer",
+            version="1.0.0",
+            supported_artifact_types=[ArtifactTypeEnum.AUTH_LOG],
+            status=CapabilityStatusEnum.AVAILABLE,
+            description="Analyzes authentication telemetry for brute force, password spray, impossible travel, and account takeover.",
+        ))
+        self.register(AnalyzerCapability(
             name="file_metadata",
             version="1.0.0",
             supported_artifact_types=[ArtifactTypeEnum.FILE, ArtifactTypeEnum.IMAGE, ArtifactTypeEnum.AUDIO, ArtifactTypeEnum.VIDEO],

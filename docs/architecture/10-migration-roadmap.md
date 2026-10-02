@@ -349,6 +349,52 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - Full test suite passing: **447 passed, 0 failed** in 61 seconds.
 
 5. **Requirements for Section 9 (Identity, Credential & Authentication Security)**:
-   - Identity store inspection (Active Directory / Entra ID / Okta logs).
-   - Authentication anomalous behavior detection (impossible travel, password spray, session hijacking).
-   - Credential theft correlation with phishing and attachment findings.
+   - Handled in Section 9 Authentication & Account-Takeover Detection Engine.
+
+---
+
+## 10. Section 9 Progress & Implementation Summary
+
+**Section 9 Status: COMPLETED**
+
+1. **Modular Authentication & ATO Detection Architecture**: Built an explainable, deterministic/heuristic authentication security engine with multi-provider log normalization, baseline comparison, and multi-category ATO hypothesis aggregation:
+   - `NormalizedAuthEvent`: Canonical representation of authentication attempts with standardized result states (`SUCCESS`, `FAILURE`, `CHALLENGE`, `MFA_REQUIRED`, `MFA_SUCCESS`, `MFA_FAILURE`, `LOCKED`, `DENIED`, `UNKNOWN`), auth methods, MFA factors, failure reasons, geolocation, device identifiers, and client profile normalization.
+   - `SecretRedactor`: Zero raw password or credential leakage; automatically redacts passwords, tokens, API keys, session secrets, and authorization headers to `[REDACTED_BY_CYBERGUARD]`.
+   - `AdapterRegistry`: Multi-provider log adapters for Okta System Log, Microsoft Entra ID (Azure AD), Google Workspace Login Audits, Linux OpenSSH/Syslog, and a universal `GenericAuthAdapter`.
+   - `FailureAnalysisEngine`: Detects repeated failures (`REPEATED_LOGIN_FAILURES`) and defensive account lockouts (`ACCOUNT_LOCKED`).
+   - `BruteForceDetector`: Detects concentrated password guessing against a single account (`BRUTE_FORCE_PATTERN`, MITRE `T1110.001`).
+   - `PasswordSprayDetector`: Detects low-and-slow horizontal password spray across multiple accounts from single sources (`PASSWORD_SPRAY_PATTERN`, MITRE `T1110.003`).
+   - `CredentialStuffingDetector`: Detects high-volume testing of credential dumps (`CREDENTIAL_STUFFING_SUSPECTED`, MITRE `T1110.004`).
+   - `SuccessAfterFailuresDetector`: Identifies sequence of consecutive failures followed immediately by successful entry (`SUCCESS_AFTER_REPEATED_FAILURES`).
+   - `DeviceAnalysisEngine`: Identifies unfamiliar hardware (`NEW_DEVICE`) and substantially new OS/browser profiles (`NEW_CLIENT_PROFILE`) with strict `INSUFFICIENT_HISTORY` guards.
+   - `LocationAnalysisEngine`: Identifies unseen source IPs (`NEW_SOURCE_IP`), unfamiliar geographic regions (`UNUSUAL_LOGIN_LOCATION`), and rapid location changes exceeding 900 km/h with Haversine great-circle calculation (`RAPID_LOCATION_CHANGE`), including proxy/VPN contextual caveats.
+   - `TemporalAnalysisEngine`: Identifies authentications outside established activity hours (`UNUSUAL_LOGIN_TIME`).
+   - `MFAAnalysisEngine`: Detects repeated MFA rejections (`REPEATED_MFA_FAILURES`) and policy bypass signals (`MFA_EXPECTATION_ANOMALY`).
+   - `SessionAnalysisEngine`: Identifies concurrent session reuse across distinct IP subnets (`SUSPICIOUS_SESSION_ACTIVITY`).
+   - `AccountTakeoverAggregator`: Corroborates ATO hypothesis (`ACCOUNT_TAKEOVER_SUSPECTED`) only when successful authentication occurs alongside at least 2 or 3 independent anomaly categories (`CREDENTIAL_ATTACK`, `DEVICE_ANOMALY`, `LOCATION_ANOMALY`, `MFA_ANOMALY`, `SESSION_ANOMALY`).
+
+2. **Canonical Persistence Integration**:
+   - `ArtifactModel`: Records container artifacts for ingested `AUTH_LOG` payloads.
+   - `AnalysisRunModel`: Tracks individual evaluation runs with overall threat scores and severities.
+   - `FindingModel` & `FindingEvidenceModel`: Persists structured machine-readable findings and evidentiary proofs.
+   - `IndicatorModel`: Records source IPs with canonical normalized representations.
+   - `EntityModel`: Persists `ACCOUNT`, `USER`, `DEVICE`, and `SESSION` entities.
+   - `RelationshipModel`: Persists `AUTHENTICATED_FROM`, `AUTHENTICATED_ON`, and `HAS_SESSION` graph relationships.
+   - `ThreatEventModel`: Emits security events for `ACCOUNT_TAKEOVER_SUSPECTED`, `BRUTE_FORCE_ATTACK`, `PASSWORD_SPRAY_ATTACK`, and `SUSPICIOUS_AUTHENTICATION`.
+
+3. **API Endpoints**:
+   - `GET /api/auth-security/config`: Runtime configuration, detection thresholds, and temporal windows.
+   - `POST /api/auth-security/analyze-event`: Real-time analysis of single authentication events.
+   - `POST /api/auth-security/analyze-batch`: Ingestion and processing of event batches.
+   - `POST /api/auth-security/upload-log`: Log file upload (JSON array, JSON lines, Linux syslog).
+   - `POST /api/auth-security/analyze-artifact/{id}`: Re-analysis of stored `AUTH_LOG` artifacts with append-only lineage.
+   - `GET /api/auth-security/accounts/{id}/profile`: Historical baseline status and observed dimensions.
+
+4. **Testing & Verification**:
+   - 38 comprehensive tests in `backend/tests/test_authentication_security.py` covering event normalization, timestamp parsing, out-of-order sorting, deduplication, brute force, spray, impossible travel, new device, false-positive resistance, API routes, and synthetic performance benchmark.
+   - Full regression test suite passing: **485 passed, 0 failed** in 64 seconds.
+
+5. **Requirements for Section 10 (Network & Traffic Security Analyzer)**:
+   - PCAP / Zeek / Suricata log parsing and network protocol inspection.
+   - Beaconing and C2 communications detection.
+   - DNS tunneling and exfiltration pattern analysis.
