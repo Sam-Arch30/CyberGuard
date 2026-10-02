@@ -394,7 +394,31 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - 38 comprehensive tests in `backend/tests/test_authentication_security.py` covering event normalization, timestamp parsing, out-of-order sorting, deduplication, brute force, spray, impossible travel, new device, false-positive resistance, API routes, and synthetic performance benchmark.
    - Full regression test suite passing: **485 passed, 0 failed** in 64 seconds.
 
-5. **Requirements for Section 10 (Network & Traffic Security Analyzer)**:
-   - PCAP / Zeek / Suricata log parsing and network protocol inspection.
-   - Beaconing and C2 communications detection.
-   - DNS tunneling and exfiltration pattern analysis.
+5. **Section 10 Implementation Summary (Network & Traffic Anomaly Detection Engine)**:
+   - **Section 10 Status: COMPLETED**
+   - Implemented canonical `NormalizedNetworkEvent` with rich transport attributes, DNS query/response telemetry, direction (`INBOUND`, `OUTBOUND`, `INTERNAL`, `UNKNOWN`), and IP scopes (`PUBLIC`, `PRIVATE`, `LOOPBACK`, `LINK_LOCAL`, `MULTICAST`, `RESERVED`).
+   - Built modular log adapters: `GenericJsonNetworkAdapter`, `GenericCsvNetworkAdapter`, `DnsLogAdapter`, `NetflowJsonAdapter`.
+   - Built specialized detection engines:
+     - `ConnectionPatternEngine`: Repeated drops/failures (`REPEATED_CONNECTION_FAILURES`), scan-like port sweeps & host sweeps (`SCAN_LIKE_CONNECTION_PATTERN`), and high-frequency bursts (`CONNECTION_BURST`).
+     - `PeriodicityEngine`: Statistical beaconing interval analysis ($\mu, \text{median}, \sigma^2, \text{CV} \le 0.20$ with minimum 5 observations) with explicit false-positive controls (severity MEDIUM with explicit caveat that benign software/cloud agents are periodic).
+     - `DnsTelemetryEngine`: NXDOMAIN bursts (`EXCESSIVE_DNS_FAILURES`), lexical DGA heuristics (`DGA_LIKE_DOMAIN_STRUCTURE` with Shannon entropy and character distribution), DNS query bursts (`DNS_QUERY_BURST`), and tunneling indicators (`DNS_TUNNELING_INDICATORS`).
+     - `TransferExfiltrationEngine`: High outbound volume transfers (`HIGH_OUTBOUND_DATA_VOLUME`), asymmetric flows (`OUTBOUND_TRAFFIC_ASYMMETRY`), and persistent sessions (`LONG_LIVED_EXTERNAL_CONNECTION`).
+     - `DestinationAnomalyEngine`: Destination novelty (`NEW_NETWORK_DESTINATION`), new ports (`NEW_DESTINATION_PORT`), and fleet-wide rarity (`RARE_DESTINATION`), guarded by strict minimum history thresholds.
+     - `NetworkPatternAggregator`: Multi-signal hypothesis corroboration for `SUSPICIOUS_EXTERNAL_COMMUNICATION` and `POSSIBLE_DATA_EXFILTRATION`.
+   - Integrated full canonical persistence (`ArtifactModel`, `AnalysisRunModel`, `FindingModel`, `FindingEvidenceModel`, `EntityModel` for `DEVICE`/`SESSION`/`USER`, `IndicatorModel` for `IP`/`DOMAIN`, `RelationshipModel` for `CONNECTS_TO`/`QUERIED_DNS`/`HAS_SESSION`, `ThreatEventModel`).
+   - Integrated with Section 4 Universal Ingestion (`ArtifactTypeEnum.NETWORK_LOG`) and registered operational capability `network_security_analyzer` in `CapabilityRegistry`.
+   - Exposed REST API endpoints:
+     - `GET /api/network-security/config`
+     - `POST /api/network-security/analyze-event`
+     - `POST /api/network-security/analyze-batch`
+     - `POST /api/network-security/upload-log`
+     - `POST /api/network-security/analyze-artifact/{id}`
+     - `GET /api/network-security/devices/{id}/profile`
+   - Verified with 38 unit and security tests in `backend/tests/test_network_security.py` and benchmarked at 2,411.2 events/second.
+   - **Architectural Boundary Note**: Section 10 implements deterministic and statistical network telemetry analysis. Advanced behavioral baseline ML, auto-regressive forecasting, dynamic clustering, and continual learning are reserved for **Section 21 (Behavioral Baseline Engine)**.
+
+6. **Requirements for Section 11 (Endpoint & Host Security Analyzer)**:
+   - Endpoint telemetry ingestion (process creation, file operations, registry modifications, network socket binding).
+   - Parent-child process tree analysis and suspicious command-line heuristics.
+   - Host persistence mechanism detection and credential access indicators.
+

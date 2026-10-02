@@ -21,6 +21,7 @@ from backend.api.routes.ingest import router as ingest_router
 from backend.api.routes.urls import router as urls_router
 from backend.api.routes.files import router as files_router
 from backend.api.routes.auth_security import router as auth_security_router
+from backend.api.routes.network_security import router as network_security_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -98,6 +99,7 @@ app.include_router(ingest_router)
 app.include_router(urls_router)
 app.include_router(files_router)
 app.include_router(auth_security_router)
+app.include_router(network_security_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

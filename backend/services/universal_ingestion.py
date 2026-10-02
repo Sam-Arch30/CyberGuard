@@ -286,11 +286,11 @@ class CapabilityRegistry:
             description="Real-time host endpoint telemetry scanner (Planned Section 28).",
         ))
         self.register(AnalyzerCapability(
-            name="network_flow_analyzer",
-            version="0.0.0",
+            name="network_security_analyzer",
+            version="1.0.0",
             supported_artifact_types=[ArtifactTypeEnum.NETWORK_LOG],
-            status=CapabilityStatusEnum.NOT_IMPLEMENTED,
-            description="PCAP packet capture and NetFlow anomaly analyzer (Planned Section 29).",
+            status=CapabilityStatusEnum.AVAILABLE,
+            description="Analyzes defensive network telemetry, NetFlow, DNS logs, and connection summaries for beaconing, bursts, scan patterns, and exfiltration.",
         ))
 
 
