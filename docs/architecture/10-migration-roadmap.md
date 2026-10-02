@@ -417,8 +417,33 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - Verified with 38 unit and security tests in `backend/tests/test_network_security.py` and benchmarked at 2,411.2 events/second.
    - **Architectural Boundary Note**: Section 10 implements deterministic and statistical network telemetry analysis. Advanced behavioral baseline ML, auto-regressive forecasting, dynamic clustering, and continual learning are reserved for **Section 21 (Behavioral Baseline Engine)**.
 
-6. **Requirements for Section 11 (Endpoint & Host Security Analyzer)**:
-   - Endpoint telemetry ingestion (process creation, file operations, registry modifications, network socket binding).
-   - Parent-child process tree analysis and suspicious command-line heuristics.
-   - Host persistence mechanism detection and credential access indicators.
+6. **Section 11 Implementation Summary (API Abuse Detection Engine)**:
+   - **Section 11 Status: COMPLETED**
+   - Canonical `NormalizedAPIEvent` model supporting granular identity attribution (`account_id`, `session_id`, `device_id`), token cryptographic fingerprints (`tkfp_<hash>`), HTTP semantics, status codes, query redaction, and egress bytes.
+   - Built modular log adapters: `GenericJsonApiAdapter`, `GenericCsvApiAdapter`, `GatewayJsonApiAdapter`.
+   - Built specialized detection engines:
+     - `APIRateBurstEngine`: High request volume (`HIGH_API_REQUEST_RATE`) and concentrated spikes (`API_REQUEST_BURST`).
+     - `APIEnumerationEngine`: Route traversal (`API_ENDPOINT_ENUMERATION_PATTERN`) and sequential resource probing (`RESOURCE_ENUMERATION_PATTERN`).
+     - `APIAuthFailureEngine`: Authentication denials (`REPEATED_API_AUTH_FAILURES`), authorization barriers (`REPEATED_AUTHORIZATION_FAILURES`), and missing endpoints (`HIGH_MISSING_ENDPOINT_RATE`).
+     - `APIMethodPrivilegeEngine`: Unusual destructive HTTP methods (`UNUSUAL_API_METHOD`) and sensitive administrative access (`PRIVILEGED_API_OPERATION`).
+     - `APISessionAnomalyEngine`: IP shifting (`SESSION_SOURCE_CHANGE`), rapid hijacking indicators (`RAPID_SESSION_SOURCE_CHANGE`), client profile changes (`API_CLIENT_PROFILE_CHANGE`), and first-time endpoint access (`NEW_API_ENDPOINT`).
+     - `APIVolumeScrapingEngine`: High egress volume (`HIGH_API_RESPONSE_VOLUME`), bulk export activity (`UNUSUAL_BULK_EXPORT_ACTIVITY`), scraping patterns (`SCRAPING_LIKE_API_ACTIVITY`), and bot periodicity (`PERIODIC_API_ACTIVITY`).
+     - `APIPatternAggregator`: Cross-engine corroboration for `API_ABUSE_SUSPECTED` and `POSSIBLE_API_DATA_EXFILTRATION`.
+   - Cross-module correlation with Section 9 (`ACCOUNT_TAKEOVER_SUSPECTED`) and Section 10 (`SUSPICIOUS_EXTERNAL_COMMUNICATION`).
+   - Integrated full canonical persistence (`ArtifactModel`, `AnalysisRunModel`, `FindingModel`, `FindingEvidenceModel`, `EntityModel` for `ACCOUNT`/`SESSION`/`SERVICE`, `IndicatorModel` for `IP`, `ThreatEventModel`).
+   - Integrated with Section 4 Universal Ingestion (`ArtifactTypeEnum.API_LOG`) and registered operational capability `api_abuse_analyzer` in `CapabilityRegistry`.
+   - Exposed REST API endpoints:
+     - `GET /api/api-security/config`
+     - `POST /api/api-security/analyze-event`
+     - `POST /api/api-security/analyze-batch`
+     - `POST /api/api-security/upload-log`
+     - `POST /api/api-security/reanalyze/{artifact_id}`
+     - `GET /api/api-security/account/{account_id}`
+   - Verified with 34 comprehensive tests in `backend/tests/test_api_abuse_analyzer.py` and benchmarked at >11,000 events/second. Full test suite passing: **557 passed, 0 failed**.
+   - **Architectural Boundary Note**: Section 11 implements deterministic and statistical API telemetry analysis. Full adaptive behavioral baseline ML is reserved for **Section 21 (Behavioral Baseline Engine)**.
+
+7. **Requirements & Prerequisites for Section 12**:
+   - Ready for Section 12 engine development.
+   - Continuous preservation of graph relationships, canonical evidence models, and cross-module correlations across email, URL, file, auth, network, and API domains.
+
 

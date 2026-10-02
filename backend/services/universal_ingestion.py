@@ -292,6 +292,13 @@ class CapabilityRegistry:
             status=CapabilityStatusEnum.AVAILABLE,
             description="Analyzes defensive network telemetry, NetFlow, DNS logs, and connection summaries for beaconing, bursts, scan patterns, and exfiltration.",
         ))
+        self.register(AnalyzerCapability(
+            name="api_abuse_analyzer",
+            version="1.0.0",
+            supported_artifact_types=[ArtifactTypeEnum.API_LOG],
+            status=CapabilityStatusEnum.AVAILABLE,
+            description="Analyzes defensive API telemetry for rate anomalies, endpoint/resource enumeration, authz failures, scraping, and exfiltration.",
+        ))
 
 
 global_capability_registry = CapabilityRegistry()
