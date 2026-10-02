@@ -242,7 +242,7 @@ export const Reports: React.FC = () => {
                 <div>
                   <div className="flex items-center space-x-2 text-primary font-mono text-xs font-semibold uppercase tracking-widest">
                     <ShieldCheck className="w-4 h-4 text-primary" />
-                    <span>MAILTRACE AI // OFFICIAL FORENSIC EVIDENCE DOSSIER</span>
+                    <span>CYBERGUARD // OFFICIAL FORENSIC EVIDENCE DOSSIER</span>
                   </div>
                   <h2 className="text-xl font-bold text-foreground font-sans mt-2">
                     {selectedReport.title}
@@ -264,7 +264,7 @@ export const Reports: React.FC = () => {
                     onClick={() =>
                       handleDownloadPDF(
                         selectedReport.id,
-                        `MailTrace_${selectedReport.report_number}.pdf`
+                        `CyberGuard_${selectedReport.report_number}.pdf`
                       )
                     }
                     disabled={isDownloading}

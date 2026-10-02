@@ -17,7 +17,10 @@ import {
   Layers,
   X,
   Download,
-  Network
+  Network,
+  KeyRound,
+  Binary,
+  Link2
 } from 'lucide-react';
 import type { DashboardSummary } from '../types/dashboard';
 import type { EmailAnalysis } from '../types/forensic';
@@ -297,7 +300,7 @@ export const Dashboard: React.FC = () => {
   return (
     <div className="max-w-5xl lg:max-w-6xl w-full mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fadeIn">
       {/* =========================================================================
-          TOP: Minimal MailTraceAI Branding & Global Context
+          TOP: CyberGuard Unified Platform Branding & Global Context
           ========================================================================= */}
       <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
         <div className="space-y-1">
@@ -306,11 +309,16 @@ export const Dashboard: React.FC = () => {
               <Shield className="w-4 h-4" />
             </div>
             <div>
-              <h1 className="text-xl font-bold tracking-tight text-foreground font-sans">
-                MailTraceAI
-              </h1>
+              <div className="flex items-center space-x-2">
+                <h1 className="text-xl font-bold tracking-tight text-foreground font-sans">
+                  CyberGuard
+                </h1>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
+                  v2.0 Unified
+                </span>
+              </div>
               <p className="text-xs text-foreground-muted font-mono">
-                Email Forensics & Incident Response
+                Unified Threat Intelligence & Multi-Telemetry Forensic Security
               </p>
             </div>
           </div>
@@ -334,6 +342,101 @@ export const Dashboard: React.FC = () => {
           </button>
         </div>
       </header>
+
+      {/* =========================================================================
+          MULTI-TELEMETRY DETECTION ENGINES
+          ========================================================================= */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center gap-2">
+            <span>Specialized Telemetry & Analysis Engines</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">4 ENGINES</span>
+          </h2>
+          <span className="text-xs font-mono text-foreground-subtle">Engines 7 – 10 Online</span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div
+            onClick={() => navigate('/network-security')}
+            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
+                <Network className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-10</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Network & Traffic</h3>
+              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Beaconing CV jitter, DNS tunneling entropy, exfiltration & port anomalies</p>
+            </div>
+            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
+              <span>Launch Engine</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => navigate('/auth-security')}
+            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 group-hover:scale-105 transition-transform">
+                <KeyRound className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-09</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Authentication & ATO</h3>
+              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Brute-force, password spraying, impossible travel velocity & ASN shifts</p>
+            </div>
+            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
+              <span>Launch Engine</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => navigate('/file-security')}
+            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform">
+                <Binary className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-08</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">File & Attachment</h3>
+              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Safe static analysis, MIME spoofing, double extensions & Shannon entropy</p>
+            </div>
+            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
+              <span>Launch Engine</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+
+          <div
+            onClick={() => navigate('/url-intelligence')}
+            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform">
+                <Link2 className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-07</span>
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">URL & Domain Intel</h3>
+              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Homoglyphs, punycode, redirects, brand impersonation & safe DOM crawl</p>
+            </div>
+            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
+              <span>Launch Engine</span>
+              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* =========================================================================
           OPTIONAL COMPACT SUMMARY: Single-Line Operational Context

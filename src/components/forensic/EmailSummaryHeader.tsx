@@ -37,7 +37,7 @@ export const EmailSummaryHeader: React.FC<EmailSummaryHeaderProps> = ({ email })
       const a = document.createElement('a');
       a.href = url;
       const sha = email.email_sha256 || email.id || 'forensic';
-      a.download = `MailTrace_Forensic_Report_${sha.slice(0, 10)}.pdf`;
+      a.download = `CyberGuard_Forensic_Report_${sha.slice(0, 10)}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);

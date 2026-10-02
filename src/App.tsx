@@ -18,6 +18,10 @@ import { Settings } from './pages/Settings';
 import { CrossInvestigationWorkspacePage } from './pages/CrossInvestigationWorkspacePage';
 import { BenchmarkEvaluation } from './pages/BenchmarkEvaluation';
 import { InvestigationHistory } from './pages/InvestigationHistory';
+import { NetworkSecurityView } from './pages/NetworkSecurityView';
+import { AuthSecurityView } from './pages/AuthSecurityView';
+import { FileSecurityView } from './pages/FileSecurityView';
+import { UrlSecurityView } from './pages/UrlSecurityView';
 
 function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -68,6 +72,10 @@ function AppContent() {
               <Route path="/" element={<Dashboard />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/analyze" element={<AnalyzeEmail />} />
+              <Route path="/network-security" element={<NetworkSecurityView />} />
+              <Route path="/auth-security" element={<AuthSecurityView />} />
+              <Route path="/file-security" element={<FileSecurityView />} />
+              <Route path="/url-intelligence" element={<UrlSecurityView />} />
               <Route path="/history" element={<InvestigationHistory />} />
               <Route path="/cross-investigation" element={<CrossInvestigationWorkspacePage />} />
               <Route path="/cross-investigation/:id" element={<CrossInvestigationWorkspacePage />} />

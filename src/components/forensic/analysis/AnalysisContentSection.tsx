@@ -256,7 +256,7 @@ export const AnalysisContentSection: React.FC<AnalysisContentSectionProps> = ({ 
                       Classifier Model
                     </span>
                     <div className="text-xs font-bold text-foreground break-all">
-                      {ml?.model_name || 'MailTraceAI-NLP-v2.4'}
+                      {ml?.model_name || 'CyberGuard-NLP-v2.4'}
                     </div>
                     <span className="text-[10px] text-foreground-muted block">
                       Architecture: TF-IDF + Logistic Regression
@@ -318,7 +318,7 @@ export const AnalysisContentSection: React.FC<AnalysisContentSectionProps> = ({ 
           isOpen={Boolean(selectedRawModal)}
           onClose={() => setSelectedRawModal(null)}
           title="Machine Learning Classifier Model Diagnostics"
-          subtitle={ml?.model_name || 'MailTraceAI-NLP'}
+          subtitle={ml?.model_name || 'CyberGuard-NLP'}
           data={selectedRawModal}
           format="json"
         />

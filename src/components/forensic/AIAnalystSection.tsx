@@ -76,7 +76,7 @@ export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-mono font-bold tracking-widest uppercase text-primary">
-                MAILTRACEAI INVESTIGATION COPILOT
+                CYBERGUARD INVESTIGATION COPILOT
               </span>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-surface-secondary border border-border text-foreground-muted">
                 EVIDENCE-GROUNDED
@@ -153,7 +153,7 @@ export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({
         <div className="space-y-4">
           <ExpandableSection
             title="Executive Forensic Synthesis"
-            subtitle={`Deterministic attack categorization from ${aiAnalyst?.model || aiAnalyst?.provider || 'mailtrace-copilot-v1'}`}
+            subtitle={`Deterministic attack categorization from ${aiAnalyst?.model || aiAnalyst?.provider || 'cyberguard-copilot-v2'}`}
             icon={Layers}
             defaultExpanded={true}
             badge={
@@ -289,7 +289,7 @@ export const AIAnalystSection: React.FC<AIAnalystSectionProps> = ({
               title="Copilot Model Synthesis Dossier"
               subtitle="Full evidence-grounding trace and LLM response payload"
               data={{
-                model: aiAnalyst?.model || 'mailtrace-copilot-v1',
+                model: aiAnalyst?.model || 'cyberguard-copilot-v2',
                 likely_attack_type: aiAnalyst?.likely_attack_type,
                 likely_objective: aiAnalyst?.likely_objective,
                 confidence: email?.threat_score?.confidence ?? email?.attribution?.confidence_score ?? 'Calibrated',

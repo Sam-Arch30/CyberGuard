@@ -20,7 +20,7 @@ export const TOUR_STEPS: TourStep[] = [
     targetSection: 'overview',
     targetTab: 'executive',
     targetPath: '/investigate/scenario-3-campaign/overview',
-    description: 'MailTraceAI dynamically parses RFC-822 headers, MIME structure, and body text without relying on external cloud APIs.',
+    description: 'CyberGuard dynamically parses RFC-822 headers, MIME structure, and body text without relying on external cloud APIs.',
     actionGuidance: 'Observe parsed headers, sender identity, and clean execution under local sandbox isolation.',
     nextButtonLabel: 'Next: View Threat Score →'
   },

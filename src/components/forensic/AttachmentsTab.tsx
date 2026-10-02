@@ -831,7 +831,7 @@ export const AttachmentsTab: React.FC<AttachmentsTabProps> = ({ email }) => {
                       {staticAnalysis?.reputation_status || 'Reputation unavailable'}
                     </h5>
                     <p className="text-[11px] font-mono text-foreground-muted">
-                      {staticAnalysis?.reputation_details || 'No external threat-intelligence reputation provider configured. (MailTraceAI strict forensic policy: Reputation is never fabricated).'}
+                      {staticAnalysis?.reputation_details || 'No external threat-intelligence reputation provider configured. (CyberGuard strict forensic policy: Reputation is never fabricated).'}
                     </p>
                   </div>
                 </div>

@@ -244,7 +244,7 @@ export const InvestigationAIDrawer: React.FC = () => {
           'Verify external perimeter ingress blocks for confirmed IOCs.',
           'Cross-reference sending IP in corporate firewall connection logs.'
         ],
-        model: 'mailtrace-copilot-local',
+        model: 'cyberguard-copilot-local',
         timestamp: new Date().toISOString()
       };
 
@@ -282,7 +282,7 @@ export const InvestigationAIDrawer: React.FC = () => {
       const initMessage: CopilotMessage = {
         id: 'init-drawer-msg',
         sender: 'copilot',
-        text: `**MailTraceAI Investigation Copilot** ready for target: **\`${targetFilename}\`** (\`${targetContextId}\`).\n\nAll answers are strictly grounded in structured forensic telemetry with calibrated confidence tiers. Click any suggested question below or enter a prompt to begin.`,
+        text: `**CyberGuard Security Copilot** ready for target: **\`${targetFilename}\`** (\`${targetContextId}\`).\n\nAll answers are strictly grounded in structured forensic telemetry with calibrated confidence tiers. Click any suggested question below or enter a prompt to begin.`,
         timestamp: new Date().toISOString()
       };
       setMessages([initMessage]);

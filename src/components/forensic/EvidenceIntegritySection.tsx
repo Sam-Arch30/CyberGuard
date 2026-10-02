@@ -149,7 +149,7 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
           action: 'ANALYSIS_COMPLETED',
           title: 'Forensic Triage Completed',
           description: 'Autonomous authentication, relay path reconstruction, and URL inspections evaluated.',
-          user: 'MailTrace Engine',
+          user: 'CyberGuard Engine',
           resource_type: 'evidence',
           resource_id: identifier
         }

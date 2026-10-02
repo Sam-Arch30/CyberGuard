@@ -16,7 +16,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ShieldCheck,
-  Palette
+  Palette,
+  Network,
+  KeyRound,
+  Binary,
+  Link2
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useInvestigation } from '../../context/InvestigationContext';
@@ -100,7 +104,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
     }
   ];
 
-  // 2. SECONDARY PLATFORM & INTAKE TOOLS
+  // 2. MULTI-TELEMETRY DETECTION ENGINES (Sections 7-10)
+  const multiTelemetryAnalyzers = [
+    {
+      name: 'Network Telemetry',
+      path: '/network-security',
+      icon: Network,
+      badge: 'SEC-10'
+    },
+    {
+      name: 'Authentication & ATO',
+      path: '/auth-security',
+      icon: KeyRound,
+      badge: 'SEC-09'
+    },
+    {
+      name: 'File & Attachment Security',
+      path: '/file-security',
+      icon: Binary,
+      badge: 'SEC-08'
+    },
+    {
+      name: 'URL & Domain Intelligence',
+      path: '/url-intelligence',
+      icon: Link2,
+      badge: 'SEC-07'
+    }
+  ];
+
+  // 3. PLATFORM & INTAKE TOOLS
   const platformTools = [
     {
       name: 'Ingest Email',
@@ -176,10 +208,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
             {!isCollapsed && (
               <div className="flex flex-col min-w-0">
                 <span className="font-sans font-bold text-xs tracking-tight text-foreground truncate">
-                  MailTrace AI
+                  CyberGuard
                 </span>
                 <span className="text-[10px] font-mono text-foreground-muted tracking-wider uppercase truncate">
-                  Forensic Suite
+                  Threat Intelligence
                 </span>
               </div>
             )}
@@ -242,6 +274,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
                     }`}
                   >
                     {item.step}
+                  </span>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        {/* Multi-Telemetry Detection Engines (Sections 7-10) */}
+        {!isCollapsed ? (
+          <div className="px-4 pt-4 pb-1 text-[10px] font-mono font-semibold uppercase tracking-wider text-foreground-subtle flex items-center justify-between">
+            <span>Detection Engines</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">
+              4 ENGINES
+            </span>
+          </div>
+        ) : (
+          <div className="my-2 border-b border-sidebar-border" />
+        )}
+
+        <nav className="px-2 space-y-0.5">
+          {multiTelemetryAnalyzers.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `flex items-center justify-between px-2.5 py-1.5 rounded-control text-xs font-medium transition-all group ${
+                    isActive
+                      ? 'bg-primary/10 text-primary font-semibold border-l-2 border-primary pl-2'
+                      : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border-l-2 border-transparent'
+                  }`
+                }
+                title={isCollapsed ? item.name : undefined}
+              >
+                <div className="flex items-center space-x-2.5 min-w-0">
+                  <Icon className="w-3.5 h-3.5 flex-shrink-0 group-hover:text-primary transition-colors" />
+                  {!isCollapsed && <span className="truncate">{item.name}</span>}
+                </div>
+
+                {!isCollapsed && item.badge && (
+                  <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-surface border border-border text-foreground-subtle">
+                    {item.badge}
                   </span>
                 )}
               </NavLink>

@@ -97,7 +97,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
       const payload = {
         analysis: email,
         analyst_name: 'Lead SOC Forensic Investigator',
-        notes: 'Forensic evidence analysis generated from MailTraceAI Investigation Workspace.'
+        notes: 'Forensic evidence analysis generated from CyberGuard Investigation Workspace.'
       };
 
       const res = await fetch(apiUrl('/api/reports/generate'), {
@@ -118,7 +118,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
       const a = document.createElement('a');
       a.href = url;
       const shaSlice = (email.email_sha256 || email.id || 'EVD').slice(0, 10);
-      const filename = `MailTrace_Forensic_Report_${shaSlice}.pdf`;
+      const filename = `CyberGuard_Forensic_Report_${shaSlice}.pdf`;
       a.download = filename;
       document.body.appendChild(a);
       a.click();
@@ -143,7 +143,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `MailTraceAI_Forensic_Evidence_${email.evidence_id || email.id || 'export'}.json`;
+    a.download = `CyberGuard_Forensic_Evidence_${email.evidence_id || email.id || 'export'}.json`;
     document.body.appendChild(a);
     a.click();
     URL.revokeObjectURL(url);
@@ -495,7 +495,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
             <div className="flex items-center space-x-2">
               <span className="w-2.5 h-2.5 rounded-full bg-primary" />
               <span className="font-bold tracking-widest text-primary uppercase">
-                MAILTRACE AI FORENSICS DIVISION
+                CYBERGUARD FORENSICS DIVISION
               </span>
             </div>
             <div className="flex items-center space-x-2 text-[10px] text-foreground-muted uppercase tracking-wider">
@@ -552,7 +552,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
 
           <div className="prose prose-sm max-w-none text-foreground-muted font-sans text-xs sm:text-sm leading-relaxed space-y-3">
             <p>
-              On <strong className="text-foreground">{email.date ? new Date(email.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'the recorded intake date'}</strong>, MailTraceAI ingested an email artifact with the subject <strong className="text-foreground">&quot;{email.subject || 'Untitled'}&quot;</strong> transmitted to target mailbox <strong className="text-foreground">{email.to || 'internal corporate personnel'}</strong>. Automated forensic triage and multi-engine inspection concluded that this communication represents a <strong className="text-danger font-semibold">{severity.toUpperCase()}</strong> severity security threat with an evaluated Threat Score of <strong className="text-foreground">{score}/100</strong>.
+              On <strong className="text-foreground">{email.date ? new Date(email.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'the recorded intake date'}</strong>, CyberGuard ingested an email artifact with the subject <strong className="text-foreground">&quot;{email.subject || 'Untitled'}&quot;</strong> transmitted to target mailbox <strong className="text-foreground">{email.to || 'internal corporate personnel'}</strong>. Automated forensic triage and multi-engine inspection concluded that this communication represents a <strong className="text-danger font-semibold">{severity.toUpperCase()}</strong> severity security threat with an evaluated Threat Score of <strong className="text-foreground">{score}/100</strong>.
             </p>
 
             <p>
@@ -710,7 +710,7 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
           </div>
 
           <p className="text-xs text-foreground-muted font-sans leading-relaxed">
-            MailTraceAI inspected the cryptographic headers and alignment records to establish whether the observed transmission originated from the legitimate domain owner.
+            CyberGuard inspected the cryptographic headers and alignment records to establish whether the observed transmission originated from the legitimate domain owner.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">

@@ -324,8 +324,8 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         // Populate default greeting message with explicit .eml filename
         const modeLabel = activeMode === 'email' ? 'Email Investigation' : activeMode === 'campaign' ? 'Campaign Investigation' : 'Case Investigation';
         const greetingText = activeMode === 'email'
-          ? `MailTraceAI Investigation Copilot initialized in **${modeLabel}** mode, currently analyzing target file: **\`${activeFileName}\`** (Evidence ID: ${currentContextId}). All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`
-          : `MailTraceAI Investigation Copilot initialized in **${modeLabel}** mode. All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`;
+          ? `CyberGuard Security Copilot initialized in **${modeLabel}** mode, currently analyzing target file: **\`${activeFileName}\`** (Evidence ID: ${currentContextId}). All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`
+          : `CyberGuard Security Copilot initialized in **${modeLabel}** mode. All responses are strictly grounded in verified forensic evidence with calibrated confidence tiers. Click any suggested question below or ask in natural language.`;
 
         setMessages([
           {
@@ -424,7 +424,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
           'Verify perimeter firewall dropzone block.',
           'Review user authentication logs on IdP.'
         ],
-        model: 'mailtrace-copilot-local',
+        model: 'cyberguard-copilot-local',
         timestamp: new Date().toISOString()
       };
 
@@ -523,7 +523,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
           <div>
             <div className="flex items-center space-x-2">
               <h2 className="text-sm sm:text-base font-bold font-sans text-foreground tracking-tight">
-                MailTraceAI Investigation Copilot
+                CyberGuard Security Copilot
               </h2>
               <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/10 border border-primary/20 text-primary font-bold">
                 EVIDENCE-GROUNDED
@@ -1005,7 +1005,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         </form>
         <div className="mt-1.5 px-1 flex items-center justify-between text-[10px] font-mono text-foreground-muted">
           <span>Passive evidence isolation active: Untrusted email data cannot issue instructions.</span>
-          <span className="text-foreground-subtle">MailTraceAI Copilot v1</span>
+          <span className="text-foreground-subtle">CyberGuard Copilot v2.0</span>
         </div>
       </div>
 
