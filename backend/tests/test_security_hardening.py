@@ -83,6 +83,36 @@ def test_invalid_rfc822_rejection():
     assert "valid RFC-822 email format" in res.json()["detail"]
 
 
+def test_valid_rfc822_with_utf8_bom():
+    """Verify emails starting with UTF-8 BOM are accepted and parsed."""
+    bom_eml = b"\xef\xbb\xbfFrom: sender@example.com\r\nTo: recipient@example.com\r\nSubject: Test BOM\r\n\r\nHello world"
+    files = {"file": ("bom_email.eml", io.BytesIO(bom_eml), "message/rfc822")}
+    res = client.post("/api/emails/analyze", files=files)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["subject"] == "Test BOM"
+
+
+def test_valid_rfc822_with_modern_auth_headers_first():
+    """Verify emails starting with Delivered-To, ARC, DKIM, or Received-SPF are accepted."""
+    modern_eml = (
+        b"Delivered-To: recipient@corp.com\r\n"
+        b"Received-SPF: pass (google.com: domain of sender@example.com designates 1.2.3.4 as permitted sender)\r\n"
+        b"Authentication-Results: mx.google.com; dkim=pass header.i=@example.com\r\n"
+        b"DKIM-Signature: v=1; a=rsa-sha256; c=relaxed/relaxed; d=example.com\r\n"
+        b"From: sender@example.com\r\n"
+        b"To: recipient@corp.com\r\n"
+        b"Subject: Modern Email Auth\r\n\r\n"
+        b"Body content here"
+    )
+    files = {"file": ("auth_headers.eml", io.BytesIO(modern_eml), "message/rfc822")}
+    res = client.post("/api/emails/analyze", files=files)
+    assert res.status_code == 200
+    data = res.json()
+    assert data["subject"] == "Modern Email Auth"
+
+
+
 # =====================================================================
 # 3. HTML Sanitization & Script Injection Tests
 # =====================================================================

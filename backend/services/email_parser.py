@@ -60,10 +60,21 @@ class EmailParserService:
 
         # 1. Calculate evidence SHA-256 hash strictly from original bytes
         email_sha256 = IOCExtractorService.calculate_sha256(content_bytes)
-        raw_email_str = content_bytes.decode("utf-8", errors="replace")
+
+        # Strip any UTF-8 / UTF-16 BOM or leading blank lines that cause email parser to treat headers as body
+        parse_bytes = content_bytes
+        if parse_bytes.startswith(b"\xef\xbb\xbf"):  # UTF-8 BOM
+            parse_bytes = parse_bytes[3:]
+        elif parse_bytes.startswith(b"\xff\xfe"):  # UTF-16 LE BOM
+            parse_bytes = parse_bytes[2:]
+        elif parse_bytes.startswith(b"\xfe\xff"):  # UTF-16 BE BOM
+            parse_bytes = parse_bytes[2:]
+        parse_bytes = parse_bytes.lstrip(b"\r\n\t ")
+
+        raw_email_str = parse_bytes.decode("utf-8", errors="replace")
 
         try:
-            msg = email.message_from_bytes(content_bytes, policy=policy.default)
+            msg = email.message_from_bytes(parse_bytes, policy=policy.default)
         except Exception as e:
             raise EmailParseException(f"Failed to parse email structure: {str(e)}")
 

@@ -17,7 +17,12 @@ ALLOWED_EXTENSIONS = {".eml", ".msg", ".txt"}
 
 # Common RFC-822 email header tokens to detect genuine email format
 RFC822_HEADER_TOKENS = [
-    re.compile(r'^(from|to|subject|received|date|mime-version|return-path|message-id|content-type):', re.IGNORECASE | re.MULTILINE),
+    re.compile(
+        r'^(from|to|subject|received|date|mime-version|return-path|message-id|content-type|delivered-to|'
+        r'dkim-signature|arc-[a-z-]+|received-spf|authentication-results|reply-to|cc|bcc|sender|x-[a-z0-9-]+|'
+        r'content-transfer-encoding|precedence|auto-submitted|references|in-reply-to):',
+        re.IGNORECASE | re.MULTILINE
+    ),
 ]
 
 
@@ -126,12 +131,26 @@ class UploadSecurityService:
             )
 
         # 5. Conservative RFC-822 syntax validation
-        # Examine the first 4KB of text for at least one standard email header
-        sample = content_bytes[:4096].decode("utf-8", errors="ignore")
+        # Examine the first 16KB of text for standard email headers or valid parsed headers
+        sample_bytes = content_bytes[:16384]
+        if sample_bytes.startswith(b"\xef\xbb\xbf"):
+            sample_bytes = sample_bytes[3:]
+        sample = sample_bytes.decode("utf-8", errors="ignore").lstrip()
         has_rfc_header = any(pattern.search(sample) for pattern in RFC822_HEADER_TOKENS)
 
         # Also permit mbox format starting with "From "
         is_mbox = sample.startswith("From ")
+
+        if not (has_rfc_header or is_mbox):
+            # Fallback to standard Python email parser
+            try:
+                import email
+                from email import policy
+                parsed_msg = email.message_from_bytes(content_bytes[:16384], policy=policy.default)
+                if parsed_msg and len(parsed_msg.keys()) > 0:
+                    has_rfc_header = True
+            except Exception:
+                pass
 
         if not (has_rfc_header or is_mbox):
             raise HTTPException(

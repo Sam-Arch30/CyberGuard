@@ -4,7 +4,7 @@ import type { EmailAnalysis } from '../types/forensic';
 import { getAnalysisResult, saveAnalysisResult, getAllAvailableAnalyses, resetDemoStore, clearForensicStore } from '../utils/forensicStore';
 import { resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHelper';
 import { resolveConfidenceConclusions } from '../utils/confidenceResolver';
-import { apiUrl } from '../utils/apiClient';
+import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 
 export type InvestigationSection =
   | 'overview'
@@ -610,9 +610,9 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     }
 
     if (!res || !res.ok) {
-      const errText = res ? await res.text() : 'Analysis service unreachable.';
+      const errDetail = await extractErrorMessage(res, 'Analysis request failed');
       setLoading(false);
-      throw new Error(`Forensic analysis failed: ${errText || 'Unprocessable email format'}`);
+      throw new Error(`Forensic analysis failed: ${errDetail}`);
     }
 
     const data = await res.json();

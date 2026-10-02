@@ -255,9 +255,18 @@ class EmailParserAnalyzer(BaseEmailAnalyzer):
             result.errors.append("Empty email bytes provided.")
             return result
 
-        raw_str = raw_bytes.decode("utf-8", errors="replace")
+        parse_bytes = raw_bytes
+        if parse_bytes.startswith(b"\xef\xbb\xbf"):
+            parse_bytes = parse_bytes[3:]
+        elif parse_bytes.startswith(b"\xff\xfe"):
+            parse_bytes = parse_bytes[2:]
+        elif parse_bytes.startswith(b"\xfe\xff"):
+            parse_bytes = parse_bytes[2:]
+        parse_bytes = parse_bytes.lstrip(b"\r\n\t ")
+
+        raw_str = parse_bytes.decode("utf-8", errors="replace")
         try:
-            msg = email.message_from_bytes(raw_bytes, policy=policy.default)
+            msg = email.message_from_bytes(parse_bytes, policy=policy.default)
         except Exception as e:
             result.status = AnalysisStatusEnum.FAILED
             result.errors.append(f"Failed to parse email message: {e}")

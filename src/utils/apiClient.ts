@@ -31,8 +31,62 @@ export const apiFetch = async (endpoint: string, init?: RequestInit): Promise<Re
   return fetch(apiUrl(endpoint), init);
 };
 
+/**
+ * Safely extracts human-readable error messages from fetch responses,
+ * handling JSON responses, proxy errors, offline servers, and fallbacks.
+ */
+export const extractErrorMessage = async (
+  res: Response | null,
+  defaultMsg: string = 'Analysis request failed'
+): Promise<string> => {
+  if (!res) {
+    return 'Backend server is unreachable. Please verify that the CyberGuard API server is running on http://127.0.0.1:8000.';
+  }
+
+  // Clone response so callers can still inspect it if needed
+  try {
+    const cloned = res.clone();
+    const data = await cloned.json();
+    if (data) {
+      if (typeof data.detail === 'string' && data.detail.trim()) {
+        return data.detail.trim();
+      }
+      if (Array.isArray(data.detail) && data.detail.length > 0) {
+        return data.detail.map((d: any) => d.msg || JSON.stringify(d)).join(', ');
+      }
+      if (typeof data.message === 'string' && data.message.trim()) {
+        return data.message.trim();
+      }
+      if (typeof data.error === 'string' && data.error.trim()) {
+        return data.error.trim();
+      }
+    }
+  } catch {
+    // Not JSON
+  }
+
+  try {
+    const text = await res.text();
+    if (text && text.trim()) {
+      if (text.includes('ECONNREFUSED')) {
+        return 'Backend server is not running on http://127.0.0.1:8000 (ECONNREFUSED). Please start the backend.';
+      }
+      return text.trim();
+    }
+  } catch {
+    // Text extraction failed
+  }
+
+  if (res.status === 502 || res.status === 503 || res.status === 504 || res.status === 500) {
+    return `Backend server unreachable on port 8000 (HTTP ${res.status}). Please ensure the FastAPI backend is running.`;
+  }
+
+  return res.statusText ? `HTTP ${res.status}: ${res.statusText}` : defaultMsg;
+};
+
 export default {
   API_BASE_URL,
   apiUrl,
-  apiFetch
+  apiFetch,
+  extractErrorMessage,
 };

@@ -17,7 +17,7 @@ import type { EmailAnalysis } from '../types/forensic';
 import { saveAnalysisResult } from '../utils/forensicStore';
 import { decodeRfc2047 } from '../utils/indicatorHelper';
 import { AnalysisPipelineProgress, type PipelineOverallStatus } from '../components/forensic/AnalysisPipelineProgress';
-import { apiUrl } from '../utils/apiClient';
+import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 
 const SAMPLE_PHISHING = `Received: from edge-relay.security-gateway.net (194.165.16.88) by mx01.enterprise.corp with ESMTPS id p4102 for <security.ops@enterprise.corp>; Tue, 15 Sep 2026 10:41:45 +0000
 Received: from smtp-origin.shadow-node.ru (185.220.101.42) by edge-relay.security-gateway.net with ESMTP id r9182; Tue, 15 Sep 2026 10:41:02 +0000
@@ -162,8 +162,8 @@ export const AnalyzeEmail: React.FC = () => {
         }, 500);
         return;
       } else {
-        const errText = res ? await res.text() : 'Server did not respond.';
-        setErrorMessage(`Forensic analysis failed: ${errText || 'Unprocessable email format'}`);
+        const errDetail = await extractErrorMessage(res, 'Analysis request failed');
+        setErrorMessage(`Forensic analysis failed: ${errDetail}`);
         setPipelineStatus('error');
       }
     } catch (err: any) {

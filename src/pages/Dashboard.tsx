@@ -26,7 +26,7 @@ import type { DashboardSummary } from '../types/dashboard';
 import type { EmailAnalysis } from '../types/forensic';
 import { getAllAvailableAnalyses, saveAnalysisResult } from '../utils/forensicStore';
 import { decodeRfc2047 } from '../utils/indicatorHelper';
-import { apiUrl } from '../utils/apiClient';
+import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 import {
   SCENARIO_1_LEGITIMATE,
   SCENARIO_2_PHISHING,
@@ -206,8 +206,8 @@ export const Dashboard: React.FC = () => {
         navigate(`/investigate/${analysisId}/overview`);
         return;
       } else {
-        const errText = res ? await res.text() : 'Analysis service unreachable.';
-        setErrorMessage(`Forensic analysis failed: ${errText || 'Unprocessable email format'}`);
+        const errDetail = await extractErrorMessage(res, 'Analysis request failed');
+        setErrorMessage(`Forensic analysis failed: ${errDetail}`);
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Network error';
