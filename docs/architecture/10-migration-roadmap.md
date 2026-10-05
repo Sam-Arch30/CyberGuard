@@ -538,14 +538,44 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
      - `POST /api/campaigns/candidates/{campaign_id}/review`
    - Verified with 13 comprehensive unit/scenario tests in `backend/tests/test_cross_incident_correlation.py` and 1 large-scale performance benchmark (1,000 incidents) in `backend/tests/test_correlation_performance.py`.
 
-11. **Requirements & Prerequisites for Section 16 (Temporal Correlation & Event Sequencing Engine)**:
+11. **Section 16 — Canonical Temporal Correlation & Event Sequencing Engine (COMPLETED)**:
+   - Architecture document: [`25-temporal-correlation-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/25-temporal-correlation-engine.md).
+   - Core Database Models & Alembic Migration:
+     - `SecurityEventModel` (`security_events` table) storing indexed temporal event projections over multi-source evidence.
+     - `TemporalSequenceCandidateModel` (`temporal_sequences` table) storing multi-event sequence candidates with supporting/conflicting evidence, shared entities, and limitations.
+     - Alembic migration `f5a1c3d7b92e_create_temporal_correlation_engine.py` applied and verified.
+   - Core Schemas & Controlled Contracts: `backend/schemas/temporal_correlation.py` defining controlled `SecurityEventType` vocabulary, `TimePrecision` (EXACT, MILLISECOND, SECOND, MINUTE, DATE_ONLY, UNKNOWN), `TimestampTrust` (HIGH, MEDIUM, LOW, UNCERTAIN), `SequenceStatus`, `TimestampProvenance`, `SecurityEvent`, `TimelineBurstSummary`, `TimelineItem`, `IncidentTimelineResponse`, `EntityTimelineResponse`, and `CampaignTimelineResponse`.
+   - Canonical Temporal Engine: `backend/services/temporal_engine.py` implementing:
+     - `TimestampNormalizer`: Handles parsing, timezone conversion (aware vs naive, default adapter timezone, `UNKNOWN_TIMEZONE`), precision detection, trust assignment, clock offset application, and clock-skew tolerance comparison (`compare_timestamps`).
+     - `EventProjector`: Projects `SecurityEvent` models from normalized source models (`NormalizedAuthEvent`, `NormalizedNetworkEvent`, `NormalizedAPIEvent`, `FindingModel`, `ThreatEventModel`, Email MIME headers) without duplicating truth stores.
+     - `TemporalRuleRegistry`: 8 versioned declarative temporal rules with configurable delay windows, required shared entities, and resulting sequence statuses.
+     - `CandidateGenerator`: Sub-linear $O(K \log K)$ candidate generation using entity-keyed indices and binary search (`bisect`), completely avoiding $O(N^2)$ all-pairs bottlenecks.
+     - `TimelineCompressor`: Presentation-layer burst summarization collapsing $\ge 4$ repetitive consecutive events into `TimelineBurstSummary` while preserving underlying evidence.
+     - `TemporalCorrelationService`: Authoritative service orchestrating event recording, incident/entity/campaign timelines, and sequence candidate discovery.
+   - False-Positive Controls & Non-Attribution:
+     - Enforces non-attribution linguistic guarantee: outputs "observed cross-incident/temporal sequence similarity", never claiming adversary causation or actor attribution.
+     - Strictly suppresses false sequences between different accounts (Scenario B).
+     - Identifies conflicting evidence (`TIMESTAMP_INCONSISTENCY`) and near-simultaneous clock skew (`ORDER_UNCERTAIN`).
+   - REST API Endpoints: `backend/api/routes/temporal_correlation.py` mounted in `backend/main.py`:
+     - `GET /api/incidents/{incident_id}/timeline`
+     - `GET /api/entities/{entity_id}/timeline`
+     - `GET /api/incidents/{incident_id}/sequences`
+     - `POST /api/incidents/{incident_id}/analyze-sequences`
+     - `GET /api/sequences/{sequence_id}`
+     - `GET /api/campaigns/{campaign_id}/timeline`
+   - Verification & Performance:
+     - 25 comprehensive unit/scenario tests in `backend/tests/test_temporal_correlation.py` covering Scenarios A-F, Hero scenario, out-of-order ingestion, late events, and API endpoints.
+     - Large-scale performance benchmark with **100,000 synthetic events** in `backend/tests/test_temporal_performance.py`: 33.15 ms incident timeline queries, 31.32 ms entity queries, and 235.84 ms candidate evaluation over 2,000 events across 8 rules.
+
+12. **Requirements & Prerequisites for Section 17 (Attack Path Reconstruction Engine)**:
    - **Prerequisites Satisfied**:
-     - Canonical Security Knowledge Graph links multi-telemetry evidence with provenance and timestamps.
-     - Cross-incident pattern engine identifies shared infrastructure and campaign candidates.
-     - Workspace tenant isolation and analyst audit records established.
-   - **Section 16 Focus**:
-     - Chronological event sequencing across multi-stage cyber intrusions.
-     - Burst anomaly and periodicity detection.
-     - Multi-event temporal windows and kill-chain timeline construction.
+     - Canonical Security Knowledge Graph links multi-telemetry evidence with provenance and timestamps (Section 14).
+     - Cross-incident pattern engine identifies shared infrastructure and campaign candidates (Section 15).
+     - Temporal correlation engine provides chronological sequencing, sub-linear candidates, and timestamp provenance (Section 16).
+     - Workspace tenant isolation, privacy secret redaction, and analyst audit records established.
+   - **Section 17 Focus**:
+     - Mapping temporal sequences and graph relationships into directed attack graphs.
+     - MITRE ATT&CK tactic and technique stage alignment (Initial Access -> Execution -> Persistence -> C2 -> Exfiltration).
+     - Causal attack progression reasoning, branch pruning, and confidence scoring.
 
 

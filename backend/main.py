@@ -27,6 +27,7 @@ from backend.api.routes.impersonation import router as impersonation_router
 from backend.api.routes.multimedia import router as multimedia_router
 from backend.api.routes.knowledge_graph import router as knowledge_graph_router
 from backend.api.routes.cross_incident import router as cross_incident_router
+from backend.api.routes.temporal_correlation import router as temporal_correlation_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -110,6 +111,7 @@ app.include_router(impersonation_router)
 app.include_router(multimedia_router)
 app.include_router(knowledge_graph_router)
 app.include_router(cross_incident_router)
+app.include_router(temporal_correlation_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

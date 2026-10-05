@@ -652,6 +652,8 @@ class IncidentModel(Base):
     threat_events = relationship("ThreatEventModel", back_populates="incident", lazy="selectin")
     response_actions = relationship("ResponseActionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     attack_paths = relationship("AttackPathModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    security_events = relationship("SecurityEventModel", back_populates="incident", lazy="selectin")
+    temporal_sequences = relationship("TemporalSequenceCandidateModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -827,6 +829,88 @@ class ProtectedIdentityModel(Base):
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+
+# ============================================================================
+# TEMPORAL CORRELATION & EVENT SEQUENCING MODELS (SECTION 16)
+# ============================================================================
+
+class SecurityEventModel(Base):
+    """
+    Canonical normalized security event acting as an indexed temporal projection
+    over multi-source evidence (Section 16).
+    """
+    __tablename__ = "security_events"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    event_type = Column(String(100), nullable=False, index=True)
+    event_time = Column(DateTime, nullable=False, index=True)  # Normalized UTC timestamp
+    event_time_end = Column(DateTime, nullable=True)  # Optional end of interval
+    event_time_precision = Column(String(30), nullable=False, default="SECOND")
+    event_time_confidence = Column(Float, nullable=False, default=1.0)
+    ingested_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    analyzed_at = Column(DateTime, nullable=True)
+    source_type = Column(String(50), nullable=False, index=True)
+    source_artifact_id = Column(String(36), ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    entity_ids_json = Column(Text, default="[]", nullable=False)
+    finding_ids_json = Column(Text, default="[]", nullable=False)
+    threat_event_ids_json = Column(Text, default="[]", nullable=False)
+    provider = Column(String(100), nullable=False, default="generic")
+    adapter = Column(String(100), nullable=False, default="generic")
+    adapter_version = Column(String(32), nullable=False, default="1.0.0")
+    attributes_json = Column(Text, default="{}", nullable=False)
+    timestamp_provenance_json = Column(Text, default="{}", nullable=False)
+    summary = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="security_events")
+    source_artifact = relationship("ArtifactModel")
+    analysis_run = relationship("AnalysisRunModel")
+
+    __table_args__ = (
+        Index("ix_sec_ev_inc_time", "incident_id", "event_time"),
+        Index("ix_sec_ev_ws_time", "workspace_id", "event_time"),
+        Index("ix_sec_ev_type_time", "event_type", "event_time"),
+    )
+
+
+class TemporalSequenceCandidateModel(Base):
+    """
+    Explainable multi-event temporal sequence candidate (Section 16).
+    """
+    __tablename__ = "temporal_sequences"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    event_ids_json = Column(Text, default="[]", nullable=False)
+    rule_ids_json = Column(Text, default="[]", nullable=False)
+    start_time = Column(DateTime, nullable=False, index=True)
+    end_time = Column(DateTime, nullable=False, index=True)
+    duration_seconds = Column(Float, nullable=False, default=0.0)
+    shared_entities_json = Column(Text, default="[]", nullable=False)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    conflicting_evidence_json = Column(Text, default="[]", nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    confidence = Column(Float, nullable=False, default=0.5)
+    status = Column(String(50), nullable=False, default="OBSERVED_SEQUENCE", index=True)
+    summary = Column(Text, nullable=False)
+    engine_version = Column(String(32), nullable=False, default="1.0.0")
+    rule_version = Column(String(32), nullable=False, default="1.0.0")
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="temporal_sequences")
+
+    __table_args__ = (
+        Index("ix_temp_seq_inc_time", "incident_id", "start_time"),
+        Index("ix_temp_seq_ws_status", "workspace_id", "status"),
+    )
 
 
 

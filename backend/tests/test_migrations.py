@@ -66,6 +66,8 @@ def test_alembic_migrations_from_scratch():
                 "relationship_observations",
                 "incident_correlations",
                 "campaign_incidents",
+                "security_events",
+                "temporal_sequences",
                 "alembic_version"
             }
 
