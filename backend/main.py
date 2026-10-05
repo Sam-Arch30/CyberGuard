@@ -29,6 +29,7 @@ from backend.api.routes.knowledge_graph import router as knowledge_graph_router
 from backend.api.routes.cross_incident import router as cross_incident_router
 from backend.api.routes.temporal_correlation import router as temporal_correlation_router
 from backend.api.routes.attack_reconstruction import router as attack_reconstruction_router
+from backend.api.routes.attack_confidence import router as attack_confidence_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -114,6 +115,7 @@ app.include_router(knowledge_graph_router)
 app.include_router(cross_incident_router)
 app.include_router(temporal_correlation_router)
 app.include_router(attack_reconstruction_router)
+app.include_router(attack_confidence_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

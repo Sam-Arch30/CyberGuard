@@ -600,16 +600,60 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
      - 17 comprehensive unit and scenario tests in `backend/tests/test_attack_reconstruction.py` covering Scenarios A-G, false-positive guardrails, prompt injection safety, workspace isolation, versioning, and analyst feedback.
      - Benchmark test in `backend/tests/test_reconstruction_performance.py` over 1,200 events and 120 entities: 33.02 ms context load, 1.35 ms stage generation, 27.84 ms end-to-end reconstruction, and 19.47 ms retrieval.
 
-13. **Requirements & Prerequisites for Section 18 (Path Confidence, Explainability & Graph Uncertainty)**:
+13. **Section 18 — Attack Path Confidence & Explainability Engine (COMPLETED)**:
+   - Architecture document: [`27-attack-confidence-explainability.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/27-attack-confidence-explainability.md).
+   - Core Principles:
+     - Confidence is NOT Certainty: Represents heuristic evidence strength (0.0 to 1.0), not mathematical probability that CyberGuard is correct.
+     - Explainability from Evidence: Directed reasoning from raw observations to decomposed confidence to analyst explanation.
+     - Weakest Link / Bottleneck Principle: Path confidence is bounded by its weakest critical transition or speculative link; naive arithmetic averaging is strictly forbidden.
+     - Strict Distinction between Missing Data and Contradictions: Missing telemetry represents epistemic uncertainty (gap); conflicting facts represent refutation penalties.
+   - Database Models & Alembic Migration:
+     - Augmented `AttackPathModel`, `AttackStageModel`, `AttackEdgeModel`, and `AttackHypothesisModel` with `confidence_level` (`VERY_LOW`, `LOW`, `MODERATE`, `HIGH`, `VERY_HIGH`, `UNKNOWN`), `confidence_breakdown_json`, `explanation_json`, and `confidence_bottleneck_json`.
+     - Applied Alembic migration `b2c3d4e5f6a7_create_attack_confidence_engine.py`.
+   - Core Services:
+     - `AttackConfidenceEngine` (`backend/services/attack_confidence_engine.py`):
+       - 10-dimension confidence decomposition (`OBSERVATION_STRENGTH`, `ENTITY_CONTINUITY`, `TEMPORAL_CONSISTENCY`, `GRAPH_CONNECTIVITY`, `SOURCE_INDEPENDENCE`, `INDICATOR_SPECIFICITY`, `DETECTOR_CONFIDENCE`, `HISTORICAL_SUPPORT`, `CONTRADICTION_STRENGTH`, `EVIDENCE_COMPLETENESS`).
+       - Source trust hierarchy (`DIRECT_TELEMETRY` 0.95 down to `UNTRUSTED_CONTENT` 0.25).
+       - Dynamic `EvidenceFamily` grouping preventing double-counting of related findings.
+       - Prevalence adjustments reducing significance for shared common cloud/CDN IPs (e.g. `104.16.0.0`, `1.1.1.1`).
+       - Bottleneck detection isolating weakest transition and bounding path score.
+       - Deterministic `compare_hypotheses` explaining why one hypothesis outranks another.
+     - `AttackExplanationService` (`backend/services/attack_explanation_service.py`):
+       - `explain_stage`: Generates evidence-grounded bulleted reasons, caveats, and what would strengthen/weaken.
+       - `explain_transition`: Explains shared entity keys, temporal proximity, and bridging telemetry.
+       - `explain_attack_path`: Exposes overall evidence strength, strong sub-chains, and confidence bottleneck.
+       - `explain_entity_relationship`: Cites Knowledge Graph sensor observations and timestamps (never "AI determined").
+       - `explain_cross_incident`: Explains shared technical observables and campaign heuristics.
+       - `generate_report_explanation`: Report-ready executive and technical summary preserving epistemic humility ("CyberGuard reconstructed a plausible sequence...", never asserts unverified speculation as fact).
+       - Auxiliary LLM prose enhancement with strict prompt-injection isolation (`<untrusted_content>`) and unsupported claim rejection.
+   - REST API Endpoints (`backend/api/routes/attack_confidence.py`):
+     - `GET /api/incidents/{incident_id}/confidence`
+     - `GET /api/incidents/{incident_id}/explanation`
+     - `GET /api/incidents/{incident_id}/report-explanation`
+     - `POST /api/incidents/{incident_id}/compare-hypotheses`
+     - `GET /api/attack-paths/{path_id}/confidence`
+     - `GET /api/attack-paths/{path_id}/explanation`
+     - `POST /api/attack-paths/{path_id}/analyst-disposition`
+     - `GET /api/attack-stages/{stage_id}/confidence`
+     - `GET /api/attack-stages/{stage_id}/explanation`
+     - `POST /api/attack-stages/{stage_id}/analyst-disposition`
+     - `GET /api/attack-edges/{edge_id}/confidence`
+     - `GET /api/attack-edges/{edge_id}/explanation`
+     - `GET /api/relationships/{relationship_id}/explanation`
+     - `GET /api/correlations/{correlation_id}/explanation`
+   - Verification & Performance:
+     - 28 unit and integration tests in `backend/tests/test_attack_confidence.py` covering all 45 requirements, false-confidence guardrails, and Scenarios A through G.
+     - Large-scale performance benchmark in `backend/tests/test_confidence_performance.py` over 50 stages and 49 transitions: 0.138 ms/stage scoring, 0.109 ms/transition scoring, 4.60 ms full path scoring + bottleneck bounding, and 5.34 ms complete explanation generation.
+
+14. **Requirements & Prerequisites for Section 19 (MITRE ATT&CK Mapping & Threat Actor Attribution Engine)**:
    - **Prerequisites Satisfied**:
-     - Evidence-backed Attack Stages and DAG transitions persisted with forensic certainty statuses (Section 17).
-     - Explicit Evidence Gaps and Contradictions audited and exposed via APIs (Section 17).
-     - Primary and alternative hypotheses ranked and explainable (Section 17).
-     - Complete versioning and analyst disposition feedback established (Section 17).
-   - **Section 18 Focus**:
-     - Visual differentiation and frontend representation of OBSERVED vs DERIVED vs INFERRED nodes.
-     - Per-edge transition confidence calibration and uncertainty visualization.
-     - Interactive evidence expansion ("Why does this stage/edge exist?").
-     - Multi-hypothesis path comparison and analyst review workflows.
+     - Decomposed stage and transition confidence scores with clear evidence lineage (Section 18).
+     - Epistemically grounded explanation objects suitable for mapping to ATT&CK techniques and sub-techniques (Section 18).
+     - Evidence families preventing redundant technique scoring and double-counting (Section 18).
+     - Explicit catalog of missing telemetry and contradictions to prevent false actor attribution (Section 18).
+   - **Section 19 Focus**:
+     - Formal MITRE ATT&CK Enterprise Matrix mapping across observed and inferred stages.
+     - TTP confidence scoring based on evidence specificity and tool telemetry.
+     - Conservative threat actor attribution and diamond model integration.
 
 

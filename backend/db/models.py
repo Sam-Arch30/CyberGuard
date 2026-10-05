@@ -762,6 +762,7 @@ class AttackPathModel(Base):
     description = Column(Text, nullable=True)
     classification = Column(String(50), nullable=False, default="PLAUSIBLE_RECONSTRUCTION")
     confidence = Column(Float, nullable=False, default=1.0)
+    confidence_level = Column(String(30), nullable=False, default="MODERATE")
     status = Column(String(30), nullable=False, default="CURRENT", index=True)  # CURRENT, SUPERSEDED, INVALIDATED
     start_time = Column(DateTime, nullable=True)
     end_time = Column(DateTime, nullable=True)
@@ -769,6 +770,9 @@ class AttackPathModel(Base):
     contradicting_evidence_json = Column(Text, default="[]", nullable=False)
     evidence_gaps_json = Column(Text, default="[]", nullable=False)
     alternative_hypotheses_json = Column(Text, default="[]", nullable=False)
+    confidence_breakdown_json = Column(Text, default="{}", nullable=False)
+    explanation_json = Column(Text, default="{}", nullable=False)
+    confidence_bottleneck_json = Column(Text, default="{}", nullable=False)
     version = Column(Integer, nullable=False, default=1)
     engine_version = Column(String(32), nullable=False, default="1.0.0")
     rule_version = Column(String(32), nullable=False, default="1.0.0")
@@ -789,7 +793,8 @@ class AttackPathModel(Base):
 class AttackStageModel(Base):
     """
     Discrete node/stage in an AttackPath representing a specific reconstructed activity.
-    Augmented in Section 17 with strict OBSERVED/DERIVED/INFERRED status and evidence bindings.
+    Augmented in Section 17 & 18 with strict OBSERVED/DERIVED/INFERRED status, evidence bindings,
+    and granular confidence/explainability breakdowns.
     """
     __tablename__ = "attack_stages"
 
@@ -806,6 +811,7 @@ class AttackStageModel(Base):
     start_time = Column(DateTime, nullable=True, index=True)
     end_time = Column(DateTime, nullable=True)
     confidence = Column(Float, nullable=False, default=1.0)
+    confidence_level = Column(String(30), nullable=False, default="HIGH")
     entity_ids_json = Column(Text, default="[]", nullable=False)
     event_ids_json = Column(Text, default="[]", nullable=False)
     finding_ids_json = Column(Text, default="[]", nullable=False)
@@ -814,6 +820,8 @@ class AttackStageModel(Base):
     supporting_evidence_json = Column(Text, default="[]", nullable=False)
     contradicting_evidence_json = Column(Text, default="[]", nullable=False)
     limitations_json = Column(Text, default="[]", nullable=False)
+    confidence_breakdown_json = Column(Text, default="{}", nullable=False)
+    explanation_json = Column(Text, default="{}", nullable=False)
     analyst_disposition = Column(String(50), nullable=True)
     analyst_notes = Column(Text, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
@@ -825,7 +833,8 @@ class AttackStageModel(Base):
 class AttackEdgeModel(Base):
     """
     Directed transition edge between AttackStages.
-    Augmented in Section 17 with transition semantics, shared entities, and evidence support.
+    Augmented in Section 17 & 18 with transition semantics, shared entities, evidence support,
+    and granular transition confidence / explainability breakdowns.
     """
     __tablename__ = "attack_edges"
 
@@ -840,6 +849,9 @@ class AttackEdgeModel(Base):
     supporting_evidence_json = Column(Text, default="[]", nullable=False)
     contradicting_evidence_json = Column(Text, default="[]", nullable=False)
     confidence = Column(Float, nullable=False, default=1.0)
+    confidence_level = Column(String(30), nullable=False, default="HIGH")
+    confidence_breakdown_json = Column(Text, default="{}", nullable=False)
+    explanation_json = Column(Text, default="{}", nullable=False)
     analyst_disposition = Column(String(50), nullable=True)
     analyst_notes = Column(Text, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
@@ -850,7 +862,7 @@ class AttackEdgeModel(Base):
 
 class AttackHypothesisModel(Base):
     """
-    Alternative or primary explainable hypothesis for attack reconstruction (Section 17).
+    Alternative or primary explainable hypothesis for attack reconstruction (Section 17 & 18).
     """
     __tablename__ = "attack_hypotheses"
 
@@ -864,6 +876,9 @@ class AttackHypothesisModel(Base):
     is_primary = Column(Boolean, nullable=False, default=False)
     stage_ids_json = Column(Text, default="[]", nullable=False)
     confidence = Column(Float, nullable=False, default=0.5)
+    confidence_level = Column(String(30), nullable=False, default="MODERATE")
+    confidence_breakdown_json = Column(Text, default="{}", nullable=False)
+    explanation_json = Column(Text, default="{}", nullable=False)
     supporting_evidence_json = Column(Text, default="[]", nullable=False)
     contradicting_evidence_json = Column(Text, default="[]", nullable=False)
     missing_evidence_json = Column(Text, default="[]", nullable=False)
