@@ -58,11 +58,20 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
                 # Ensure newly added columns exist in SQLite without requiring manual drop
-                try:
-                    conn.execute(text("ALTER TABLE reports ADD COLUMN ai_summary_json TEXT;"))
-                    conn.commit()
-                except Exception:
-                    pass
+                column_migrations = [
+                    "ALTER TABLE reports ADD COLUMN ai_summary_json TEXT;",
+                    "ALTER TABLE entities ADD COLUMN canonical_key VARCHAR(500);",
+                    "ALTER TABLE entities ADD COLUMN workspace_id VARCHAR(100);",
+                    "ALTER TABLE relationships ADD COLUMN origin VARCHAR(50) DEFAULT 'OBSERVED';",
+                    "ALTER TABLE relationships ADD COLUMN status VARCHAR(30) DEFAULT 'ACTIVE';",
+                    "ALTER TABLE relationships ADD COLUMN workspace_id VARCHAR(100);",
+                ]
+                for stmt in column_migrations:
+                    try:
+                        conn.execute(text(stmt))
+                        conn.commit()
+                    except Exception:
+                        pass
             Base.metadata.create_all(bind=engine)
             logger.info("Database connection established and tables verified successfully.")
             return True

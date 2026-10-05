@@ -11,7 +11,8 @@ from sqlalchemy import (
     Index,
     Boolean
 )
-from sqlalchemy.orm import relationship
+from typing import Optional
+from sqlalchemy.orm import relationship, relationship as orm_relationship
 from backend.db.session import Base
 
 
@@ -508,11 +509,18 @@ class EntityModel(Base):
     entity_type = Column(String(50), nullable=False, index=True)  # USER, ACCOUNT, DEVICE, HOST, ORGANIZATION, BRAND, etc.
     name = Column(String(255), nullable=False, index=True)
     external_id = Column(String(255), nullable=True, index=True)
+    canonical_key = Column(String(500), nullable=True, index=True)
+    workspace_id = Column(String(100), nullable=True, index=True)
     attributes_json = Column(Text, default="{}", nullable=False)
     first_seen = Column(DateTime, default=get_utc_now, nullable=False)
     last_seen = Column(DateTime, default=get_utc_now, nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_entities_type_key", "entity_type", "canonical_key"),
+        Index("ix_entities_workspace", "workspace_id"),
+    )
 
 
 class RelationshipModel(Base):
@@ -529,6 +537,9 @@ class RelationshipModel(Base):
     target_type = Column(String(50), nullable=False, index=True)
     target_id = Column(String(128), nullable=False, index=True)
     confidence = Column(Float, nullable=False, default=1.0)
+    origin = Column(String(50), nullable=False, default="OBSERVED")  # OBSERVED, DERIVED, INFERRED, EXTERNAL_INTELLIGENCE
+    status = Column(String(30), nullable=False, default="ACTIVE")  # ACTIVE, SUPERSEDED, RETRACTED
+    workspace_id = Column(String(100), nullable=True, index=True)
     first_seen = Column(DateTime, default=get_utc_now, nullable=False)
     last_seen = Column(DateTime, default=get_utc_now, nullable=False)
     evidence_reference = Column(String(255), nullable=True)
@@ -538,11 +549,53 @@ class RelationshipModel(Base):
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
+    observations = relationship("RelationshipObservationModel", back_populates="canonical_relationship", cascade="all, delete-orphan", lazy="selectin")
+
     __table_args__ = (
         Index("ix_rel_src", "source_type", "source_id"),
         Index("ix_rel_tgt", "target_type", "target_id"),
         Index("ix_rel_type_src_tgt", "relationship_type", "source_id", "target_id"),
+        Index("ix_rel_workspace", "workspace_id"),
     )
+
+
+class RelationshipObservationModel(Base):
+    """
+    Individual evidence-backed observation of a canonical relationship edge.
+    Supports multiple observations over time for the same canonical relationship.
+    """
+    __tablename__ = "relationship_observations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    relationship_id = Column(String(36), ForeignKey("relationships.id", ondelete="CASCADE"), nullable=False, index=True)
+    observed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    source_artifact_id = Column(String(36), ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    evidence_id = Column(String(36), ForeignKey("finding_evidence.id", ondelete="SET NULL"), nullable=True, index=True)
+    analyzer = Column(String(100), nullable=True)
+    analyzer_version = Column(String(50), nullable=True)
+    confidence = Column(Float, nullable=False, default=1.0)
+    origin = Column(String(50), nullable=False, default="OBSERVED")
+    attributes_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    canonical_relationship = orm_relationship("RelationshipModel", back_populates="observations")
+    artifact = orm_relationship("ArtifactModel")
+    analysis_run = orm_relationship("AnalysisRunModel")
+    evidence = orm_relationship("FindingEvidenceModel")
+
+    @property
+    def relationship(self):
+        return self.canonical_relationship
+
+    @relationship.setter
+    def relationship(self, value):
+        self.canonical_relationship = value
+
+    __table_args__ = (
+        Index("ix_rel_obs_rel_obs_at", "relationship_id", "observed_at"),
+    )
+
 
 
 class IncidentModel(Base):

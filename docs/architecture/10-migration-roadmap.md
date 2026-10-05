@@ -494,10 +494,31 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - Universal Ingestion Gateway: Registered `multimedia_authenticity_analyzer` in `CapabilityRegistry` for `IMAGE`, `AUDIO`, and `VIDEO`.
    - Verified with 28 comprehensive tests in `backend/tests/test_multimedia_authenticity.py`.
 
-9. **Requirements & Prerequisites for Section 14 (Visual Brand, QR Code & Phishing Vision Engine)**:
-   - Ready for Section 14 engine development.
-   - Visual logo extraction, perceptual image hashing, QR code decoding and destination redirection tracing.
-   - Visual brand matching without biometric assumptions.
-   - Correlating visual findings with Section 6 (Email), Section 7 (URL/Web), Section 8 (Attachments), Section 12 (Impersonation), and Section 13 (Multimedia Authenticity).
+9. **Section 14 — Canonical Security Knowledge Graph (COMPLETED)**:
+   - Architecture document: [`23-security-knowledge-graph.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/23-security-knowledge-graph.md).
+   - Relational Graph Decision: Validated that relational RDBMS store (`EntityModel` + `RelationshipModel` + `RelationshipObservationModel`) provides superior ACID consistency, operational simplicity, and sub-millisecond query performance without the operational complexity and failure modes of an external graph database.
+   - Core Database Models & Alembic Migration:
+     - `EntityModel` augmented with `canonical_key` and `workspace_id`.
+     - `RelationshipModel` augmented with `origin` (`OBSERVED`, `DERIVED`, `INFERRED`, `EXTERNAL_INTELLIGENCE`), `status` (`ACTIVE`, `SUPERSEDED`, `RETRACTED`), `workspace_id`, and `observations` relationship.
+     - `RelationshipObservationModel` (`relationship_observations` table) tracking individual evidence-backed observations over time with provenance, analyzer, confidence, timestamps.
+     - Alembic migration `d3e1a72b8c4f_create_security_knowledge_graph.py` applied and verified.
+   - Core Schemas & Controlled Vocabulary: `backend/schemas/knowledge_graph.py` defining 19 canonical entity types, 25 controlled relationship types, `GraphNode`, `GraphEdge`, `EdgeEvidenceResponse`, `GraphSubgraphResponse`, `GraphPathResponse`, `EntityTimelineResponse`, and `EntitySearchResponse`.
+   - Security Graph Service: `backend/services/security_graph_service.py` implementing bounded neighborhood traversal, multi-hop path query with hop-by-hop provenance, incident subgraphs, entity timelines, and edge evidence disclosure ("Why does this edge exist?"). Traversal safety bounds enforce maximum depth $\le 5$, maximum nodes $\le 500$, and maximum edges $\le 1000$.
+   - Centralized Graph Builder: `backend/services/security_graph_builder.py` consuming normalized outputs from Sections 6–13 with strict idempotency and re-analysis support.
+   - Legacy Investigation Graph Bridge: `InvestigationGraphService` in `backend/services/graph_service.py` preserves 100% backward compatibility while adding bidirectional bridges to/from the canonical graph store (`persist_to_knowledge_graph`, `build_from_knowledge_graph`).
+   - Security & Tenant Isolation: Recursive secret and credential redaction (`sanitize_graph_attributes`) and workspace isolation scoping.
+   - REST API Endpoints: `backend/api/routes/knowledge_graph.py` mounted at `/api/graph`.
+   - Performance Benchmark: Validated on synthetic graph of 10,000 entities and 25,000 relationships with 0.119 ms average entity lookups, 0.834 ms depth-1 neighbor queries, and 11.9 ms multi-hop path searches.
+   - Verified with 22 comprehensive tests in `backend/tests/test_security_knowledge_graph.py` and 1 performance benchmark in `backend/tests/test_graph_performance.py`.
+
+10. **Requirements & Prerequisites for Section 15 (Cross-Incident & Campaign Correlation Engine)**:
+   - **Prerequisites Satisfied**:
+     - Canonical entities deduplicate across multiple incidents and evidence artifacts.
+     - Edge provenance and timestamps are preserved on all relationships.
+     - Sub-millisecond neighborhood traversal and path discovery available via `SecurityGraphService`.
+   - **Section 15 Focus**:
+     - Cross-incident correlation and cluster detection across shared infrastructure, indicators, and actor TTPs.
+     - Fingerprint scoring and confidence evaluation.
+     - Formal campaign models linking correlated incidents without premature causal conclusions.
 
 

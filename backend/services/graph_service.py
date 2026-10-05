@@ -802,6 +802,155 @@ class InvestigationGraphService:
             )
         )
 
+    def persist_to_knowledge_graph(
+        self,
+        db: Any,
+        graph: InvestigationGraphResponse,
+        artifact_id: Optional[str] = None,
+        analysis_run_id: Optional[str] = None,
+        incident_id: Optional[str] = None,
+        workspace_id: Optional[str] = None,
+    ) -> Dict[str, int]:
+        """
+        Bridges the in-memory InvestigationGraphResponse into the persistent
+        canonical Security Knowledge Graph store.
+        """
+        from backend.services.security_graph_service import global_security_graph_service
+        from backend.schemas.knowledge_graph import GraphEntityType, GraphRelationshipType, RelationshipOrigin
+
+        type_map = {
+            NodeType.EMAIL: GraphEntityType.EMAIL,
+            NodeType.EMAIL_ADDRESS: GraphEntityType.EMAIL_ADDRESS,
+            NodeType.DOMAIN: GraphEntityType.DOMAIN,
+            NodeType.URL: GraphEntityType.URL,
+            NodeType.IP: GraphEntityType.IP,
+            NodeType.ASN: GraphEntityType.ASN,
+            NodeType.ATTACHMENT: GraphEntityType.FILE,
+            NodeType.CASE: GraphEntityType.INCIDENT,
+            NodeType.CAMPAIGN: GraphEntityType.CAMPAIGN,
+            NodeType.HASH: GraphEntityType.HASH,
+            NodeType.COUNTRY: GraphEntityType.OTHER,
+        }
+
+        created_nodes = 0
+        node_id_map: Dict[str, str] = {}
+
+        for n in graph.nodes:
+            canon_type = type_map.get(n.type, GraphEntityType.OTHER)
+            val = n.metadata.get("url") or n.metadata.get("domain") or n.metadata.get("ip") or n.metadata.get("sha256") or n.label
+            ent = global_security_graph_service.upsert_canonical_entity(
+                db=db,
+                entity_type=canon_type,
+                value=str(val),
+                display_value=n.label,
+                attributes=n.metadata,
+                workspace_id=workspace_id,
+            )
+            node_id_map[n.id] = ent.id
+            created_nodes += 1
+
+        created_edges = 0
+        for e in graph.edges:
+            src_id = node_id_map.get(e.source, e.source)
+            tgt_id = node_id_map.get(e.target, e.target)
+            rel_type = getattr(GraphRelationshipType, e.label, GraphRelationshipType.RELATED_TO)
+            global_security_graph_service.record_relationship(
+                db=db,
+                source_id=src_id,
+                target_id=tgt_id,
+                relationship_type=rel_type,
+                origin=RelationshipOrigin.OBSERVED,
+                confidence=float(e.metadata.get("confidence", 1.0) or 1.0),
+                source_artifact_id=artifact_id,
+                analysis_run_id=analysis_run_id,
+                analyzer="InvestigationGraphBridge",
+                evidence_reference=e.metadata.get("role") or e.label,
+                workspace_id=workspace_id,
+            )
+            created_edges += 1
+
+        db.commit()
+        return {"nodes_persisted": created_nodes, "edges_persisted": created_edges}
+
+    def build_from_knowledge_graph(
+        self,
+        db: Any,
+        incident_id: Optional[str] = None,
+        root_entity_id: Optional[str] = None,
+        max_nodes: int = 150,
+        workspace_id: Optional[str] = None,
+    ) -> InvestigationGraphResponse:
+        """
+        Exports a canonical Security Knowledge Graph subgraph into the Cytoscape-compatible
+        InvestigationGraphResponse format.
+        """
+        from backend.services.security_graph_service import global_security_graph_service
+
+        if incident_id:
+            subgraph = global_security_graph_service.get_incident_subgraph(
+                db=db, incident_id=incident_id, max_nodes=max_nodes, workspace_id=workspace_id
+            )
+        elif root_entity_id:
+            subgraph = global_security_graph_service.get_neighbors(
+                db=db, entity_id=root_entity_id, depth=2, max_nodes=max_nodes, workspace_id=workspace_id
+            )
+        else:
+            return InvestigationGraphResponse(
+                nodes=[], edges=[], summary=GraphSummary(total_nodes=0, total_edges=0, node_type_counts={})
+            )
+
+        type_rev_map = {
+            "EMAIL": NodeType.EMAIL,
+            "EMAIL_ADDRESS": NodeType.EMAIL_ADDRESS,
+            "DOMAIN": NodeType.DOMAIN,
+            "URL": NodeType.URL,
+            "IP": NodeType.IP,
+            "ASN": NodeType.ASN,
+            "FILE": NodeType.ATTACHMENT,
+            "ATTACHMENT": NodeType.ATTACHMENT,
+            "INCIDENT": NodeType.CASE,
+            "CASE": NodeType.CASE,
+            "CAMPAIGN": NodeType.CAMPAIGN,
+            "HASH": NodeType.HASH,
+        }
+
+        gnodes: List[GraphNode] = []
+        for n in subgraph.nodes:
+            ntype = type_rev_map.get(n.type.upper(), NodeType.CASE)
+            gnodes.append(GraphNode(
+                id=n.id,
+                type=ntype,
+                label=n.display_value,
+                metadata=n.attributes,
+            ))
+
+        gedges: List[GraphEdge] = []
+        for e in subgraph.edges:
+            gedges.append(GraphEdge(
+                id=e.id,
+                source=e.source,
+                target=e.target,
+                label=e.type,
+                metadata=e.attributes,
+            ))
+
+        counts: Dict[str, int] = {}
+        for n in gnodes:
+            counts[n.type.value] = counts.get(n.type.value, 0) + 1
+
+        return InvestigationGraphResponse(
+            nodes=gnodes,
+            edges=gedges,
+            summary=GraphSummary(
+                total_nodes=len(gnodes),
+                total_edges=len(gedges),
+                node_type_counts=counts,
+                has_high_risk_entities=any(
+                    n.metadata.get("severity") in ("high", "critical") for n in gnodes
+                ),
+            ),
+        )
+
 
 global_graph_service = InvestigationGraphService()
 
