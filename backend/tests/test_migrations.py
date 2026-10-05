@@ -64,6 +64,8 @@ def test_alembic_migrations_from_scratch():
                 "artifact_storage_records",
                 "ingestions",
                 "relationship_observations",
+                "incident_correlations",
+                "campaign_incidents",
                 "alembic_version"
             }
 

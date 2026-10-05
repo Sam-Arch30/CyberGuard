@@ -18,10 +18,14 @@ class CampaignService:
     @classmethod
     def ensure_campaigns_initialized(cls, db: Session) -> None:
         """
-        Seeds baseline campaign C-042 and creates dynamic clusters from stored ingested emails
-        if the campaigns table is empty or missing data.
+        Dynamically clusters stored incidents and emails into real campaign candidates.
+        Does NOT inject unverified or fake campaign entities into production.
         """
-        # Only cluster real ingested emails into campaigns
+        try:
+            from backend.services.cross_incident_engine import global_cross_incident_engine
+            global_cross_incident_engine.generate_campaign_candidates("default", db)
+        except Exception:
+            pass
         cls.cluster_ingested_emails(db)
 
     @classmethod

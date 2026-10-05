@@ -210,11 +210,39 @@ class CampaignModel(Base):
     fingerprint_json = Column(Text, default="{}", nullable=False)
     associated_iocs_json = Column(Text, default="[]", nullable=False)
     timeline_events_json = Column(Text, default="[]", nullable=False)
+    status = Column(String(30), nullable=False, default="CANDIDATE", index=True)  # CANDIDATE, LIKELY_RELATED, REVIEWED_CONFIRMED, REVIEWED_REJECTED
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    engine_version = Column(String(32), nullable=False, default="2.0.0")
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
+    correlation_summary = Column(Text, nullable=True)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
     # Relationships
     emails = relationship("CampaignEmailModel", back_populates="campaign", cascade="all, delete-orphan", lazy="selectin")
+    incidents = relationship("CampaignIncidentModel", back_populates="campaign", cascade="all, delete-orphan", lazy="selectin")
+
+
+class CampaignIncidentModel(Base):
+    __tablename__ = "campaign_incidents"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="CASCADE"), nullable=False, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    similarity_score = Column(Float, default=0.0, nullable=False)
+    membership_reasons_json = Column(Text, default="[]", nullable=False)
+    status = Column(String(30), default="CANDIDATE", nullable=False)  # CANDIDATE, CONFIRMED, REJECTED
+    added_at = Column(DateTime, default=get_utc_now, nullable=False)
+    added_by = Column(String(100), default="AUTOMATED", nullable=False)
+
+    # Relationships
+    campaign = relationship("CampaignModel", back_populates="incidents")
+    incident = relationship("IncidentModel")
+
+    __table_args__ = (
+        Index("ix_campaign_incidents_camp_inc", "campaign_id", "incident_id", unique=True),
+    )
 
 
 class CampaignEmailModel(Base):
@@ -606,6 +634,7 @@ class IncidentModel(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     incident_number = Column(String(32), unique=True, nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     status = Column(String(30), nullable=False, default="OPEN", index=True)  # OPEN, INVESTIGATING, CONTAINED, RESOLVED, CLOSED, FALSE_POSITIVE
@@ -623,6 +652,41 @@ class IncidentModel(Base):
     threat_events = relationship("ThreatEventModel", back_populates="incident", lazy="selectin")
     response_actions = relationship("ResponseActionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     attack_paths = relationship("AttackPathModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+
+
+class IncidentCorrelationModel(Base):
+    """
+    Pairwise incident correlation record with structured supporting and contradicting evidence.
+    """
+    __tablename__ = "incident_correlations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    incident_a_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    incident_b_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    correlation_score = Column(Float, nullable=False, default=0.0)
+    confidence = Column(Float, nullable=False, default=1.0)
+    relationship_label = Column(String(100), nullable=False, default="Inconclusive / No significant relationship")
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
+    feature_breakdown_json = Column(Text, default="{}", nullable=False)
+    shared_indicators_json = Column(Text, default="[]", nullable=False)
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, CONFIRMED, REJECTED, SUPERSEDED
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_notes = Column(Text, nullable=True)
+    engine_version = Column(String(32), nullable=False, default="2.0.0")
+    config_version = Column(String(32), nullable=False, default="2.0.0")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident_a = relationship("IncidentModel", foreign_keys=[incident_a_id])
+    incident_b = relationship("IncidentModel", foreign_keys=[incident_b_id])
+
+    __table_args__ = (
+        Index("ix_inc_corr_pair", "workspace_id", "incident_a_id", "incident_b_id", unique=True),
+        Index("ix_inc_corr_score", "workspace_id", "correlation_score"),
+    )
 
 
 class ThreatEventModel(Base):

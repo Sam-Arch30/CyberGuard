@@ -511,14 +511,41 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
    - Performance Benchmark: Validated on synthetic graph of 10,000 entities and 25,000 relationships with 0.119 ms average entity lookups, 0.834 ms depth-1 neighbor queries, and 11.9 ms multi-hop path searches.
    - Verified with 22 comprehensive tests in `backend/tests/test_security_knowledge_graph.py` and 1 performance benchmark in `backend/tests/test_graph_performance.py`.
 
-10. **Requirements & Prerequisites for Section 15 (Cross-Incident & Campaign Correlation Engine)**:
+10. **Section 15 — Cross-Incident Pattern Detection & Campaign Correlation Engine (COMPLETED)**:
+   - Architecture document: [`24-cross-incident-correlation.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/24-cross-incident-correlation.md).
+   - Core Models & Alembic Migration:
+     - `IncidentModel` augmented with `workspace_id`.
+     - `CampaignModel` augmented with `status`, `workspace_id`, `engine_version`, `supporting_evidence_json`, `contradicting_evidence_json`, and `correlation_summary`.
+     - `IncidentCorrelationModel` (`incident_correlations` table) recording pairwise correlations with decomposed category breakdowns, supporting evidence, and contradicting penalties.
+     - `CampaignIncidentModel` (`campaign_incidents` table) managing campaign candidate memberships.
+     - Alembic migration `e4f2b8c1a93d_create_cross_incident_correlation.py` applied and verified.
+   - Schemas & Controlled Contracts: `backend/schemas/cross_incident.py` defining 8 feature categories (`INFRASTRUCTURE`, `ARTIFACT`, `IDENTITY`, `CONTENT`, `BEHAVIOR`, `TACTIC`, `TEMPORAL`, `TARGETING`), `IndicatorSpecificity` (`HIGH`, `MEDIUM`, `LOW`), `CorrelationEvidenceItem`, `ContradictingEvidenceItem`, `FeatureBreakdown`, `IncidentCorrelationProfile`, and `IncidentCorrelationResult`.
+   - Cross-Incident Correlation Engine: `backend/services/cross_incident_engine.py` implementing:
+     - Incident Profile Extraction from normalized incident metadata, threat events, and Security Knowledge Graph subgraphs (no raw artifact reparsing).
+     - Inverted Indicator Indexing: Sub-linear candidate selection ($O(k)$ lookup) achieving 20.0x speedup over naive all-pairs search.
+     - False-Positive & Specificity Control: Down-weighting or penalizing shared CDNs (Cloudflare, Fastly), public DNS resolvers, generic webmail, and generic URL paths.
+     - Transitive Correlation & Bridge Indicator Prevention: Requiring high specificity or corroborated threshold to avoid transitive mega-clustering.
+     - Graph-Based Threshold Clustering: Groups related incidents into explainable Campaign Candidates with non-attribution semantics.
+     - Knowledge Graph Integration: Dynamically generates `CAMPAIGN` nodes and `ASSOCIATED_WITH` edges to `INCIDENT` nodes.
+     - Analyst Feedback & Audit: Append-only audit logs for correlation and campaign confirmation/rejection.
+   - REST API Endpoints: `backend/api/routes/cross_incident.py` mounted in `backend/main.py`:
+     - `GET /api/incidents/{incident_id}/related`
+     - `POST /api/correlations/compare`
+     - `GET /api/correlations/{correlation_id}`
+     - `POST /api/correlations/{correlation_id}/review`
+     - `GET /api/campaigns/candidates`
+     - `GET /api/campaigns/candidates/{campaign_id}`
+     - `POST /api/campaigns/candidates/{campaign_id}/review`
+   - Verified with 13 comprehensive unit/scenario tests in `backend/tests/test_cross_incident_correlation.py` and 1 large-scale performance benchmark (1,000 incidents) in `backend/tests/test_correlation_performance.py`.
+
+11. **Requirements & Prerequisites for Section 16 (Temporal Correlation & Event Sequencing Engine)**:
    - **Prerequisites Satisfied**:
-     - Canonical entities deduplicate across multiple incidents and evidence artifacts.
-     - Edge provenance and timestamps are preserved on all relationships.
-     - Sub-millisecond neighborhood traversal and path discovery available via `SecurityGraphService`.
-   - **Section 15 Focus**:
-     - Cross-incident correlation and cluster detection across shared infrastructure, indicators, and actor TTPs.
-     - Fingerprint scoring and confidence evaluation.
-     - Formal campaign models linking correlated incidents without premature causal conclusions.
+     - Canonical Security Knowledge Graph links multi-telemetry evidence with provenance and timestamps.
+     - Cross-incident pattern engine identifies shared infrastructure and campaign candidates.
+     - Workspace tenant isolation and analyst audit records established.
+   - **Section 16 Focus**:
+     - Chronological event sequencing across multi-stage cyber intrusions.
+     - Burst anomaly and periodicity detection.
+     - Multi-event temporal windows and kill-chain timeline construction.
 
 

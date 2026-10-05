@@ -65,6 +65,13 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE relationships ADD COLUMN origin VARCHAR(50) DEFAULT 'OBSERVED';",
                     "ALTER TABLE relationships ADD COLUMN status VARCHAR(30) DEFAULT 'ACTIVE';",
                     "ALTER TABLE relationships ADD COLUMN workspace_id VARCHAR(100);",
+                    "ALTER TABLE incidents ADD COLUMN workspace_id VARCHAR(64) DEFAULT 'default';",
+                    "ALTER TABLE campaigns ADD COLUMN status VARCHAR(30) DEFAULT 'CANDIDATE';",
+                    "ALTER TABLE campaigns ADD COLUMN workspace_id VARCHAR(64) DEFAULT 'default';",
+                    "ALTER TABLE campaigns ADD COLUMN engine_version VARCHAR(32) DEFAULT '2.0.0';",
+                    "ALTER TABLE campaigns ADD COLUMN supporting_evidence_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN contradicting_evidence_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN correlation_summary TEXT;",
                 ]
                 for stmt in column_migrations:
                     try:
