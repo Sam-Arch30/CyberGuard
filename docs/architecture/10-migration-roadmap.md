@@ -567,15 +567,49 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
      - 25 comprehensive unit/scenario tests in `backend/tests/test_temporal_correlation.py` covering Scenarios A-F, Hero scenario, out-of-order ingestion, late events, and API endpoints.
      - Large-scale performance benchmark with **100,000 synthetic events** in `backend/tests/test_temporal_performance.py`: 33.15 ms incident timeline queries, 31.32 ms entity queries, and 235.84 ms candidate evaluation over 2,000 events across 8 rules.
 
-12. **Requirements & Prerequisites for Section 17 (Attack Path Reconstruction Engine)**:
+12. **Section 17 — AI Attack Reconstruction Engine (COMPLETED)**:
+   - Architecture document: [`26-attack-reconstruction-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/26-attack-reconstruction-engine.md).
+   - Core Principle & Forensic Certainty:
+     - Attack Reconstruction = Evidence-Constrained Hypothesis Generation (NOT Story Generation).
+     - Strict 4-tier forensic classification: `OBSERVED` (direct telemetry), `DERIVED` (deterministic interpretation), `INFERRED` (reasonable security hypothesis supported indirectly), and `UNRESOLVED` (evidence absent/inconclusive).
+     - Anti-hallucination guardrails: Never invent missing telemetry (e.g. no inferred URL clicks, no unobserved malware execution, no unsubstantiated password theft claims).
+   - Database Models & Alembic Migration:
+     - `AttackPathModel` augmented with `workspace_id`, `classification`, `start_time`, `end_time`, `version`, `status` (`CURRENT`, `SUPERSEDED`, `INVALIDATED`), `completeness_score`, and JSON arrays for supporting evidence, contradictions, evidence gaps, and alternative hypotheses.
+     - `AttackStageModel` augmented with `stage_type`, `stage_status` (`OBSERVED`, `DERIVED`, `INFERRED`, `UNRESOLVED`), `technique_id`, `tactic`, `confidence`, ordered timestamps, and evidence bindings.
+     - `AttackEdgeModel` augmented with `edge_status`, `temporal_gap_seconds`, `shared_entities_json`, and transition confidence.
+     - `AttackHypothesisModel` (`attack_hypotheses` table) storing primary and ranked alternative hypotheses.
+     - Alembic migration `a1b2c3d4e5f6_create_attack_reconstruction_engine.py` applied and verified.
+   - Core Service Implementation (`backend/services/attack_reconstruction_engine.py`):
+     - `load_context`: Ingests normalized data across Sections 6-16 with tenant workspace isolation and zero raw re-parsing.
+     - `build_candidate_stages`: Generates evidence-backed stages across controlled vocabulary (`DELIVERY`, `SOCIAL_ENGINEERING`, `USER_INTERACTION`, `FILE_ACTIVITY`, `EXECUTION`, `INFRASTRUCTURE_CONTACT`, `CREDENTIAL_ACTIVITY`, `AUTHENTICATION`, `SESSION_ESTABLISHMENT`, `ENUMERATION`, `COLLECTION`, `OUTBOUND_TRANSFER`, `IMPERSONATION`).
+     - `build_transitions`: Constructs directed DAG edges enforcing entity continuity while filtering out false correlations based solely on generic cloud infrastructure (Scenario E).
+     - `detect_contradictions_and_gaps`: Identifies conflicting indicators (valid MFA, corporate VPN) and explicitly catalogs missing telemetry gaps (`NO_EVIDENCE_OF_URL_CLICK`, `NO_PROCESS_TELEMETRY`, `NO_PROOF_OF_CREDENTIAL_THEFT`, `NO_DIRECT_EXFILTRATION_CONFIRMATION`, `NO_VICTIM_INTERACTION_TELEMETRY`, `UNKNOWN_PRECEDING_ACTIVITY`, `NO_FURTHER_TELEMETRY`).
+     - `generate_and_rank_hypotheses`: Deterministically scores and ranks primary and alternative hypotheses without LLM preference.
+     - `reconstruct_incident`: Orchestrates end-to-end pipeline, version incrementing, and persistence.
+   - REST API Endpoints (`backend/api/routes/attack_reconstruction.py`):
+     - `GET /api/incidents/{incident_id}/reconstruction`
+     - `POST /api/incidents/{incident_id}/reconstruct`
+     - `GET /api/incidents/{incident_id}/hypotheses`
+     - `GET /api/incidents/{incident_id}/evidence-gaps`
+     - `GET /api/attack-stages/{stage_id}`
+     - `POST /api/attack-stages/{stage_id}/feedback`
+     - `GET /api/attack-edges/{edge_id}/evidence`
+     - `POST /api/attack-edges/{edge_id}/feedback`
+     - `POST /api/attack-hypotheses/{hypothesis_id}/feedback`
+   - Verification & Performance:
+     - 17 comprehensive unit and scenario tests in `backend/tests/test_attack_reconstruction.py` covering Scenarios A-G, false-positive guardrails, prompt injection safety, workspace isolation, versioning, and analyst feedback.
+     - Benchmark test in `backend/tests/test_reconstruction_performance.py` over 1,200 events and 120 entities: 33.02 ms context load, 1.35 ms stage generation, 27.84 ms end-to-end reconstruction, and 19.47 ms retrieval.
+
+13. **Requirements & Prerequisites for Section 18 (Path Confidence, Explainability & Graph Uncertainty)**:
    - **Prerequisites Satisfied**:
-     - Canonical Security Knowledge Graph links multi-telemetry evidence with provenance and timestamps (Section 14).
-     - Cross-incident pattern engine identifies shared infrastructure and campaign candidates (Section 15).
-     - Temporal correlation engine provides chronological sequencing, sub-linear candidates, and timestamp provenance (Section 16).
-     - Workspace tenant isolation, privacy secret redaction, and analyst audit records established.
-   - **Section 17 Focus**:
-     - Mapping temporal sequences and graph relationships into directed attack graphs.
-     - MITRE ATT&CK tactic and technique stage alignment (Initial Access -> Execution -> Persistence -> C2 -> Exfiltration).
-     - Causal attack progression reasoning, branch pruning, and confidence scoring.
+     - Evidence-backed Attack Stages and DAG transitions persisted with forensic certainty statuses (Section 17).
+     - Explicit Evidence Gaps and Contradictions audited and exposed via APIs (Section 17).
+     - Primary and alternative hypotheses ranked and explainable (Section 17).
+     - Complete versioning and analyst disposition feedback established (Section 17).
+   - **Section 18 Focus**:
+     - Visual differentiation and frontend representation of OBSERVED vs DERIVED vs INFERRED nodes.
+     - Per-edge transition confidence calibration and uncertainty visualization.
+     - Interactive evidence expansion ("Why does this stage/edge exist?").
+     - Multi-hypothesis path comparison and analyst review workflows.
 
 

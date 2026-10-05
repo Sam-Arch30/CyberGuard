@@ -652,6 +652,7 @@ class IncidentModel(Base):
     threat_events = relationship("ThreatEventModel", back_populates="incident", lazy="selectin")
     response_actions = relationship("ResponseActionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     attack_paths = relationship("AttackPathModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    attack_hypotheses = relationship("AttackHypothesisModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     security_events = relationship("SecurityEventModel", back_populates="incident", lazy="selectin")
     temporal_sequences = relationship("TemporalSequenceCandidateModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
 
@@ -750,15 +751,31 @@ class ResponseActionModel(Base):
 class AttackPathModel(Base):
     """
     Represents a multi-stage attack path hypothesis or confirmed progression.
+    Augmented in Section 17 for evidence-driven Attack Reconstruction.
     """
     __tablename__ = "attack_paths"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
+    classification = Column(String(50), nullable=False, default="PLAUSIBLE_RECONSTRUCTION")
     confidence = Column(Float, nullable=False, default=1.0)
-    status = Column(String(30), nullable=False, default="HYPOTHESIS")
+    status = Column(String(30), nullable=False, default="CURRENT", index=True)  # CURRENT, SUPERSEDED, INVALIDATED
+    start_time = Column(DateTime, nullable=True)
+    end_time = Column(DateTime, nullable=True)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
+    evidence_gaps_json = Column(Text, default="[]", nullable=False)
+    alternative_hypotheses_json = Column(Text, default="[]", nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    engine_version = Column(String(32), nullable=False, default="1.0.0")
+    rule_version = Column(String(32), nullable=False, default="1.0.0")
+    analyst_disposition = Column(String(50), nullable=True)
+    analyst_notes = Column(Text, nullable=True)
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
@@ -766,22 +783,39 @@ class AttackPathModel(Base):
     incident = relationship("IncidentModel", back_populates="attack_paths")
     stages = relationship("AttackStageModel", back_populates="attack_path", cascade="all, delete-orphan", order_by="AttackStageModel.stage_order", lazy="selectin")
     edges = relationship("AttackEdgeModel", back_populates="attack_path", cascade="all, delete-orphan", lazy="selectin")
+    hypotheses = relationship("AttackHypothesisModel", back_populates="attack_path", cascade="all, delete-orphan", lazy="selectin")
 
 
 class AttackStageModel(Base):
     """
-    Discrete node/stage in an AttackPath representing a specific TTP or kill-chain step.
+    Discrete node/stage in an AttackPath representing a specific reconstructed activity.
+    Augmented in Section 17 with strict OBSERVED/DERIVED/INFERRED status and evidence bindings.
     """
     __tablename__ = "attack_stages"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     attack_path_id = Column(String(36), ForeignKey("attack_paths.id", ondelete="CASCADE"), nullable=False, index=True)
     stage_order = Column(Integer, nullable=False, default=1)
+    stage_type = Column(String(50), nullable=False, default="UNKNOWN_ACTIVITY", index=True)
+    stage_status = Column(String(30), nullable=False, default="OBSERVED", index=True)  # OBSERVED, DERIVED, INFERRED, UNRESOLVED
     technique_id = Column(String(50), nullable=True, index=True)  # MITRE ATT&CK technique (e.g. T1566.002)
     tactic = Column(String(100), nullable=True)  # e.g. Initial Access
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(String(30), nullable=False, default="SUSPECTED")
+    status = Column(String(30), nullable=False, default="ACTIVE")
+    start_time = Column(DateTime, nullable=True, index=True)
+    end_time = Column(DateTime, nullable=True)
+    confidence = Column(Float, nullable=False, default=1.0)
+    entity_ids_json = Column(Text, default="[]", nullable=False)
+    event_ids_json = Column(Text, default="[]", nullable=False)
+    finding_ids_json = Column(Text, default="[]", nullable=False)
+    evidence_ids_json = Column(Text, default="[]", nullable=False)
+    relationship_ids_json = Column(Text, default="[]", nullable=False)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    analyst_disposition = Column(String(50), nullable=True)
+    analyst_notes = Column(Text, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
 
@@ -791,6 +825,7 @@ class AttackStageModel(Base):
 class AttackEdgeModel(Base):
     """
     Directed transition edge between AttackStages.
+    Augmented in Section 17 with transition semantics, shared entities, and evidence support.
     """
     __tablename__ = "attack_edges"
 
@@ -798,12 +833,48 @@ class AttackEdgeModel(Base):
     attack_path_id = Column(String(36), ForeignKey("attack_paths.id", ondelete="CASCADE"), nullable=False, index=True)
     source_stage_id = Column(String(36), ForeignKey("attack_stages.id", ondelete="CASCADE"), nullable=False)
     target_stage_id = Column(String(36), ForeignKey("attack_stages.id", ondelete="CASCADE"), nullable=False)
-    relationship_type = Column(String(50), nullable=False, default="LEADS_TO")
+    relationship_type = Column(String(50), nullable=False, default="PRECEDES")
+    edge_status = Column(String(30), nullable=False, default="DERIVED", index=True)  # OBSERVED, DERIVED, INFERRED
+    temporal_gap_seconds = Column(Float, nullable=True)
+    shared_entities_json = Column(Text, default="[]", nullable=False)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
     confidence = Column(Float, nullable=False, default=1.0)
+    analyst_disposition = Column(String(50), nullable=True)
+    analyst_notes = Column(Text, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
 
     attack_path = relationship("AttackPathModel", back_populates="edges")
+
+
+class AttackHypothesisModel(Base):
+    """
+    Alternative or primary explainable hypothesis for attack reconstruction (Section 17).
+    """
+    __tablename__ = "attack_hypotheses"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    attack_path_id = Column(String(36), ForeignKey("attack_paths.id", ondelete="CASCADE"), nullable=True, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(50), nullable=False, default="PLAUSIBLE", index=True)  # ACTIVE, PLAUSIBLE, REJECTED, SUPERSEDED
+    is_primary = Column(Boolean, nullable=False, default=False)
+    stage_ids_json = Column(Text, default="[]", nullable=False)
+    confidence = Column(Float, nullable=False, default=0.5)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
+    missing_evidence_json = Column(Text, default="[]", nullable=False)
+    analyst_disposition = Column(String(50), nullable=True)
+    analyst_notes = Column(Text, nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="attack_hypotheses")
+    attack_path = relationship("AttackPathModel", back_populates="hypotheses")
 
 
 class ProtectedIdentityModel(Base):
