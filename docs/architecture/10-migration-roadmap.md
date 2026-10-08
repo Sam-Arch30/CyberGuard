@@ -868,10 +868,35 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
        - `test_candidate_rules_api.py` (4 tests): Candidates CRUD, role-based authorization enforcement, pattern synthesis/backtest, and full lifecycle execution with dashboard stats.
      - All repository tests passing without regressions.
 
-21. **Requirements & Prerequisites for Section 26**:
+21. **Section 26 — Unified Risk Engine (COMPLETED)**:
+   - Architecture document: [`35-unified-risk-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/35-unified-risk-engine.md).
+   - Core Principles & Epistemic Boundaries:
+     - Strict Boundaries: $\text{Risk Score} \ne \text{Severity} \ne \text{Confidence} \ne \text{Uncertainty} \ne \text{Probability} \ne \text{Novelty}$.
+     - Centralized Aggregation Layer: Consumes structured findings and signals from all analyzers without replacing detector-local diagnostic scores.
+     - Zero Arbitrary Code Execution / Zero Autonomous Verdicts: Deterministic mathematical aggregation; LLM cannot calculate risk scores or override assessments.
+     - Evidence Deduplication & Correlated Discounting: Diminishing returns schedule $[1.0, 0.40, 0.15, 0.05]$ for signals sharing correlation groups (e.g. same URL).
+     - Asymptotic Multi-Vector Saturation: Combines capped independent families ($URL, FILE, AUTH, etc.$) asymptotically: $100 \times (1 - \prod (1 - f/100))$.
+     - Contextual Modifiers: Protected identity (+10), Critical asset (+10), Behavioral deviations (+4 to +8), Novelty (+6 conditional on threats; 0 in isolation), Threat memory (+8), Attack path continuity (+10 * conf), MITRE techniques (+4 supported).
+     - Decoupled Metrics: Severity represents potential blast radius; Confidence represents multi-source corroboration; Uncertainty represents telemetry gaps and contradictions.
+     - Immutable Versioning & Reassessment: Reassessments produce incremented versions ($v1 \to v2 \to v3$) referencing `parent_assessment_id` with full audit logs.
+     - Multi-Scope Evaluation: `EVENT`, `INVESTIGATION`, and `INCIDENT` scopes with explicit non-linear aggregation semantics (not naive averages).
+   - Core Components & Services:
+     - `RiskEngineService` (`backend/services/risk_engine_service.py`): Centralized engine for signal normalization, correlation grouping, asymptotic aggregation, severity/confidence/uncertainty derivation, and scope evaluations.
+     - Configuration Management: Centralized `risk_configuration.json` and DB `RiskConfigurationModel`.
+     - Database Persistence (`backend/db/models.py`): `RiskAssessmentModel`, `RiskSignalModel`, `RiskConfigurationModel`, and `ThreatEventModel.risk_assessment_id` integration.
+     - REST API (`backend/api/routes/risk_engine.py`): Endpoints for assessment retrieval, history lineage, breakdown, structured explanation, evaluation, reassessment, configuration, and dashboard stats with role-based authorization.
+     - Executive Reporting (`backend/services/report_service.py`): Added `_format_unified_risk_section` for executive PDF dossiers.
+   - Verification & Benchmarks:
+     - 15 comprehensive automated tests across 3 test suites:
+       - `test_risk_engine.py` (10 tests): Signal normalization, bounding, correlation discounting, evidence independence, counter-evidence mitigation, contradiction uncertainty, novelty isolation, threat memory / attack path modifiers, strict determinism, and ThreatEvent evaluation.
+       - `test_risk_engine_api.py` (4 tests): Assessment retrieval, breakdown/explanation, reassessment lineage, config authorization enforcement, dashboard stats.
+       - `test_risk_engine_scenarios.py` (1 test): Complete end-to-end multi-vector scenario from spear-phish URL to executive credential theft, ATO, attack path continuity, and unified assessment.
+     - All repository tests passing without regressions.
+
+22. **Requirements & Prerequisites for Section 27**:
    - **Prerequisites Satisfied**:
-     - Unified threat/event data model and persistent findings (Sections 2–5).
-     - Multi-vector detection engines (Sections 6–13).
+     - Universal Ingestion, ThreatEvents, persistent evidence, and structured findings (Sections 2–5).
+     - Multi-vector detection analyzers (Sections 6–13).
      - Security Knowledge Graph, cross-incident & temporal correlation (Sections 14–16).
      - Attack reconstruction & MITRE ATT&CK mapping (Sections 17–19).
      - Infrastructure attribution & behavioral baselines (Sections 20–21).
@@ -879,8 +904,9 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
      - Persistent Threat Memory (Section 23).
      - Controlled continual learning pipeline (Section 24).
      - Emerging pattern & candidate rule engine (Section 25).
+     - Unified Risk Engine (Section 26).
    - **Next Steps**:
-     - Ready for Section 26.
+     - Ready for Section 27.
 
 
 

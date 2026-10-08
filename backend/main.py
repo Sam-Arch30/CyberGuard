@@ -37,6 +37,7 @@ from backend.api.routes.novelty import router as novelty_router
 from backend.api.routes.threat_memory import router as threat_memory_router
 from backend.api.routes.continual_learning import router as continual_learning_router
 from backend.api.routes.candidate_rules import router as candidate_rules_router
+from backend.api.routes.risk_engine import router as risk_engine_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -130,6 +131,7 @@ app.include_router(novelty_router)
 app.include_router(threat_memory_router)
 app.include_router(continual_learning_router)
 app.include_router(candidate_rules_router)
+app.include_router(risk_engine_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

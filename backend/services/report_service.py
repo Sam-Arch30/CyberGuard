@@ -1835,6 +1835,109 @@ class ReportService:
         flowables.append(Spacer(1, 8))
         return flowables
 
+    @classmethod
+    def _format_unified_risk_section(
+        cls,
+        risk_assessment_data: Optional[Dict[str, Any] | Any],
+        styles: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """
+        Formats Section 26 Unified Risk Assessment table for executive legal/SOC reports.
+        Visualizes unified score, level, severity, confidence, uncertainty, and top contributors.
+        """
+        flowables: List[Any] = []
+        flowables.append(Paragraph("<b>UNIFIED RISK ENGINE ASSESSMENT (SECTION 26)</b>", styles["SectionHeader"]))
+        flowables.append(Spacer(1, 4))
+
+        if not risk_assessment_data:
+            flowables.append(Paragraph("<i>No unified risk assessment record associated with this scope.</i>", styles["TableCell"]))
+            flowables.append(Spacer(1, 8))
+            return flowables
+
+        data = risk_assessment_data if isinstance(risk_assessment_data, dict) else (
+            risk_assessment_data.model_dump() if hasattr(risk_assessment_data, "model_dump") else {}
+        )
+
+        score = data.get("risk_score", 0.0)
+        level = data.get("risk_level", "INFO")
+        sev = data.get("severity", "MEDIUM")
+        conf = data.get("confidence", 1.0)
+        unc = data.get("uncertainty", "LOW")
+        summary = data.get("explanation_summary", "Deterministic multi-vector risk synthesis completed.")
+        agg_ver = data.get("aggregation_version", "1.0.0")
+        cfg_ver = data.get("configuration_version", "1.0.0")
+
+        # Color mapping for risk level
+        level_colors = {
+            "CRITICAL": "#7F1D1D",
+            "HIGH": "#EF4444",
+            "MEDIUM": "#F59E0B",
+            "LOW": "#10B981",
+            "INFO": "#64748B"
+        }
+        badge_color = level_colors.get(str(level).upper(), "#64748B")
+
+        # Summary box
+        summary_data = [
+            [
+                Paragraph(f"<font size='14' color='{badge_color}'><b>RISK {score:.1f}/100</b></font><br/><b>LEVEL: {level}</b>", styles["TableCellBold"]),
+                Paragraph(f"<b>SEVERITY:</b> {sev}<br/><b>CONFIDENCE:</b> {conf:.2f}<br/><b>UNCERTAINTY:</b> {unc}", styles["TableCell"]),
+                Paragraph(f"<b>AGGREGATION:</b> v{agg_ver}<br/><b>CONFIG:</b> v{cfg_ver}", styles["TableCell"]),
+            ]
+        ]
+        sum_table = Table(summary_data, colWidths=[180, 180, 180])
+        sum_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BOX", (0, 0), (-1, -1), 1.0, colors.HexColor(badge_color)),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        flowables.append(sum_table)
+        flowables.append(Spacer(1, 6))
+
+        flowables.append(Paragraph(f"<b>Assessment Summary:</b> {html.escape(str(summary))}", styles["TableCell"]))
+        flowables.append(Spacer(1, 6))
+
+        # Top contributors breakdown
+        components = data.get("components") or []
+        if components:
+            flowables.append(Paragraph("<b>Top Risk Contributors & Modifiers:</b>", styles["TableCellBold"]))
+            comp_table_data = [
+                [
+                    Paragraph("<b>CONTRIBUTOR / SIGNAL</b>", styles["TableHead"]),
+                    Paragraph("<b>FAMILY</b>", styles["TableHead"]),
+                    Paragraph("<b>POINTS</b>", styles["TableHead"]),
+                    Paragraph("<b>DESCRIPTION</b>", styles["TableHead"]),
+                ]
+            ]
+            for c in components[:6]:
+                c_dict = c if isinstance(c, dict) else (c.model_dump() if hasattr(c, "model_dump") else {})
+                c_name = c_dict.get("name", "Unknown")
+                c_fam = c_dict.get("family", "GENERAL")
+                c_pts = c_dict.get("contribution", 0.0)
+                c_desc = c_dict.get("description", "")
+                comp_table_data.append([
+                    Paragraph(f"<b>{html.escape(str(c_name))}</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(str(c_fam)), styles["TableCell"]),
+                    Paragraph(f"<b>+{c_pts:.1f}</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(str(c_desc)), styles["TableCell"]),
+                ])
+
+            ct = Table(comp_table_data, colWidths=[150, 100, 70, 220])
+            ct.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            flowables.append(ct)
+
+        flowables.append(Spacer(1, 8))
+        return flowables
+
+
 
 
 

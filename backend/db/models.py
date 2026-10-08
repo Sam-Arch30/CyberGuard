@@ -663,6 +663,7 @@ class IncidentModel(Base):
     novelty_assessments = relationship("NoveltyAssessmentModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     emerging_patterns = relationship("EmergingPatternCandidateModel", back_populates="incident", lazy="selectin")
     threat_memory_observations = relationship("ThreatMemoryObservationModel", back_populates="incident", lazy="selectin")
+    risk_assessments = relationship("RiskAssessmentModel", back_populates="incident", foreign_keys="RiskAssessmentModel.incident_id", cascade="all, delete-orphan", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -717,6 +718,7 @@ class ThreatEventModel(Base):
     status = Column(String(30), nullable=False, default="OPEN", index=True)
     summary = Column(Text, nullable=False)
     incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    risk_assessment_id = Column(String(36), ForeignKey("risk_assessments.id", ondelete="SET NULL", use_alter=True, name="fk_threat_events_risk_assessment"), nullable=True, index=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
@@ -725,6 +727,7 @@ class ThreatEventModel(Base):
     analysis_run = relationship("AnalysisRunModel", back_populates="threat_events")
     incident = relationship("IncidentModel", back_populates="threat_events")
     response_actions = relationship("ResponseActionModel", back_populates="threat_event")
+    risk_assessment = relationship("RiskAssessmentModel", foreign_keys=[risk_assessment_id])
 
 
 class ResponseActionModel(Base):
@@ -1849,6 +1852,183 @@ class CandidateRuleExecutionModel(Base):
     @property
     def matched_conditions(self) -> List[Dict[str, Any]]:
         return json.loads(self.matched_conditions_json or "[]")
+
+
+# ============================================================================
+# UNIFIED RISK ENGINE MODELS (SECTION 26)
+# ============================================================================
+
+class RiskAssessmentModel(Base):
+    """
+    Centralized, deterministic, versioned risk-assessment layer (Section 26).
+    Combines signals from all detection and intelligence systems into a unified
+    reproducible assessment at EVENT, INVESTIGATION, or INCIDENT scopes.
+    """
+    __tablename__ = "risk_assessments"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    scope_type = Column(String(30), nullable=False, default="EVENT", index=True)  # EVENT, INVESTIGATION, INCIDENT, CAMPAIGN, ENTITY
+    scope_id = Column(String(128), nullable=False, index=True)
+    threat_event_id = Column(String(36), ForeignKey("threat_events.id", ondelete="SET NULL"), nullable=True, index=True)
+    investigation_id = Column(String(36), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    risk_score = Column(Float, nullable=False, default=0.0)  # 0.0 - 100.0
+    risk_level = Column(String(20), nullable=False, default="INFO")  # INFO, LOW, MEDIUM, HIGH, CRITICAL
+    severity = Column(String(20), nullable=False, default="MEDIUM")  # INFO, LOW, MEDIUM, HIGH, CRITICAL
+    confidence = Column(Float, nullable=False, default=1.0)  # 0.0 - 1.0
+    confidence_level = Column(String(20), nullable=False, default="HIGH")  # LOW, MODERATE, HIGH, VERY_HIGH
+    uncertainty = Column(String(20), nullable=False, default="LOW")  # LOW, MEDIUM, HIGH
+    uncertainty_score = Column(Float, nullable=False, default=0.0)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(30), nullable=False, default="CURRENT", index=True)  # CURRENT, SUPERSEDED, HISTORICAL
+    parent_assessment_id = Column(String(36), ForeignKey("risk_assessments.id", ondelete="SET NULL"), nullable=True, index=True)
+    aggregation_version = Column(String(32), nullable=False, default="1.0.0")
+    configuration_version = Column(String(32), nullable=False, default="1.0.0")
+    components_json = Column(Text, default="[]", nullable=False)
+    signals_json = Column(Text, default="[]", nullable=False)
+    evidence_refs_json = Column(Text, default="[]", nullable=False)
+    counter_evidence_refs_json = Column(Text, default="[]", nullable=False)
+    contradictions_json = Column(Text, default="[]", nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    contextual_factors_json = Column(Text, default="{}", nullable=False)
+    explanation_summary = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False, default="system")
+    reassessment_reason = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    evaluated_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    signals = relationship("RiskSignalModel", back_populates="assessment", cascade="all, delete-orphan", lazy="selectin")
+    incident = relationship("IncidentModel", back_populates="risk_assessments", foreign_keys=[incident_id])
+    analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
+    parent_assessment = relationship("RiskAssessmentModel", remote_side=[id])
+
+    __table_args__ = (
+        Index("ix_ra_ws_scope", "workspace_id", "scope_type", "scope_id"),
+        Index("ix_ra_score", "workspace_id", "risk_score"),
+        Index("ix_ra_status", "workspace_id", "status"),
+    )
+
+    @property
+    def components(self) -> List[Dict[str, Any]]:
+        return json.loads(self.components_json or "[]")
+
+    @property
+    def raw_signals(self) -> List[Dict[str, Any]]:
+        return json.loads(self.signals_json or "[]")
+
+    @property
+    def evidence_refs(self) -> List[str]:
+        return json.loads(self.evidence_refs_json or "[]")
+
+    @property
+    def counter_evidence_refs(self) -> List[str]:
+        return json.loads(self.counter_evidence_refs_json or "[]")
+
+    @property
+    def contradictions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.contradictions_json or "[]")
+
+    @property
+    def limitations(self) -> List[str]:
+        return json.loads(self.limitations_json or "[]")
+
+    @property
+    def contextual_factors(self) -> Dict[str, Any]:
+        return json.loads(self.contextual_factors_json or "{}")
+
+
+class RiskSignalModel(Base):
+    """
+    Structured normalized risk signal input feeding into RiskAssessment (Section 26).
+    Preserves exact origin, detector version, reliability factor, and correlation group.
+    """
+    __tablename__ = "risk_signals"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    assessment_id = Column(String(36), ForeignKey("risk_assessments.id", ondelete="CASCADE"), nullable=False, index=True)
+    signal_type = Column(String(100), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False, index=True)
+    detector_id = Column(String(100), nullable=False, index=True)
+    detector_version = Column(String(50), nullable=False, default="1.0.0")
+    evidence_family = Column(String(50), nullable=False, index=True)
+    semantics = Column(String(50), nullable=False, default="THREAT_SCORE")
+    direction = Column(String(30), nullable=False, default="SUPPORTING", index=True)  # SUPPORTING, COUNTER, CONTRADICTORY
+    raw_score = Column(Float, nullable=False, default=0.0)
+    normalized_score = Column(Float, nullable=False, default=0.0)
+    reliability = Column(Float, nullable=False, default=1.0)
+    weight = Column(Float, nullable=False, default=1.0)
+    contribution = Column(Float, nullable=False, default=0.0)
+    correlation_group = Column(String(255), nullable=True, index=True)
+    evidence_refs_json = Column(Text, default="[]", nullable=False)
+    provenance_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    assessment = relationship("RiskAssessmentModel", back_populates="signals")
+
+    __table_args__ = (
+        Index("ix_rs_fam_corr", "evidence_family", "correlation_group"),
+    )
+
+    @property
+    def evidence_refs(self) -> List[str]:
+        return json.loads(self.evidence_refs_json or "[]")
+
+    @property
+    def provenance(self) -> Dict[str, Any]:
+        return json.loads(self.provenance_json or "{}")
+
+
+class RiskConfigurationModel(Base):
+    """
+    Versioned, auditable risk configuration storage (Section 26).
+    Enforces governance: changes require authorization and audit trail.
+    """
+    __tablename__ = "risk_configurations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    version = Column(String(32), nullable=False, index=True)
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, DRAFT, RETIRED
+    thresholds_json = Column(Text, default="{}", nullable=False)
+    confidence_levels_json = Column(Text, default="{}", nullable=False)
+    uncertainty_levels_json = Column(Text, default="{}", nullable=False)
+    family_caps_json = Column(Text, default="{}", nullable=False)
+    family_weights_json = Column(Text, default="{}", nullable=False)
+    correlation_discount_schedule_json = Column(Text, default="[]", nullable=False)
+    reliability_defaults_json = Column(Text, default="{}", nullable=False)
+    contextual_modifiers_json = Column(Text, default="{}", nullable=False)
+    severity_rules_json = Column(Text, default="{}", nullable=False)
+    created_by = Column(String(100), nullable=False, default="admin")
+    description = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_rc_ws_ver", "workspace_id", "version", unique=True),
+    )
+
+    @property
+    def thresholds(self) -> Dict[str, Any]:
+        return json.loads(self.thresholds_json or "{}")
+
+    @property
+    def family_caps(self) -> Dict[str, Any]:
+        return json.loads(self.family_caps_json or "{}")
+
+    @property
+    def family_weights(self) -> Dict[str, Any]:
+        return json.loads(self.family_weights_json or "{}")
+
+    @property
+    def correlation_discount_schedule(self) -> List[float]:
+        return json.loads(self.correlation_discount_schedule_json or "[]")
+
+    @property
+    def contextual_modifiers(self) -> Dict[str, Any]:
+        return json.loads(self.contextual_modifiers_json or "{}")
+
 
 
 

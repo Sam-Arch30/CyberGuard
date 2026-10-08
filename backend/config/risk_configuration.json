@@ -1,0 +1,112 @@
+{
+  "version": "1.0.0-unified-risk",
+  "scoring_version": "1.0.0",
+  "thresholds": {
+    "INFO": { "min": 0, "max": 19, "label": "INFO", "color": "#64748B" },
+    "LOW": { "min": 20, "max": 39, "label": "LOW", "color": "#10B981" },
+    "MEDIUM": { "min": 40, "max": 59, "label": "MEDIUM", "color": "#F59E0B" },
+    "HIGH": { "min": 60, "max": 79, "label": "HIGH", "color": "#EF4444" },
+    "CRITICAL": { "min": 80, "max": 100, "label": "CRITICAL", "color": "#7F1D1D" }
+  },
+  "confidence_levels": {
+    "LOW": { "min": 0.0, "max": 0.39, "label": "LOW" },
+    "MODERATE": { "min": 0.40, "max": 0.69, "label": "MODERATE" },
+    "HIGH": { "min": 0.70, "max": 0.84, "label": "HIGH" },
+    "VERY_HIGH": { "min": 0.85, "max": 1.0, "label": "VERY_HIGH" }
+  },
+  "uncertainty_levels": {
+    "LOW": { "min": 0.0, "max": 0.35, "label": "LOW" },
+    "MEDIUM": { "min": 0.35, "max": 0.65, "label": "MEDIUM" },
+    "HIGH": { "min": 0.65, "max": 1.0, "label": "HIGH" }
+  },
+  "family_caps": {
+    "URL": 35.0,
+    "FILE": 35.0,
+    "AUTHENTICATION": 35.0,
+    "NETWORK": 35.0,
+    "API": 30.0,
+    "IDENTITY": 25.0,
+    "CONTENT": 25.0,
+    "BEHAVIOR": 20.0,
+    "RULE_DETECTION": 30.0,
+    "INFRASTRUCTURE": 20.0,
+    "HISTORICAL": 15.0,
+    "NOVELTY": 15.0,
+    "GRAPH": 20.0,
+    "TEMPORAL": 20.0,
+    "MULTIMEDIA": 25.0,
+    "THREAT_INTELLIGENCE": 25.0
+  },
+  "family_weights": {
+    "URL": 1.0,
+    "FILE": 1.0,
+    "AUTHENTICATION": 1.0,
+    "NETWORK": 1.0,
+    "API": 0.9,
+    "IDENTITY": 0.9,
+    "CONTENT": 0.8,
+    "BEHAVIOR": 0.8,
+    "RULE_DETECTION": 1.0,
+    "INFRASTRUCTURE": 0.7,
+    "HISTORICAL": 0.6,
+    "NOVELTY": 0.5,
+    "GRAPH": 0.7,
+    "TEMPORAL": 0.8,
+    "MULTIMEDIA": 0.8,
+    "THREAT_INTELLIGENCE": 0.7
+  },
+  "correlation_discount_schedule": [1.0, 0.40, 0.15, 0.05],
+  "reliability_defaults": {
+    "CRYPTOGRAPHIC": 1.0,
+    "STATIC_HASH": 0.95,
+    "DETERMINISTIC_RULE": 0.90,
+    "AUTHENTICATED_LOG": 0.90,
+    "AUTHORITATIVE_DNS_WHOIS": 0.85,
+    "REPUTABLE_INTELLIGENCE": 0.80,
+    "ML_MODEL": 0.75,
+    "STATISTICAL_BASELINE": 0.70,
+    "HEURISTIC": 0.65,
+    "UNVERIFIED_EXTERNAL": 0.40
+  },
+  "contextual_modifiers": {
+    "privileged_account_boost": 10.0,
+    "critical_asset_boost": 10.0,
+    "max_asset_modifier": 15.0,
+    "high_behavioral_deviation_boost": 8.0,
+    "moderate_behavioral_deviation_boost": 4.0,
+    "novelty_threat_threshold": 25.0,
+    "novelty_corroboration_boost": 6.0,
+    "threat_memory_match_boost": 8.0,
+    "max_threat_memory_boost": 15.0,
+    "attack_path_continuity_boost": 10.0,
+    "mitre_supported_boost": 4.0,
+    "mitre_plausible_boost": 2.0,
+    "max_mitre_boost": 10.0,
+    "max_counter_evidence_deduction": 20.0
+  },
+  "severity_rules": {
+    "critical_impact_triggers": [
+      "CREDENTIAL_EXPOSURE",
+      "PRIVILEGED_ACCOUNT_COMPROMISE",
+      "ROOT_COMPROMISE",
+      "DATA_EXFILTRATION",
+      "RANSOMWARE_PAYLOAD",
+      "CRITICAL_ASSET_IMPACT",
+      "FINANCIAL_FRAUD_EXECUTION"
+    ],
+    "high_impact_triggers": [
+      "ACCOUNT_TAKEOVER_ATTEMPT",
+      "CREDENTIAL_HARVESTING",
+      "EXECUTIVE_IMPERSONATION",
+      "MALICIOUS_ATTACHMENT_EXECUTION",
+      "LATERAL_MOVEMENT",
+      "C2_BEACON_ESTABLISHED"
+    ],
+    "medium_impact_triggers": [
+      "COMMODITY_PHISHING",
+      "SUSPICIOUS_LOGIN",
+      "API_RATE_ABUSE",
+      "UNUSUAL_EXTERNAL_CONNECTION"
+    ]
+  }
+}
