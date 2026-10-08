@@ -403,6 +403,27 @@ CRITICAL OPERATIONAL & FORENSIC CONSTRAINTS:
                 params={"evidence_id": "E-1103"}
             ))
 
+        # 15. Threat Memory & Historical Retrospective
+        elif intent == "threat_memory":
+            assessment = "CyberGuard Threat Memory reports persistent historical intelligence across investigations. CURRENT EVIDENCE > HISTORICAL MEMORY."
+            reasoning = "Threat Memory records show prior observations, independent investigation lineages, and analyst verifications. Historical context enriches current analysis but does not automatically determine current verdict."
+            confidence = UncertaintyLevel.HIGH_CONFIDENCE_INFERENCE
+            selected_refs = [
+                EvidenceReference(
+                    evidence_id="MEM-HIST-01",
+                    type="historical_memory",
+                    statement="Historical Threat Memory retains cross-investigation provenance and prior observation lineages.",
+                    source_module="threat_memory",
+                    reliability=0.95,
+                    confidence_category="CONFIRMED"
+                )
+            ]
+            actions.append(CopilotAction(
+                action_type=CopilotActionType.VIEW_EVIDENCE,
+                label="View Threat Memory Context",
+                params={"view": "threat_memory"}
+            ))
+
         # Default fallback
         else:
             assessment = "Forensic analysis evaluates the target entity as elevated risk, supported by corroborated authentication failures, lookalike domains, and network indicators."

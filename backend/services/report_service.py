@@ -1594,5 +1594,99 @@ class ReportService:
 
         return flowables
 
+    @classmethod
+    def format_threat_memory_section(
+        cls,
+        memory_contexts: List[Any],
+        styles: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """
+        Formats Section 23 CyberGuard Threat Memory flowables.
+        Maintains strict epistemic humility: CURRENT EVIDENCE > HISTORICAL MEMORY.
+        """
+        flowables = []
+        flowables.append(Paragraph("CyberGuard Threat Memory & Historical Intelligence", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        # Forensic Epistemic Notice
+        epistemic_notice = (
+            "Threat Memory provides persistent historical security intelligence across prior investigations. "
+            "Historical memory serves as contextual enrichment and does not substitute for present forensic observation. "
+            "CURRENT EVIDENCE > HISTORICAL MEMORY."
+        )
+        note_style = styles.get("WarningBox", styles.get("TableCell", styles["Normal"]))
+        flowables.append(Paragraph(f"<b>FORENSIC NOTICE:</b> <i>{html.escape(epistemic_notice)}</i>", note_style))
+        flowables.append(Spacer(1, 6))
+
+        if not memory_contexts:
+            flowables.append(Paragraph("<i>No historical security memory or cross-investigation sightings recorded for observed entities.</i>", styles["TableCell"]))
+            flowables.append(Spacer(1, 8))
+            return flowables
+
+        table_data = [
+            [
+                Paragraph("<b>CANONICAL KEY</b>", styles["TableHead"]),
+                Paragraph("<b>MEMORY STATUS</b>", styles["TableHead"]),
+                Paragraph("<b>OBSERVATIONS</b>", styles["TableHead"]),
+                Paragraph("<b>INCIDENTS</b>", styles["TableHead"]),
+                Paragraph("<b>PROVENANCE & CONFLICT</b>", styles["TableHead"]),
+            ]
+        ]
+
+        for ctx in memory_contexts:
+            key_val = getattr(ctx, "canonical_key", "")
+            if isinstance(ctx, dict):
+                key_val = ctx.get("canonical_key", "")
+                status_val = ctx.get("memory_status", "OBSERVED")
+                obs_c = ctx.get("observation_count", 0)
+                sources_c = ctx.get("independent_source_count", 0)
+                inc_list = ctx.get("related_incidents", [])
+                conflict = ctx.get("conflict", {})
+                is_conflicted = conflict.get("is_conflicted", False) if isinstance(conflict, dict) else False
+                conflict_expl = conflict.get("explanation", "") if isinstance(conflict, dict) else ""
+                verified = ctx.get("is_analyst_verified", False)
+            else:
+                status_val = getattr(ctx, "memory_status", "OBSERVED")
+                obs_c = getattr(ctx, "observation_count", 0)
+                sources_c = getattr(ctx, "independent_source_count", 0)
+                inc_list = getattr(ctx, "related_incidents", [])
+                conflict = getattr(ctx, "conflict", None)
+                is_conflicted = getattr(conflict, "is_conflicted", False) if conflict else False
+                conflict_expl = getattr(conflict, "explanation", "") if conflict else ""
+                verified = getattr(ctx, "is_analyst_verified", False)
+
+            status_str = html.escape(str(status_val.value if hasattr(status_val, "value") else status_val))
+            obs_str = f"{obs_c} seen<br/>({sources_c} indep. src)"
+            inc_str = f"{len(inc_list)} incident(s)"
+
+            prov_parts = []
+            if verified:
+                prov_parts.append("<b>[ANALYST VERIFIED]</b>")
+            if is_conflicted:
+                prov_parts.append(f"<b>[CONFLICT]</b>: {html.escape(str(conflict_expl))}")
+            else:
+                prov_parts.append("Consistent provenance")
+
+            table_data.append([
+                Paragraph(f"<b>{html.escape(str(key_val))}</b>", styles["TableCellBold"]),
+                Paragraph(status_str, styles["TableCell"]),
+                Paragraph(obs_str, styles["TableCell"]),
+                Paragraph(inc_str, styles["TableCell"]),
+                Paragraph("<br/>".join(prov_parts), styles["TableCell"]),
+            ])
+
+        t = Table(table_data, colWidths=[150, 85, 80, 75, 150])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ]))
+        flowables.append(t)
+        flowables.append(Spacer(1, 8))
+        return flowables
+
+
 
 

@@ -661,6 +661,7 @@ class IncidentModel(Base):
     behavioral_deviations = relationship("BehavioralDeviationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     novelty_assessments = relationship("NoveltyAssessmentModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     emerging_patterns = relationship("EmergingPatternCandidateModel", back_populates="incident", lazy="selectin")
+    threat_memory_observations = relationship("ThreatMemoryObservationModel", back_populates="incident", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -1408,6 +1409,148 @@ class NoveltySuppressionRuleModel(Base):
     __table_args__ = (
         Index("ix_nsr_ws_fp", "workspace_id", "fingerprint_hash"),
     )
+
+
+# ============================================================================
+# Section 23: Threat Memory Models
+# ============================================================================
+
+class ThreatMemoryEntryModel(Base):
+    """
+    Persistent security-memory projection retaining consolidated historical intelligence (Section 23).
+    Acts as a queryable index/projection over canonical evidence without duplicating primary tables.
+    """
+    __tablename__ = "threat_memory_entries"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    memory_type = Column(String(50), nullable=False, index=True)  # INDICATOR, DOMAIN, IP, URL, HASH, CAMPAIGN, etc.
+    subject_type = Column(String(50), nullable=False, index=True)
+    subject_id = Column(String(128), nullable=True, index=True)
+    canonical_key = Column(String(500), nullable=False, index=True)
+    scope = Column(String(50), nullable=False, default="ORGANIZATION", index=True)  # GLOBAL, ORGANIZATION, INVESTIGATION
+    status = Column(String(30), nullable=False, default="OBSERVED", index=True)  # OBSERVED, CORRELATED, VERIFIED, DISMISSED, EXPIRED, SUPERSEDED
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    observation_count = Column(Integer, nullable=False, default=1)
+    independent_source_count = Column(Integer, nullable=False, default=1)
+    incident_count = Column(Integer, nullable=False, default=0)
+    campaign_count = Column(Integer, nullable=False, default=0)
+    confidence = Column(Float, nullable=False, default=1.0)
+    confidence_level = Column(String(20), nullable=False, default="MEDIUM")
+    provenance_type = Column(String(50), nullable=False, default="DIRECT_OBSERVATION")  # DIRECT_OBSERVATION, ANALYST_VERIFIED, EXTERNAL_INTELLIGENCE, MODEL_DERIVED
+    provenance_reference = Column(String(255), nullable=True)
+    summary = Column(Text, nullable=True)
+    attributes_json = Column(Text, default="{}", nullable=False)
+    version = Column(String(32), nullable=False, default="1.0.0")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    observations = relationship("ThreatMemoryObservationModel", back_populates="memory_entry", cascade="all, delete-orphan", lazy="selectin")
+    decisions = relationship("ThreatMemoryDecisionModel", back_populates="memory_entry", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_tme_ws_key", "workspace_id", "canonical_key", unique=True),
+        Index("ix_tme_ws_type_key", "workspace_id", "memory_type", "canonical_key"),
+        Index("ix_tme_ws_status", "workspace_id", "status"),
+        Index("ix_tme_ws_seen", "workspace_id", "last_seen_at"),
+    )
+
+
+class ThreatMemoryObservationModel(Base):
+    """
+    Individual evidence-backed historical observation retained with strict provenance (Section 23).
+    Answers: 'Why does CyberGuard remember this historical fact?'
+    """
+    __tablename__ = "threat_memory_observations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    memory_entry_id = Column(String(36), ForeignKey("threat_memory_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_type = Column(String(50), nullable=False, index=True)  # SECURITY_EVENT, FINDING, EVIDENCE, EXTERNAL_FEED, ARTIFACT
+    source_id = Column(String(128), nullable=True, index=True)
+    investigation_id = Column(String(36), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True)
+    observed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    observation_type = Column(String(50), nullable=False, default="DETECTION")
+    classification = Column(String(30), nullable=False, default="INCONCLUSIVE", index=True)  # MALICIOUS, SUSPICIOUS, BENIGN, INCONCLUSIVE
+    severity = Column(String(20), nullable=True)
+    confidence = Column(Float, nullable=False, default=1.0)
+    evidence_reference = Column(String(255), nullable=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    detector_name = Column(String(100), nullable=True, index=True)
+    detector_version = Column(String(32), nullable=False, default="1.0.0")
+    is_analyst_verified = Column(Boolean, nullable=False, default=False)
+    verified_by = Column(String(100), nullable=True)
+    raw_context_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    memory_entry = relationship("ThreatMemoryEntryModel", back_populates="observations")
+    incident = relationship("IncidentModel", back_populates="threat_memory_observations")
+
+    __table_args__ = (
+        Index("ix_tmo_entry_observed", "memory_entry_id", "observed_at"),
+        Index("ix_tmo_ws_inv", "workspace_id", "investigation_id"),
+        Index("ix_tmo_ws_inc", "workspace_id", "incident_id"),
+    )
+
+
+class ThreatMemoryDecisionModel(Base):
+    """
+    Durable human analyst validation, false-positive labeling, and suppression decisions (Section 23).
+    VERIFIED_MALICIOUS, VERIFIED_BENIGN, FALSE_POSITIVE, NEEDS_REVIEW, SUPPRESSED, ESCALATED.
+    """
+    __tablename__ = "threat_memory_decisions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    memory_entry_id = Column(String(36), ForeignKey("threat_memory_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    decision = Column(String(50), nullable=False, index=True)
+    reason = Column(String(500), nullable=False)
+    approved_by = Column(String(100), nullable=False, index=True)
+    scope = Column(String(50), nullable=False, default="ORGANIZATION")
+    valid_from = Column(DateTime, default=get_utc_now, nullable=False)
+    valid_until = Column(DateTime, nullable=True, index=True)
+    evidence_ids_json = Column(Text, default="[]", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    memory_entry = relationship("ThreatMemoryEntryModel", back_populates="decisions")
+
+    __table_args__ = (
+        Index("ix_tmd_entry_decision", "memory_entry_id", "decision"),
+        Index("ix_tmd_ws_approved", "workspace_id", "approved_by"),
+    )
+
+
+class ThreatMemoryRelationshipModel(Base):
+    """
+    Cross-memory association edges (Section 23).
+    Links historical entities, domains, IPs, campaigns, and false-positive patterns.
+    """
+    __tablename__ = "threat_memory_relationships"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_memory_id = Column(String(36), ForeignKey("threat_memory_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    target_memory_id = Column(String(36), ForeignKey("threat_memory_entries.id", ondelete="CASCADE"), nullable=False, index=True)
+    relationship_type = Column(String(50), nullable=False, index=True)  # ASSOCIATED_WITH, RESOLVES_TO, HOSTED_ON, PART_OF, etc.
+    confidence = Column(Float, nullable=False, default=1.0)
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    evidence_references_json = Column(Text, default="[]", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    source_memory = relationship("ThreatMemoryEntryModel", foreign_keys=[source_memory_id])
+    target_memory = relationship("ThreatMemoryEntryModel", foreign_keys=[target_memory_id])
+
+    __table_args__ = (
+        Index("ix_tmr_src_tgt", "source_memory_id", "target_memory_id", "relationship_type", unique=True),
+        Index("ix_tmr_ws_type", "workspace_id", "relationship_type"),
+    )
+
 
 
 

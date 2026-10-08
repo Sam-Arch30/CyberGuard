@@ -39,7 +39,8 @@ class CopilotContextEngine:
         "high_confidence_iocs": ["high-confidence ioc", "iocs", "indicators of compromise", "blocklist", "list all iocs"],
         "auth_explanation": ["spf", "dkim", "dmarc", "authentication", "alignment", "spoof", "return-path"],
         "campaign_timeline": ["timeline", "chronology", "sequence", "events", "when did"],
-        "attachment_analysis": ["attachment", "payload", "pe", "exe", "macro", "pdf", "zip", "entropy", "executable disguised", "authenticode"]
+        "attachment_analysis": ["attachment", "payload", "pe", "exe", "macro", "pdf", "zip", "entropy", "executable disguised", "authenticode"],
+        "threat_memory": ["seen before", "have we seen", "appeared in another", "previously associated", "threat memory", "historical observation", "seen this domain", "seen this hash", "seen this ip", "false positive previously"]
     }
 
     def detect_intent(self, query: str) -> str:
@@ -47,6 +48,8 @@ class CopilotContextEngine:
         q_lower = query.lower()
 
         # Exact match priorities
+        if any(term in q_lower for term in ["seen before", "have we seen", "appeared in another", "previously associated", "threat memory", "seen this domain", "seen this hash", "seen this ip", "false positive previously"]):
+            return "threat_memory"
         if "why" in q_lower and ("malicious" in q_lower or "classified" in q_lower or "flagged" in q_lower):
             return "why_malicious"
         if "which indicators" in q_lower or "contributed most" in q_lower or "threat score" in q_lower:
