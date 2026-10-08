@@ -1218,3 +1218,173 @@ class ReportService:
         pdf_bytes = buffer.getvalue()
         buffer.close()
         return pdf_bytes
+
+    @classmethod
+    def format_mitre_attack_section(cls, mitre_report: Any, styles: Dict[str, ParagraphStyle]) -> List[Any]:
+        """
+        Formats Section 19 MITRE ATT&CK Analysis flowables for legal/SOC reporting.
+        Uses epistemically safe language ('CyberGuard mapped observed activity to...').
+        """
+        flowables = []
+        flowables.append(Paragraph("MITRE ATT&CK Mapping & Technique Assessment", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        # Executive summary
+        exec_summary = getattr(mitre_report, "executive_summary", "")
+        if exec_summary:
+            body_style = styles.get("BodyText", styles.get("TableCell", styles["Normal"]))
+            flowables.append(Paragraph(f"<b>Assessment Summary:</b> {html.escape(exec_summary)}", body_style))
+            flowables.append(Spacer(1, 6))
+
+        # Supported Techniques Table
+        supported = getattr(mitre_report, "supported_mappings", [])
+        if supported:
+            table_data = [
+                [
+                    Paragraph("<b>TECHNIQUE</b>", styles["TableHead"]),
+                    Paragraph("<b>TACTICS</b>", styles["TableHead"]),
+                    Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>CONFIDENCE</b>", styles["TableHead"]),
+                    Paragraph("<b>EXPLANATION / EVIDENCE</b>", styles["TableHead"]),
+                ]
+            ]
+            for m in supported:
+                tid_str = f"<b>{html.escape(m.technique_id)}</b><br/>{html.escape(m.technique_name)}"
+                tacs_str = html.escape(", ".join(getattr(m, "tactic_names", [])))
+                stat_val = m.status.value if hasattr(m.status, "value") else str(m.status)
+                stat_str = f"<b>{stat_val}</b>"
+                conf_val = getattr(m, "confidence_level", None)
+                conf_level_str = conf_val.value if hasattr(conf_val, "value") else str(conf_val)
+                conf_str = f"{m.confidence:.2f} ({conf_level_str})"
+                expl_str = f"{html.escape(m.explanation)}"
+                if m.limitations:
+                    expl_str += f"<br/><i>Limitations: {html.escape('; '.join(m.limitations))}</i>"
+                table_data.append([
+                    Paragraph(tid_str, styles["TableCellBold"]),
+                    Paragraph(tacs_str, styles["TableCell"]),
+                    Paragraph(stat_str, styles["TableCell"]),
+                    Paragraph(conf_str, styles["TableCell"]),
+                    Paragraph(expl_str, styles["TableCell"]),
+                ])
+            t = Table(table_data, colWidths=[110, 80, 75, 75, 200])
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ]))
+            flowables.append(t)
+            flowables.append(Spacer(1, 8))
+
+        return flowables
+
+    @classmethod
+    def format_infrastructure_attribution_section(cls, infra_assessment: Any, styles: Dict[str, ParagraphStyle]) -> List[Any]:
+        """
+        Formats Section 20 Probable Origin Infrastructure & Threat Infrastructure Assessment flowables.
+        Strictly enforces non-attribution standards and highlights server geography vs human location.
+        """
+        flowables = []
+        flowables.append(Paragraph("Probable Origin Infrastructure & Threat Infrastructure Assessment", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        # Forensic Disclaimer
+        disclaimer = getattr(infra_assessment, "disclaimer", "")
+        if disclaimer:
+            note_style = styles.get("WarningBox", styles.get("TableCell", styles["Normal"]))
+            flowables.append(Paragraph(f"<b>FORENSIC NOTICE:</b> <i>{html.escape(disclaimer)}</i>", note_style))
+            flowables.append(Spacer(1, 6))
+
+        # Executive Summary
+        summary = getattr(infra_assessment, "summary", "")
+        if summary:
+            body_style = styles.get("BodyText", styles.get("TableCell", styles["Normal"]))
+            flowables.append(Paragraph(f"<b>Assessment Narrative:</b> {html.escape(summary)}", body_style))
+            flowables.append(Spacer(1, 6))
+
+        # Primary & Competing Hypotheses Table
+        primary = getattr(infra_assessment, "primary_hypothesis", None)
+        competing = getattr(infra_assessment, "competing_hypotheses", [])
+        all_hypotheses = ([primary] if primary else []) + list(competing)
+
+        if all_hypotheses:
+            table_data = [
+                [
+                    Paragraph("<b>HYPOTHESIS ID</b>", styles["TableHead"]),
+                    Paragraph("<b>ORIGIN TARGET</b>", styles["TableHead"]),
+                    Paragraph("<b>TYPE</b>", styles["TableHead"]),
+                    Paragraph("<b>CONFIDENCE</b>", styles["TableHead"]),
+                    Paragraph("<b>ASSESSMENT SUMMARY & LIMITATIONS</b>", styles["TableHead"]),
+                ]
+            ]
+            for h in all_hypotheses:
+                hid_str = f"<b>{html.escape(h.hypothesis_id)}</b><br/>{html.escape(h.status.value if hasattr(h.status, 'value') else str(h.status))}"
+                target_str = f"<b>{html.escape(h.origin_value)}</b>"
+                type_val = h.origin_type.value if hasattr(h.origin_type, "value") else str(h.origin_type)
+                type_str = html.escape(type_val)
+                conf_val = getattr(h, "confidence_level", None)
+                conf_level_str = conf_val.value if hasattr(conf_val, "value") else str(conf_val)
+                conf_str = f"{h.confidence_score * 100:.1f}% ({conf_level_str})"
+                summary_str = f"{html.escape(h.hypothesis)}"
+                if h.limitations:
+                    summary_str += f"<br/><i>Caveats: {html.escape('; '.join(h.limitations[:2]))}</i>"
+
+                table_data.append([
+                    Paragraph(hid_str, styles["TableCellBold"]),
+                    Paragraph(target_str, styles["TableCell"]),
+                    Paragraph(type_str, styles["TableCell"]),
+                    Paragraph(conf_str, styles["TableCell"]),
+                    Paragraph(summary_str, styles["TableCell"]),
+                ])
+
+            t = Table(table_data, colWidths=[80, 110, 80, 80, 190])
+            t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ]))
+            flowables.append(t)
+            flowables.append(Spacer(1, 8))
+
+        # Infrastructure Clusters
+        clusters = getattr(infra_assessment, "clusters", [])
+        if clusters:
+            flowables.append(Paragraph("<b>Identified Infrastructure Clusters</b>", styles["SubSectionHeader"]))
+            cl_data = [
+                [
+                    Paragraph("<b>CLUSTER ID</b>", styles["TableHead"]),
+                    Paragraph("<b>NAME / TITLE</b>", styles["TableHead"]),
+                    Paragraph("<b>MEMBERS</b>", styles["TableHead"]),
+                    Paragraph("<b>INCIDENTS</b>", styles["TableHead"]),
+                    Paragraph("<b>SIGNALS</b>", styles["TableHead"]),
+                ]
+            ]
+            for cl in clusters:
+                cid_str = f"<b>{html.escape(cl.cluster_id)}</b>"
+                name_str = html.escape(cl.name)
+                members_preview = html.escape(", ".join([m.value for m in getattr(cl, "members", [])][:4]))
+                inc_str = str(cl.incident_count)
+                sig_str = html.escape("; ".join(cl.supporting_signals[:2]))
+                cl_data.append([
+                    Paragraph(cid_str, styles["TableCellBold"]),
+                    Paragraph(name_str, styles["TableCell"]),
+                    Paragraph(members_preview, styles["TableCell"]),
+                    Paragraph(inc_str, styles["TableCell"]),
+                    Paragraph(sig_str, styles["TableCell"]),
+                ])
+            cl_table = Table(cl_data, colWidths=[90, 120, 140, 50, 140])
+            cl_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F8FAFC")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.0),
+            ]))
+            flowables.append(cl_table)
+            flowables.append(Spacer(1, 8))
+
+        return flowables
+

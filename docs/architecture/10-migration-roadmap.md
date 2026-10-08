@@ -645,15 +645,82 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
      - 28 unit and integration tests in `backend/tests/test_attack_confidence.py` covering all 45 requirements, false-confidence guardrails, and Scenarios A through G.
      - Large-scale performance benchmark in `backend/tests/test_confidence_performance.py` over 50 stages and 49 transitions: 0.138 ms/stage scoring, 0.109 ms/transition scoring, 4.60 ms full path scoring + bottleneck bounding, and 5.34 ms complete explanation generation.
 
-14. **Requirements & Prerequisites for Section 19 (MITRE ATT&CK Mapping & Threat Actor Attribution Engine)**:
+14. **Section 19 — MITRE ATT&CK Mapping & Adversary Technique Intelligence Engine (COMPLETED)**:
+   - Architecture document: [`28-mitre-attack-mapping-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/28-mitre-attack-mapping-engine.md).
+   - Core Principles & Epistemic Framework:
+     - ATT&CK Is a Taxonomy and Analytical Framework, NOT Proof of Compromise, identity, or intent.
+     - Answers: "What ATT&CK techniques are supported by the evidence?", never speculative attribution.
+     - Strict No Keyword-Only Mapping: "PowerShell", "password", "email", or "network" keywords never trigger mappings without verified behavioral telemetry.
+     - Specific Sub-Technique Preference: Prefers specific sub-techniques (T1110.003 > T1110) when evidence permits, suppressing redundant broad parents.
+   - Deterministic Local Versioned Dataset:
+     - Managed in `backend/data/mitre_attack_enterprise_v15_1.json` with startup validation of tactics, technique IDs, subtechnique-parent relationships, and deprecation flags.
+     - Zero external web lookups per event/analysis; runtime downloads forbidden.
+     - Deprecated and revoked techniques clearly flagged (`is_deprecated=True`, `is_revoked=True`, `revoked_by="T1059.001"`).
+   - Database Models & Persistence:
+     - Created `AttackTechniqueMappingModel` (`attack_technique_mappings` table) with tenant workspace isolation, explicit evidence lineage (`evidence_ids`, `finding_ids`, `event_ids`, `stage_ids`), version stamps (`attack_version`, `engine_version`, `configuration_version`), and analyst review fields (`analyst_disposition`, `analyst_notes`).
+     - Added relationships to `IncidentModel` and `AttackPathModel`.
+   - Core Services & Rule Engine:
+     - `MitreDatasetService` (`backend/services/mitre_dataset_service.py`): In-memory query index and structural validation.
+     - `MitreRuleRegistry` & Behavioral Evaluators (`backend/services/mitre_rules.py`): Versioned rules distinguishing password spraying (T1110.003), brute force (T1110.001), credential stuffing (T1110.004), spearphishing links (T1566.002) vs attachments (T1566.001), static scripts vs process execution (T1059.001), API enumeration (T1087 / T1595.002), and exfiltration vs egress volume.
+     - `MITREAttackMappingEngine` (`backend/services/mitre_mapping_engine.py`): End-to-end mapping for findings, events, threat events, stages, paths, and incidents; deduplication, sequence ordering, tactic timelines, coverage assessments, and deterministic LLM suggestion validation.
+     - `ReportService` (`backend/services/report_service.py`): Flowable formatting for PDF reports using epistemically humble phrasing ("CyberGuard mapped observed activity to...", never "The attacker used...").
+   - REST API Endpoints (`backend/api/routes/mitre_attack.py`):
+     - `GET /api/attack-mapping/tactics`
+     - `GET /api/attack-mapping/techniques`
+     - `GET /api/attack-mapping/techniques/{technique_id}`
+     - `POST /api/incidents/{incident_id}/mitre-map`
+     - `GET /api/incidents/{incident_id}/mitre-mappings`
+     - `GET /api/incidents/{incident_id}/mitre-timeline`
+     - `POST /api/attack-paths/{path_id}/mitre-map`
+     - `POST /api/mitre-mappings/{mapping_id}/feedback`
+     - `POST /api/attack-mapping/validate-llm-suggestion`
+     - `GET /api/attack-mapping/environment-exclusions`
+     - `POST /api/attack-mapping/environment-exclusions`
+   - Verification & Benchmarks:
+     - 40 comprehensive unit and integration tests in `backend/tests/test_mitre_attack_mapping.py` covering all Section 71 requirements and Scenarios A through L.
+     - 13 dedicated false-positive guardrail tests in `backend/tests/test_mitre_false_positives.py` verifying suppression of benign activity, CDN egress, authorized scanners, single failed logins, and monitoring probes.
+     - 6 API integration tests in `backend/tests/test_mitre_api_routes.py`.
+     - Performance benchmarks in `backend/tests/test_mitre_performance.py`: sub-millisecond per-finding evaluation (0.15 ms/finding), dataset load < 5 ms, 1,000-candidate deduplication < 15 ms, and incident report generation < 30 ms.
+
+15. **Section 20 — Probable Origin Infrastructure & Threat Infrastructure Attribution Engine (COMPLETED)**:
+   - Architecture document: [`29-probable-origin-infrastructure.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/29-probable-origin-infrastructure.md).
+   - Core Principles & Epistemic Boundaries:
+     - Strict Non-Attribution: Reconstructs technical network infrastructure, hosting clusters, and origin hypotheses without human or legal attribution.
+     - Four Core Concepts: Cleanly separates Observed Infrastructure, Associated Infrastructure, Infrastructure Clusters, and Probable Origin Infrastructure.
+     - Directionality: Preserves observed source vs observed destination without labeling endpoints as "attacker".
+     - Infrastructure Geography vs Human Location: IP geolocation is strictly characterized as server facility geography.
+   - Core Services & Data Pipeline:
+     - `InfrastructureCandidateGenerator` (`backend/services/infrastructure_candidate_generator.py`): Bounded extraction from SecurityEvents, ThreatEvents, Findings, and 1-3 hop Knowledge Graph traversals.
+     - `InfrastructureClusterer` (`backend/services/infrastructure_clusterer.py`): Conservative clustering on shared dedicated IPs, custom nameservers, certificates, and campaign links; generic cloud (AWS/Cloudflare) suppression.
+     - `InfrastructureTemporalAnalyzer` (`backend/services/infrastructure_temporal_analyzer.py`): Chronological sequencing and detection of DNS/IP migrations and rotations.
+     - `InfrastructureAttributionEngine` (`backend/services/infrastructure_attribution_engine.py`): End-to-end orchestration, multi-hypothesis formulation (H1 Dedicated, H2 Compromised, H3 Shared Proxy, H4 Insufficient Evidence), and Section 18 confidence integration.
+     - `ReportService` (`backend/services/report_service.py`): High-fidelity PDF report section (`format_infrastructure_attribution_section`) with legal disclaimers and structured hypothesis tables.
+   - Database Persistence & Schemas:
+     - Created `InfrastructureAttributionModel`, `InfrastructureAttributionEvidenceModel`, and `InfrastructureClusterModel` in `backend/db/models.py`.
+     - Pydantic models in `backend/schemas/infrastructure_attribution.py` with runtime validation forbidding human attribution keys.
+   - REST API Endpoints (`backend/api/routes/infrastructure_attribution.py`):
+     - `POST /api/v1/investigations/{id}/infrastructure/analyze`
+     - `GET /api/v1/investigations/{id}/infrastructure`
+     - `GET /api/v1/investigations/{id}/infrastructure/origin`
+     - `GET /api/v1/investigations/{id}/infrastructure/clusters`
+     - `GET /api/v1/investigations/{id}/infrastructure/timeline`
+     - `GET /api/v1/investigations/{id}/infrastructure/evidence`
+     - `GET /api/v1/investigations/{id}/infrastructure/hypotheses`
+   - Verification & Benchmarks:
+     - 27 comprehensive tests across 4 test suites:
+       - `test_infrastructure_attribution.py` (12 tests): direct infrastructure, relationships, clustering, temporal, confidence penalties, and Synthetic Scenario.
+       - `test_infrastructure_attribution_boundaries.py` (5 tests): non-attribution schema validation, forbidden key checks, prompt-injection defense.
+       - `test_infrastructure_performance.py` (4 tests): 500-event candidate generation < 250ms, cyclic graph bounded depth, clustering 150 candidates < 50ms, E2E analysis < 200ms.
+       - `test_infrastructure_api_routes.py` (6 tests): REST endpoint contracts.
+
+16. **Requirements & Prerequisites for Section 21**:
    - **Prerequisites Satisfied**:
-     - Decomposed stage and transition confidence scores with clear evidence lineage (Section 18).
-     - Epistemically grounded explanation objects suitable for mapping to ATT&CK techniques and sub-techniques (Section 18).
-     - Evidence families preventing redundant technique scoring and double-counting (Section 18).
-     - Explicit catalog of missing telemetry and contradictions to prevent false actor attribution (Section 18).
-   - **Section 19 Focus**:
-     - Formal MITRE ATT&CK Enterprise Matrix mapping across observed and inferred stages.
-     - TTP confidence scoring based on evidence specificity and tool telemetry.
-     - Conservative threat actor attribution and diamond model integration.
+     - Provenance-backed MITRE ATT&CK technique mappings (Section 19).
+     - Infrastructure-level origin hypotheses and conservative clustering without human attribution (Section 20).
+     - Explainable confidence decomposition and evidence independence (Section 18).
+     - Temporal sequences and cross-incident campaign linkages (Sections 15-16).
+   - **Next Steps**:
+     - Progressing to Section 21 per architecture roadmap.
+
 
 

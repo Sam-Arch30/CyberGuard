@@ -44,6 +44,10 @@ class GraphEntityType(str, Enum):
     CAMPAIGN = "CAMPAIGN"
     EMAIL_ADDRESS = "EMAIL_ADDRESS"
     ASN = "ASN"
+    CERTIFICATE = "CERTIFICATE"
+    NAMESERVER = "NAMESERVER"
+    NETWORK = "NETWORK"
+    INFRASTRUCTURE_CLUSTER = "INFRASTRUCTURE_CLUSTER"
     OTHER = "OTHER"
 
 
@@ -73,6 +77,16 @@ class GraphRelationshipType(str, Enum):
     QUERIED_DNS = "QUERIED_DNS"
     SUBMITS_TO = "SUBMITS_TO"
     ROUTED_THROUGH = "ROUTED_THROUGH"
+    USES_NAMESERVER = "USES_NAMESERVER"
+    USES_MAIL_SERVER = "USES_MAIL_SERVER"
+    HOSTED_BY = "HOSTED_BY"
+    HOSTED_ON = "HOSTED_ON"
+    SHARES_CERTIFICATE = "SHARES_CERTIFICATE"
+    SHARES_NAMESERVER = "SHARES_NAMESERVER"
+    SHARES_IP = "SHARES_IP"
+    SHARES_ASN = "SHARES_ASN"
+    RELATED_TO_DOMAIN = "RELATED_TO_DOMAIN"
+    RELATED_TO_CAMPAIGN = "RELATED_TO_CAMPAIGN"
     OTHER = "OTHER"
 
 
@@ -197,6 +211,14 @@ def make_canonical_key(
     elif type_str == "ASN":
         clean_asn = val.upper() if val.upper().startswith("AS") else f"AS{val.upper()}"
         return f"asn:{clean_asn}"
+    elif type_str == "CERTIFICATE":
+        return f"cert:{val.lower()}"
+    elif type_str == "NAMESERVER":
+        return f"ns:{normalize_domain(val)}"
+    elif type_str == "NETWORK":
+        return f"network:{val.lower()}"
+    elif type_str in ("INFRASTRUCTURE_CLUSTER", "CLUSTER"):
+        return f"cluster:{val.lower()}"
     else:
         return f"{type_str.lower()}:{val}"
 

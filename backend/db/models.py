@@ -655,6 +655,9 @@ class IncidentModel(Base):
     attack_hypotheses = relationship("AttackHypothesisModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     security_events = relationship("SecurityEventModel", back_populates="incident", lazy="selectin")
     temporal_sequences = relationship("TemporalSequenceCandidateModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    attack_technique_mappings = relationship("AttackTechniqueMappingModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    infrastructure_attributions = relationship("InfrastructureAttributionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    infrastructure_clusters = relationship("InfrastructureClusterModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -788,6 +791,7 @@ class AttackPathModel(Base):
     stages = relationship("AttackStageModel", back_populates="attack_path", cascade="all, delete-orphan", order_by="AttackStageModel.stage_order", lazy="selectin")
     edges = relationship("AttackEdgeModel", back_populates="attack_path", cascade="all, delete-orphan", lazy="selectin")
     hypotheses = relationship("AttackHypothesisModel", back_populates="attack_path", cascade="all, delete-orphan", lazy="selectin")
+    technique_mappings = relationship("AttackTechniqueMappingModel", back_populates="attack_path", lazy="selectin")
 
 
 class AttackStageModel(Base):
@@ -997,6 +1001,156 @@ class TemporalSequenceCandidateModel(Base):
         Index("ix_temp_seq_inc_time", "incident_id", "start_time"),
         Index("ix_temp_seq_ws_status", "workspace_id", "status"),
     )
+
+
+class AttackTechniqueMappingModel(Base):
+    """
+    Persisted evidence-grounded MITRE ATT&CK technique mapping.
+    Maintains provenance back to source SecurityEvent, Finding, ThreatEvent,
+    AttackStage, or AttackPath transition.
+    """
+    __tablename__ = "attack_technique_mappings"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=True, index=True)
+    attack_path_id = Column(String(36), ForeignKey("attack_paths.id", ondelete="SET NULL"), nullable=True, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_type = Column(String(50), nullable=False, index=True)
+    source_id = Column(String(128), nullable=False, index=True)
+    technique_id = Column(String(50), nullable=False, index=True)
+    subtechnique_id = Column(String(50), nullable=True, index=True)
+    technique_name = Column(String(255), nullable=False)
+    tactic_ids_json = Column(Text, default="[]", nullable=False)
+    tactic_names_json = Column(Text, default="[]", nullable=False)
+    status = Column(String(30), nullable=False, default="SUPPORTED", index=True)  # SUPPORTED, PLAUSIBLE, INSUFFICIENT_EVIDENCE, REJECTED
+    confidence = Column(Float, nullable=False, default=1.0)
+    confidence_level = Column(String(30), nullable=False, default="HIGH")
+    evidence_ids_json = Column(Text, default="[]", nullable=False)
+    finding_ids_json = Column(Text, default="[]", nullable=False)
+    event_ids_json = Column(Text, default="[]", nullable=False)
+    stage_ids_json = Column(Text, default="[]", nullable=False)
+    mapping_method = Column(String(50), nullable=False, default="RULE_BASED", index=True)
+    mapping_rule_id = Column(String(100), nullable=True, index=True)
+    explanation = Column(Text, nullable=False, default="")
+    limitations_json = Column(Text, default="[]", nullable=False)
+    contradictions_json = Column(Text, default="[]", nullable=False)
+    attack_version = Column(String(32), nullable=False, default="v15.1", index=True)
+    engine_version = Column(String(32), nullable=False, default="1.0.0")
+    configuration_version = Column(String(32), nullable=False, default="2026.10")
+    analyst_disposition = Column(String(50), nullable=True)  # CONFIRMED, REJECTED, NOT_APPLICABLE, MODIFIED, PENDING
+    analyst_notes = Column(Text, nullable=True)
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="attack_technique_mappings")
+    attack_path = relationship("AttackPathModel", back_populates="technique_mappings")
+
+    __table_args__ = (
+        Index("ix_atm_inc_status", "incident_id", "status"),
+        Index("ix_atm_tech_status", "technique_id", "status"),
+        Index("ix_atm_src", "source_type", "source_id"),
+    )
+
+
+class InfrastructureAttributionModel(Base):
+    """
+    Persisted technical infrastructure attribution hypothesis.
+    Maintains origin hypothesis, confidence, limitations, and evidence links without human attribution.
+    """
+    __tablename__ = "infrastructure_attributions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    investigation_id = Column(String(36), nullable=True, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    subject_entity_id = Column(String(128), nullable=True, index=True)
+    origin_entity_id = Column(String(128), nullable=True, index=True)
+    origin_value = Column(String(255), nullable=False)
+    origin_type = Column(String(50), nullable=False, default="UNKNOWN", index=True)
+    hypothesis_id = Column(String(32), nullable=False, default="H1")
+    hypothesis_type = Column(String(64), nullable=False, default="DEDICATED_THREAT_INFRASTRUCTURE", index=True)
+    hypothesis_title = Column(String(255), nullable=False)
+    status = Column(String(30), nullable=False, default="PROBABLE", index=True)  # PROBABLE, PLAUSIBLE, INSUFFICIENT_EVIDENCE, REJECTED
+    confidence_score = Column(Float, nullable=False, default=0.5)
+    confidence_level = Column(String(30), nullable=False, default="MODERATE")
+    evidence_count = Column(Integer, nullable=False, default=0)
+    supporting_evidence_count = Column(Integer, nullable=False, default=0)
+    contradicting_evidence_count = Column(Integer, nullable=False, default=0)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    engine_version = Column(String(32), nullable=False, default="1.0.0")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="infrastructure_attributions")
+    evidence_items = relationship("InfrastructureAttributionEvidenceModel", back_populates="attribution", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_infra_attr_inc_status", "incident_id", "status"),
+        Index("ix_infra_attr_origin", "origin_type", "origin_value"),
+        Index("ix_infra_attr_ws", "workspace_id", "created_at"),
+    )
+
+
+class InfrastructureAttributionEvidenceModel(Base):
+    """
+    Forensic link connecting an attribution hypothesis to concrete telemetry, graph relationship, or artifact.
+    """
+    __tablename__ = "infrastructure_attribution_evidence"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    attribution_id = Column(String(36), ForeignKey("infrastructure_attributions.id", ondelete="CASCADE"), nullable=False, index=True)
+    evidence_id = Column(String(64), nullable=True, index=True)
+    relationship_id = Column(String(64), nullable=True, index=True)
+    source_entity_id = Column(String(128), nullable=False, index=True)
+    target_entity_id = Column(String(128), nullable=True)
+    relationship_type = Column(String(64), nullable=False)
+    evidence_family = Column(String(64), nullable=False, index=True)  # DIRECT_TELEMETRY, DNS, etc.
+    support_direction = Column(String(30), nullable=False, default="SUPPORTS")  # SUPPORTS, CONTRADICTS, NEUTRAL
+    strength = Column(Float, nullable=False, default=1.0)
+    explanation = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    attribution = relationship("InfrastructureAttributionModel", back_populates="evidence_items")
+
+    __table_args__ = (
+        Index("ix_iae_attr_family", "attribution_id", "evidence_family"),
+        Index("ix_iae_src_rel", "source_entity_id", "relationship_type"),
+    )
+
+
+class InfrastructureClusterModel(Base):
+    """
+    Persisted infrastructure cluster linking correlated domains, IPs, ASNs, and certificates.
+    """
+    __tablename__ = "infrastructure_clusters"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    cluster_id = Column(String(64), nullable=False, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(255), nullable=False)
+    members_json = Column(Text, default="[]", nullable=False)
+    relationship_types_json = Column(Text, default="[]", nullable=False)
+    evidence_count = Column(Integer, nullable=False, default=0)
+    incident_count = Column(Integer, nullable=False, default=0)
+    campaign_count = Column(Integer, nullable=False, default=0)
+    supporting_signals_json = Column(Text, default="[]", nullable=False)
+    contradicting_signals_json = Column(Text, default="[]", nullable=False)
+    confidence = Column(Float, nullable=False, default=0.5)
+    confidence_level = Column(String(30), nullable=False, default="MODERATE")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    incident = relationship("IncidentModel", back_populates="infrastructure_clusters")
+
+    __table_args__ = (
+        Index("ix_icm_inc_cluster", "incident_id", "cluster_id"),
+        Index("ix_icm_ws_conf", "workspace_id", "confidence"),
+    )
+
 
 
 
