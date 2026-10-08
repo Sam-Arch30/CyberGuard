@@ -1761,6 +1761,81 @@ class ReportService:
         flowables.append(Spacer(1, 8))
         return flowables
 
+    @classmethod
+    def _format_candidate_rule_section(
+        cls,
+        candidate_rules_data: Any,
+        styles: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """
+        Formats Section 25 Emerging Pattern & Candidate Rule Engine flowables.
+        Maintains strict boundary: PATTERN != RULE; RULE != APPROVED RULE; APPROVED RULE != PRODUCTION RULE.
+        """
+        flowables = []
+        flowables.append(Paragraph("Emerging Patterns & Candidate Detection Rules", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        notice = (
+            "Candidate detection rules are derived from validated emerging patterns and Threat Memory. "
+            "To prevent alert fatigue and false positives, candidate rules require historical backtesting, "
+            "false positive analysis, shadow mode staging, and explicit human approval prior to production activation."
+        )
+        note_style = styles.get("WarningBox", styles.get("TableCell", styles["Normal"]))
+        flowables.append(Paragraph(f"<b>GOVERNANCE NOTICE:</b> <i>{html.escape(notice)}</i>", note_style))
+        flowables.append(Spacer(1, 6))
+
+        if not candidate_rules_data:
+            flowables.append(Paragraph("<i>No candidate detection rules or emerging pattern evaluations in this scope.</i>", styles["TableCell"]))
+            flowables.append(Spacer(1, 8))
+            return flowables
+
+        rules_list = candidate_rules_data if isinstance(candidate_rules_data, list) else [candidate_rules_data]
+
+        table_data = [
+            [
+                Paragraph("<b>RULE NAME / ID</b>", styles["TableHead"]),
+                Paragraph("<b>TYPE / SCOPE</b>", styles["TableHead"]),
+                Paragraph("<b>STATUS / VER</b>", styles["TableHead"]),
+                Paragraph("<b>COMPLEXITY / CONF</b>", styles["TableHead"]),
+                Paragraph("<b>BACKTEST MATCHES / PRECISION</b>", styles["TableHead"]),
+            ]
+        ]
+
+        for item in rules_list[:10]:
+            data = item if isinstance(item, dict) else (item.model_dump() if hasattr(item, "model_dump") else {})
+            name = data.get("name", "Candidate Rule")
+            rule_id = str(data.get("id", "N/A"))[:8]
+            rtype = data.get("rule_type", "STRUCTURAL")
+            scope = data.get("scope", "GLOBAL")
+            status_val = data.get("status", "DISCOVERED")
+            ver = data.get("version", "v1")
+            comp = data.get("complexity_score", 1.0)
+            conf = data.get("confidence", 0.8)
+            eval_data = data.get("evaluation_summary") or {}
+            matches = eval_data.get("historical_match_count", "N/A")
+            prec = eval_data.get("precision", "N/A")
+
+            table_data.append([
+                Paragraph(f"<b>{html.escape(str(name))}</b><br/><font size='7' color='#64748B'>{rule_id}</font>", styles["TableCellBold"]),
+                Paragraph(f"{html.escape(str(rtype))}<br/>{html.escape(str(scope))}", styles["TableCell"]),
+                Paragraph(f"<b>{html.escape(str(status_val))}</b><br/>{html.escape(str(ver))}", styles["TableCell"]),
+                Paragraph(f"Comp: {comp}<br/>Conf: {conf}", styles["TableCell"]),
+                Paragraph(f"Matches: {matches}<br/>Prec: {prec}", styles["TableCell"]),
+            ])
+
+        t = Table(table_data, colWidths=[150, 85, 85, 95, 125])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ]))
+        flowables.append(t)
+        flowables.append(Spacer(1, 8))
+        return flowables
+
+
 
 
 

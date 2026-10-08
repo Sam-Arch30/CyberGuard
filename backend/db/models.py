@@ -1710,6 +1710,148 @@ class RegisteredModelModel(Base):
         return json.loads(self.baseline_comparison_json or "{}")
 
 
+# ============================================================================
+# Section 25: Emerging Pattern & Candidate Rule Models
+# ============================================================================
+
+class CandidateRuleModel(Base):
+    """
+    Candidate detection rule synthesized from validated emerging patterns,
+    correlations, and Threat Memory (Section 25).
+    """
+    __tablename__ = "candidate_rules"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False, default="")
+    rule_type = Column(String(50), nullable=False, default="STRUCTURAL", index=True)  # INDICATOR, STRUCTURAL, BEHAVIORAL, etc.
+    status = Column(String(30), nullable=False, default="DISCOVERED", index=True)  # DISCOVERED, DRAFT, VALIDATING, TESTED, REVIEW_REQUIRED, APPROVED, STAGED, ACTIVE, REJECTED, DISABLED, RETIRED, SUPERSEDED
+    pattern_candidate_id = Column(String(36), ForeignKey("emerging_pattern_candidates.id", ondelete="SET NULL"), nullable=True, index=True)
+    source_memory_ids_json = Column(Text, default="[]", nullable=False)
+    source_incident_ids_json = Column(Text, default="[]", nullable=False)
+    definition_json = Column(Text, default="{}", nullable=False)
+    thresholds_json = Column(Text, default="{}", nullable=False)
+    time_window_seconds = Column(Integer, nullable=True)
+    scope = Column(String(30), nullable=False, default="GLOBAL", index=True)  # EMAIL, URL, AUTH, NETWORK, API, FILE, MEDIA, GLOBAL
+    severity = Column(String(20), nullable=False, default="MEDIUM")  # INFORMATIONAL, LOW, MEDIUM, HIGH, CRITICAL
+    confidence = Column(Float, nullable=False, default=0.8)
+    generalization_level = Column(String(30), nullable=False, default="STRUCTURAL")  # EXACT, STRUCTURAL, BEHAVIORAL, etc.
+    complexity_score = Column(Float, nullable=False, default=1.0)
+    normalized_fingerprint = Column(String(64), nullable=False, index=True)
+    version = Column(String(20), nullable=False, default="v1", index=True)
+    evaluation_summary_json = Column(Text, default="{}", nullable=False)
+    staged_at = Column(DateTime, nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+    retired_at = Column(DateTime, nullable=True)
+    created_by = Column(String(100), nullable=False, default="analyst")
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_reason = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    versions = relationship("CandidateRuleVersionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin")
+    executions = relationship("CandidateRuleExecutionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_cr_ws_status", "workspace_id", "status"),
+        Index("ix_cr_ws_scope", "workspace_id", "scope"),
+        Index("ix_cr_ws_fp", "workspace_id", "normalized_fingerprint"),
+    )
+
+    @property
+    def source_memory_ids(self) -> List[str]:
+        return json.loads(self.source_memory_ids_json or "[]")
+
+    @property
+    def source_incident_ids(self) -> List[str]:
+        return json.loads(self.source_incident_ids_json or "[]")
+
+    @property
+    def definition(self) -> Dict[str, Any]:
+        return json.loads(self.definition_json or "{}")
+
+    @property
+    def thresholds(self) -> Dict[str, Any]:
+        return json.loads(self.thresholds_json or "{}")
+
+    @property
+    def evaluation_summary(self) -> Dict[str, Any]:
+        return json.loads(self.evaluation_summary_json or "{}")
+
+
+class CandidateRuleVersionModel(Base):
+    """
+    Immutable version history for candidate and production rules (Section 25).
+    """
+    __tablename__ = "candidate_rule_versions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(String(20), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    definition_json = Column(Text, default="{}", nullable=False)
+    thresholds_json = Column(Text, default="{}", nullable=False)
+    evaluation_summary_json = Column(Text, default="{}", nullable=False)
+    status = Column(String(30), nullable=False, default="DRAFT")
+    created_by = Column(String(100), nullable=False, default="analyst")
+    reviewed_by = Column(String(100), nullable=True)
+    change_reason = Column(String(500), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    rule = relationship("CandidateRuleModel", back_populates="versions")
+
+    __table_args__ = (
+        Index("ix_crv_rule_ver", "rule_id", "version", unique=True),
+    )
+
+    @property
+    def definition(self) -> Dict[str, Any]:
+        return json.loads(self.definition_json or "{}")
+
+    @property
+    def thresholds(self) -> Dict[str, Any]:
+        return json.loads(self.thresholds_json or "{}")
+
+    @property
+    def evaluation_summary(self) -> Dict[str, Any]:
+        return json.loads(self.evaluation_summary_json or "{}")
+
+
+class CandidateRuleExecutionModel(Base):
+    """
+    Telemetry log for candidate and active rule executions, including shadow mode (Section 25).
+    """
+    __tablename__ = "candidate_rule_executions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    rule_version = Column(String(20), nullable=False)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    mode = Column(String(20), nullable=False, default="SHADOW", index=True)  # SHADOW, PRODUCTION, BACKTEST
+    matched = Column(Boolean, nullable=False, default=False, index=True)
+    matched_conditions_json = Column(Text, default="[]", nullable=False)
+    event_id = Column(String(36), nullable=True, index=True)
+    incident_id = Column(String(36), nullable=True, index=True)
+    execution_time_ms = Column(Float, nullable=False, default=0.0)
+    is_false_positive = Column(Boolean, nullable=True)
+    feedback_reason = Column(String(255), nullable=True)
+    executed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    rule = relationship("CandidateRuleModel", back_populates="executions")
+
+    __table_args__ = (
+        Index("ix_cre_ws_mode_matched", "workspace_id", "mode", "matched"),
+        Index("ix_cre_executed_at", "executed_at"),
+    )
+
+    @property
+    def matched_conditions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.matched_conditions_json or "[]")
+
+
+
 
 
 

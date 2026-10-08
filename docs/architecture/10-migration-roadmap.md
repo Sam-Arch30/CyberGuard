@@ -844,14 +844,44 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
        - `test_continual_learning_api.py` (4 tests): Candidates CRUD & reviews, RBAC role verification, Threat Memory ingestion endpoint, and complete dataset/training/model REST lifecycle.
      - All repository tests passing without regressions.
 
-20. **Requirements & Prerequisites for Section 25**:
+20. **Section 25 — Emerging Pattern & Candidate Rule Engine (COMPLETED)**:
+   - Architecture document: [`34-emerging-pattern-rule-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/34-emerging-pattern-rule-engine.md).
+   - Core Principles & Epistemic Boundaries:
+     - Strict Boundaries: `PATTERN != RULE`, `RULE != APPROVED RULE`, `APPROVED RULE != PRODUCTION RULE`.
+     - Zero Arbitrary Code Execution: Rules are declared exclusively as structured JSON schemas conforming to a bounded Domain Specific Language (DSL). No `eval()`, `exec()`, Python, SQL, JS, or shell execution.
+     - Computational Complexity Budgets: Max 20 conditions per rule, complexity score capped at 25.0, regex length $\le 128$ chars with ReDoS heuristic rejection.
+     - Controlled Lifecycle State Machine: `DISCOVERED -> DRAFT -> VALIDATING -> TESTED -> REVIEW_REQUIRED -> APPROVED -> STAGED -> ACTIVE -> DISABLED -> RETIRED -> SUPERSEDED`.
+     - Ground-Truth Aware Backtesting: Historical backtesting against `ThreatEventModel` and `FindingModel`. Known malicious $\to$ TP; known benign $\to$ FP; unlabeled data $\to$ Unknown (**never** assumed true negatives).
+     - Shadow Mode Staging: Approved rules operate in `STAGED` shadow mode, recording telemetry in `CandidateRuleExecutionModel` without generating live production alerts.
+     - Immutable Versioning & Provenance: Rule edits produce an incremented version (e.g. `v1` $\to$ `v2`), keeping historical versions historically reproducible.
+     - Detection vs Response Boundary: Rule matches emit standardized `ThreatEventModel` and `FindingModel` records; rules **never** autonomously execute destructive response actions.
+   - Core Components & Services:
+     - `CandidateRuleService` (`backend/services/candidate_rule_service.py`): Complete orchestration for DSL validation, canonical fingerprinting deduplication, pattern-to-rule synthesis, historical backtesting, shadow execution, and lifecycle state management.
+     - Pydantic Schemas (`backend/schemas/candidate_rules.py`): Structured types for conditions, definitions, evaluations, requests, and dashboard metrics.
+     - Database Persistence (`backend/db/models.py`): `CandidateRuleModel`, `CandidateRuleVersionModel`, `CandidateRuleExecutionModel`.
+     - REST API (`backend/api/routes/candidate_rules.py`): Endpoints for candidate rules, pattern synthesis, backtesting, approval, shadow staging, activation, disablement, retirement, and runtime evaluation with RBAC verification.
+     - Report Generation (`backend/services/report_service.py`): Added `_format_candidate_rule_section` for executive dossier inclusion.
+   - Verification & Benchmarks:
+     - 15 comprehensive automated tests across 3 test suites:
+       - `test_candidate_rules.py` (10 tests): DSL validation, ReDoS rejection, canonical fingerprint deduplication, operator evaluation, pattern synthesis, ground-truth aware backtesting, lifecycle state machine, immutable versioning, shadow mode vs active firing, disablement/retirement.
+       - `test_candidate_rules_scenarios.py` (1 test): Complete Section 60 lifecycle from emerging URL pattern to shadow mode, production activation, ThreatEvent firing, and threshold tuning (`v1` $\to$ `v2`).
+       - `test_candidate_rules_api.py` (4 tests): Candidates CRUD, role-based authorization enforcement, pattern synthesis/backtest, and full lifecycle execution with dashboard stats.
+     - All repository tests passing without regressions.
+
+21. **Requirements & Prerequisites for Section 26**:
    - **Prerequisites Satisfied**:
-     - Provenance-aware Threat Memory and observation history (Section 23).
-     - Controlled learning candidate qualification and immutable versioned datasets (Section 24).
-     - Model registry with cryptographic verification, regression gating, staging, and rollback (Section 24).
-     - Real model retraining and offline evaluation pipeline (Section 24).
+     - Unified threat/event data model and persistent findings (Sections 2–5).
+     - Multi-vector detection engines (Sections 6–13).
+     - Security Knowledge Graph, cross-incident & temporal correlation (Sections 14–16).
+     - Attack reconstruction & MITRE ATT&CK mapping (Sections 17–19).
+     - Infrastructure attribution & behavioral baselines (Sections 20–21).
+     - Novelty detection & emerging pattern candidates (Section 22).
+     - Persistent Threat Memory (Section 23).
+     - Controlled continual learning pipeline (Section 24).
+     - Emerging pattern & candidate rule engine (Section 25).
    - **Next Steps**:
-     - Ready for Section 25.
+     - Ready for Section 26.
+
 
 
 
