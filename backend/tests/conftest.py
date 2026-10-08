@@ -30,3 +30,14 @@ def stored_analysis():
             db.commit()
         return data
     return store
+
+
+@pytest.fixture(autouse=True)
+def preserve_global_ml_classifier():
+    """Ensure global ML classifier state is not permanently mutated across tests."""
+    from backend.app.ml.classifier import global_phishing_classifier, PhishingClassifier
+    orig_path = global_phishing_classifier.model_path
+    yield
+    global_phishing_classifier.model_path = PhishingClassifier.DEFAULT_MODEL_PATH
+    global_phishing_classifier._load_model()
+

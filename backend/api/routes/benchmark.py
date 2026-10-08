@@ -146,6 +146,8 @@ def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
         from sqlalchemy import text
         with engine.begin() as conn:
             for tbl in [
+                "threat_memory_decisions", "threat_memory_observations", "threat_memory_entries",
+                "registered_models", "learning_training_jobs", "learning_datasets", "learning_candidates",
                 "attack_edges", "attack_stages", "attack_paths", "response_actions",
                 "threat_events", "finding_evidence", "findings", "relationships",
                 "entities", "indicators", "model_versions", "analysis_runs",

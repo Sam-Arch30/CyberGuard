@@ -820,15 +820,39 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
        - `test_threat_memory_api.py` (6 tests): REST endpoint contracts, lookup, context aggregation, analyst decision recording, chronological history, stats, and natural-language query triage.
      - All 882 repository tests passing (861 baseline + 21 Section 23).
 
-19. **Requirements & Prerequisites for Section 24**:
+19. **Section 24 — Controlled Continual-Learning Pipeline (COMPLETED)**:
+   - Architecture document: [`33-continual-learning.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/33-continual-learning.md).
+   - Core Principles & Epistemic Boundaries:
+     - Strict Decoupling: `TRAINING ≠ PRODUCTION DEPLOYMENT`. The production system never silently rewrites itself from untrusted inputs.
+     - Controlled Lifecycle State Machine: `COLLECTING -> READY_FOR_REVIEW -> DATA_VALIDATION -> TRAINING -> EVALUATING -> CANDIDATE -> APPROVED -> STAGED -> PRODUCTION -> ROLLED_BACK -> ARCHIVED`.
+     - Epistemic Ground Truth Separation: Model predictions are never treated as ground truth by default.
+     - Data Poisoning Defenses: Maximum source concentration caps (<= 35%), minimum class representation floors (>= 5%), deduplication preserving observation frequency, and zero execution of samples during dataset curation.
+     - Temporal Splitting & Leakage Prevention: Temporal ordering strictly preserves past -> train, later -> val, newest -> holdout. Incident/campaign grouping prevents cross-split leakage of related clusters.
+     - Cryptographic Artifact Integrity: Model artifacts are hashed with SHA-256 upon saving; loading requires runtime checksum verification against tampering.
+     - Strict Security Regression Gates: Candidate models must meet configurable thresholds (F1, critical recall, FPR) compared against current production baseline before approval.
+     - Reversible Rollback: Any promoted model can be immediately rolled back to the prior production model version without deleting evaluation history.
+   - Core Components & Services:
+     - `ContinualLearningService` (`backend/services/continual_learning_service.py`): Complete orchestration for candidate qualification, secret redaction, Threat Memory decision ingestion (converting false positives to hard negatives), dataset generation with SHA-256 manifests, real TF-IDF + LogisticRegression training, offline evaluation, regression gates, model registry lifecycle, and drift reporting.
+     - Pydantic Schemas (`backend/schemas/continual_learning.py`): Structured types for candidates, datasets, jobs, metrics, gates, model cards, drift, and requests.
+     - Database Persistence (`backend/db/models.py`): `LearningCandidateModel`, `LearningDatasetModel`, `LearningTrainingJobModel`, `RegisteredModelModel`.
+     - REST API (`backend/api/routes/continual_learning.py`): Endpoints for candidates, reviews, threat memory ingestion, datasets, training jobs, models, approvals, staging, promotions, rollbacks, drift evaluation, and dashboard metrics with role-based access control (`ROLE_ML_OPS`, `ROLE_ADMIN`).
+     - Report Generation (`backend/services/report_service.py`): PDF reporting flowables for continual learning status, dataset lineage, and model registry state.
+   - Verification & Benchmarks:
+     - 15 comprehensive automated tests across 3 test suites:
+       - `test_continual_learning.py` (10 tests): secret redaction, candidate eligibility, deduplication, Threat Memory false positive hard negatives, dataset immutability, temporal/campaign leakage prevention, anti-poisoning concentration checks, real TF-IDF + LogisticRegression training & offline metrics, model registry approval/staging/promotion/rollback, and artifact tampering protection.
+       - `test_continual_learning_scenarios.py` (1 test): Section 68 complete Day 1 through Day 10 end-to-end lifecycle scenario (Observe -> Analyst feedback -> False positive hard negative -> Dataset D-025 build -> Train candidate -> Compare baseline -> Approve -> Stage -> Promote -> Regression -> Rollback).
+       - `test_continual_learning_api.py` (4 tests): Candidates CRUD & reviews, RBAC role verification, Threat Memory ingestion endpoint, and complete dataset/training/model REST lifecycle.
+     - All repository tests passing without regressions.
+
+20. **Requirements & Prerequisites for Section 25**:
    - **Prerequisites Satisfied**:
-     - Persistent, provenance-aware Threat Memory projection and observation lineage (Section 23).
-     - Retained historical pattern library and structural similarity distance engine (Section 22).
-     - Emerging pattern recurrence tracking and candidate clustering (Section 22).
-     - Entity-specific behavioral baselines and deviation scoring (Section 21).
-     - Full cross-incident and temporal correlation graphs (Sections 14-16).
+     - Provenance-aware Threat Memory and observation history (Section 23).
+     - Controlled learning candidate qualification and immutable versioned datasets (Section 24).
+     - Model registry with cryptographic verification, regression gating, staging, and rollback (Section 24).
+     - Real model retraining and offline evaluation pipeline (Section 24).
    - **Next Steps**:
-     - Ready for Section 24 (Controlled Continual Learning Pipeline).
+     - Ready for Section 25.
+
 
 
 

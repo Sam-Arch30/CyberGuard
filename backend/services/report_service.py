@@ -1687,6 +1687,80 @@ class ReportService:
         flowables.append(Spacer(1, 8))
         return flowables
 
+    @classmethod
+    def _format_continual_learning_section(
+        cls,
+        model_card_or_learning_data: Any,
+        styles: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """
+        Formats Section 24 Controlled Continual-Learning & Model Card flowables.
+        Maintains strict epistemic boundary: TRAINING != PRODUCTION DEPLOYMENT.
+        """
+        flowables = []
+        flowables.append(Paragraph("Controlled Continual Learning & Model Lineage", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        notice = (
+            "CyberGuard employs controlled continual learning. Untrusted inputs never modify production models. "
+            "All model candidates undergo offline evaluation, regression gating, explicit approval, staging, "
+            "and cryptographic checksum verification before deployment."
+        )
+        note_style = styles.get("WarningBox", styles.get("TableCell", styles["Normal"]))
+        flowables.append(Paragraph(f"<b>GOVERNANCE NOTICE:</b> <i>{html.escape(notice)}</i>", note_style))
+        flowables.append(Spacer(1, 6))
+
+        if not model_card_or_learning_data:
+            flowables.append(Paragraph("<i>No continual learning model updates or candidates associated with this report scope.</i>", styles["TableCell"]))
+            flowables.append(Spacer(1, 8))
+            return flowables
+
+        # Render Model Card table
+        data = model_card_or_learning_data if isinstance(model_card_or_learning_data, dict) else (
+            model_card_or_learning_data.model_dump() if hasattr(model_card_or_learning_data, "model_dump") else {}
+        )
+        model_type = data.get("model_type", "PHISHING_CLASSIFIER")
+        version = data.get("version", "v1.0.0")
+        dataset_ver = data.get("dataset_version", "D-001")
+        status_val = data.get("status", "PRODUCTION")
+        checksum = str(data.get("checksum", "N/A"))
+        if len(checksum) > 16:
+            checksum = checksum[:16] + "..."
+        metrics = data.get("metrics", {})
+        acc = metrics.get("accuracy", "N/A")
+        f1 = metrics.get("f1_score", "N/A")
+        rec = metrics.get("recall", "N/A")
+        crit_rec = metrics.get("critical_threat_recall", "N/A")
+
+        table_data = [
+            [
+                Paragraph("<b>MODEL / VERSION</b>", styles["TableHead"]),
+                Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                Paragraph("<b>DATASET</b>", styles["TableHead"]),
+                Paragraph("<b>ACC / F1 / RECALL</b>", styles["TableHead"]),
+                Paragraph("<b>CRITICAL RECALL / SHA-256</b>", styles["TableHead"]),
+            ],
+            [
+                Paragraph(f"<b>{html.escape(str(model_type))}</b><br/>{html.escape(str(version))}", styles["TableCellBold"]),
+                Paragraph(html.escape(str(status_val)), styles["TableCell"]),
+                Paragraph(html.escape(str(dataset_ver)), styles["TableCell"]),
+                Paragraph(f"Acc: {acc}<br/>F1: {f1}<br/>Rec: {rec}", styles["TableCell"]),
+                Paragraph(f"Crit: {crit_rec}<br/>SHA: {checksum}", styles["TableCell"]),
+            ]
+        ]
+
+        t = Table(table_data, colWidths=[130, 85, 80, 115, 130])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ]))
+        flowables.append(t)
+        flowables.append(Spacer(1, 8))
+        return flowables
+
 
 
 

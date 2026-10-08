@@ -37,6 +37,10 @@ backend/data/eml_store/*.eml
 !backend/data/eml_store/.gitkeep
 backend/data/storage/*
 !backend/data/storage/.gitkeep
+backend/app/ml/models/candidates/*.joblib
+!backend/app/ml/models/candidates/.gitkeep
+backend/data/datasets/*
+
 
 # Editor directories and files
 .vscode/*

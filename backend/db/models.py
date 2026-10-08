@@ -1,5 +1,7 @@
+import json
 import uuid
 from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional
 from sqlalchemy import (
     Column,
     String,
@@ -11,7 +13,6 @@ from sqlalchemy import (
     Index,
     Boolean
 )
-from typing import Optional
 from sqlalchemy.orm import relationship, relationship as orm_relationship
 from backend.db.session import Base
 
@@ -1550,6 +1551,164 @@ class ThreatMemoryRelationshipModel(Base):
         Index("ix_tmr_src_tgt", "source_memory_id", "target_memory_id", "relationship_type", unique=True),
         Index("ix_tmr_ws_type", "workspace_id", "relationship_type"),
     )
+
+
+# ============================================================================
+# Section 24: Controlled Continual-Learning Models
+# ============================================================================
+
+class LearningCandidateModel(Base):
+    """
+    Curated candidate for model learning derived from verified observations,
+    hard negatives, and analyst feedback (Section 24).
+    """
+    __tablename__ = "learning_candidates"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_type = Column(String(50), nullable=False, index=True)  # THREAT_MEMORY, INCIDENT, ANALYSIS_RUN, EXTERNAL_FEED
+    source_reference = Column(String(255), nullable=False, index=True)
+    feature_reference = Column(String(255), nullable=True)
+    text_content = Column(Text, nullable=True)
+    label = Column(String(50), nullable=False, index=True)  # phishing, legitimate, etc.
+    label_source = Column(String(50), nullable=False, index=True)  # ANALYST_VERIFIED, RULE_VERIFIED, etc.
+    confidence = Column(Float, nullable=False, default=1.0)
+    is_hard_negative = Column(Boolean, nullable=False, default=False)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True)
+    observed_at = Column(DateTime, default=get_utc_now, nullable=False)
+    eligibility_status = Column(String(30), nullable=False, default="ELIGIBLE", index=True)  # ELIGIBLE, INELIGIBLE, EXCLUDED, REVIEW_REQUIRED
+    ineligibility_reason = Column(String(255), nullable=True)
+    review_status = Column(String(30), nullable=False, default="PENDING", index=True)  # PENDING, REVIEWED, ACCEPTED, REJECTED, DEFERRED
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_reason = Column(String(500), nullable=True)
+    dataset_version = Column(String(50), nullable=True, index=True)
+    raw_payload_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_lc_ws_elig", "workspace_id", "eligibility_status"),
+        Index("ix_lc_ws_review", "workspace_id", "review_status"),
+        Index("ix_lc_ws_dataset", "workspace_id", "dataset_version"),
+    )
+
+    @property
+    def raw_payload(self) -> Dict[str, Any]:
+        return json.loads(self.raw_payload_json or "{}")
+
+
+class LearningDatasetModel(Base):
+    """
+    Immutable versioned training dataset snapshot with cryptographic integrity (Section 24).
+    """
+    __tablename__ = "learning_datasets"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    version = Column(String(50), nullable=False, index=True)  # e.g. D-001, D-025
+    feature_schema_version = Column(String(32), nullable=False, default="1.0.0")
+    label_policy_version = Column(String(32), nullable=False, default="1.0.0")
+    sample_count = Column(Integer, nullable=False, default=0)
+    malicious_count = Column(Integer, nullable=False, default=0)
+    benign_count = Column(Integer, nullable=False, default=0)
+    hard_negative_count = Column(Integer, nullable=False, default=0)
+    source_distribution_json = Column(Text, default="{}", nullable=False)
+    time_range_start = Column(DateTime, nullable=True)
+    time_range_end = Column(DateTime, nullable=True)
+    quality_score = Column(Float, nullable=False, default=1.0)
+    validation_status = Column(String(30), nullable=False, default="VALIDATED", index=True)  # COLLECTING, VALIDATED, REJECTED, ARCHIVED
+    validation_errors_json = Column(Text, default="[]", nullable=False)
+    manifest_checksum = Column(String(64), nullable=False)
+    created_by = Column(String(100), nullable=False, default="system")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ld_ws_ver", "workspace_id", "version", unique=True),
+        Index("ix_ld_ws_status", "workspace_id", "validation_status"),
+    )
+
+    @property
+    def source_distribution(self) -> Dict[str, Any]:
+        return json.loads(self.source_distribution_json or "{}")
+
+    @property
+    def validation_errors(self) -> List[str]:
+        return json.loads(self.validation_errors_json or "[]")
+
+
+class LearningTrainingJobModel(Base):
+    """
+    Asynchronous training and offline evaluation job records (Section 24).
+    """
+    __tablename__ = "learning_training_jobs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    model_type = Column(String(50), nullable=False, default="PHISHING_CLASSIFIER", index=True)
+    dataset_version = Column(String(50), nullable=False, index=True)
+    status = Column(String(30), nullable=False, default="QUEUED", index=True)  # QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED, REJECTED
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    base_model_version = Column(String(50), nullable=True)
+    candidate_model_version = Column(String(50), nullable=True)
+    training_config_json = Column(Text, default="{}", nullable=False)
+    metrics_json = Column(Text, default="{}", nullable=False)
+    error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ltj_ws_status", "workspace_id", "status"),
+        Index("ix_ltj_ws_dataset", "workspace_id", "dataset_version"),
+    )
+
+    @property
+    def training_config(self) -> Dict[str, Any]:
+        return json.loads(self.training_config_json or "{}")
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        return json.loads(self.metrics_json or "{}")
+
+
+class RegisteredModelModel(Base):
+    """
+    Model Registry entry managing candidate, staged, and production model artifacts (Section 24).
+    """
+    __tablename__ = "registered_models"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    model_type = Column(String(50), nullable=False, default="PHISHING_CLASSIFIER", index=True)
+    version = Column(String(50), nullable=False, index=True)  # e.g. phishing-v1, phishing-v13
+    dataset_version = Column(String(50), nullable=False, index=True)
+    feature_schema_version = Column(String(32), nullable=False, default="1.0.0")
+    training_job_id = Column(String(36), nullable=True)
+    status = Column(String(30), nullable=False, default="CANDIDATE", index=True)  # CANDIDATE, APPROVED, STAGED, PRODUCTION, ROLLED_BACK, ARCHIVED, REJECTED
+    metrics_json = Column(Text, default="{}", nullable=False)
+    baseline_comparison_json = Column(Text, default="{}", nullable=False)
+    artifact_path = Column(String(500), nullable=False)
+    artifact_checksum = Column(String(64), nullable=False)
+    approved_by = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    staged_at = Column(DateTime, nullable=True)
+    promoted_at = Column(DateTime, nullable=True)
+    rolled_back_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_rm_ws_type_ver", "workspace_id", "model_type", "version", unique=True),
+        Index("ix_rm_ws_status", "workspace_id", "model_type", "status"),
+    )
+
+    @property
+    def metrics(self) -> Dict[str, Any]:
+        return json.loads(self.metrics_json or "{}")
+
+    @property
+    def baseline_comparison(self) -> Dict[str, Any]:
+        return json.loads(self.baseline_comparison_json or "{}")
+
 
 
 
