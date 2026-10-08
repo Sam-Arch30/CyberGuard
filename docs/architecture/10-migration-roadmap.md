@@ -745,14 +745,54 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
        - `test_behavioral_baseline_api.py` (6 tests): REST endpoint contracts and lifecycle actions.
        - `test_behavioral_performance.py` (3 tests): 1,000-event extraction < 100ms, sub-millisecond cache retrieval, bounded queries.
 
-17. **Requirements & Prerequisites for Section 22**:
+17. **Section 22 — Novelty Detection & Emerging-Threat Identification Engine (COMPLETED)**:
+   - Architecture document: [`31-novelty-emerging-threat-detection.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/31-novelty-emerging-threat-detection.md).
+   - Core Principles & Epistemic Boundaries:
+     - Novelty vs. Anomaly Distinction: Evaluates global/historical unfamiliarity within retained telemetry rather than entity-specific deviations.
+     - Epistemic Humility: Novelty is technical unfamiliarity, never an autonomous verdict of compromise or zero-day discovery.
+     - 4-Quadrant Behavior-Familiarity Matrix: `NORMAL_FAMILIAR`, `NORMAL_NOVEL` (benign business rollout), `UNUSUAL_FAMILIAR`, `UNUSUAL_NOVEL`.
+     - Strict Privacy Boundary: Credentials, passwords, tokens, API keys, cookies, and MFA secrets are strictly prohibited from fingerprints and features.
+   - Core Components & Services:
+     - `NoveltyFingerprinter` (`backend/services/novelty_fingerprinter.py`): Deterministic SHA-256 pattern hashing and sanitized representations across API, URL, Domain, Network, Auth, Sequences, Combinations, and Relationships.
+     - `NoveltySimilarityService` (`backend/services/novelty_similarity.py`): Lightweight Jaccard, normalized Levenshtein edit distance, composite LCS sequence alignment, and candidate distance scoring.
+     - `NoveltyDetectionService` (`backend/services/novelty_detection_service.py`): End-to-end evaluation, retention window lookback (90 days), poisoning filtering, contextual suppression handling, and emerging pattern recurrence tracking.
+     - `NoveltyMetricsTracker` (`backend/services/novelty_metrics.py`): Structured in-memory observability counters and execution metrics.
+     - `ReportService` (`backend/services/report_service.py`): Objective non-alarmist PDF flowable reporting (`format_novelty_assessment_section`).
+   - Database Persistence & Schemas:
+     - Models in `backend/db/models.py`: `PatternFingerprintModel`, `NoveltyAssessmentModel`, `EmergingPatternCandidateModel`, `NoveltySuppressionRuleModel`.
+     - Pydantic models in `backend/schemas/novelty_detection.py` with runtime privacy validators.
+     - Knowledge Graph: Added `EMERGING_PATTERN` entity type and `EXHIBITS_NOVEL_PATTERN`, `ASSOCIATED_WITH_NOVEL_PATTERN` relationship types (`backend/schemas/knowledge_graph.py`).
+     - Attack Reconstruction: Integrated `novel_sequence = true` indicator into `AttackReconstructionEngine` (`backend/services/attack_reconstruction_engine.py`).
+   - REST API Endpoints (`backend/api/routes/novelty.py`):
+     - `POST /api/v1/novelty/evaluate`
+     - `GET /api/v1/investigations/{id}/novelty`
+     - `GET /api/v1/investigations/{id}/novelty/patterns`
+     - `GET /api/v1/investigations/{id}/novelty/sequences`
+     - `GET /api/v1/investigations/{id}/novelty/infrastructure`
+     - `GET /api/v1/investigations/{id}/emerging-patterns`
+     - `GET /api/v1/entities/{id}/novelty`
+     - `POST /api/v1/novelty/emerging-patterns/{id}/status`
+     - `POST /api/v1/novelty/suppressions`
+     - `GET /api/v1/novelty/stats`
+   - Verification & Benchmarks:
+     - 21 comprehensive automated tests across 4 test suites:
+       - `test_novelty_detection.py` (11 tests): exact match, structural URL similarity, sequence alignment, multi-signal combination, emerging pattern recurrence, retention boundaries, poisoning safeguards, contextual suppressions, and privacy validation.
+       - `test_novelty_scenarios.py` (3 tests):
+         - Scenario 1: API sequence novelty evolving into emerging pattern candidate across incidents.
+         - Scenario 2: Novel network behavior (device -> new domain -> new port) without false malware classification.
+         - Scenario 3: Legitimate SaaS rollout evaluated into NORMAL quadrants without malicious false positives.
+       - `test_novelty_api.py` (6 tests): REST endpoint contracts, investigation summaries, entity lookups, and lifecycle transitions.
+       - `test_novelty_performance.py` (1 test): 500-fingerprint candidate evaluation bounded and completed in < 200ms.
+
+18. **Requirements & Prerequisites for Section 23**:
    - **Prerequisites Satisfied**:
-     - Entity-specific behavioral baselines with robust statistics and quality states (Section 21).
-     - Poisoning-resistant baseline lifecycle with freezing and controlled relearning (Section 21).
-     - Contextual profiles for service accounts and administrators (Section 21).
-     - Knowledge graph integration with `BEHAVIORAL_BASELINE`, `HAS_BEHAVIOR_BASELINE`, and `DEVIATES_FROM_BASELINE` (Sections 14, 21).
+     - Retained historical pattern library and structural similarity distance engine (Section 22).
+     - Emerging pattern candidate clustering and recurrence lifecycle (Section 22).
+     - 4-quadrant behavior-familiarity matrix integrating entity anomalies (Section 21) with global unfamiliarity (Section 22).
+     - Contextual suppression and baseline poisoning safeguards (Section 22).
    - **Next Steps**:
-     - Progressing to Section 22 (Novelty & Emerging-Threat Detection Engine) per architecture roadmap.
+     - Ready for Section 23 implementation per architectural roadmap.
+
 
 
 

@@ -1467,4 +1467,132 @@ class ReportService:
 
         return flowables
 
+    @classmethod
+    def format_novelty_assessment_section(
+        cls,
+        assessments: List[Any],
+        styles: Dict[str, ParagraphStyle],
+        emerging_patterns: Optional[List[Any]] = None,
+    ) -> List[Any]:
+        """
+        Formats Section 22 Novelty & Emerging-Threat Assessment flowables.
+        Maintains strict epistemic humility: technical unfamiliarity != malicious intent.
+        """
+        flowables = []
+        flowables.append(Paragraph("Novelty & Emerging-Threat Assessment", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        # Forensic Notice
+        forensic_notice = (
+            "Novelty represents technical unfamiliarity within CyberGuard's retained historical telemetry. "
+            "A novel pattern or unprecedented event combination alone does NOT establish malicious intent, attack causation, or compromise."
+        )
+        note_style = styles.get("WarningBox", styles.get("TableCell", styles["Normal"]))
+        flowables.append(Paragraph(f"<b>FORENSIC NOTICE:</b> <i>{html.escape(forensic_notice)}</i>", note_style))
+        flowables.append(Spacer(1, 6))
+
+        if not assessments:
+            flowables.append(Paragraph("<i>No previously unobserved or emerging behavioral patterns identified in retained telemetry.</i>", styles["TableCell"]))
+            flowables.append(Spacer(1, 8))
+            return flowables
+
+        table_data = [
+            [
+                Paragraph("<b>ENTITY / PATTERN</b>", styles["TableHead"]),
+                Paragraph("<b>CATEGORY</b>", styles["TableHead"]),
+                Paragraph("<b>NOVELTY LEVEL</b>", styles["TableHead"]),
+                Paragraph("<b>DISTANCE</b>", styles["TableHead"]),
+                Paragraph("<b>FAMILIARITY MATRIX</b>", styles["TableHead"]),
+                Paragraph("<b>EVIDENCE & LIMITATIONS</b>", styles["TableHead"]),
+            ]
+        ]
+
+        for a in assessments:
+            ent_id = getattr(a, "entity_id", "")
+            ent_type = getattr(a, "entity_type", "")
+            repr_str = getattr(a, "fingerprint_repr", "") or f"{ent_type}:{ent_id}"
+            ent_cell = f"<b>{html.escape(str(repr_str))}</b><br/>Entity: {html.escape(str(ent_type))}:{html.escape(str(ent_id))}"
+
+            cat_val = getattr(a, "novelty_type", "")
+            cat_str = html.escape(cat_val.value if hasattr(cat_val, "value") else str(cat_val))
+
+            lvl_val = getattr(a, "novelty_level", "")
+            lvl_str = html.escape(lvl_val.value if hasattr(lvl_val, "value") else str(lvl_val))
+
+            score = float(getattr(a, "novelty_score", 0.0))
+            sim = float(getattr(a, "similarity_score", 0.0))
+            dist_str = f"Novelty: {score * 100:.0f}%<br/>Similarity: {sim * 100:.0f}%"
+
+            mat_val = getattr(a, "behavior_familiarity_matrix", "")
+            mat_str = html.escape(mat_val.value if hasattr(mat_val, "value") else str(mat_val))
+
+            ev_list = getattr(a, "supporting_evidence", [])
+            ev_desc = ""
+            if ev_list and isinstance(ev_list, list) and isinstance(ev_list[0], dict):
+                ev_desc = ev_list[0].get("description", "")
+            limits = getattr(a, "limitations", [])
+            limit_str = f"<br/><i>Limit: {html.escape(limits[0])}</i>" if limits else ""
+            expl_cell = f"{html.escape(ev_desc)}{limit_str}"
+
+            table_data.append([
+                Paragraph(ent_cell, styles["TableCellBold"]),
+                Paragraph(cat_str, styles["TableCell"]),
+                Paragraph(f"<b>{lvl_str}</b>", styles["TableCell"]),
+                Paragraph(dist_str, styles["TableCell"]),
+                Paragraph(mat_str, styles["TableCell"]),
+                Paragraph(expl_cell, styles["TableCell"]),
+            ])
+
+        t = Table(table_data, colWidths=[110, 85, 75, 75, 85, 110])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ]))
+        flowables.append(t)
+        flowables.append(Spacer(1, 8))
+
+        # Emerging Pattern Candidates
+        if emerging_patterns:
+            flowables.append(Paragraph("<b>Emerging Recurring Patterns</b>", styles["TableCellBold"]))
+            emerging_data = [
+                [
+                    Paragraph("<b>PATTERN REPR</b>", styles["TableHead"]),
+                    Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>OBSERVATIONS</b>", styles["TableHead"]),
+                    Paragraph("<b>ENTITIES</b>", styles["TableHead"]),
+                    Paragraph("<b>RECURRENCE SCORE</b>", styles["TableHead"]),
+                ]
+            ]
+            for ep in emerging_patterns:
+                ep_repr = html.escape(str(getattr(ep, "fingerprint_repr", "")))
+                st_val = getattr(ep, "status", "")
+                st_str = html.escape(st_val.value if hasattr(st_val, "value") else str(st_val))
+                obs_c = str(getattr(ep, "observation_count", 1))
+                ent_c = str(getattr(ep, "entity_count", 1))
+                rec_s = f"{float(getattr(ep, 'recurrence_score', 0.0)):.1f}"
+                emerging_data.append([
+                    Paragraph(ep_repr, styles["TableCellBold"]),
+                    Paragraph(st_str, styles["TableCell"]),
+                    Paragraph(obs_c, styles["TableCell"]),
+                    Paragraph(ent_c, styles["TableCell"]),
+                    Paragraph(rec_s, styles["TableCell"]),
+                ])
+
+            t_ep = Table(emerging_data, colWidths=[200, 85, 75, 75, 105])
+            t_ep.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.0),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.0),
+            ]))
+            flowables.append(t_ep)
+            flowables.append(Spacer(1, 8))
+
+        return flowables
+
+
 

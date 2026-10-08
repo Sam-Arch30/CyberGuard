@@ -659,6 +659,8 @@ class IncidentModel(Base):
     infrastructure_attributions = relationship("InfrastructureAttributionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     infrastructure_clusters = relationship("InfrastructureClusterModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     behavioral_deviations = relationship("BehavioralDeviationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    novelty_assessments = relationship("NoveltyAssessmentModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    emerging_patterns = relationship("EmergingPatternCandidateModel", back_populates="incident", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -1278,6 +1280,135 @@ class BaselineAuditModel(Base):
     __table_args__ = (
         Index("ix_bal_base_action", "baseline_id", "action"),
     )
+
+
+# ============================================================================
+# SECTION 22: NOVELTY DETECTION & EMERGING-THREAT IDENTIFICATION MODELS
+# ============================================================================
+
+class PatternFingerprintModel(Base):
+    """
+    Persisted pattern fingerprints powering exact match and historical structural similarity (Section 22).
+    """
+    __tablename__ = "pattern_fingerprints"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    pattern_type = Column(String(50), nullable=False, index=True)
+    fingerprint_hash = Column(String(64), nullable=False, index=True)
+    fingerprint_repr = Column(String(255), nullable=False)
+    attributes_json = Column(Text, default="{}", nullable=False)
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    observation_count = Column(Integer, nullable=False, default=1)
+    entity_count = Column(Integer, nullable=False, default=1)
+    incident_count = Column(Integer, nullable=False, default=1)
+    is_suppressed = Column(Boolean, nullable=False, default=False)
+    suppression_reason = Column(String(255), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_pf_ws_type_hash", "workspace_id", "pattern_type", "fingerprint_hash", unique=True),
+        Index("ix_pf_ws_last_seen", "workspace_id", "last_seen_at"),
+    )
+
+
+class NoveltyAssessmentModel(Base):
+    """
+    Persisted novelty assessments evaluating pattern unfamiliarity in retained telemetry (Section 22).
+    """
+    __tablename__ = "novelty_assessments"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=True, index=True)
+    investigation_id = Column(String(36), nullable=True, index=True)
+    entity_type = Column(String(50), nullable=False, index=True)
+    entity_id = Column(String(128), nullable=False, index=True)
+    novelty_type = Column(String(50), nullable=False, index=True)
+    novelty_score = Column(Float, nullable=False, default=0.0)  # 0.0 - 1.0 relative distance
+    novelty_level = Column(String(30), nullable=False, default="UNKNOWN")
+    similarity_score = Column(Float, nullable=False, default=0.0)
+    historical_sample_count = Column(Integer, nullable=False, default=0)
+    comparison_window = Column(String(50), nullable=False, default="90_DAYS")
+    behavior_familiarity_matrix = Column(String(50), nullable=False, default="NORMAL_NOVEL")
+    feature_version = Column(String(32), nullable=False, default="1.0.0")
+    baseline_version = Column(String(32), nullable=False, default="1.0.0")
+    status = Column(String(30), nullable=False, default="ACTIVE")
+    fingerprint_hash = Column(String(64), nullable=True, index=True)
+    fingerprint_repr = Column(String(255), nullable=True)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    contradicting_evidence_json = Column(Text, default="[]", nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    threat_assessment_note = Column(Text, nullable=True)
+    engine_version = Column(String(32), nullable=False, default="1.0.0")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    incident = relationship("IncidentModel", back_populates="novelty_assessments")
+
+    __table_args__ = (
+        Index("ix_na_ws_entity", "workspace_id", "entity_type", "entity_id"),
+        Index("ix_na_inc_type", "incident_id", "novelty_type"),
+        Index("ix_na_ws_score", "workspace_id", "novelty_score"),
+    )
+
+
+class EmergingPatternCandidateModel(Base):
+    """
+    Clusters of recurring novel patterns across multiple entities/incidents (Section 22).
+    """
+    __tablename__ = "emerging_pattern_candidates"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    pattern_type = Column(String(50), nullable=False, index=True)
+    fingerprint_hash = Column(String(64), nullable=False, index=True)
+    fingerprint_repr = Column(String(255), nullable=False)
+    similarity_cluster = Column(String(100), nullable=True)
+    novelty_score = Column(Float, nullable=False, default=1.0)
+    recurrence_score = Column(Float, nullable=False, default=0.0)
+    first_seen = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen = Column(DateTime, default=get_utc_now, nullable=False)
+    observation_count = Column(Integer, nullable=False, default=1)
+    entity_count = Column(Integer, nullable=False, default=1)
+    incident_count = Column(Integer, nullable=False, default=1)
+    supporting_evidence_json = Column(Text, default="[]", nullable=False)
+    status = Column(String(30), nullable=False, default="OBSERVED")  # OBSERVED, EMERGING, INVESTIGATING, VALIDATED, REJECTED, ARCHIVED
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="emerging_patterns")
+
+    __table_args__ = (
+        Index("ix_epc_ws_hash", "workspace_id", "fingerprint_hash", unique=True),
+        Index("ix_epc_ws_status", "workspace_id", "status"),
+        Index("ix_epc_recurrence", "workspace_id", "recurrence_score"),
+    )
+
+
+class NoveltySuppressionRuleModel(Base):
+    """
+    Auditable contextual exceptions suppressing benign novelty (Section 22).
+    """
+    __tablename__ = "novelty_suppression_rules"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    pattern_type = Column(String(50), nullable=True, index=True)
+    entity_type = Column(String(50), nullable=True)
+    entity_id = Column(String(128), nullable=True)
+    fingerprint_hash = Column(String(64), nullable=True, index=True)
+    reason = Column(String(255), nullable=False)
+    approved_by = Column(String(100), nullable=False)
+    valid_from = Column(DateTime, default=get_utc_now, nullable=False)
+    valid_until = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_nsr_ws_fp", "workspace_id", "fingerprint_hash"),
+    )
+
 
 
 

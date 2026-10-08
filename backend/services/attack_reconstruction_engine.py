@@ -40,6 +40,7 @@ from backend.db.models import (
     AnalysisRunModel,
     TemporalSequenceCandidateModel,
     CampaignIncidentModel,
+    NoveltyAssessmentModel,
     generate_uuid,
     get_utc_now,
 )
@@ -139,6 +140,12 @@ class AttackReconstructionEngine:
             CampaignIncidentModel.incident_id == incident_id
         ).all()
 
+        # Fetch novelty assessments (Section 22)
+        novelty_assessments = db.query(NoveltyAssessmentModel).filter(
+            NoveltyAssessmentModel.incident_id == incident_id,
+            NoveltyAssessmentModel.workspace_id == workspace_id
+        ).all()
+
         # Fetch findings linked via threat events or analysis runs
         finding_ids: Set[str] = set()
         for ev in security_events:
@@ -219,6 +226,12 @@ class AttackReconstructionEngine:
             "relationships": relationships,
             "temporal_sequences": temporal_sequences,
             "campaign_memberships": campaign_memberships,
+            "novelty_assessments": novelty_assessments,
+            "has_novel_sequence": any(
+                getattr(a, "novelty_type", "") in ("NOVEL_ATTACK_SEQUENCE", "NOVEL_EVENT_COMBINATION")
+                and float(getattr(a, "novelty_score", 0.0)) >= 0.70
+                for a in novelty_assessments
+            ),
             "time_range": {"start": earliest_dt, "end": latest_dt}
         }
         return incident, telemetry
