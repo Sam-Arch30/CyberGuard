@@ -713,14 +713,46 @@ Evaluation of the 12 core cybersecurity concepts required for the future CyberGu
        - `test_infrastructure_performance.py` (4 tests): 500-event candidate generation < 250ms, cyclic graph bounded depth, clustering 150 candidates < 50ms, E2E analysis < 200ms.
        - `test_infrastructure_api_routes.py` (6 tests): REST endpoint contracts.
 
-16. **Requirements & Prerequisites for Section 21**:
+16. **Section 21 — Behavioral Baseline & Anomaly Detection Engine (COMPLETED)**:
+   - Architecture document: [`30-behavioral-baseline-engine.md`](file:///Users/samvabmishra/Sam/Codes/CyberGuard/docs/architecture/30-behavioral-baseline-engine.md).
+   - Core Principles & Epistemic Boundaries:
+     - Entity-Specific Anomaly Detection: Evaluates deviations against an entity's own historical telemetry rather than global averages.
+     - Evidence, Not Verdict: Behavioral deviation is statistical evidence, not an automatic compromise verdict.
+     - Hard Privacy Boundary: Raw credentials, passwords, tokens, API keys, cookies, and MFA secrets are strictly prohibited from baseline features.
+   - Core Components & Robust Statistics:
+     - `BehavioralFeatureExtractor` (`backend/services/behavioral_feature_extractor.py`): Privacy-enforced extraction across SecurityEvent, Auth, Network, and API telemetry.
+     - `BehavioralStatisticsEngine` (`backend/services/behavioral_statistics.py`): Median, MAD (Median Absolute Deviation), Winsorization, Percentiles, and Circular 24-hour wrap-around distance.
+     - `BaselinePoisoningGuard` (`backend/services/baseline_poisoning_guard.py`): Automatic exclusion of confirmed malicious, quarantined, and threat-linked events to resist adversary baseline training.
+     - `BaselineContextManager` (`backend/services/baseline_context_manager.py`): 24/7 machine allowance for service accounts, admin privilege context, and auditable authorized exceptions.
+     - `BehavioralBaselineService` (`backend/services/behavioral_baseline_service.py`): End-to-end baseline lifecycle (LEARNING, STABLE, RELEARNING, FROZEN, DEGRADED) and runtime deviation scoring.
+     - `ReportService` (`backend/services/report_service.py`): Objective non-alarmist PDF flowable reporting (`format_behavioral_baseline_section`).
+   - Database Persistence & Schemas:
+     - Models in `backend/db/models.py`: `BehavioralBaselineModel`, `BehavioralDeviationModel`, `BaselineAuditModel`.
+     - Pydantic models in `backend/schemas/behavioral_baseline.py` with privacy validators.
+   - REST API Endpoints (`backend/api/routes/behavioral_baseline.py`):
+     - `GET /api/v1/entities/{entity_type}/{entity_id}/baseline`
+     - `GET /api/v1/entities/{entity_type}/{entity_id}/baseline/history`
+     - `POST /api/v1/entities/{entity_type}/{entity_id}/baseline/freeze`
+     - `POST /api/v1/entities/{entity_type}/{entity_id}/baseline/unfreeze`
+     - `POST /api/v1/entities/{entity_type}/{entity_id}/baseline/relearn`
+     - `POST /api/v1/entities/{entity_type}/{entity_id}/exceptions`
+     - `GET /api/v1/investigations/{investigation_id}/behavioral-deviations`
+     - `POST /api/v1/baselines/evaluate-deviation`
+   - Verification & Benchmarks:
+     - 26 comprehensive automated tests across 4 test suites:
+       - `test_behavioral_baseline.py` (13 tests): zero events, insufficient history, stable creation, robust stats, circular distance, categorical novelty, normal evaluation, unusual hour alert, poisoning guard, frozen state, service accounts, exceptions, Hero scenario.
+       - `test_behavioral_baseline_boundaries.py` (4 tests): credential privacy, model validation, non-alarmist phrasing, reproducibility version stamps.
+       - `test_behavioral_baseline_api.py` (6 tests): REST endpoint contracts and lifecycle actions.
+       - `test_behavioral_performance.py` (3 tests): 1,000-event extraction < 100ms, sub-millisecond cache retrieval, bounded queries.
+
+17. **Requirements & Prerequisites for Section 22**:
    - **Prerequisites Satisfied**:
-     - Provenance-backed MITRE ATT&CK technique mappings (Section 19).
-     - Infrastructure-level origin hypotheses and conservative clustering without human attribution (Section 20).
-     - Explainable confidence decomposition and evidence independence (Section 18).
-     - Temporal sequences and cross-incident campaign linkages (Sections 15-16).
+     - Entity-specific behavioral baselines with robust statistics and quality states (Section 21).
+     - Poisoning-resistant baseline lifecycle with freezing and controlled relearning (Section 21).
+     - Contextual profiles for service accounts and administrators (Section 21).
+     - Knowledge graph integration with `BEHAVIORAL_BASELINE`, `HAS_BEHAVIOR_BASELINE`, and `DEVIATES_FROM_BASELINE` (Sections 14, 21).
    - **Next Steps**:
-     - Progressing to Section 21 per architecture roadmap.
+     - Progressing to Section 22 (Novelty & Emerging-Threat Detection Engine) per architecture roadmap.
 
 
 

@@ -282,16 +282,50 @@ class AuthenticationSecurityPipeline:
 
         for account_id in all_accounts:
             if account_id not in profiles:
+                known_ips: List[str] = []
+                known_devs: List[str] = []
+                known_countries: List[str] = []
+                typical_hours: List[int] = []
+                total_samples = 0
+                status = BaselineStatusEnum.INSUFFICIENT_HISTORY
+
+                if db:
+                    try:
+                        from backend.db.models import BehavioralBaselineModel
+                        baselines = db.query(BehavioralBaselineModel).filter(
+                            BehavioralBaselineModel.entity_type.in_(["ACCOUNT", "USER"]),
+                            BehavioralBaselineModel.entity_id == account_id.lower(),
+                        ).all()
+                        for b in baselines:
+                            total_samples = max(total_samples, b.sample_count)
+                            if b.quality_status == "STABLE":
+                                status = BaselineStatusEnum.ESTABLISHED
+                            if b.distribution_json:
+                                try:
+                                    d = json.loads(b.distribution_json)
+                                    if b.metric_type == "LOGIN_SOURCE_IP":
+                                        known_ips.extend(list(d.keys()))
+                                    elif b.metric_type == "LOGIN_DEVICE":
+                                        known_devs.extend(list(d.keys()))
+                                    elif b.metric_type == "LOGIN_LOCATION":
+                                        known_countries.extend(list(d.keys()))
+                                    elif b.metric_type == "LOGIN_HOUR" and "active_hours" in d:
+                                        typical_hours.extend(d["active_hours"])
+                                except Exception:
+                                    pass
+                    except Exception as e:
+                        logger.debug(f"Could not load behavioral baselines for {account_id}: {e}")
+
                 profiles[account_id] = AccountSecurityProfile(
                     account_id=account_id,
-                    baseline_status=BaselineStatusEnum.INSUFFICIENT_HISTORY,
-                    total_successful_logins=0,
+                    baseline_status=status,
+                    total_successful_logins=total_samples,
                     total_failed_logins=0,
-                    known_source_ips=[],
-                    known_devices=[],
-                    known_countries=[],
+                    known_source_ips=list(set(known_ips)),
+                    known_devices=list(set(known_devs)),
+                    known_countries=list(set(known_countries)),
                     known_client_profiles=[],
-                    typical_login_hours=[],
+                    typical_login_hours=list(set(typical_hours)),
                 )
 
         return profiles

@@ -658,6 +658,7 @@ class IncidentModel(Base):
     attack_technique_mappings = relationship("AttackTechniqueMappingModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     infrastructure_attributions = relationship("InfrastructureAttributionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
     infrastructure_clusters = relationship("InfrastructureClusterModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    behavioral_deviations = relationship("BehavioralDeviationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -1150,6 +1151,134 @@ class InfrastructureClusterModel(Base):
         Index("ix_icm_inc_cluster", "incident_id", "cluster_id"),
         Index("ix_icm_ws_conf", "workspace_id", "confidence"),
     )
+
+
+# ============================================================================
+# BEHAVIORAL BASELINE & ANOMALY DETECTION MODELS (SECTION 21)
+# ============================================================================
+
+class BehavioralBaselineModel(Base):
+    """
+    Persisted entity-specific behavioral baseline model.
+    Encapsulates robust statistical distributions, quality states, and version stamps.
+    """
+    __tablename__ = "behavioral_baselines"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    entity_type = Column(String(50), nullable=False, index=True)  # USER, ACCOUNT, DEVICE, SERVICE, API_CLIENT, etc.
+    entity_id = Column(String(128), nullable=False, index=True)
+    entity_category = Column(String(50), nullable=False, default="HUMAN_USER", index=True)  # HUMAN_USER, SERVICE_ACCOUNT, etc.
+    metric_type = Column(String(64), nullable=False, index=True)
+    metric_version = Column(String(32), nullable=False, default="1.0.0")
+    window_type = Column(String(32), nullable=False, default="ROLLING_30D")
+    window_start = Column(DateTime, nullable=True)
+    window_end = Column(DateTime, nullable=True)
+    sample_count = Column(Integer, nullable=False, default=0)
+    valid_sample_count = Column(Integer, nullable=False, default=0)
+    missing_sample_count = Column(Integer, nullable=False, default=0)
+
+    # Robust statistics
+    median_value = Column(Float, nullable=True)
+    mean_value = Column(Float, nullable=True)
+    std_dev = Column(Float, nullable=True)
+    mad_value = Column(Float, nullable=True)
+    min_value = Column(Float, nullable=True)
+    max_value = Column(Float, nullable=True)
+    percentiles_json = Column(Text, default="{}", nullable=False)
+
+    # Categorical & temporal distributions
+    distribution_json = Column(Text, default="{}", nullable=False)
+    expected_range_summary = Column(String(255), default="", nullable=False)
+
+    # Quality & State
+    confidence_score = Column(Float, nullable=False, default=0.5)
+    confidence_level = Column(String(30), nullable=False, default="MODERATE")
+    quality_status = Column(String(30), nullable=False, default="INSUFFICIENT_HISTORY", index=True)
+    learning_mode = Column(String(30), nullable=False, default="LEARNING", index=True)
+
+    # Freeze & Control
+    is_frozen = Column(Boolean, nullable=False, default=False)
+    frozen_reason = Column(Text, nullable=True)
+    frozen_by = Column(String(100), nullable=True)
+    frozen_at = Column(DateTime, nullable=True)
+
+    # Lineage & Versioning
+    baseline_version = Column(String(32), nullable=False, default="1.0.0")
+    feature_version = Column(String(32), nullable=False, default="1.0.0")
+    calculation_method = Column(String(50), nullable=False, default="ROBUST_STATISTICS")
+    configuration_version = Column(String(32), nullable=False, default="2026.10")
+    source_count = Column(Integer, nullable=False, default=0)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    deviations = relationship("BehavioralDeviationModel", back_populates="baseline", cascade="all, delete-orphan", lazy="selectin")
+    audit_logs = relationship("BaselineAuditModel", back_populates="baseline", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_bb_entity_metric", "entity_type", "entity_id", "metric_type"),
+        Index("ix_bb_ws_quality", "workspace_id", "quality_status"),
+        Index("ix_bb_updated", "updated_at"),
+    )
+
+
+class BehavioralDeviationModel(Base):
+    """
+    Persisted behavioral deviation finding linking observed telemetry to established baseline.
+    Represents objective statistical deviation without premature compromise verdicts.
+    """
+    __tablename__ = "behavioral_deviations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    baseline_id = Column(String(36), ForeignKey("behavioral_baselines.id", ondelete="SET NULL"), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=True, index=True)
+    investigation_id = Column(String(36), nullable=True, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    entity_type = Column(String(50), nullable=False, index=True)
+    entity_id = Column(String(128), nullable=False, index=True)
+    metric_type = Column(String(64), nullable=False, index=True)
+    observed_value = Column(String(255), nullable=False)
+    expected_range_summary = Column(String(255), nullable=False, default="")
+    deviation_score = Column(Float, nullable=False, default=0.0)  # 0.0 - 1.0
+    deviation_direction = Column(String(30), nullable=False, default="CHANGED")  # ABOVE_NORMAL, BELOW_NORMAL, NEW, MISSING, CHANGED
+    severity_hint = Column(String(30), nullable=False, default="LOW")
+    baseline_confidence = Column(Float, nullable=False, default=0.5)
+    baseline_quality = Column(String(30), nullable=False, default="STABLE")
+    evidence_ids_json = Column(Text, default="[]", nullable=False)
+    explanation = Column(Text, nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    incident = relationship("IncidentModel", back_populates="behavioral_deviations")
+    baseline = relationship("BehavioralBaselineModel", back_populates="deviations")
+
+    __table_args__ = (
+        Index("ix_bd_entity_time", "entity_type", "entity_id", "created_at"),
+        Index("ix_bd_inc_metric", "incident_id", "metric_type"),
+        Index("ix_bd_ws_dev", "workspace_id", "deviation_score"),
+    )
+
+
+class BaselineAuditModel(Base):
+    """
+    Audit log record for baseline lifecycle operations (freeze, unfreeze, relearn, exceptions).
+    """
+    __tablename__ = "baseline_audit_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    baseline_id = Column(String(36), ForeignKey("behavioral_baselines.id", ondelete="CASCADE"), nullable=False, index=True)
+    action = Column(String(50), nullable=False)  # FREEZE, UNFREEZE, RELEARN, EXCEPTION_ADDED, RECALCULATE
+    actor = Column(String(100), nullable=False)
+    reason = Column(Text, nullable=False)
+    details_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    baseline = relationship("BehavioralBaselineModel", back_populates="audit_logs")
+
+    __table_args__ = (
+        Index("ix_bal_base_action", "baseline_id", "action"),
+    )
+
 
 
 

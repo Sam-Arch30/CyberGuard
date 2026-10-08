@@ -48,6 +48,7 @@ class GraphEntityType(str, Enum):
     NAMESERVER = "NAMESERVER"
     NETWORK = "NETWORK"
     INFRASTRUCTURE_CLUSTER = "INFRASTRUCTURE_CLUSTER"
+    BEHAVIORAL_BASELINE = "BEHAVIORAL_BASELINE"
     OTHER = "OTHER"
 
 
@@ -87,6 +88,8 @@ class GraphRelationshipType(str, Enum):
     SHARES_ASN = "SHARES_ASN"
     RELATED_TO_DOMAIN = "RELATED_TO_DOMAIN"
     RELATED_TO_CAMPAIGN = "RELATED_TO_CAMPAIGN"
+    HAS_BEHAVIOR_BASELINE = "HAS_BEHAVIOR_BASELINE"
+    DEVIATES_FROM_BASELINE = "DEVIATES_FROM_BASELINE"
     OTHER = "OTHER"
 
 
@@ -219,6 +222,8 @@ def make_canonical_key(
         return f"network:{val.lower()}"
     elif type_str in ("INFRASTRUCTURE_CLUSTER", "CLUSTER"):
         return f"cluster:{val.lower()}"
+    elif type_str in ("BEHAVIORAL_BASELINE", "BASELINE"):
+        return f"baseline:{val.lower()}"
     else:
         return f"{type_str.lower()}:{val}"
 

@@ -1388,3 +1388,83 @@ class ReportService:
 
         return flowables
 
+    @classmethod
+    def format_behavioral_baseline_section(
+        cls,
+        deviations: List[Any],
+        styles: Dict[str, ParagraphStyle],
+        baselines: Optional[List[Any]] = None,
+    ) -> List[Any]:
+        """
+        Formats Section 21 Behavioral Baseline & Anomaly Assessment flowables.
+        Maintains epistemic humility and objective forensic reporting without alarmist verdicts.
+        """
+        flowables = []
+        flowables.append(Paragraph("Behavioral Baseline & Anomaly Assessment", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        # Forensic Notice
+        forensic_notice = (
+            "Behavioral baseline deviations reflect statistical deviation from an entity's own historical telemetry. "
+            "A baseline deviation is objective technical evidence, NOT an independent verdict of compromise or attacker takeover."
+        )
+        note_style = styles.get("WarningBox", styles.get("TableCell", styles["Normal"]))
+        flowables.append(Paragraph(f"<b>FORENSIC NOTICE:</b> <i>{html.escape(forensic_notice)}</i>", note_style))
+        flowables.append(Spacer(1, 6))
+
+        if not deviations:
+            flowables.append(Paragraph("<i>No significant behavioral deviations observed relative to historical baselines.</i>", styles["TableCell"]))
+            flowables.append(Spacer(1, 8))
+            return flowables
+
+        table_data = [
+            [
+                Paragraph("<b>ENTITY</b>", styles["TableHead"]),
+                Paragraph("<b>METRIC</b>", styles["TableHead"]),
+                Paragraph("<b>OBSERVED</b>", styles["TableHead"]),
+                Paragraph("<b>HISTORICAL RANGE</b>", styles["TableHead"]),
+                Paragraph("<b>DEVIATION</b>", styles["TableHead"]),
+                Paragraph("<b>EVIDENCE & EXPLANATION</b>", styles["TableHead"]),
+            ]
+        ]
+
+        for d in deviations:
+            ent_str = f"<b>{html.escape(str(getattr(d, 'entity_type', '')))}</b><br/>{html.escape(str(getattr(d, 'entity_id', '')))}"
+            m_val = getattr(d, "metric_type", "")
+            m_str = html.escape(m_val.value if hasattr(m_val, "value") else str(m_val))
+            obs_str = html.escape(str(getattr(d, "observed_value", "")))
+            exp_str = html.escape(str(getattr(d, "expected_range_summary", "")))
+            score = float(getattr(d, "deviation_score", 0.0))
+            score_pct = f"{score * 100:.0f}%"
+            dir_val = getattr(d, "deviation_direction", "")
+            dir_str = dir_val.value if hasattr(dir_val, "value") else str(dir_val)
+            dev_str = f"<b>{score_pct}</b><br/>{html.escape(dir_str)}"
+
+            expl = html.escape(str(getattr(d, "explanation", "")))
+            limits = getattr(d, "limitations", [])
+            if limits:
+                expl += f"<br/><i>Limitations: {html.escape('; '.join(limits[:2]))}</i>"
+
+            table_data.append([
+                Paragraph(ent_str, styles["TableCellBold"]),
+                Paragraph(m_str, styles["TableCell"]),
+                Paragraph(obs_str, styles["TableCell"]),
+                Paragraph(exp_str, styles["TableCell"]),
+                Paragraph(dev_str, styles["TableCell"]),
+                Paragraph(expl, styles["TableCell"]),
+            ])
+
+        t = Table(table_data, colWidths=[90, 85, 75, 95, 65, 130])
+        t.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+        ]))
+        flowables.append(t)
+        flowables.append(Spacer(1, 8))
+
+        return flowables
+
+

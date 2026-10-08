@@ -32,6 +32,7 @@ from backend.api.routes.attack_reconstruction import router as attack_reconstruc
 from backend.api.routes.attack_confidence import router as attack_confidence_router
 from backend.api.routes.mitre_attack import router as mitre_attack_router
 from backend.api.routes.infrastructure_attribution import router as infrastructure_attribution_router
+from backend.api.routes.behavioral_baseline import router as behavioral_baseline_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -120,6 +121,7 @@ app.include_router(attack_reconstruction_router)
 app.include_router(attack_confidence_router)
 app.include_router(mitre_attack_router)
 app.include_router(infrastructure_attribution_router)
+app.include_router(behavioral_baseline_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])
