@@ -27,7 +27,7 @@ export const ToastProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, []);
 
   const toast = useCallback(({ type = 'info', title, message, durationMs = 4000 }: Omit<ToastItem, 'id'>) => {
-    const id = Math.random().toString(36).substring(2, 9);
+    const id = `toast_${Date.now()}_${performance.now().toString(36).replace('.', '_')}`;
     setToasts((prev) => [...prev, { id, type, title, message, durationMs }]);
 
     if (durationMs > 0) {

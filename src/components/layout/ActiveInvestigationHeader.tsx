@@ -516,7 +516,41 @@ export const ActiveInvestigationHeader: React.FC = () => {
       </div>
 
       {/* =========================================================================
-          2. COMPACT INVESTIGATION NAVIGATION: Overview, Email, Analysis, Intel, Investigate, Report
+          2. WORKFLOW LIFECYCLE STRIP (Section 35: Ingestion -> Analysis -> Investigation -> Response -> Report)
+          ========================================================================= */}
+      <div className="bg-surface-secondary/40 px-3 sm:px-4 py-1.5 flex items-center justify-between border-b border-border overflow-x-auto text-[11px] font-mono select-none">
+        <div className="flex items-center space-x-2 shrink-0">
+          <span className="text-[10px] uppercase font-semibold text-foreground-muted tracking-wider">Workflow Stage:</span>
+          {[
+            { id: 'ingestion', label: 'INGESTION', active: activeSection === 'email', done: Boolean(activeEmail) },
+            { id: 'analysis', label: 'ANALYSIS', active: activeSection === 'overview' || activeSection === 'analysis', done: Boolean(activeEmail?.threat_score) },
+            { id: 'investigation', label: 'INVESTIGATION', active: activeSection === 'intelligence' || activeSection === 'investigation', done: Boolean(activeEmail?.investigation_graph || activeEmail?.indicators) },
+            { id: 'response', label: 'RESPONSE', active: false, done: Boolean(activeEmail?.threat_score) },
+            { id: 'report', label: 'REPORT', active: activeSection === 'report', done: Boolean(activeEmail?.threat_score) },
+          ].map((stage, sIdx, arr) => (
+            <React.Fragment key={stage.id}>
+              <span
+                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded ${
+                  stage.active
+                    ? 'bg-primary-subtle text-primary font-bold border border-primary/30'
+                    : stage.done
+                    ? 'text-threat-safe-foreground font-medium'
+                    : 'text-foreground-muted'
+                }`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-current" />
+                <span>{stage.label}</span>
+              </span>
+              {sIdx < arr.length - 1 && (
+                <span className="text-foreground-muted/40 font-light">&rarr;</span>
+              )}
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* =========================================================================
+          3. COMPACT INVESTIGATION SUB-NAVIGATION: Overview, Email, Analysis, Intel, Investigate, Report
           ========================================================================= */}
       <nav className="bg-surface px-2 sm:px-4 py-1 flex items-center justify-between border-b border-border overflow-x-auto scrollbar-none">
         <div className="flex items-center space-x-1 min-w-max">

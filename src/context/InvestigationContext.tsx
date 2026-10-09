@@ -122,7 +122,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [activeEmailId, setActiveEmailIdState] = useState<string>(() => {
     // Check URL first
     const pathParts = location.pathname.split('/').filter(Boolean);
-    if (pathParts[0] === 'investigate' && pathParts[1] && !INVESTIGATION_SECTIONS.some(s => s.id === pathParts[1])) {
+    if ((pathParts[0] === 'investigate' || pathParts[0] === 'investigations') && pathParts[1] && !INVESTIGATION_SECTIONS.some(s => s.id === pathParts[1])) {
       return pathParts[1].startsWith('scenario-') ? '' : pathParts[1];
     }
     if (pathParts[0] === 'analysis' && pathParts[1]) {
@@ -162,12 +162,12 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   // Determine current active section from URL
   const determineActiveSection = useCallback((): InvestigationSection => {
     const path = location.pathname;
-    if (path.includes('/investigate/')) {
+    if (path.includes('/investigate/') || path.includes('/investigations/')) {
       const parts = path.split('/').filter(Boolean);
       const lastPart = parts[parts.length - 1];
       const match = INVESTIGATION_SECTIONS.find(s => s.id === lastPart);
       if (match) return match.id;
-      // Maybe /investigate/:section
+      // Maybe /investigate/:section or /investigations/:section
       if (parts[1] && INVESTIGATION_SECTIONS.some(s => s.id === parts[1])) {
         return parts[1] as InvestigationSection;
       }
@@ -197,7 +197,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   // Sync activeEmailId when URL parameter changes
   useEffect(() => {
     const pathParts = location.pathname.split('/').filter(Boolean);
-    if (pathParts[0] === 'investigate') {
+    if (pathParts[0] === 'investigate' || pathParts[0] === 'investigations') {
       if (pathParts[1] && !INVESTIGATION_SECTIONS.some(s => s.id === pathParts[1])) {
         if (!pathParts[1].startsWith('scenario-') && pathParts[1] !== activeEmailId) {
           setActiveEmailIdState(pathParts[1]);
@@ -445,14 +445,14 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   const setActiveEmailId = useCallback((newId: string) => {
     setActiveEmailIdState(newId);
     localStorage.setItem(LAST_INVESTIGATED_KEY, newId);
-    navigate(`/investigate/${newId}/${activeSection}`);
+    navigate(`/investigations/${newId}/${activeSection}`);
   }, [navigate, activeSection]);
 
   const setSection = useCallback((section: InvestigationSection, subTab?: string) => {
     if (subTab) {
       setSubTabs(prev => ({ ...prev, [section]: subTab }));
     }
-    navigate(`/investigate/${activeEmailId}/${section}`);
+    navigate(`/investigations/${activeEmailId}/${section}`);
   }, [navigate, activeEmailId]);
 
   const setSubTab = useCallback((subTab: string) => {
@@ -462,7 +462,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   const focusGraphNode = useCallback((nodeId: string) => {
     setFocusedGraphNodeId(nodeId);
     setSubTabs(prev => ({ ...prev, investigation: 'graph' }));
-    navigate(`/investigate/${activeEmailId}/investigation`);
+    navigate(`/investigations/${activeEmailId}/investigation`);
   }, [navigate, activeEmailId]);
 
   // Compute Next Step Guidance based on current section
@@ -640,7 +640,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(LAST_INVESTIGATED_KEY, realId);
     refreshAnalyses();
     setLoading(false);
-    navigate(`/investigate/${analysisId}/overview`);
+    navigate(`/investigations/${analysisId}/overview`);
     return resolved;
   }, [navigate, refreshAnalyses]);
 
