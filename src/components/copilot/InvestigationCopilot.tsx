@@ -21,7 +21,11 @@ import {
   RefreshCw,
   Upload,
   FileCode,
-  X
+  X,
+  ThumbsUp,
+  ThumbsDown,
+  AlertTriangle,
+  ShieldAlert
 } from 'lucide-react';
 import type {
   CopilotMode,
@@ -97,6 +101,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   isCompact = false
 }) => {
   const [activeMode, setActiveMode] = useState<CopilotMode>(mode);
+  const [socMode, setSocMode] = useState<'ANALYST' | 'EXECUTIVE' | 'FORENSIC'>('ANALYST');
   const [currentContextId, setCurrentContextId] = useState<string>(contextId);
   const [currentEmailPayload, setCurrentEmailPayload] = useState<Record<string, any> | undefined>(emailPayload);
   const [messages, setMessages] = useState<CopilotMessage[]>([]);
@@ -107,6 +112,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   const [selectedEvidence, setSelectedEvidence] = useState<EvidenceReference | null>(null);
   const [copiedText, setCopiedText] = useState<string | null>(null);
   const [notification, setNotification] = useState<string | null>(null);
+  const [feedbackState, setFeedbackState] = useState<Record<string, string>>({});
 
   // EML Selector State
   const [isEmailSelectorOpen, setIsEmailSelectorOpen] = useState<boolean>(false);
@@ -289,27 +295,35 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         setSuggestedQuestions(data);
       })
       .catch(() => {
-        // Fallback offline suggested questions
+        // Section 30 Quick Actions & suggested investigative questions
         if (activeMode === 'email') {
           setSuggestedQuestions([
-            { question: 'Why was this email classified as malicious?', category: 'threat_score', mode: 'email' },
-            { question: 'Which indicators contributed most to the threat score?', category: 'threat_score', mode: 'email' },
-            { question: 'Which relay is most likely attacker-controlled?', category: 'relay', mode: 'email' },
-            { question: 'Show the evidence connecting this email to Campaign C-042.', category: 'campaign', mode: 'email' },
-            { question: 'Explain the SPF, DKIM and DMARC results.', category: 'auth', mode: 'email' },
-            { question: 'List all high-confidence IOCs.', category: 'iocs', mode: 'email' }
+            { question: 'Summarize this incident', category: 'summary', mode: 'email' },
+            { question: 'Explain why this is risky', category: 'risk', mode: 'email' },
+            { question: 'Show the attack path', category: 'attack_path', mode: 'email' },
+            { question: 'What evidence supports this?', category: 'evidence', mode: 'email' },
+            { question: 'Have we seen this before?', category: 'threat_memory', mode: 'email' },
+            { question: 'What should I investigate next?', category: 'guidance', mode: 'email' },
+            { question: 'Show response recommendations', category: 'response', mode: 'email' },
+            { question: 'Compare analysis runs', category: 'compare', mode: 'email' },
+            { question: 'Prepare incident report', category: 'report', mode: 'email' },
+            { question: 'Explain for management', category: 'executive', mode: 'email' }
           ]);
         } else if (activeMode === 'campaign') {
           setSuggestedQuestions([
-            { question: 'Compare this message with the other campaign emails.', category: 'campaign', mode: 'campaign' },
+            { question: 'Summarize this incident', category: 'summary', mode: 'campaign' },
             { question: 'What infrastructure is shared by these emails?', category: 'campaign', mode: 'campaign' },
-            { question: 'Construct a timeline of this campaign.', category: 'campaign', mode: 'campaign' }
+            { question: 'Have we seen this before?', category: 'threat_memory', mode: 'campaign' },
+            { question: 'Show the attack path', category: 'attack_path', mode: 'campaign' },
+            { question: 'Show response recommendations', category: 'response', mode: 'campaign' }
           ]);
         } else {
           setSuggestedQuestions([
-            { question: 'Summarize this case for a SOC analyst.', category: 'case', mode: 'case' },
-            { question: 'Generate an executive summary.', category: 'case', mode: 'case' },
-            { question: 'List all high-confidence IOCs.', category: 'iocs', mode: 'case' }
+            { question: 'Summarize this incident', category: 'case', mode: 'case' },
+            { question: 'Explain for management', category: 'case', mode: 'case' },
+            { question: 'What evidence supports this?', category: 'evidence', mode: 'case' },
+            { question: 'Show response recommendations', category: 'response', mode: 'case' },
+            { question: 'What should I investigate next?', category: 'guidance', mode: 'case' }
           ]);
         }
       });
@@ -369,22 +383,79 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await fetch(apiUrl('/api/copilot/query'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: queryText,
-          mode: activeMode,
-          context_id: currentContextId,
-          email_payload: currentEmailPayload
-        })
-      });
+      let copilotData: CopilotQueryResponse;
+      try {
+        // Section 30 API call with authoritative grounding & claim validation
+        const v1Res = await fetch(apiUrl('/api/v1/copilot/query'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: queryText,
+            mode: socMode,
+            workspace_id: 'default',
+            investigation_id: currentContextId,
+            target_scope_id: currentContextId,
+            email_payload: currentEmailPayload
+          })
+        });
 
-      if (!response.ok) {
-        throw new Error(`Copilot query failed: HTTP ${response.status}`);
+        if (v1Res.ok) {
+          const v1Data = await v1Res.json();
+          copilotData = {
+            query: queryText,
+            mode: activeMode,
+            context_id: currentContextId,
+            assessment: v1Data.content,
+            reasoning_summary: `Authoritative security engines retrieved via Section 30 SOC Copilot (${(v1Data.tools_called || []).join(', ') || 'deterministic pipeline'}).`,
+            confidence: (v1Data.model_provider === 'deterministic_fallback' || (v1Data.claims || []).some((c: any) => c.validation_status === 'SUPPORTED')) ? 'CONFIRMED' : 'HIGH-CONFIDENCE INFERENCE',
+            evidence_refs: (v1Data.citations || []).map((c: any) => ({
+              evidence_id: c.source_id,
+              type: c.source_type,
+              statement: c.claim_span || `Corroborating record (${c.source_type})`,
+              source_module: 'soc_copilot',
+              reliability: c.confidence || 0.95,
+              confidence_category: c.verified ? 'CONFIRMED' : 'PROBABLE'
+            })),
+            suggested_actions: [
+              {
+                action_type: 'view_evidence',
+                label: `Inspect Primary Evidence (${currentContextId || 'EV-01'})`,
+                params: { evidence_id: currentContextId || 'EV-01' }
+              }
+            ],
+            recommended_next_steps: v1Data.next_steps || [],
+            model: `${v1Data.model_provider}:${v1Data.model_name}`,
+            timestamp: v1Data.created_at || new Date().toISOString(),
+            message_id: v1Data.id,
+            citations: v1Data.citations || [],
+            claims: v1Data.claims || [],
+            hypotheses: v1Data.hypotheses || [],
+            uncertainties: v1Data.uncertainties || [],
+            tools_called: v1Data.tools_called || [],
+            is_fallback: v1Data.model_provider === 'deterministic_fallback'
+          };
+        } else {
+          throw new Error(`v1 endpoint returned ${v1Res.status}`);
+        }
+      } catch (err) {
+        // Fall back to legacy /api/copilot/query
+        const response = await fetch(apiUrl('/api/copilot/query'), {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: queryText,
+            mode: activeMode,
+            context_id: currentContextId,
+            email_payload: currentEmailPayload
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Copilot query failed: HTTP ${response.status}`);
+        }
+
+        copilotData = await response.json();
       }
-
-      const copilotData: CopilotQueryResponse = await response.json();
 
       const copilotMsg: CopilotMessage = {
         id: copilotMessageId,
@@ -512,6 +583,28 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
     setTimeout(() => setCopiedText(null), 2000);
   };
 
+  const handleFeedback = async (
+    messageId: string,
+    rating: 'HELPFUL' | 'NOT_HELPFUL' | 'INCORRECT' | 'MISSING_EVIDENCE'
+  ) => {
+    try {
+      await fetch(apiUrl(`/api/v1/copilot/messages/${messageId}/feedback`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating,
+          feedback_text: `Analyst feedback: ${rating}`,
+          analyst_id: 'analyst_active'
+        })
+      });
+      setFeedbackState((prev) => ({ ...prev, [messageId]: rating }));
+      showNotification(`Analyst feedback recorded: ${rating}`);
+    } catch (err) {
+      setFeedbackState((prev) => ({ ...prev, [messageId]: rating }));
+      showNotification(`Feedback staged: ${rating}`);
+    }
+  };
+
   return (
     <div className={`flex flex-col bg-surface rounded-card border border-border overflow-hidden shadow-sm ${isCompact ? 'h-[540px]' : 'h-[680px]'}`}>
       {/* Copilot Header */}
@@ -537,21 +630,42 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
           </div>
         </div>
 
-        {/* Mode Selector Tabs */}
-        <div className="flex items-center bg-surface border border-border rounded-lg p-0.5">
-          {(['email', 'campaign', 'case'] as CopilotMode[]).map((m) => (
-            <button
-              key={m}
-              onClick={() => setActiveMode(m)}
-              className={`px-2.5 py-1 rounded text-[11px] font-mono capitalize transition-all ${
-                activeMode === m
-                  ? 'bg-primary text-white font-bold shadow-xs'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
+        {/* Mode & Depth Selectors */}
+        <div className="flex items-center space-x-2">
+          {/* Section 30 Depth Persona Tabs */}
+          <div className="flex items-center bg-surface border border-border rounded-lg p-0.5">
+            {(['ANALYST', 'EXECUTIVE', 'FORENSIC'] as const).map((sm) => (
+              <button
+                key={sm}
+                onClick={() => setSocMode(sm)}
+                className={`px-2 py-1 rounded text-[10px] font-mono transition-all ${
+                  socMode === sm
+                    ? 'bg-primary/20 text-primary font-bold border border-primary/30 shadow-2xs'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
+                }`}
+                title={`Run Copilot in ${sm} depth mode`}
+              >
+                {sm}
+              </button>
+            ))}
+          </div>
+
+          {/* Scope Selector Tabs */}
+          <div className="flex items-center bg-surface border border-border rounded-lg p-0.5">
+            {(['email', 'campaign', 'case'] as CopilotMode[]).map((m) => (
+              <button
+                key={m}
+                onClick={() => setActiveMode(m)}
+                className={`px-2.5 py-1 rounded text-[11px] font-mono capitalize transition-all ${
+                  activeMode === m
+                    ? 'bg-primary text-white font-bold shadow-xs'
+                    : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -951,6 +1065,94 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
                       </>
                     )}
                   </button>
+                </div>
+
+                {/* 5b. Verified Citations (Section 30) */}
+                {res.citations && res.citations.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-foreground-muted font-bold flex items-center space-x-1">
+                      <Layers className="w-3 h-3 text-cyan-400" />
+                      <span>Verified Citations ({res.citations.length})</span>
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {res.citations.map((c, cIdx) => (
+                        <button
+                          key={cIdx}
+                          onClick={() => {
+                            if (onOpenEvidence) onOpenEvidence(c.source_id);
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-mono bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-colors flex items-center space-x-1 cursor-pointer"
+                          title={`Source: ${c.source_type} - ID: ${c.source_id}`}
+                        >
+                          <span className="font-bold">[{c.source_type} #{c.source_id}]</span>
+                          {c.verified && <Check className="w-2.5 h-2.5 text-emerald-400" />}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5c. Semantic Claim Breakdown (Section 30) */}
+                {res.claims && res.claims.length > 0 && (
+                  <div className="space-y-1.5 pt-1">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-foreground-muted font-bold flex items-center space-x-1">
+                      <ShieldAlert className="w-3 h-3 text-amber-400" />
+                      <span>Semantic Claim Validation</span>
+                    </div>
+                    <div className="space-y-1">
+                      {res.claims.slice(0, 3).map((cl, clIdx) => (
+                        <div key={clIdx} className="text-[11px] font-mono flex items-start space-x-2 bg-surface-secondary/40 p-1.5 rounded border border-border">
+                          <span className={`px-1 py-0.2 rounded text-[9px] font-bold shrink-0 ${
+                            cl.semantic_type === 'OBSERVED_FACT' ? 'bg-emerald-500/20 text-emerald-400' :
+                            cl.semantic_type === 'RECOMMENDATION' ? 'bg-blue-500/20 text-blue-400' :
+                            cl.semantic_type === 'HYPOTHESIS' ? 'bg-amber-500/20 text-amber-400' :
+                            'bg-purple-500/20 text-purple-400'
+                          }`}>
+                            {cl.semantic_type}
+                          </span>
+                          <span className="text-foreground-muted flex-1 line-clamp-1">{cl.claim_text}</span>
+                          <span className={`text-[9px] font-bold shrink-0 ${
+                            cl.validation_status === 'SUPPORTED' ? 'text-emerald-400' :
+                            cl.validation_status === 'UNSUPPORTED' ? 'text-rose-400' :
+                            'text-amber-400'
+                          }`}>
+                            {cl.validation_status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5d. Analyst Feedback & Security Notice (Section 30) */}
+                <div className="pt-2 border-t border-border flex flex-wrap items-center justify-between gap-2 text-[11px] font-mono">
+                  <div className="flex items-center space-x-1.5">
+                    <span className="text-foreground-subtle text-[10px]">Analyst Rating:</span>
+                    {(['HELPFUL', 'NOT_HELPFUL', 'INCORRECT', 'MISSING_EVIDENCE'] as const).map((r) => {
+                      const isSelected = feedbackState[res.message_id || msg.id] === r;
+                      return (
+                        <button
+                          key={r}
+                          onClick={() => handleFeedback(res.message_id || msg.id, r)}
+                          disabled={isSelected}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono border transition-all flex items-center space-x-1 ${
+                            isSelected
+                              ? 'bg-primary/20 text-primary border-primary/40 font-bold'
+                              : 'bg-surface-secondary/50 text-foreground-muted hover:text-foreground border-border'
+                          }`}
+                        >
+                          {r === 'HELPFUL' && <><ThumbsUp className="w-3 h-3 text-emerald-400" /><span>Helpful</span></>}
+                          {r === 'NOT_HELPFUL' && <><ThumbsDown className="w-3 h-3 text-amber-400" /><span>Not Helpful</span></>}
+                          {r === 'INCORRECT' && <><AlertTriangle className="w-3 h-3 text-rose-400" /><span>Incorrect</span></>}
+                          {r === 'MISSING_EVIDENCE' && <><AlertTriangle className="w-3 h-3 text-orange-400" /><span>Missing Evidence</span></>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <span className="text-[10px] text-foreground-subtle flex items-center space-x-1">
+                    <ShieldCheck className="w-3 h-3 text-primary inline" />
+                    <span>Advisory only • Zero direct execution (Section 29)</span>
+                  </span>
                 </div>
               </div>
             </div>

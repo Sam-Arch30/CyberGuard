@@ -64,6 +64,23 @@ export interface CopilotQueryResponse {
   model: string;
   timestamp: string;
   audit_id?: string;
+  message_id?: string;
+  citations?: Array<{
+    citation_id: string;
+    source_type: string;
+    source_id: string;
+    verified: boolean;
+  }>;
+  claims?: Array<{
+    claim_text: string;
+    semantic_type: string;
+    validation_status: string;
+    supporting_evidence_ids: string[];
+  }>;
+  hypotheses?: string[];
+  uncertainties?: string[];
+  tools_called?: string[];
+  is_fallback?: boolean;
 }
 
 export interface CopilotMessage {

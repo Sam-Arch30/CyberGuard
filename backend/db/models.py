@@ -2736,6 +2736,150 @@ class TargetLockModel(Base):
     )
 
 
+# ============================================================================
+# SECTION 30: LLM SOC COPILOT PERSISTENT DATA MODELS
+# ============================================================================
+
+class SocCopilotConversationModel(Base):
+    """
+    Section 30: LLM SOC Copilot Conversation.
+    Persistent container for analyst multi-turn investigation dialogues.
+    """
+    __tablename__ = "soc_copilot_conversations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    investigation_id = Column(String(128), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    title = Column(String(255), nullable=False, default="New SOC Investigation Dialogue")
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, ARCHIVED, DELETED
+    created_by = Column(String(100), nullable=False, default="analyst")
+    model_provider = Column(String(50), nullable=False, default="mock")
+    model_name = Column(String(100), nullable=False, default="cyberguard-copilot-v2")
+    context_policy_version = Column(String(32), nullable=False, default="1.0.0")
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    messages = relationship("SocCopilotMessageModel", back_populates="conversation", cascade="all, delete-orphan", order_by="SocCopilotMessageModel.created_at", lazy="selectin")
+    snapshots = relationship("SocCopilotContextSnapshotModel", back_populates="conversation", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_scc_ws_status", "workspace_id", "status"),
+        Index("ix_scc_ws_inv", "workspace_id", "investigation_id"),
+        Index("ix_scc_ws_inc", "workspace_id", "incident_id"),
+    )
+
+
+class SocCopilotContextSnapshotModel(Base):
+    """
+    Section 30: Copilot Context Snapshot.
+    Forensically immutable snapshot recording exactly what structured data the Copilot observed at response time.
+    """
+    __tablename__ = "soc_copilot_context_snapshots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    conversation_id = Column(String(36), ForeignKey("soc_copilot_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    scope = Column(String(30), nullable=False, default="INVESTIGATION", index=True)  # INCIDENT, INVESTIGATION, EVENT, CAMPAIGN, GLOBAL
+    investigation_id = Column(String(128), nullable=True, index=True)
+    incident_id = Column(String(36), nullable=True, index=True)
+    context_version = Column(String(32), nullable=False, default="1.0.0")
+    retrieved_entity_ids_json = Column(Text, default="[]", nullable=False)
+    retrieved_evidence_ids_json = Column(Text, default="[]", nullable=False)
+    retrieved_finding_ids_json = Column(Text, default="[]", nullable=False)
+    risk_assessment_version = Column(Integer, nullable=True)
+    attack_path_version = Column(String(32), nullable=True)
+    explanation_version = Column(Integer, nullable=True)
+    threat_memory_snapshot_json = Column(Text, default="{}", nullable=False)
+    snapshot_data_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    # Relationships
+    conversation = relationship("SocCopilotConversationModel", back_populates="snapshots")
+
+
+class SocCopilotMessageModel(Base):
+    """
+    Section 30: LLM SOC Copilot Message.
+    Stores dialogue messages, structured claims, citations, uncertainties, and next steps.
+    """
+    __tablename__ = "soc_copilot_messages"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    conversation_id = Column(String(36), ForeignKey("soc_copilot_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String(20), nullable=False, index=True)  # USER, ASSISTANT, SYSTEM, TOOL
+    content = Column(Text, nullable=False)
+    message_type = Column(String(50), nullable=False, default="ANSWER", index=True)  # QUESTION, ANSWER, SUMMARY, EXPLANATION, INVESTIGATION_RESULT, RECOMMENDATION_SUMMARY, REPORT_DRAFT, ERROR
+    context_snapshot_id = Column(String(36), ForeignKey("soc_copilot_context_snapshots.id", ondelete="SET NULL"), nullable=True, index=True)
+    model_provider = Column(String(50), nullable=False, default="mock")
+    model_name = Column(String(100), nullable=False, default="cyberguard-copilot-v2")
+    prompt_version = Column(String(32), nullable=False, default="1.0.0")
+    claims_json = Column(Text, default="[]", nullable=False)
+    citations_json = Column(Text, default="[]", nullable=False)
+    uncertainties_json = Column(Text, default="[]", nullable=False)
+    hypotheses_json = Column(Text, default="[]", nullable=False)
+    next_steps_json = Column(Text, default="[]", nullable=False)
+    tools_called_json = Column(Text, default="[]", nullable=False)
+    latency_ms = Column(Float, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    # Relationships
+    conversation = relationship("SocCopilotConversationModel", back_populates="messages")
+    context_snapshot = relationship("SocCopilotContextSnapshotModel")
+    feedbacks = relationship("SocCopilotFeedbackModel", back_populates="message", cascade="all, delete-orphan", lazy="selectin")
+
+    @property
+    def claims(self) -> List[Dict[str, Any]]:
+        return json.loads(self.claims_json or "[]")
+
+    @property
+    def citations(self) -> List[Dict[str, Any]]:
+        return json.loads(self.citations_json or "[]")
+
+    @property
+    def uncertainties(self) -> List[str]:
+        return json.loads(self.uncertainties_json or "[]")
+
+    @property
+    def hypotheses(self) -> List[str]:
+        return json.loads(self.hypotheses_json or "[]")
+
+    @property
+    def next_steps(self) -> List[str]:
+        return json.loads(self.next_steps_json or "[]")
+
+    @property
+    def tools_called(self) -> List[str]:
+        return json.loads(self.tools_called_json or "[]")
+
+
+class SocCopilotFeedbackModel(Base):
+    """
+    Section 30: Copilot Analyst Feedback.
+    Auditable feedback on Copilot claims, citations, and answers without corrupting ground truth.
+    """
+    __tablename__ = "soc_copilot_feedback"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    message_id = Column(String(36), ForeignKey("soc_copilot_messages.id", ondelete="CASCADE"), nullable=False, index=True)
+    conversation_id = Column(String(36), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    analyst_id = Column(String(100), nullable=False, default="analyst", index=True)
+    rating = Column(String(30), nullable=False, index=True)  # HELPFUL, NOT_HELPFUL, INCORRECT, MISSING_EVIDENCE
+    feedback_text = Column(Text, nullable=True)
+    structured_feedback_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    message = relationship("SocCopilotMessageModel", back_populates="feedbacks")
+
+    __table_args__ = (
+        Index("ix_scf_ws_rating", "workspace_id", "rating"),
+    )
+
+
+
 
 
 

@@ -157,6 +157,8 @@ class MockLLMProvider(BaseLLMProvider):
     async def generate_assessment(self, prompt: str, system_prompt: str) -> Optional[str]:
         # Extract the structured evidence block from the prompt
         evidence_match = re.search(r'<structured_forensic_evidence>(.*?)</structured_forensic_evidence>', prompt, re.DOTALL)
+        if not evidence_match:
+            evidence_match = re.search(r'<untrusted_analyzed_content>(.*?)</untrusted_analyzed_content>', prompt, re.DOTALL)
         evidence_str = evidence_match.group(1).strip() if evidence_match else "{}"
 
         try:
@@ -165,9 +167,13 @@ class MockLLMProvider(BaseLLMProvider):
             ev = {}
 
         threat = ev.get("threat_score", {})
-        score = threat.get("score", 0)
-        severity = threat.get("severity", "low").lower()
-        reasons = threat.get("reasons", [])
+        ra = ev.get("risk_assessment", {})
+        expl = ev.get("explanation", {})
+        score = ra.get("risk_score") if (ra and ra.get("risk_score") is not None) else threat.get("score", 0)
+        severity = (ra.get("risk_level") or threat.get("severity", "low")).lower()
+        reasons = list(threat.get("reasons", []))
+        if expl and expl.get("summary"):
+            reasons.append(expl["summary"])
         ml = ev.get("ml_content_assessment", {})
         ml_prob = ml.get("probability")
         lookalikes = ev.get("lookalike_domains", [])

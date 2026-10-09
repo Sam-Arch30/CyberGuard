@@ -41,6 +41,7 @@ from backend.api.routes.risk_engine import router as risk_engine_router
 from backend.api.routes.explainable_ai import router as explainable_ai_router
 from backend.api.routes.response_recommendations import router as response_recommendations_router
 from backend.api.routes.response_playbooks import router as response_playbooks_router
+from backend.api.routes.soc_copilot import router as soc_copilot_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -138,6 +139,7 @@ app.include_router(risk_engine_router)
 app.include_router(explainable_ai_router)
 app.include_router(response_recommendations_router)
 app.include_router(response_playbooks_router)
+app.include_router(soc_copilot_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])
