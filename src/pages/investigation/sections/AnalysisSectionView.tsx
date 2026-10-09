@@ -20,27 +20,29 @@ import {
   AnalysisScoringSection
 } from '../../../components/forensic/analysis';
 import { LiveAnalysisView } from '../../../components/analysis/LiveAnalysisView';
+import { AnalysisResultsWorkstation } from '../../../components/analysis/results/AnalysisResultsWorkstation';
 
 interface AnalysisSectionViewProps {
   email: EmailAnalysis;
 }
 
-type AnalysisSubTab = 'live' | 'all' | 'indicators' | 'urls' | 'lookalikes' | 'content' | 'scoring';
+type AnalysisSubTab = 'results' | 'live' | 'all' | 'indicators' | 'urls' | 'lookalikes' | 'content' | 'scoring';
 
 export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email }) => {
   const { subTabs, setSubTab, stepGuidance } = useInvestigation();
 
   // Normalize legacy tab IDs (e.g. 'iocs' -> 'indicators', 'nlp' -> 'content')
-  const rawSubTab = subTabs.analysis || 'live';
-  let currentSubTab: AnalysisSubTab = 'live';
-  if (rawSubTab === 'live') currentSubTab = 'live';
+  const rawSubTab = subTabs.analysis || 'results';
+  let currentSubTab: AnalysisSubTab = 'results';
+  if (rawSubTab === 'results') currentSubTab = 'results';
+  else if (rawSubTab === 'live') currentSubTab = 'live';
   else if (rawSubTab === 'indicators' || rawSubTab === 'iocs') currentSubTab = 'indicators';
   else if (rawSubTab === 'urls') currentSubTab = 'urls';
   else if (rawSubTab === 'lookalikes') currentSubTab = 'lookalikes';
   else if (rawSubTab === 'content' || rawSubTab === 'nlp') currentSubTab = 'content';
   else if (rawSubTab === 'scoring') currentSubTab = 'scoring';
   else if (rawSubTab === 'all') currentSubTab = 'all';
-  else currentSubTab = 'live';
+  else currentSubTab = 'results';
 
   const indicators = email.indicators || {};
   const totalIocs =
@@ -59,6 +61,7 @@ export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email 
     icon: React.FC<{ className?: string }>;
     count?: number;
   }[] = [
+    { id: 'results', label: 'Analysis Results', icon: ShieldAlert },
     { id: 'live', label: 'Live Pipeline DAG', icon: Activity },
     { id: 'all', label: 'All Sections', icon: Layers },
     { id: 'indicators', label: 'Indicators', icon: Target, count: totalIocs },
@@ -104,12 +107,23 @@ export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email 
         })}
       </div>
 
-      {/* 2. LIVE PIPELINE DAG EXECUTION VIEW */}
-      {currentSubTab === 'live' && (
-        <LiveAnalysisView investigationId={email.evidence_id || email.id || ''} />
+      {/* 2. VERIFIED ANALYSIS RESULTS & PROGRESSIVE DISCLOSURE */}
+      {currentSubTab === 'results' && (
+        <AnalysisResultsWorkstation
+          investigationId={email.evidence_id || email.id || ''}
+          onToggleViewDAG={() => setSubTab('live')}
+        />
       )}
 
-      {/* 3. TOP ANALYSIS SUMMARY CARD (Surfaced in 'All Sections' overview mode) */}
+      {/* 3. LIVE PIPELINE DAG EXECUTION VIEW */}
+      {currentSubTab === 'live' && (
+        <LiveAnalysisView
+          investigationId={email.evidence_id || email.id || ''}
+          defaultMode="dag"
+        />
+      )}
+
+      {/* 4. TOP ANALYSIS SUMMARY CARD (Surfaced in 'All Sections' overview mode) */}
       {currentSubTab === 'all' && (
         <AnalysisSummaryCard
           email={email}
@@ -117,8 +131,8 @@ export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email 
         />
       )}
 
-      {/* 4. COLLAPSIBLE FORENSIC SECTIONS */}
-      {currentSubTab !== 'live' && (
+      {/* 5. COLLAPSIBLE FORENSIC SECTIONS */}
+      {currentSubTab !== 'live' && currentSubTab !== 'results' && (
         <div className="space-y-6">
           {/* SECTION 1: INDICATORS */}
           {(currentSubTab === 'all' || currentSubTab === 'indicators') && (

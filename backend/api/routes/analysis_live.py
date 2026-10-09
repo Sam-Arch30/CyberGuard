@@ -29,10 +29,15 @@ from backend.schemas.analysis_live import (
     AnalysisEventRead,
     FindingPreview,
 )
+from backend.schemas.analysis_results import (
+    AnalysisResultsResponse,
+    EvidenceDetailResponse,
+)
 from backend.services.analysis_orchestrator import (
     AnalysisOrchestrator,
     global_event_hub,
 )
+from backend.services.analysis_results_aggregator import AnalysisResultsAggregator
 
 logger = logging.getLogger("cyberguard.api.analysis_live")
 
@@ -353,3 +358,93 @@ async def stream_live_analysis(run_id: str, db: Session = Depends(get_db)):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ============================================================================
+# SECTION 38: ANALYSIS RESULTS + PROGRESSIVE DISCLOSURE ENDPOINTS
+# ============================================================================
+
+@router.get(
+    "/api/analysis/{run_id}/results",
+    response_model=AnalysisResultsResponse,
+    summary="Get Aggregated Analysis Results (Section 38)",
+    description="Returns consolidated analysis results supporting 4 progressive disclosure tiers (Executive, Analyst, Investigator, Forensic).",
+)
+def get_analysis_results_endpoint(
+    run_id: str,
+    workspace_id: str = Query("default"),
+    db: Session = Depends(get_db),
+):
+    results = AnalysisResultsAggregator.get_results_for_run(db, run_id, workspace_id)
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"AnalysisRun '{run_id}' not found.",
+        )
+    return results
+
+
+@router.get(
+    "/api/investigations/{identifier}/analysis/results",
+    response_model=AnalysisResultsResponse,
+    summary="Get Investigation Analysis Results (Section 38)",
+    description="Resolves investigation ID, incident number, evidence ID, or artifact SHA-256 and returns consolidated analysis results.",
+)
+def get_investigation_analysis_results_endpoint(
+    identifier: str,
+    workspace_id: str = Query("default"),
+    db: Session = Depends(get_db),
+):
+    run = AnalysisOrchestrator.resolve_run_for_investigation(db, identifier)
+    if not run:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No active analysis run found for investigation identifier '{identifier}'.",
+        )
+    results = AnalysisResultsAggregator.get_results_for_run(db, run.id, workspace_id)
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Failed to compile analysis results for run '{run.id}'.",
+        )
+    return results
+
+
+@router.get(
+    "/api/analysis/{run_id}/evidence/{evidence_id}",
+    response_model=EvidenceDetailResponse,
+    summary="Lazy-Load Forensic Evidence Details",
+    description="Returns detailed evidence record, provenance, and sanitized values for deep drawer inspection.",
+)
+def get_evidence_detail_endpoint(
+    run_id: str,
+    evidence_id: str,
+    db: Session = Depends(get_db),
+):
+    detail = AnalysisResultsAggregator.get_evidence_detail(db, run_id, evidence_id)
+    if not detail:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Evidence '{evidence_id}' not found for run '{run_id}'.",
+        )
+    return detail
+
+
+@router.post(
+    "/api/analysis/{run_id}/reassess",
+    response_model=AnalysisResultsResponse,
+    summary="Trigger Manual Risk Reassessment",
+    description="Executes a controlled risk reassessment through the Unified Risk Engine without creating duplicate evidence records.",
+)
+def reassess_analysis_run_endpoint(
+    run_id: str,
+    workspace_id: str = Query("default"),
+    db: Session = Depends(get_db),
+):
+    results = AnalysisResultsAggregator.reassess_run(db, run_id, workspace_id)
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"AnalysisRun '{run_id}' not found.",
+        )
+    return results

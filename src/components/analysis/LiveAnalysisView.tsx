@@ -57,19 +57,25 @@ const mapArtifactTypeToSource = (type?: string): string => {
   }
 };
 
+import { AnalysisResultsWorkstation } from './results/AnalysisResultsWorkstation';
+
 interface LiveAnalysisViewProps {
   investigationId?: string;
   runId?: string;
   onOpenInvestigation?: () => void;
+  defaultMode?: 'results' | 'dag';
 }
 
 export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
   investigationId,
   runId: initialRunId,
   onOpenInvestigation,
+  defaultMode,
 }) => {
   const navigate = useNavigate();
 
+  const [viewMode, setViewMode] = useState<'results' | 'dag'>(defaultMode || 'dag');
+  const hasAutoSwitched = useRef<boolean>(false);
   const [analysisState, setAnalysisState] = useState<AnalysisRunLiveResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -118,6 +124,10 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
         throw new Error('No investigation or analysis run identifier provided.');
       }
       setAnalysisState(data);
+      if (!defaultMode && !hasAutoSwitched.current && ['COMPLETED', 'PARTIAL'].includes(data.status)) {
+        hasAutoSwitched.current = true;
+        setViewMode('results');
+      }
       setError(null);
       return data;
     } catch (err: unknown) {
@@ -127,7 +137,7 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [initialRunId, investigationId]);
+  }, [initialRunId, investigationId, defaultMode]);
 
   // Handle SSE subscription and polling fallback
   useEffect(() => {
@@ -277,6 +287,16 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
     );
   }
 
+  if (viewMode === 'results' && analysisState) {
+    return (
+      <AnalysisResultsWorkstation
+        runId={analysisState.id}
+        investigationId={investigationId}
+        onToggleViewDAG={() => setViewMode('dag')}
+      />
+    );
+  }
+
   const isRunning = analysisState.status === 'RUNNING' || analysisState.status === 'QUEUED';
   const isCompleted = analysisState.status === 'COMPLETED';
   const isPartial = analysisState.status === 'PARTIAL';
@@ -365,14 +385,24 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
 
           {/* Primary Action Button */}
           {(isCompleted || isPartial) && (
-            <Button
-              variant="primary"
-              size="sm"
-              onClick={handleOpenInvestigation}
-              rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
-            >
-              Open Investigation
-            </Button>
+            <>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => setViewMode('results')}
+                leftIcon={<ShieldAlert className="w-3.5 h-3.5 text-primary" />}
+              >
+                Forensic Results
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={handleOpenInvestigation}
+                rightIcon={<ArrowRight className="w-3.5 h-3.5" />}
+              >
+                Open Investigation
+              </Button>
+            </>
           )}
 
           {isRunning && (
