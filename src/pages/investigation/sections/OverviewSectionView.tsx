@@ -17,7 +17,7 @@ import { useInvestigation } from '../../../context/InvestigationContext';
 import { ExplainableAIPanel } from '../../../components/forensic/explanation';
 
 interface OverviewSectionViewProps {
-  email: EmailAnalysis;
+  email?: EmailAnalysis | null;
 }
 
 interface TriageFinding {
@@ -39,9 +39,11 @@ const defang = (val?: string): string => {
 };
 
 export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email }) => {
-  const { setSection, setSubTab, openCopilotDrawer } = useInvestigation();
+  const { setSection, setSubTab, openCopilotDrawer, workspaceSummary } = useInvestigation();
   const [copiedIndicator, setCopiedIndicator] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState<boolean>(false);
+
+  const safeEmail = email || ({} as Partial<EmailAnalysis>);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -52,9 +54,10 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
   // ---------------------------------------------------------------------------
   // SECTION 1: Threat Assessment Data
   // ---------------------------------------------------------------------------
-  const score = email.threat_score?.score ?? 0;
+  const score = safeEmail.threat_score?.score ?? workspaceSummary?.risk?.score ?? 0;
   const severity = (
-    email.threat_score?.severity ||
+    safeEmail.threat_score?.severity ||
+    workspaceSummary?.risk?.severity ||
     (score >= 80 ? 'critical' : score >= 50 ? 'high' : score >= 20 ? 'medium' : 'low')
   ).toLowerCase();
 
@@ -63,19 +66,22 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
 
   // Genuine confidence extraction without fabrication
   const genuineConfidence = useMemo(() => {
-    if (email.threat_score?.confidence !== undefined && email.threat_score?.confidence !== null) {
-      return typeof email.threat_score.confidence === 'number'
-        ? `${email.threat_score.confidence}%`
-        : String(email.threat_score.confidence);
+    if (safeEmail.threat_score?.confidence !== undefined && safeEmail.threat_score?.confidence !== null) {
+      return typeof safeEmail.threat_score.confidence === 'number'
+        ? `${safeEmail.threat_score.confidence}%`
+        : String(safeEmail.threat_score.confidence);
     }
-    if (email.attribution?.confidence_score !== undefined) {
-      return `${email.attribution.confidence_score}% (${email.attribution.confidence_level || 'Calibrated'})`;
+    if (workspaceSummary?.risk?.confidence !== undefined && workspaceSummary?.risk?.confidence !== null) {
+      return `${Math.round(workspaceSummary.risk.confidence * 100)}% (Calibrated)`;
     }
-    if (email.ml_assessment?.confidence) {
-      return `${email.ml_assessment.confidence.toUpperCase()} Confidence`;
+    if (safeEmail.attribution?.confidence_score !== undefined) {
+      return `${safeEmail.attribution.confidence_score}% (${safeEmail.attribution.confidence_level || 'Calibrated'})`;
+    }
+    if (safeEmail.ml_assessment?.confidence) {
+      return `${safeEmail.ml_assessment.confidence.toUpperCase()} Confidence`;
     }
     return null;
-  }, [email]);
+  }, [safeEmail, workspaceSummary]);
 
   // ---------------------------------------------------------------------------
   // SECTION 2: Key Findings (Real Analysis Data Only)
@@ -84,8 +90,8 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     const list: TriageFinding[] = [];
 
     // 1. Lookalike domain impersonation
-    if (email.lookalike_domains && email.lookalike_domains.length > 0) {
-      email.lookalike_domains.forEach((look, idx) => {
+    if (safeEmail.lookalike_domains && safeEmail.lookalike_domains.length > 0) {
+      safeEmail.lookalike_domains.forEach((look, idx) => {
         list.push({
           id: `lookalike-${idx}`,
           severity: 'CRITICAL',
@@ -99,7 +105,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     }
 
     // 2. Authentication Failures (DMARC, SPF, DKIM)
-    const auth = email.authentication;
+    const auth = safeEmail.authentication;
     if (auth?.dmarc?.result === 'fail') {
       list.push({
         id: 'auth-dmarc',
@@ -137,8 +143,8 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     }
 
     // 3. Suspicious URLs & Redirect Chains
-    if (email.url_analysis && email.url_analysis.length > 0) {
-      const suspiciousUrls = email.url_analysis.filter(
+    if (safeEmail.url_analysis && safeEmail.url_analysis.length > 0) {
+      const suspiciousUrls = safeEmail.url_analysis.filter(
         u => (u.suspicion_score && u.suspicion_score >= 50) || u.suspicion_level !== 'low'
       );
       suspiciousUrls.slice(0, 2).forEach((u, idx) => {
@@ -156,10 +162,10 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
 
     // 4. Infrastructure Discrepancies
     if (
-      email.hops &&
-      email.hops.some(h => h.authStatus === 'fail' || (h.asn && h.asn.toLowerCase().includes('bulletproof')))
+      safeEmail.hops &&
+      safeEmail.hops.some(h => h.authStatus === 'fail' || (h.asn && h.asn.toLowerCase().includes('bulletproof')))
     ) {
-      const badHop = email.hops.find(
+      const badHop = safeEmail.hops.find(
         h => h.authStatus === 'fail' || (h.asn && h.asn.toLowerCase().includes('bulletproof'))
       );
       list.push({
@@ -171,12 +177,12 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
         targetSubTab: 'infrastructure',
         actionLabel: 'View infrastructure'
       });
-    } else if (email.attribution?.probable_origin_ip && isMalicious) {
+    } else if (safeEmail.attribution?.probable_origin_ip && isMalicious) {
       list.push({
         id: 'attr-origin',
         severity: 'MEDIUM',
         title: 'Sending infrastructure differs from expected origin',
-        description: `Ingress traffic originating from public hosting network (${email.attribution.probable_origin_provider || email.attribution.probable_origin_asn || email.attribution.probable_origin_ip})`,
+        description: `Ingress traffic originating from public hosting network (${safeEmail.attribution.probable_origin_provider || safeEmail.attribution.probable_origin_asn || safeEmail.attribution.probable_origin_ip})`,
         targetSection: 'intelligence',
         targetSubTab: 'infrastructure',
         actionLabel: 'View infrastructure'
@@ -185,8 +191,8 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
 
     // 5. Suspicious Attachments
     if (
-      email.attachments &&
-      email.attachments.some(
+      safeEmail.attachments &&
+      safeEmail.attachments.some(
         a =>
           (a.static_analysis &&
             (a.static_analysis.threat_level === 'CRITICAL' ||
@@ -207,7 +213,22 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       });
     }
 
-    // 6. Benign Baseline Findings (For Low Risk / Legitimate Emails)
+    // 6. Top findings from workspace summary if available
+    if (list.length === 0 && workspaceSummary?.top_findings && workspaceSummary.top_findings.length > 0) {
+      workspaceSummary.top_findings.forEach((tf, idx) => {
+        list.push({
+          id: tf.id || `ws-finding-${idx}`,
+          severity: (tf.severity || 'HIGH').toUpperCase() as any,
+          title: tf.title,
+          description: tf.description || 'Forensic signal identified during automated analysis run.',
+          targetSection: 'analysis',
+          targetSubTab: 'results',
+          actionLabel: 'View finding in analysis'
+        });
+      });
+    }
+
+    // 7. Benign Baseline Findings (For Low Risk / Legitimate Emails)
     if (list.length === 0 || isBenign) {
       return [
         {
@@ -241,12 +262,12 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     }
 
     return list;
-  }, [email, isMalicious, isBenign]);
+  }, [safeEmail, isMalicious, isBenign, workspaceSummary]);
 
   // ---------------------------------------------------------------------------
   // SECTION 3: Authentication Snapshot States
   // ---------------------------------------------------------------------------
-  const auth = email.authentication;
+  const auth = safeEmail.authentication;
   const spfState = (auth?.spf?.result || 'NONE').toUpperCase();
   const dkimState = (auth?.dkim?.result || 'NONE').toUpperCase();
   const dmarcState = (auth?.dmarc?.result || 'NONE').toUpperCase();
@@ -272,15 +293,15 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     const list: Array<{ type: 'DOMAIN' | 'URL' | 'IP'; value: string; isMalicious: boolean }> = [];
 
     // Lookalike domains first
-    if (email.lookalike_domains) {
-      email.lookalike_domains.forEach(d => {
+    if (safeEmail.lookalike_domains) {
+      safeEmail.lookalike_domains.forEach(d => {
         list.push({ type: 'DOMAIN', value: d.domain, isMalicious: true });
       });
     }
 
     // Flagged URLs next
-    if (email.url_analysis) {
-      email.url_analysis
+    if (safeEmail.url_analysis) {
+      safeEmail.url_analysis
         .filter(u => (u.suspicion_score && u.suspicion_score >= 50) || u.suspicion_level !== 'low')
         .forEach(u => {
           list.push({ type: 'URL', value: u.url, isMalicious: true });
@@ -288,14 +309,14 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     }
 
     // Origin/transit IPs
-    if (email.attribution?.probable_origin_ip) {
+    if (safeEmail.attribution?.probable_origin_ip) {
       list.push({
         type: 'IP',
-        value: email.attribution.probable_origin_ip,
+        value: safeEmail.attribution.probable_origin_ip,
         isMalicious: isMalicious
       });
-    } else if (email.ips && email.ips.length > 0) {
-      const publicIp = email.ips.find(
+    } else if (safeEmail.ips && safeEmail.ips.length > 0) {
+      const publicIp = safeEmail.ips.find(
         ip => !ip.startsWith('10.') && !ip.startsWith('192.168.') && !ip.startsWith('127.')
       );
       if (publicIp) {
@@ -304,8 +325,8 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     }
 
     // Fallback domains if needed
-    if (list.length < 3 && email.domains) {
-      email.domains.slice(0, 3 - list.length).forEach(dom => {
+    if (list.length < 3 && safeEmail.domains) {
+      safeEmail.domains.slice(0, 3 - list.length).forEach(dom => {
         if (!list.some(i => i.value === dom)) {
           list.push({ type: 'DOMAIN', value: dom, isMalicious: false });
         }
@@ -313,20 +334,21 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     }
 
     return list.slice(0, 4);
-  }, [email, isMalicious]);
+  }, [safeEmail, isMalicious]);
 
   const totalIOCsCount =
-    (email.ips?.length || 0) +
-    (email.domains?.length || 0) +
-    (email.urls?.length || 0) +
-    (email.emails?.length || 0);
+    (safeEmail.ips?.length || 0) +
+    (safeEmail.domains?.length || 0) +
+    (safeEmail.urls?.length || 0) +
+    (safeEmail.emails?.length || 0);
 
   // ---------------------------------------------------------------------------
   // SECTION 5: Investigation Summary (Concise AI/Backend Narrative)
   // ---------------------------------------------------------------------------
   const rawSummary =
-    email.ai_analyst?.summary ||
-    email.threat_score?.summary ||
+    safeEmail.ai_analyst?.summary ||
+    workspaceSummary?.executive_summary ||
+    safeEmail.threat_score?.summary ||
     (isMalicious
       ? 'Automated inspection detected severe indicators of phishing, domain impersonation, and authentication failures. The email exhibits deceptive sender alignment designed to mislead recipients into performing unauthorized actions.'
       : 'Automated forensic inspection completed. The email adheres to standard enterprise cryptographic authentication, verified sender domains, and exhibits baseline benign characteristics.');
@@ -681,7 +703,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
           ======================================================================= */}
       <ExplainableAIPanel
         scopeType="EVENT"
-        scopeId={email.id}
+        scopeId={safeEmail.id || workspaceSummary?.investigation.investigation_id || 'investigation'}
         riskScore={score}
         riskLevel={severity}
         confidence={genuineConfidence || undefined}
@@ -698,9 +720,9 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
               Investigation Summary
             </h3>
           </div>
-          {email.ai_analyst?.likely_attack_type && (
+          {(safeEmail.ai_analyst?.likely_attack_type || workspaceSummary?.classification) && (
             <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-primary/10 text-primary border border-primary/20">
-              {email.ai_analyst.likely_attack_type}
+              {safeEmail.ai_analyst?.likely_attack_type || workspaceSummary?.classification}
             </span>
           )}
         </div>

@@ -54,12 +54,17 @@ function AppContent() {
         <Route path="/investigate/:section" element={<InvestigationWorkspace />} />
         <Route path="/investigate/:id/:section" element={<InvestigationWorkspace />} />
         <Route path="/overview" element={<InvestigationWorkspace />} />
-        <Route path="/email" element={<InvestigationWorkspace />} />
         <Route path="/analysis" element={<InvestigationWorkspace />} />
         <Route path="/analysis/:id" element={<InvestigationWorkspace />} />
+        <Route path="/attack-path" element={<InvestigationWorkspace />} />
+        <Route path="/graph" element={<InvestigationWorkspace />} />
+        <Route path="/timeline" element={<InvestigationWorkspace />} />
+        <Route path="/evidence" element={<InvestigationWorkspace />} />
         <Route path="/intelligence" element={<InvestigationWorkspace />} />
-        <Route path="/investigation" element={<InvestigationWorkspace />} />
+        <Route path="/response" element={<InvestigationWorkspace />} />
         <Route path="/report" element={<InvestigationWorkspace />} />
+        <Route path="/email" element={<InvestigationWorkspace />} />
+        <Route path="/investigation" element={<InvestigationWorkspace />} />
 
         {/* Contextual Security Tools (Deep Links & Sub-Workflows) */}
         <Route path="/analyze" element={<AnalyzeEmail />} />

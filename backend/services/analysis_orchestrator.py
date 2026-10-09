@@ -962,9 +962,11 @@ class AnalysisOrchestrator:
             if r:
                 return r
 
-        # 5. Fallback: check most recent run overall
-        return (
-            db.query(AnalysisRunModel)
-            .order_by(AnalysisRunModel.started_at.desc())
-            .first()
-        )
+        # 5. Fallback: check most recent run overall only for semantic aliases
+        if clean_id.lower() in ("latest", "current", "default", "recent"):
+            return (
+                db.query(AnalysisRunModel)
+                .order_by(AnalysisRunModel.started_at.desc())
+                .first()
+            )
+        return None

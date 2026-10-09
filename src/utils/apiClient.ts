@@ -8,7 +8,7 @@
 // Resolves base API URL, removing trailing slashes.
 // In local Vite development without VITE_API_BASE_URL, defaults to empty string so requests
 // hit the relative path (e.g. '/api/...'), which Vite's dev server proxies to the backend.
-const rawBase = (import.meta.env.VITE_API_BASE_URL as string | undefined) || '';
+const rawBase = (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_API_BASE_URL as string | undefined) : '') || '';
 export const API_BASE_URL: string = rawBase.trim().replace(/\/+$/, '');
 
 /**

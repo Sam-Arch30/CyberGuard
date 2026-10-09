@@ -218,7 +218,7 @@ class AnalysisResultsAggregator:
             id=artifact.id if artifact else run.artifact_id,
             name=artifact.name if artifact else "unknown",
             artifact_type=artifact.artifact_type if artifact else "FILE",
-            size=artifact.size if artifact else 0,
+            size=(artifact.size or 0) if artifact else 0,
             sha256=artifact.sha256 if artifact else None,
             source=artifact.source if artifact else "UNKNOWN",
         )

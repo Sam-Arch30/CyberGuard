@@ -283,16 +283,61 @@ class ResponseRecommendationEngine:
         # 4. Look up underlying ThreatEvent or Incident
         threat_event = None
         incident = None
+        run_obj = None
+        art_obj = None
         if scope_type == "EVENT":
             threat_event = db.query(ThreatEventModel).filter(ThreatEventModel.id == scope_id).first()
         elif scope_type == "INCIDENT":
             incident = db.query(IncidentModel).filter(IncidentModel.id == scope_id).first()
+        elif scope_type == "INVESTIGATION":
+            from backend.services.investigation_workspace_service import InvestigationWorkspaceService
+            inc_obj, run_obj, art_obj, _ = InvestigationWorkspaceService.resolve_context(db, scope_id)
+            if inc_obj:
+                incident = inc_obj
+            if not risk_assessment and inc_obj:
+                risk_assessment = db.query(RiskAssessmentModel).filter(
+                    RiskAssessmentModel.workspace_id == workspace_id,
+                    RiskAssessmentModel.scope_id == inc_obj.id
+                ).order_by(desc(RiskAssessmentModel.version)).first()
+            if not risk_assessment and run_obj:
+                risk_assessment = db.query(RiskAssessmentModel).filter(
+                    RiskAssessmentModel.workspace_id == workspace_id,
+                    RiskAssessmentModel.scope_id == run_obj.id
+                ).order_by(desc(RiskAssessmentModel.version)).first()
+            if not risk_assessment:
+                try:
+                    from backend.services.risk_engine_service import RiskEngineService
+                    risk_assessment = RiskEngineService.evaluate_investigation(db, investigation_id=scope_id, workspace_id=workspace_id)
+                except Exception as exc:
+                    logger.warning(f"Could not auto-evaluate risk for investigation {scope_id}: {exc}")
+            
+            if not explanation and inc_obj:
+                explanation = db.query(ExplanationModel).filter(
+                    ExplanationModel.workspace_id == workspace_id,
+                    ExplanationModel.scope_id == inc_obj.id
+                ).order_by(desc(ExplanationModel.explanation_version)).first()
+            if not explanation and run_obj:
+                explanation = db.query(ExplanationModel).filter(
+                    ExplanationModel.workspace_id == workspace_id,
+                    ExplanationModel.scope_id == run_obj.id
+                ).order_by(desc(ExplanationModel.explanation_version)).first()
+            if not explanation:
+                try:
+                    from backend.services.explanation_composer import ExplanationComposer
+                    explanation = ExplanationComposer.compose_explanation(db, scope_type="INVESTIGATION", scope_id=scope_id, workspace_id=workspace_id)
+                except Exception as exc:
+                    logger.warning(f"Could not auto-compose explanation for investigation {scope_id}: {exc}")
+
+            if not threat_event and run_obj:
+                threat_event = db.query(ThreatEventModel).filter(ThreatEventModel.analysis_run_id == run_obj.id).first()
+            if not threat_event and inc_obj:
+                threat_event = db.query(ThreatEventModel).filter(ThreatEventModel.incident_id == inc_obj.id).first()
 
         # 5. Extract environment capabilities
         capabilities = cls.get_capabilities(db, workspace_id)
 
         # 6. Extract raw entities and evidence tokens
-        context_data = cls._extract_context(threat_event, incident, risk_assessment, explanation)
+        context_data = cls._extract_context(threat_event, incident, risk_assessment, explanation, run_obj, art_obj)
 
         # 7. Generate Candidate Recommendations
         candidates = cls._generate_candidates(context_data, capabilities, workspace_id, scope_type, scope_id)
@@ -347,7 +392,9 @@ class ResponseRecommendationEngine:
         threat_event: Optional[ThreatEventModel],
         incident: Optional[IncidentModel],
         risk_assessment: Optional[RiskAssessmentModel],
-        explanation: Optional[ExplanationModel]
+        explanation: Optional[ExplanationModel],
+        analysis_run: Optional[Any] = None,
+        artifact: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
         Assembles all grounded inputs into a normalized inspection context.
@@ -357,6 +404,7 @@ class ResponseRecommendationEngine:
             "incident_id": incident.id if incident else (threat_event.incident_id if threat_event else None),
             "risk_assessment_id": risk_assessment.id if risk_assessment else None,
             "explanation_id": explanation.id if explanation else None,
+            "analysis_run_id": analysis_run.id if analysis_run else (threat_event.analysis_run_id if threat_event else None),
             "risk_score": risk_assessment.risk_score if risk_assessment else 50.0,
             "risk_level": risk_assessment.risk_level if risk_assessment else "MEDIUM",
             "severity": risk_assessment.severity if risk_assessment else "MEDIUM",
@@ -472,6 +520,68 @@ class ResponseRecommendationEngine:
                 if s and s not in ctx["sessions"]:
                     ctx["sessions"].append(s)
 
+        # Ingest Artifact metadata (when threat_event is not present or incomplete)
+        if artifact and getattr(artifact, "metadata_json", None):
+            try:
+                art_meta = json.loads(artifact.metadata_json) if isinstance(artifact.metadata_json, str) else artifact.metadata_json
+                if isinstance(art_meta, dict):
+                    for u in art_meta.get("urls", []) or art_meta.get("phishing_urls", []):
+                        u_str = u if isinstance(u, str) else u.get("url")
+                        if u_str and u_str not in ctx["urls"]:
+                            ctx["urls"].append(u_str)
+                    for d in art_meta.get("domains", []) or art_meta.get("lookalike_domains", []):
+                        d_str = d if isinstance(d, str) else d.get("domain")
+                        if d_str and d_str not in ctx["domains"]:
+                            ctx["domains"].append(d_str)
+                    if art_meta.get("sender_domain") and art_meta["sender_domain"] not in ctx["domains"]:
+                        ctx["domains"].append(art_meta["sender_domain"])
+                    if art_meta.get("sender_ip") and art_meta["sender_ip"] not in ctx["ips"]:
+                        ctx["ips"].append(art_meta["sender_ip"])
+                    for ip in art_meta.get("origin_ips", []) or art_meta.get("ips", []):
+                        ip_str = ip if isinstance(ip, str) else ip.get("ip")
+                        if ip_str and ip_str not in ctx["ips"]:
+                            ctx["ips"].append(ip_str)
+                    for acc in [art_meta.get("recipient"), art_meta.get("to"), art_meta.get("target_user")]:
+                        if acc and acc not in ctx["accounts"]:
+                            ctx["accounts"].append(acc)
+                    for f in art_meta.get("attachments", []):
+                        f_name = f.get("filename") if isinstance(f, dict) else str(f)
+                        f_hash = f.get("sha256") if isinstance(f, dict) else None
+                        ctx["files"].append({"filename": f_name, "sha256": f_hash})
+            except Exception as e:
+                logger.warning(f"Could not parse artifact metadata in recommendation extraction: {e}")
+
+        # Ingest AnalysisRun findings and risk metrics
+        if analysis_run:
+            if getattr(analysis_run, "overall_risk_score", None) and not risk_assessment:
+                ctx["risk_score"] = analysis_run.overall_risk_score
+            if getattr(analysis_run, "overall_severity", None) and not risk_assessment:
+                ctx["severity"] = analysis_run.overall_severity
+            if getattr(analysis_run, "confidence", None) and not risk_assessment:
+                ctx["threat_confidence"] = analysis_run.confidence
+
+            for finding in getattr(analysis_run, "findings", []) or []:
+                cat = (getattr(finding, "category", "") or "").upper()
+                if "EMAIL" in cat or "PHISH" in cat:
+                    ctx["is_phishing"] = True
+                if "AUTH" in cat or "IDENTITY" in cat or "ATO" in cat:
+                    ctx["is_ato"] = True
+                if "MALWARE" in cat or "FILE" in cat:
+                    ctx["is_malware"] = True
+                if "NET" in cat:
+                    ctx["is_network_threat"] = True
+                if getattr(finding, "target", None):
+                    t_str = str(finding.target).strip()
+                    if "@" in t_str and t_str not in ctx["accounts"]:
+                        ctx["accounts"].append(t_str)
+                    elif t_str.startswith("http") and t_str not in ctx["urls"]:
+                        ctx["urls"].append(t_str)
+                    elif "." in t_str and not t_str.startswith("http") and "/" not in t_str and t_str not in ctx["domains"]:
+                        ctx["domains"].append(t_str)
+                for ref in (getattr(finding, "evidence_refs", []) or []):
+                    if ref not in ctx["evidence_refs"]:
+                        ctx["evidence_refs"].append(ref)
+
         # Baseline flags if score is critical
         if ctx["risk_score"] >= 80:
             if not (ctx["is_phishing"] or ctx["is_ato"] or ctx["is_malware"] or ctx["is_network_threat"]):
@@ -568,6 +678,7 @@ class ResponseRecommendationEngine:
                 execution_mode=ExecutionModeEnum.MANUAL.value,
                 status=RecommendationStatusEnum.REVIEW_REQUIRED.value if approval_required else RecommendationStatusEnum.GENERATED.value,
                 recommendation_version=1,
+                metadata_json=json.dumps({"analysis_run_id": ctx.get("analysis_run_id")}),
                 created_at=now,
                 updated_at=now,
                 expires_at=expires_at

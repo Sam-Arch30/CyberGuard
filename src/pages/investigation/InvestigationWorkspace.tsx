@@ -3,14 +3,26 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInvestigation } from '../../context/InvestigationContext';
 import { ActiveInvestigationHeader } from '../../components/layout/ActiveInvestigationHeader';
+import { InvestigationSummaryBar } from '../../components/investigation/InvestigationSummaryBar';
+import { InvestigationNav } from '../../components/investigation/InvestigationNav';
+import { InvestigationNotesDrawer } from '../../components/investigation/InvestigationNotesDrawer';
 import { InvestigationAIDrawer } from '../../components/copilot/InvestigationAIDrawer';
 import { LoadingState, ErrorState, Button } from '../../components/ui';
+
+// Section Views for Section 39 Workspaces
 import { OverviewSectionView } from './sections/OverviewSectionView';
-import { EmailSectionView } from './sections/EmailSectionView';
 import { AnalysisSectionView } from './sections/AnalysisSectionView';
+import { AttackPathSectionView } from './sections/AttackPathSectionView';
+import { GraphSectionView } from './sections/GraphSectionView';
+import { TimelineSectionView } from './sections/TimelineSectionView';
+import { EvidenceSectionView } from './sections/EvidenceSectionView';
 import { IntelligenceSectionView } from './sections/IntelligenceSectionView';
-import { InvestigationSectionView } from './sections/InvestigationSectionView';
+import { ResponseSectionView } from './sections/ResponseSectionView';
 import { ReportSectionView } from './sections/ReportSectionView';
+
+// Backward-compatible sections
+import { EmailSectionView } from './sections/EmailSectionView';
+import { InvestigationSectionView } from './sections/InvestigationSectionView';
 import { LiveAnalysisView } from '../../components/analysis/LiveAnalysisView';
 
 import { CleanWorkspaceEmptyState } from './CleanWorkspaceEmptyState';
@@ -20,19 +32,27 @@ export const InvestigationWorkspace: React.FC = () => {
   const {
     activeEmail,
     activeEmailId,
+    workspaceSummary,
     loading,
     error,
     activeSection,
     reloadActiveEmail,
+    refreshWorkspaceSummary,
+    updateInvestigationStatus,
+    addAnalystNote,
+    isNotesDrawerOpen,
+    openNotesDrawer,
+    closeNotesDrawer,
     openCopilotDrawer,
-    isCopilotDrawerOpen
+    isCopilotDrawerOpen,
   } = useInvestigation();
   const navigate = useNavigate();
 
-  const effectiveId = id || activeEmailId;
+  const effectiveId = id || activeEmailId || workspaceSummary?.investigation.investigation_id;
   const isAnalysisRoute = section === 'analysis' || activeSection === 'analysis';
+  const hasInvestigationData = Boolean(activeEmail || workspaceSummary);
 
-  if (!activeEmail) {
+  if (!hasInvestigationData) {
     if (isAnalysisRoute && effectiveId && effectiveId !== 'analysis') {
       return (
         <div className="space-y-6 pb-16 page-enter relative">
@@ -43,8 +63,8 @@ export const InvestigationWorkspace: React.FC = () => {
     if (loading) {
       return (
         <LoadingState
-          message="Checking forensic workspace..."
-          subtext="Verifying active email telemetry"
+          message="Loading forensic investigation workspace..."
+          subtext="Resolving investigation context and evidence graph"
           fullHeight
         />
       );
@@ -73,24 +93,94 @@ export const InvestigationWorkspace: React.FC = () => {
   }
 
   return (
-    <div className="space-y-6 pb-16 page-enter relative">
-      {/* 1. PERSISTENT ACTIVE INVESTIGATION CONTEXT HEADER */}
-      <ActiveInvestigationHeader />
+    <div className="space-y-4 pb-16 page-enter relative">
+      {/* 1. PERSISTENT ACTIVE INVESTIGATION CONTEXT HEADER (Forensic Telemetry) */}
+      {activeEmail && <ActiveInvestigationHeader />}
 
-      {/* 2. ACTIVE SECTION VIEW */}
+      {/* 2. PERSISTENT INVESTIGATION SUMMARY BAR (Status, Score, Counts, Attention Items) */}
+      <InvestigationSummaryBar
+        summary={workspaceSummary}
+        loading={loading}
+        onStatusChange={updateInvestigationStatus}
+        onOpenNotes={openNotesDrawer}
+        onRefresh={refreshWorkspaceSummary}
+      />
+
+      {/* 3. CONTEXTUAL INVESTIGATION NAVIGATION (9 Canonical Workspaces) */}
+      <InvestigationNav
+        activeSection={activeSection}
+        investigationId={effectiveId || ''}
+        counts={workspaceSummary?.counts}
+      />
+
+      {/* 4. ACTIVE SECTION VIEW */}
       <div key={activeSection} className="page-enter">
-        {activeSection === 'overview' && <OverviewSectionView email={activeEmail} />}
-        {activeSection === 'email' && <EmailSectionView email={activeEmail} />}
-        {activeSection === 'analysis' && <AnalysisSectionView email={activeEmail} />}
-        {activeSection === 'intelligence' && <IntelligenceSectionView email={activeEmail} />}
-        {activeSection === 'investigation' && <InvestigationSectionView email={activeEmail} />}
-        {activeSection === 'report' && <ReportSectionView email={activeEmail} />}
+        {activeSection === 'overview' && (
+          <OverviewSectionView email={activeEmail} />
+        )}
+        {activeSection === 'analysis' && (
+          activeEmail ? (
+            <AnalysisSectionView email={activeEmail} />
+          ) : effectiveId ? (
+            <LiveAnalysisView investigationId={effectiveId} />
+          ) : null
+        )}
+        {activeSection === 'attack-path' && (
+          <AttackPathSectionView />
+        )}
+        {activeSection === 'graph' && (
+          <GraphSectionView />
+        )}
+        {activeSection === 'timeline' && (
+          <TimelineSectionView />
+        )}
+        {activeSection === 'evidence' && (
+          <EvidenceSectionView />
+        )}
+        {activeSection === 'intelligence' && (
+          activeEmail ? (
+            <IntelligenceSectionView email={activeEmail} />
+          ) : (
+            <div className="bg-surface border border-border rounded-xl p-8 text-center text-xs font-mono text-foreground-muted">
+              No threat intelligence telemetry available for this artifact.
+            </div>
+          )
+        )}
+        {activeSection === 'response' && (
+          <ResponseSectionView />
+        )}
+        {activeSection === 'report' && (
+          activeEmail ? (
+            <ReportSectionView email={activeEmail} />
+          ) : (
+            <div className="bg-surface border border-border rounded-xl p-8 text-center text-xs font-mono text-foreground-muted">
+              No forensic report generated yet.
+            </div>
+          )
+        )}
+
+        {/* Backward-compatible legacy aliases */}
+        {activeSection === 'email' && activeEmail && (
+          <EmailSectionView email={activeEmail} />
+        )}
+        {activeSection === 'investigation' && activeEmail && (
+          <InvestigationSectionView email={activeEmail} />
+        )}
       </div>
 
-      {/* 3. CONTEXTUAL INVESTIGATION AI DRAWER */}
+      {/* 5. AUDITABLE ANALYST NOTES DRAWER */}
+      <InvestigationNotesDrawer
+        isOpen={isNotesDrawerOpen}
+        onClose={closeNotesDrawer}
+        notes={workspaceSummary?.analyst_notes || []}
+        onAddNote={addAnalystNote}
+        investigationId={effectiveId || ''}
+      />
+
+      {/* 6. CONTEXTUAL INVESTIGATION AI DRAWER */}
       <InvestigationAIDrawer />
 
-      {/* 4. PERSISTENT FLOATING QUICK-ACCESS BUTTON (Accessible throughout workspace) */}
+      {/* 7. PERSISTENT FLOATING QUICK-ACCESS COPILOT BUTTON */}
       {!isCopilotDrawerOpen && (
         <div className="fixed bottom-6 right-6 z-40 animate-fadeIn">
           <button

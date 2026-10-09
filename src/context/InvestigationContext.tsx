@@ -6,13 +6,24 @@ import { resolveEmailIndicators, resolveAttribution } from '../utils/indicatorHe
 import { resolveConfidenceConclusions } from '../utils/confidenceResolver';
 import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 
+import { investigationWorkspaceService } from '../services/investigationWorkspaceService';
+import type {
+  InvestigationWorkspaceSummary,
+  InvestigationStatus,
+} from '../types/investigationWorkspace';
+
 export type InvestigationSection =
   | 'overview'
-  | 'email'
   | 'analysis'
+  | 'attack-path'
+  | 'graph'
+  | 'timeline'
+  | 'evidence'
   | 'intelligence'
-  | 'investigation'
-  | 'report';
+  | 'response'
+  | 'report'
+  | 'email'
+  | 'investigation';
 
 export interface SectionMetadata {
   id: InvestigationSection;
@@ -33,44 +44,84 @@ export const INVESTIGATION_SECTIONS: SectionMetadata[] = [
     defaultSubTab: 'executive'
   },
   {
-    id: 'email',
-    number: '02',
-    label: 'Email',
-    shortLabel: 'Email',
-    description: 'Email identity, authentication, relay path, headers & evidence',
-    defaultSubTab: 'all'
-  },
-  {
     id: 'analysis',
-    number: '03',
+    number: '02',
     label: 'Analysis',
     shortLabel: 'Analysis',
     description: 'Summary, indicators, URLs, domain similarity, content & scoring',
-    defaultSubTab: 'live'
+    defaultSubTab: 'results'
+  },
+  {
+    id: 'attack-path',
+    number: '03',
+    label: 'Attack Path',
+    shortLabel: 'Attack Path',
+    description: 'Reconstructed attack stages, transitions, confidence and bottlenecks',
+    defaultSubTab: 'path'
+  },
+  {
+    id: 'graph',
+    number: '04',
+    label: 'Graph',
+    shortLabel: 'Graph',
+    description: 'Security Knowledge Graph entities, relationships, and multi-hop pivots',
+    defaultSubTab: 'graph'
+  },
+  {
+    id: 'timeline',
+    number: '05',
+    label: 'Timeline',
+    shortLabel: 'Timeline',
+    description: 'Forensic event sequence, timestamps, source provenance, and telemetry order',
+    defaultSubTab: 'events'
+  },
+  {
+    id: 'evidence',
+    number: '06',
+    label: 'Evidence',
+    shortLabel: 'Evidence',
+    description: 'Immutable original artifacts, SHA-256 digests and derived evidence items',
+    defaultSubTab: 'all'
   },
   {
     id: 'intelligence',
-    number: '04',
+    number: '07',
     label: 'Intelligence',
     shortLabel: 'Intelligence',
     description: 'Infrastructure, domains, WHOIS, DNS & geographic telemetry',
     defaultSubTab: 'all'
   },
   {
-    id: 'investigation',
-    number: '05',
-    label: 'Investigation',
-    shortLabel: 'Investigation',
-    description: 'Investigation graph, campaign correlation, related emails & copilot',
-    defaultSubTab: 'graph'
+    id: 'response',
+    number: '08',
+    label: 'Response',
+    shortLabel: 'Response',
+    description: 'Containment recommendations, defensive playbooks and approval workflows',
+    defaultSubTab: 'recommendations'
   },
   {
     id: 'report',
-    number: '06',
+    number: '09',
     label: 'Report',
     shortLabel: 'Report',
     description: 'Findings summary, evidence dossier, report generation & PDF export',
     defaultSubTab: 'generate'
+  },
+  {
+    id: 'email',
+    number: '10',
+    label: 'Email',
+    shortLabel: 'Email',
+    description: 'Email identity, authentication, relay path, headers & evidence',
+    defaultSubTab: 'all'
+  },
+  {
+    id: 'investigation',
+    number: '11',
+    label: 'Investigation',
+    shortLabel: 'Investigation',
+    description: 'Investigation graph, campaign correlation, related emails & copilot',
+    defaultSubTab: 'graph'
   }
 ];
 
@@ -85,6 +136,7 @@ export interface StepGuidance {
 interface InvestigationContextType {
   activeEmailId: string;
   activeEmail: EmailAnalysis | null;
+  workspaceSummary: InvestigationWorkspaceSummary | null;
   loading: boolean;
   error: string | null;
   activeSection: InvestigationSection;
@@ -93,6 +145,9 @@ interface InvestigationContextType {
   availableAnalyses: EmailAnalysis[];
   focusedGraphNodeId: string | null;
   refreshAnalyses: () => void;
+  refreshWorkspaceSummary: () => Promise<void>;
+  updateInvestigationStatus: (newStatus: InvestigationStatus | string, reason?: string) => Promise<void>;
+  addAnalystNote: (noteText: string, author?: string) => Promise<void>;
   setActiveEmailId: (id: string) => void;
   setSection: (section: InvestigationSection, subTab?: string) => void;
   setSubTab: (subTab: string) => void;
@@ -102,6 +157,11 @@ interface InvestigationContextType {
   reanalyzeActiveEmail: () => Promise<void>;
   ingestEmail: (fileOrBlob: Blob, filename: string, rawText?: string) => Promise<EmailAnalysis>;
   resetToCleanWorkspace: () => Promise<void>;
+  // Analyst Notes Drawer
+  isNotesDrawerOpen: boolean;
+  openNotesDrawer: () => void;
+  closeNotesDrawer: () => void;
+  toggleNotesDrawer: () => void;
   // Contextual AI Copilot Drawer
   isCopilotDrawerOpen: boolean;
   copilotContextData: { prompt?: string; entity?: { type: string; identifier: string; details?: string } } | null;
@@ -137,10 +197,14 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   });
 
   const [activeEmail, setActiveEmail] = useState<EmailAnalysis | null>(null);
+  const [workspaceSummary, setWorkspaceSummary] = useState<InvestigationWorkspaceSummary | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [availableAnalyses, setAvailableAnalyses] = useState<EmailAnalysis[]>([]);
   const [focusedGraphNodeId, setFocusedGraphNodeId] = useState<string | null>(null);
+
+  // Notes Drawer State
+  const [isNotesDrawerOpen, setIsNotesDrawerOpen] = useState<boolean>(false);
 
   // Copilot Drawer State
   const [isCopilotDrawerOpen, setIsCopilotDrawerOpen] = useState<boolean>(false);
@@ -152,11 +216,16 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   // Sub-tabs state per section
   const [subTabs, setSubTabs] = useState<Record<InvestigationSection, string>>({
     overview: 'executive',
-    email: 'body',
-    analysis: 'live',
+    analysis: 'results',
+    'attack-path': 'path',
+    graph: 'graph',
+    timeline: 'events',
+    evidence: 'all',
     intelligence: 'all',
+    response: 'recommendations',
+    report: 'generate',
+    email: 'body',
     investigation: 'graph',
-    report: 'generate'
   });
 
   // Determine current active section from URL
@@ -233,6 +302,19 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     try {
       let resolved: EmailAnalysis | null = null;
+      let summaryObj: InvestigationWorkspaceSummary | null = null;
+
+      // Try fetching workspace summary from backend
+      if (effectiveId) {
+        try {
+          summaryObj = await investigationWorkspaceService.getWorkspaceSummary(effectiveId);
+          if (summaryObj) {
+            setWorkspaceSummary(summaryObj);
+          }
+        } catch {
+          // Will fallback to email analysis or latest
+        }
+      }
 
       // 1. If we have a specific candidate ID, check local real store and backend
       if (effectiveId) {
@@ -271,34 +353,54 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         }
       }
 
-      // 2. If no specific ID resolved, check for the MOST RECENT real ingested email
-      if (!resolved) {
+      // 2. If no specific ID resolved, check for the MOST RECENT real ingested email or workspace
+      if (!resolved && !summaryObj) {
         const localReal = getAllAvailableAnalyses(false);
         if (localReal.length > 0) {
           resolved = localReal[0];
         } else {
-          // Check backend for latest analyzed email
-          const latestEndpoints = [
-            apiUrl('/api/emails/latest/analysis')
-          ];
-          for (const ep of latestEndpoints) {
-            try {
-              const res = await fetch(ep);
-              if (res.ok) {
-                const apiData = await res.json();
-                resolved = resolveEmailIndicators(apiData);
-                const k = resolved.evidence_id || resolved.id || 'latest';
-                saveAnalysisResult(k, resolved);
-                break;
+          try {
+            summaryObj = await investigationWorkspaceService.getWorkspaceSummary('latest');
+            if (summaryObj) {
+              setWorkspaceSummary(summaryObj);
+            }
+          } catch {
+            // No latest workspace
+          }
+
+          if (!summaryObj) {
+            // Check backend for latest analyzed email
+            const latestEndpoints = [
+              apiUrl('/api/emails/latest/analysis')
+            ];
+            for (const ep of latestEndpoints) {
+              try {
+                const res = await fetch(ep);
+                if (res.ok) {
+                  const apiData = await res.json();
+                  resolved = resolveEmailIndicators(apiData);
+                  const k = resolved.evidence_id || resolved.id || 'latest';
+                  saveAnalysisResult(k, resolved);
+                  break;
+                }
+              } catch {
+                // Safe fallback
               }
-            } catch {
-              // Safe fallback
             }
           }
         }
       }
 
-      // 3. If a real ingested email was found, activate it and initiate dynamic enrichments
+      // 3. If workspace summary exists without active email, set id and complete
+      if (summaryObj && !resolved) {
+        const id = summaryObj.investigation.investigation_id || summaryObj.investigation.incident_number;
+        setActiveEmailIdState(id);
+        localStorage.setItem(LAST_INVESTIGATED_KEY, id);
+        setLoading(false);
+        return;
+      }
+
+      // 4. If a real ingested email was found, activate it and initiate dynamic enrichments
       if (resolved) {
         if (!resolved.attribution || !resolved.attribution.probable_origin_ip) {
           resolved.attribution = resolveAttribution(resolved);
@@ -312,6 +414,16 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         setActiveEmailIdState(realId);
         localStorage.setItem(LAST_INVESTIGATED_KEY, realId);
         setLoading(false);
+
+        // Fetch workspace summary if not yet fetched
+        if (!summaryObj) {
+          try {
+            const ws = await investigationWorkspaceService.getWorkspaceSummary(realId);
+            setWorkspaceSummary(ws);
+          } catch {
+            // Optional
+          }
+        }
 
         const currentTargetId = realId;
 
@@ -425,14 +537,15 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         return;
       }
 
-      // 4. Clean empty state: No emails ingested yet
+      // 5. Clean empty state: No emails or investigations ingested yet
       setActiveEmail(null);
+      setWorkspaceSummary(null);
       setActiveEmailIdState('');
       localStorage.removeItem(LAST_INVESTIGATED_KEY);
       setError(null);
       setLoading(false);
     } catch (err: any) {
-      console.error('Error loading investigation email:', err);
+      console.error('Error loading investigation data:', err);
       setError(err?.message || 'Failed to load analysis record');
       setLoading(false);
     }
@@ -441,6 +554,45 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     loadEmailData(activeEmailId);
   }, [activeEmailId, loadEmailData]);
+
+  const refreshWorkspaceSummary = useCallback(async () => {
+    const effectiveId = workspaceSummary?.investigation.investigation_id || activeEmailId;
+    if (!effectiveId) return;
+    try {
+      const summary = await investigationWorkspaceService.getWorkspaceSummary(effectiveId);
+      setWorkspaceSummary(summary);
+    } catch (err) {
+      console.warn('Failed to refresh workspace summary', err);
+    }
+  }, [workspaceSummary, activeEmailId]);
+
+  const updateInvestigationStatus = useCallback(async (newStatus: InvestigationStatus | string, reason?: string) => {
+    const effectiveId = workspaceSummary?.investigation.investigation_id || activeEmailId;
+    if (!effectiveId) throw new Error('No active investigation identifier');
+    const updated = await investigationWorkspaceService.updateStatus(effectiveId, { status: newStatus, reason });
+    setWorkspaceSummary(updated);
+  }, [workspaceSummary, activeEmailId]);
+
+  const addAnalystNote = useCallback(async (noteText: string, author: string = 'SOC Analyst') => {
+    const effectiveId = workspaceSummary?.investigation.investigation_id || activeEmailId;
+    if (!effectiveId) throw new Error('No active investigation identifier');
+    const note = await investigationWorkspaceService.addNote(effectiveId, noteText, author);
+    setWorkspaceSummary(prev => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        analyst_notes: [note, ...(prev.analyst_notes || [])],
+        counts: {
+          ...prev.counts,
+          notes_count: (prev.counts?.notes_count || 0) + 1,
+        },
+      };
+    });
+  }, [workspaceSummary, activeEmailId]);
+
+  const openNotesDrawer = useCallback(() => setIsNotesDrawerOpen(true), []);
+  const closeNotesDrawer = useCallback(() => setIsNotesDrawerOpen(false), []);
+  const toggleNotesDrawer = useCallback(() => setIsNotesDrawerOpen(prev => !prev), []);
 
   const setActiveEmailId = useCallback((newId: string) => {
     setActiveEmailIdState(newId);
@@ -452,8 +604,13 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     if (subTab) {
       setSubTabs(prev => ({ ...prev, [section]: subTab }));
     }
-    navigate(`/investigations/${activeEmailId}/${section}`);
-  }, [navigate, activeEmailId]);
+    const targetId = activeEmailId || workspaceSummary?.investigation.investigation_id || 'current';
+    if (section === 'overview') {
+      navigate(`/investigations/${targetId}`);
+    } else {
+      navigate(`/investigations/${targetId}/${section}`);
+    }
+  }, [navigate, activeEmailId, workspaceSummary]);
 
   const setSubTab = useCallback((subTab: string) => {
     setSubTabs(prev => ({ ...prev, [activeSection]: subTab }));
@@ -651,6 +808,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
       value={{
         activeEmailId,
         activeEmail,
+        workspaceSummary,
         loading,
         error,
         activeSection,
@@ -659,6 +817,9 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         availableAnalyses,
         focusedGraphNodeId,
         refreshAnalyses,
+        refreshWorkspaceSummary,
+        updateInvestigationStatus,
+        addAnalystNote,
         setActiveEmailId,
         setSection,
         setSubTab,
@@ -668,6 +829,10 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         reanalyzeActiveEmail,
         ingestEmail,
         resetToCleanWorkspace,
+        isNotesDrawerOpen,
+        openNotesDrawer,
+        closeNotesDrawer,
+        toggleNotesDrawer,
         isCopilotDrawerOpen,
         copilotContextData,
         openCopilotDrawer,

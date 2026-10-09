@@ -432,7 +432,7 @@ class ExplanationComposer:
                     ctx["attack_paths"].extend(inc.attack_paths)
             else:
                 # Investigation scope
-                tes = db.query(ThreatEventModel).filter(ThreatEventModel.investigation_id == scope_id).all()
+                tes = db.query(ThreatEventModel).filter(ThreatEventModel.incident_id == scope_id).all()
                 ctx["threat_events"].extend(tes)
 
             # Gather findings for all threat events

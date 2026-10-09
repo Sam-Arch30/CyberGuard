@@ -258,6 +258,7 @@ def create_from_recommendation(
 def list_executions(
     playbook_id: Optional[str] = None,
     status: Optional[str] = None,
+    investigation_id: Optional[str] = None,
     x_workspace_id: str = Header("default", alias="X-Workspace-ID"),
     db: Session = Depends(get_db)
 ):
@@ -269,6 +270,14 @@ def list_executions(
         query = query.filter(ResponsePlaybookExecutionModel.playbook_id == playbook_id)
     if status:
         query = query.filter(ResponsePlaybookExecutionModel.status == status)
+    if investigation_id:
+        from sqlalchemy import or_
+        query = query.filter(
+            or_(
+                ResponsePlaybookExecutionModel.investigation_id == investigation_id,
+                ResponsePlaybookExecutionModel.incident_id == investigation_id
+            )
+        )
 
     execs = query.order_by(ResponsePlaybookExecutionModel.created_at.desc()).limit(100).all()
     return [_serialize_execution(ex) for ex in execs]

@@ -20,7 +20,10 @@ import {
   FolderLock,
   FileCheck,
   CheckCircle2,
-  Sparkles
+  Sparkles,
+  GitBranch,
+  Network,
+  Clock,
 } from 'lucide-react';
 import { useInvestigation, INVESTIGATION_SECTIONS, type InvestigationSection } from '../../context/InvestigationContext';
 import { AddToCaseModal } from '../case/AddToCaseModal';
@@ -29,11 +32,16 @@ import { truncateMiddle } from '../../utils/forensicFormatters';
 
 const SECTION_ICONS: Record<InvestigationSection, React.FC<{ className?: string }>> = {
   overview: Compass,
-  email: FileText,
   analysis: Cpu,
+  'attack-path': GitBranch,
+  graph: Network,
+  timeline: Clock,
+  evidence: FileText,
   intelligence: Globe2,
+  response: ShieldAlert,
+  report: FileCheck,
+  email: FileText,
   investigation: FolderLock,
-  report: FileCheck
 };
 
 const formatTimestamp = (dateStr?: string) => {

@@ -201,6 +201,9 @@ export interface ResponsePlaybook {
   steps: ResponsePlaybookStep[];
 }
 
+export type ResponsePlaybookSummary = ResponsePlaybook;
+
+
 export interface SimulationPlanStep {
   sequence: number;
   step_key: string;
