@@ -3225,3 +3225,101 @@ class DeviceIncidentCorrelationModel(Base):
         Index("ix_dev_inc_corr_score", "workspace_id", "correlation_score"),
     )
 
+
+# ============================================================================
+# SECTION 45: PERSISTENT BACKGROUND JOBS & ASYNCHRONOUS ORCHESTRATION MODELS
+# ============================================================================
+
+class BackgroundJobModel(Base):
+    """
+    Section 45: Persistent Background Job Lifecycle Model.
+    Tracks asynchronous execution state, leasing, idempotency, retry budgets,
+    progress, stage milestones, and sanitized failure details for long-running operations.
+    """
+    __tablename__ = "background_jobs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    job_type = Column(String(64), nullable=False, index=True)
+    status = Column(String(32), nullable=False, default="QUEUED", index=True)
+    priority = Column(String(20), nullable=False, default="NORMAL", index=True)  # CRITICAL, HIGH, NORMAL, LOW
+    priority_weight = Column(Integer, nullable=False, default=2, index=True)      # CRITICAL=4, HIGH=3, NORMAL=2, LOW=1
+    requested_by = Column(String(100), nullable=False, default="system")
+
+    # Associated resources
+    resource_type = Column(String(50), nullable=True, index=True)  # ARTIFACT, ANALYSIS_RUN, REPORT, INCIDENT, TELEMETRY, MAINTENANCE
+    resource_id = Column(String(128), nullable=True, index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    report_id = Column(String(36), ForeignKey("reports.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    # Payload & references (Sanitized: NO raw secrets, passwords, or file bytes)
+    payload_reference = Column(String(255), nullable=True)
+    payload_json = Column(Text, default="{}", nullable=False)
+
+    # Execution attempts and scheduling
+    attempt_count = Column(Integer, nullable=False, default=0)
+    max_attempts = Column(Integer, nullable=False, default=3)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    scheduled_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    started_at = Column(DateTime, nullable=True)
+    heartbeat_at = Column(DateTime, nullable=True, index=True)
+    completed_at = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+    timeout_seconds = Column(Integer, nullable=False, default=300)
+    timeout_at = Column(DateTime, nullable=True, index=True)
+
+    # Worker and lease tracking
+    worker_id = Column(String(100), nullable=True, index=True)
+    lease_expires_at = Column(DateTime, nullable=True, index=True)
+
+    # Idempotency
+    idempotency_key = Column(String(128), nullable=True, index=True)
+
+    # Progress & stage reporting
+    progress_percent = Column(Float, nullable=True)
+    current_stage = Column(String(100), nullable=True)
+
+    # Output & sanitized errors
+    error_code = Column(String(64), nullable=True)
+    sanitized_error_message = Column(Text, nullable=True)
+    result_reference = Column(String(255), nullable=True)
+    result_json = Column(Text, default="{}", nullable=False)
+
+    events = relationship("BackgroundJobEventModel", back_populates="job", cascade="all, delete-orphan", lazy="selectin")
+    analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
+    report = relationship("ReportModel", foreign_keys=[report_id])
+
+    __table_args__ = (
+        Index("ix_bg_jobs_claim", "status", "scheduled_at", "priority_weight"),
+        Index("ix_bg_jobs_ws_idemp", "workspace_id", "idempotency_key"),
+        Index("ix_bg_jobs_ws_status", "workspace_id", "status"),
+        Index("ix_bg_jobs_ws_type", "workspace_id", "job_type"),
+        Index("ix_bg_jobs_heartbeat", "status", "heartbeat_at"),
+    )
+
+
+class BackgroundJobEventModel(Base):
+    """
+    Section 45: Auditable Background Job Event Stream.
+    Tracks state transitions, progress milestones, heartbeats, and sanitized errors.
+    """
+    __tablename__ = "background_job_events"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    job_id = Column(String(36), ForeignKey("background_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    event_type = Column(String(64), nullable=False, index=True)
+    stage = Column(String(100), nullable=True)
+    progress_percent = Column(Float, nullable=True)
+    message = Column(String(500), nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    timestamp = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    job = relationship("BackgroundJobModel", back_populates="events")
+
+    __table_args__ = (
+        Index("ix_bg_job_events_order", "job_id", "timestamp"),
+        Index("ix_bg_job_events_ws_type", "workspace_id", "event_type"),
+    )
+
+

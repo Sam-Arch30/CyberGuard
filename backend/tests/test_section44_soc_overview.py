@@ -21,6 +21,8 @@ from backend.db.models import (
     AuditLogModel,
     EndpointAgentModel,
     AnalysisRunModel,
+    BackgroundJobModel,
+    BackgroundJobEventModel,
 )
 
 
@@ -31,6 +33,16 @@ def db_session():
     # Allow audit log cleanup for test isolation
     try:
         setattr(db.connection(), "_allow_audit_cleanup", True)
+        db.query(BackgroundJobEventModel).delete()
+        db.query(BackgroundJobModel).delete()
+        db.query(IncidentModel).delete()
+        db.query(CaseModel).delete()
+        db.query(FindingModel).delete()
+        db.query(IndicatorModel).delete()
+        db.query(ResponseRecommendationModel).delete()
+        db.query(AuditLogModel).delete()
+        db.query(AnalysisRunModel).delete()
+        db.commit()
     except Exception:
         pass
 
@@ -39,6 +51,8 @@ def db_session():
     finally:
         try:
             setattr(db.connection(), "_allow_audit_cleanup", True)
+            db.query(BackgroundJobEventModel).delete()
+            db.query(BackgroundJobModel).delete()
             db.query(IncidentModel).delete()
             db.query(CaseModel).delete()
             db.query(FindingModel).delete()

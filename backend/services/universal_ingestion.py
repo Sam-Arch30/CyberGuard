@@ -1067,6 +1067,20 @@ class UniversalIngestionService:
                     AnalysisOrchestrator.initialize_run_dag(db, analysis_run_id)
                 except Exception as exc:
                     logger.warning("Failed to initialize DAG for run %s: %s", analysis_run_id, exc)
+                try:
+                    from backend.services.background_job_service import BackgroundJobService
+                    from backend.schemas.jobs import JobTypeEnum
+                    BackgroundJobService.submit_job(
+                        db=db,
+                        job_type=JobTypeEnum.ARTIFACT_ANALYSIS.value,
+                        resource_type="ARTIFACT",
+                        resource_id=artifact.id,
+                        analysis_run_id=analysis_run_id,
+                        requested_by=uploader_name,
+                        idempotency_key=f"analysis-run-{analysis_run_id}",
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to submit background job for run %s: %s", analysis_run_id, exc)
         except Exception as exc:
             logger.warning("Failed to record AnalysisRun: %s", exc)
 
@@ -1361,6 +1375,20 @@ class UniversalIngestionService:
                     AnalysisOrchestrator.initialize_run_dag(db, analysis_run_id)
                 except Exception as exc:
                     logger.warning("Failed to initialize DAG for run %s: %s", analysis_run_id, exc)
+                try:
+                    from backend.services.background_job_service import BackgroundJobService
+                    from backend.schemas.jobs import JobTypeEnum
+                    BackgroundJobService.submit_job(
+                        db=db,
+                        job_type=JobTypeEnum.ARTIFACT_ANALYSIS.value,
+                        resource_type="ARTIFACT",
+                        resource_id=artifact.id,
+                        analysis_run_id=analysis_run_id,
+                        requested_by=uploader_name,
+                        idempotency_key=f"analysis-run-{analysis_run_id}",
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to submit background job for run %s: %s", analysis_run_id, exc)
         except Exception as exc:
             logger.warning("Failed to record AnalysisRun: %s", exc)
 
@@ -1598,6 +1626,20 @@ class UniversalIngestionService:
                     AnalysisOrchestrator.initialize_run_dag(db, analysis_run_id)
                 except Exception as exc:
                     logger.warning("Failed to initialize DAG for run %s: %s", analysis_run_id, exc)
+                try:
+                    from backend.services.background_job_service import BackgroundJobService
+                    from backend.schemas.jobs import JobTypeEnum
+                    BackgroundJobService.submit_job(
+                        db=db,
+                        job_type=JobTypeEnum.ARTIFACT_ANALYSIS.value,
+                        resource_type="ARTIFACT",
+                        resource_id=artifact.id,
+                        analysis_run_id=analysis_run_id,
+                        requested_by=uploader_name,
+                        idempotency_key=f"analysis-run-{analysis_run_id}",
+                    )
+                except Exception as exc:
+                    logger.warning("Failed to submit background job for run %s: %s", analysis_run_id, exc)
         except Exception as exc:
             logger.warning("Failed to record AnalysisRun: %s", exc)
 

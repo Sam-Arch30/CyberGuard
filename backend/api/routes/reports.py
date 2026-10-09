@@ -286,6 +286,93 @@ def generate_investigation_report_endpoint(
     return _serialize_report_detail(report_record, is_stale=False)
 
 
+@router.post(
+    "/investigation/generate-async",
+    summary="Enqueue asynchronous investigation report generation job",
+    description="Validates configuration and enqueues a persistent background job to generate an immutable report version.",
+)
+def generate_investigation_report_async_endpoint(
+    request: InvestigationReportGenerateRequest,
+    db: Session = Depends(get_db)
+):
+    incident, run, artifact, case = InvestigationWorkspaceService.resolve_context(db, request.investigation_id)
+    if not incident and not run and not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Investigation with identifier '{request.investigation_id}' was not found."
+        )
+
+    inv_key = incident.id if incident else (run.id if run else request.investigation_id)
+    prior_reports = (
+        db.query(ReportModel)
+        .filter((ReportModel.investigation_id == inv_key) | (ReportModel.investigation_id == request.investigation_id))
+        .order_by(ReportModel.report_version.desc())
+        .all()
+    )
+    next_version = (prior_reports[0].report_version + 1) if prior_reports else 1
+    report_id = str(uuid.uuid4())
+    report_number = _generate_report_number(db)
+
+    # Initial placeholder record in GENERATING status
+    report_record = ReportModel(
+        id=report_id,
+        report_number=report_number,
+        title=f"Incident Report {report_number}",
+        investigation_id=inv_key,
+        case_id=case.id if case else None,
+        evidence_id=artifact.id if artifact else None,
+        artifact_id=artifact.id if artifact else None,
+        threat_score=incident.risk_score if incident else 0.0,
+        severity=(incident.severity if incident else "medium").lower(),
+        confidence=1.0,
+        report_type=request.report_type,
+        status="GENERATING",
+        report_version=next_version,
+        classification=request.classification,
+        redaction_level=request.redaction_level,
+        analyst_name=request.analyst_name or "SOC Lead Analyst",
+        summary="Report generation is currently running in the background.",
+        content_options_json=json.dumps(request.content_options.model_dump() if request.content_options else {}),
+        format="PDF",
+        generator_version="ReportService-2.0",
+        created_at=datetime.now(timezone.utc),
+    )
+    db.add(report_record)
+    db.commit()
+
+    from backend.services.background_job_service import BackgroundJobService
+    from backend.schemas.jobs import JobTypeEnum
+
+    job, _ = BackgroundJobService.submit_job(
+        db=db,
+        job_type=JobTypeEnum.REPORT_GENERATION.value,
+        resource_type="REPORT",
+        resource_id=request.investigation_id,
+        report_id=report_id,
+        requested_by=request.analyst_name or "SOC Lead Analyst",
+        payload={
+            "investigation_id": request.investigation_id,
+            "report_type": request.report_type,
+            "classification": request.classification,
+            "redaction_level": request.redaction_level,
+            "content_options": request.content_options.model_dump() if request.content_options else {},
+            "analyst_name": request.analyst_name or "SOC Lead Analyst",
+            "notes": request.notes,
+        },
+        idempotency_key=f"report-gen-{inv_key}-v{next_version}",
+    )
+
+    return {
+        "job_id": job.id,
+        "job_status": job.status,
+        "report_id": report_id,
+        "report_number": report_number,
+        "status": "GENERATING",
+        "message": f"Report generation queued under job ID {job.id}.",
+    }
+
+
+
 @router.get(
     "",
     response_model=ReportListResponse,

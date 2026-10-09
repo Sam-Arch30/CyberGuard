@@ -28,6 +28,7 @@ from backend.db.models import (
     ThreatMemoryDecisionModel,
     EndpointAgentModel,
     RelationshipModel,
+    BackgroundJobModel,
     get_utc_now,
 )
 from backend.schemas.soc_overview import (
@@ -260,16 +261,24 @@ class SocDashboardService:
             logger.warning(f"Failed to query response recommendations: {e}")
             partial_failures.append("response_recommendations")
 
-        # 4. Failed Analysis Jobs within time window
+        # 4. Failed Analysis & Background Jobs within time window
         failed_jobs_count = 0
         try:
             runs_query = db.query(AnalysisRunModel).filter(AnalysisRunModel.status == "FAILED")
             if window_start:
                 runs_query = runs_query.filter(AnalysisRunModel.started_at >= window_start)
             failed_runs = runs_query.order_by(desc(AnalysisRunModel.started_at)).all()
-            failed_jobs_count = len(failed_runs)
+            failed_jobs_count += len(failed_runs)
 
-            for fr in failed_runs[:3]:
+            bg_jobs_query = db.query(BackgroundJobModel).filter(
+                BackgroundJobModel.status.in_(["FAILED", "DEAD_LETTER", "TIMED_OUT"])
+            )
+            if window_start:
+                bg_jobs_query = bg_jobs_query.filter(BackgroundJobModel.created_at >= window_start)
+            failed_bg_jobs = bg_jobs_query.order_by(desc(BackgroundJobModel.created_at)).all()
+            failed_jobs_count += len(failed_bg_jobs)
+
+            for fr in failed_runs[:2]:
                 iso_time = (fr.started_at or now).isoformat()
                 priority_candidates.append(
                     SocPriorityQueueItem(
@@ -286,8 +295,27 @@ class SocDashboardService:
                         navigation_target=f"/investigations/{fr.id}/overview",
                     )
                 )
+
+            for bj in failed_bg_jobs[:2]:
+                iso_time = (bj.completed_at or bj.created_at or now).isoformat()
+                priority_candidates.append(
+                    SocPriorityQueueItem(
+                        id=bj.id,
+                        investigation_id=bj.resource_id if bj.resource_type in {"INCIDENT", "INVESTIGATION"} else None,
+                        title=f"Background Job {bj.status} ({bj.job_type})",
+                        risk_score=65.0,
+                        severity="HIGH",
+                        status=bj.status,
+                        resource_type="BACKGROUND_JOB",
+                        reason_for_inclusion=f"Background job failed: {bj.sanitized_error_message or bj.error_code or 'Processing error'}",
+                        urgency="P2",
+                        updated_at=iso_time,
+                        navigation_target=f"/investigations/{bj.resource_id}/overview" if bj.resource_id else "/dashboard",
+                    )
+                )
         except Exception as e:
-            logger.warning(f"Failed to query failed analysis runs: {e}")
+            logger.warning(f"Failed to query failed analysis runs or background jobs: {e}")
+            partial_failures.append("analysis_runs")
             partial_failures.append("analysis_runs")
 
         # 5. New Findings Count within time window
@@ -490,15 +518,25 @@ class SocDashboardService:
                 .filter(AnalysisTaskModel.status.in_(["PENDING", "RUNNING"]))
                 .count()
             )
+            active_tasks += (
+                db.query(BackgroundJobModel)
+                .filter(BackgroundJobModel.status.in_(["QUEUED", "RUNNING", "RETRY_WAIT"]))
+                .count()
+            )
             failed_tasks = (
                 db.query(AnalysisTaskModel)
                 .filter(AnalysisTaskModel.status == "FAILED")
                 .count()
             )
+            failed_tasks += (
+                db.query(BackgroundJobModel)
+                .filter(BackgroundJobModel.status.in_(["FAILED", "DEAD_LETTER", "TIMED_OUT"]))
+                .count()
+            )
             if failed_tasks > 10:
                 engine_status = "degraded"
         except Exception as e:
-            logger.warning(f"Failed to inspect task engine status: {e}")
+            logger.warning(f"Failed to inspect task and job engine status: {e}")
             partial_failures.append("task_engine")
 
         overall_status = "operational"

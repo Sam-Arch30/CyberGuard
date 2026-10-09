@@ -47,6 +47,7 @@ from backend.api.routes.device_incident_correlation import router as device_inci
 from backend.api.routes.analysis_live import router as analysis_live_router
 from backend.api.routes.investigations import router as investigations_router
 from backend.api.routes.search import router as search_router
+from backend.api.routes.jobs import router as jobs_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -62,10 +63,18 @@ configure_production_logging()
 async def lifespan(app: FastAPI):
     """
     Application lifespan manager.
-    Handles startup table verification with graceful retries if DB is starting slowly.
+    Handles startup table verification and in-process background worker initialization.
     """
     init_db(max_retries=15, retry_delay=2.0)
+    worker_enabled = os.getenv("BACKGROUND_WORKER_ENABLED", "true").lower() in ("true", "1", "yes")
+    if worker_enabled:
+        from backend.services.background_job_worker import start_in_process_worker, stop_in_process_worker
+        start_in_process_worker(max_concurrency=int(os.getenv("WORKER_CONCURRENCY", "2")))
     yield
+    if worker_enabled:
+        from backend.services.background_job_worker import stop_in_process_worker
+        await stop_in_process_worker()
+
 
 
 app = FastAPI(
@@ -150,6 +159,7 @@ app.include_router(device_incident_correlation_router)
 app.include_router(analysis_live_router)
 app.include_router(investigations_router)
 app.include_router(search_router)
+app.include_router(jobs_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])
