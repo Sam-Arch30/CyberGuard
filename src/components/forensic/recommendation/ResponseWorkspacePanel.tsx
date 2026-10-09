@@ -12,7 +12,8 @@ import {
   Sparkles,
   Search,
   Eye,
-  GitBranch
+  GitBranch,
+  Play
 } from 'lucide-react';
 import type {
   ResponseRecommendation,
@@ -23,6 +24,7 @@ import type {
 } from '../../../types/response_recommendation';
 import type { EmailAnalysis } from '../../../types/forensic';
 import { ActionDetailModal } from './ActionDetailModal';
+import { PlaybookExecutionModal } from './PlaybookExecutionModal';
 import { apiUrl } from '../../../utils/apiClient';
 
 interface ResponseWorkspacePanelProps {
@@ -63,6 +65,8 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
   // Modals & Panels
   const [selectedRecommendation, setSelectedRecommendation] = useState<ResponseRecommendation | null>(null);
   const [showCapabilitiesModal, setShowCapabilitiesModal] = useState<boolean>(false);
+  const [showPlaybookModal, setShowPlaybookModal] = useState<boolean>(false);
+  const [playbookTargetRec, setPlaybookTargetRec] = useState<ResponseRecommendation | null>(null);
 
   // Load recommendations and capabilities
   const fetchRecommendations = async () => {
@@ -357,6 +361,17 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
             </button>
             <button
               type="button"
+              onClick={() => {
+                setPlaybookTargetRec(recommendations[0] || null);
+                setShowPlaybookModal(true);
+              }}
+              className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-surface border border-emerald-500/30 text-xs font-mono text-emerald-400 flex items-center space-x-1.5 transition-colors cursor-pointer"
+            >
+              <Play className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Playbooks (Sec 29)</span>
+            </button>
+            <button
+              type="button"
               onClick={handleGenerate}
               disabled={generating}
               className="px-3.5 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-mono font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs disabled:opacity-50"
@@ -645,6 +660,18 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
                 <div className="flex items-center space-x-2">
                   <button
                     type="button"
+                    onClick={() => {
+                      setPlaybookTargetRec(rec);
+                      setShowPlaybookModal(true);
+                    }}
+                    className="px-2.5 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-mono text-xs font-bold flex items-center space-x-1 transition-colors cursor-pointer"
+                    title="Simulate or execute response playbook for this recommendation"
+                  >
+                    <Play className="w-3 h-3" />
+                    <span>Run Playbook</span>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setSelectedRecommendation(rec)}
                     className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
                   >
@@ -743,6 +770,18 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
           recommendation={selectedRecommendation}
           onClose={() => setSelectedRecommendation(null)}
           onStatusUpdated={handleRecommendationUpdated}
+        />
+      )}
+
+      {/* 7. RESPONSE PLAYBOOK EXECUTION & SIMULATION MODAL */}
+      {showPlaybookModal && (
+        <PlaybookExecutionModal
+          recommendation={playbookTargetRec}
+          onClose={() => {
+            setShowPlaybookModal(false);
+            setPlaybookTargetRec(null);
+          }}
+          onExecutionCompleted={() => fetchRecommendations()}
         />
       )}
     </div>

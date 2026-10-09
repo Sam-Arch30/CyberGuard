@@ -2428,6 +2428,314 @@ class ResponseCapabilityModel(Base):
         return json.loads(self.configuration_json or "{}")
 
 
+# ============================================================================
+# SECTION 29: RESPONSE PLAYBOOK MODELS
+# ============================================================================
+
+class ResponsePlaybookModel(Base):
+    """
+    Section 29: Response Playbook Domain Model.
+    Immutable versioned workflow definition for executing controlled defensive actions.
+    Distinguishes recommendation, playbook, approval, execution, and verification.
+    """
+    __tablename__ = "response_playbooks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    playbook_key = Column(String(64), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(30), nullable=False, default="DRAFT", index=True)  # DRAFT, VALIDATING, READY, REVIEW_REQUIRED, APPROVED, STAGED, ACTIVE, PAUSED, DISABLED, RETIRED, SUPERSEDED
+    trigger_type = Column(String(50), nullable=False, default="MANUAL", index=True)  # RECOMMENDATION_APPROVED, MANUAL, INCIDENT_SEVERITY
+    scope_type = Column(String(30), nullable=False, default="EVENT")  # EVENT, INCIDENT, INVESTIGATION, CAMPAIGN
+    severity_min = Column(String(20), nullable=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    risk_min = Column(Float, nullable=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    investigation_id = Column(String(128), nullable=True, index=True)
+    source_recommendation_id = Column(String(36), ForeignKey("response_recommendations.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    target_selector_json = Column(Text, default="{}", nullable=False)
+    approval_policy = Column(String(30), default="SINGLE_APPROVAL", nullable=False)  # NO_APPROVAL, SINGLE_APPROVAL, PRIVILEGED_APPROVAL, DUAL_APPROVAL
+    execution_policy = Column(String(30), default="MANUAL", nullable=False)  # MANUAL, AUTOMATED_AFTER_APPROVAL, SIMULATE_ONLY
+    timeout_seconds = Column(Integer, default=300, nullable=False)
+    max_runtime_seconds = Column(Integer, default=600, nullable=False)
+
+    parent_version = Column(Integer, nullable=True)
+    change_summary = Column(Text, nullable=True)
+    created_by = Column(String(100), default="system", nullable=False)
+    updated_by = Column(String(100), default="system", nullable=False)
+    approved_by = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    activated_at = Column(DateTime, nullable=True)
+    retired_at = Column(DateTime, nullable=True)
+
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    steps = relationship("ResponsePlaybookStepModel", back_populates="playbook", cascade="all, delete-orphan", order_by="ResponsePlaybookStepModel.sequence")
+    executions = relationship("ResponsePlaybookExecutionModel", back_populates="playbook")
+    incident = relationship("IncidentModel", foreign_keys=[incident_id])
+    source_recommendation = relationship("ResponseRecommendationModel", foreign_keys=[source_recommendation_id])
+
+    __table_args__ = (
+        Index("ix_rpb_ws_key_ver", "workspace_id", "playbook_key", "version", unique=True),
+        Index("ix_rpb_ws_status", "workspace_id", "status"),
+    )
+
+    @property
+    def target_selector(self) -> Dict[str, Any]:
+        return json.loads(self.target_selector_json or "{}")
+
+
+class ResponsePlaybookStepModel(Base):
+    """
+    Section 29: Controlled Playbook Step Definition.
+    Represents an allowlisted, typed step in a defensive response playbook.
+    Arbitrary code/shell execution is prohibited.
+    """
+    __tablename__ = "response_playbook_steps"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    playbook_id = Column(String(36), ForeignKey("response_playbooks.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_key = Column(String(64), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False, default=1)
+    step_type = Column(String(60), nullable=False, index=True)  # Controlled step taxonomy
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+
+    parameters_json = Column(Text, default="{}", nullable=False)
+    target_selector_json = Column(Text, default="{}", nullable=False)
+    condition_json = Column(Text, default="{}", nullable=False)
+    on_success = Column(String(50), default="CONTINUE", nullable=False)  # CONTINUE, COMPLETE, <step_key>
+    on_failure = Column(String(50), default="FAIL", nullable=False)  # FAIL, ROLLBACK, CONTINUE_ON_FAILURE, ABORT
+
+    timeout_seconds = Column(Integer, default=60, nullable=False)
+    retry_policy_json = Column(Text, default="{}", nullable=False)
+    requires_approval = Column(Boolean, default=False, nullable=False)
+    approval_policy = Column(String(30), default="NO_APPROVAL", nullable=False)
+    safety_class = Column(String(30), default="INFORMATIONAL", nullable=False)  # INFORMATIONAL, LOW_IMPACT, REVERSIBLE, CONTAINMENT, HIGH_IMPACT, DESTRUCTIVE
+    verification_policy_json = Column(Text, default="{}", nullable=False)
+    rollback_policy_json = Column(Text, default="{}", nullable=False)
+    depends_on_json = Column(Text, default="[]", nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    playbook = relationship("ResponsePlaybookModel", back_populates="steps")
+
+    __table_args__ = (
+        Index("ix_rpbs_pb_seq", "playbook_id", "sequence"),
+        Index("ix_rpbs_pb_key", "playbook_id", "step_key", unique=True),
+    )
+
+    @property
+    def parameters(self) -> Dict[str, Any]:
+        return json.loads(self.parameters_json or "{}")
+
+    @property
+    def target_selector(self) -> Dict[str, Any]:
+        return json.loads(self.target_selector_json or "{}")
+
+    @property
+    def condition(self) -> Dict[str, Any]:
+        return json.loads(self.condition_json or "{}")
+
+    @property
+    def retry_policy(self) -> Dict[str, Any]:
+        return json.loads(self.retry_policy_json or "{}")
+
+    @property
+    def verification_policy(self) -> Dict[str, Any]:
+        return json.loads(self.verification_policy_json or "{}")
+
+    @property
+    def rollback_policy(self) -> Dict[str, Any]:
+        return json.loads(self.rollback_policy_json or "{}")
+
+    @property
+    def depends_on(self) -> List[str]:
+        return json.loads(self.depends_on_json or "[]")
+
+
+class ResponsePlaybookExecutionModel(Base):
+    """
+    Section 29: Persistent Playbook Execution Instance.
+    Tracks live execution or dry-run simulation of an approved playbook.
+    """
+    __tablename__ = "response_playbook_executions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    playbook_id = Column(String(36), ForeignKey("response_playbooks.id", ondelete="CASCADE"), nullable=False, index=True)
+    playbook_version = Column(Integer, nullable=False, default=1)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    investigation_id = Column(String(128), nullable=True, index=True)
+    source_recommendation_id = Column(String(36), ForeignKey("response_recommendations.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    trigger_source = Column(String(50), default="MANUAL", nullable=False)  # MANUAL, RECOMMENDATION, AUTOMATED
+    mode = Column(String(20), default="LIVE", nullable=False)  # LIVE, DRY_RUN
+    status = Column(String(30), default="PENDING", nullable=False, index=True)  # PENDING, VALIDATING, WAITING_FOR_APPROVAL, READY, RUNNING, PAUSED, COMPLETED, PARTIALLY_COMPLETED, FAILED, ROLLING_BACK, ROLLED_BACK, CANCELLED, EXPIRED
+
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    requested_by = Column(String(100), nullable=False, default="system")
+    approved_by = Column(String(100), nullable=True)
+    current_step_key = Column(String(64), nullable=True)
+    result_summary = Column(Text, nullable=False, default="")
+    error_code = Column(String(50), nullable=True)
+    error_message = Column(Text, nullable=True)
+
+    execution_context_json = Column(Text, default="{}", nullable=False)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    playbook = relationship("ResponsePlaybookModel", back_populates="executions")
+    step_executions = relationship("ResponsePlaybookStepExecutionModel", back_populates="execution", cascade="all, delete-orphan", order_by="ResponsePlaybookStepExecutionModel.sequence")
+    approvals = relationship("ResponsePlaybookApprovalModel", back_populates="execution", cascade="all, delete-orphan")
+    incident = relationship("IncidentModel", foreign_keys=[incident_id])
+
+    __table_args__ = (
+        Index("ix_rpbe_ws_status", "workspace_id", "status"),
+        Index("ix_rpbe_ws_pb", "workspace_id", "playbook_id"),
+    )
+
+    @property
+    def execution_context(self) -> Dict[str, Any]:
+        return json.loads(self.execution_context_json or "{}")
+
+
+class ResponsePlaybookStepExecutionModel(Base):
+    """
+    Section 29: Immutable Step Execution Record.
+    Records exact target snapshot, adapter used, verification outcome, and forensic evidence.
+    """
+    __tablename__ = "response_playbook_step_executions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    execution_id = Column(String(36), ForeignKey("response_playbook_executions.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_id = Column(String(36), ForeignKey("response_playbook_steps.id", ondelete="SET NULL"), nullable=True, index=True)
+    step_key = Column(String(64), nullable=False)
+    sequence = Column(Integer, nullable=False)
+
+    target_snapshot_json = Column(Text, default="{}", nullable=False)
+    status = Column(String(30), default="PENDING", nullable=False, index=True)  # PENDING, SKIPPED, RUNNING, COMPLETED, FAILED, ROLLED_BACK, ROLLBACK_FAILED, VERIFICATION_FAILED
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    attempt_count = Column(Integer, default=0, nullable=False)
+
+    adapter = Column(String(100), nullable=False, default="")
+    adapter_version = Column(String(30), nullable=False, default="1.0.0")
+    input_summary_json = Column(Text, default="{}", nullable=False)  # Redacted of secrets
+    output_summary_json = Column(Text, default="{}", nullable=False)
+    verification_result_json = Column(Text, default="{}", nullable=False)
+
+    error_code = Column(String(50), nullable=True)
+    error_message = Column(Text, nullable=True)
+    evidence_refs_json = Column(Text, default="[]", nullable=False)
+    audit_event_id = Column(String(36), nullable=True)
+    idempotency_key = Column(String(128), nullable=True, index=True)
+
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    # Relationships
+    execution = relationship("ResponsePlaybookExecutionModel", back_populates="step_executions")
+    step = relationship("ResponsePlaybookStepModel", foreign_keys=[step_id])
+
+    __table_args__ = (
+        Index("ix_rpbse_exec_seq", "execution_id", "sequence"),
+    )
+
+    @property
+    def target_snapshot(self) -> Dict[str, Any]:
+        return json.loads(self.target_snapshot_json or "{}")
+
+    @property
+    def input_summary(self) -> Dict[str, Any]:
+        return json.loads(self.input_summary_json or "{}")
+
+    @property
+    def output_summary(self) -> Dict[str, Any]:
+        return json.loads(self.output_summary_json or "{}")
+
+    @property
+    def verification_result(self) -> Dict[str, Any]:
+        return json.loads(self.verification_result_json or "{}")
+
+    @property
+    def evidence_refs(self) -> List[str]:
+        return json.loads(self.evidence_refs_json or "[]")
+
+
+class ResponsePlaybookApprovalModel(Base):
+    """
+    Section 29: Scoped Human Approval Record.
+    Binds approval strictly to: playbook version + execution + target + action scope.
+    """
+    __tablename__ = "response_playbook_approvals"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    execution_id = Column(String(36), ForeignKey("response_playbook_executions.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_id = Column(String(36), ForeignKey("response_playbook_steps.id", ondelete="SET NULL"), nullable=True, index=True)
+    scope = Column(String(30), default="EXECUTION", nullable=False)  # EXECUTION, STEP
+    decision = Column(String(30), default="PENDING", nullable=False, index=True)  # PENDING, APPROVED, REJECTED, DEFERRED, EXPIRED, CANCELLED
+
+    requested_by = Column(String(100), nullable=False)
+    approved_by = Column(String(100), nullable=True)
+    reason = Column(Text, nullable=False, default="")
+
+    target_snapshot_json = Column(Text, default="{}", nullable=False)
+    authorization_context_json = Column(Text, default="{}", nullable=False)
+
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    decided_at = Column(DateTime, nullable=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+
+    # Relationships
+    execution = relationship("ResponsePlaybookExecutionModel", back_populates="approvals")
+
+    __table_args__ = (
+        Index("ix_rpba_exec_dec", "execution_id", "decision"),
+    )
+
+    @property
+    def target_snapshot(self) -> Dict[str, Any]:
+        return json.loads(self.target_snapshot_json or "{}")
+
+    @property
+    def authorization_context(self) -> Dict[str, Any]:
+        return json.loads(self.authorization_context_json or "{}")
+
+
+class TargetLockModel(Base):
+    """
+    Section 29: Target Concurrency Lock.
+    Prevents conflicting simultaneous executions against the same target entity.
+    """
+    __tablename__ = "response_target_locks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    target_type = Column(String(50), nullable=False, index=True)  # SESSION, ACCOUNT, DEVICE, DOMAIN, IP, URL
+    target_id = Column(String(255), nullable=False, index=True)
+    execution_id = Column(String(36), nullable=False, index=True)
+
+    acquired_at = Column(DateTime, default=get_utc_now, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    released_at = Column(DateTime, nullable=True)
+    active = Column(Boolean, default=True, nullable=False)
+
+    __table_args__ = (
+        Index("ix_rtl_ws_target_active", "workspace_id", "target_type", "target_id", "active"),
+    )
+
+
 
 
 

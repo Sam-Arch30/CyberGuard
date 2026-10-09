@@ -3,10 +3,12 @@ import {
   X,
   ShieldAlert,
   AlertTriangle,
-  Info
+  Info,
+  Play
 } from 'lucide-react';
 import type { ResponseRecommendation } from '../../../types/response_recommendation';
 import { apiUrl } from '../../../utils/apiClient';
+import { PlaybookExecutionModal } from './PlaybookExecutionModal';
 
 interface ActionDetailModalProps {
   recommendation: ResponseRecommendation | null;
@@ -26,6 +28,7 @@ export const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [showPlaybookModal, setShowPlaybookModal] = useState<boolean>(false);
 
   const handleReviewSubmit = async () => {
     if (!notes.trim()) {
@@ -74,7 +77,8 @@ export const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+    <>
+      <div className="fixed inset-0 z-50 overflow-hidden flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150">
       <div className="w-full max-w-2xl bg-surface border border-border rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="p-4 sm:p-5 border-b border-border bg-surface-secondary/40 flex items-center justify-between">
@@ -302,23 +306,41 @@ export const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
                   </div>
                 )}
               </div>
-              <button
-                type="button"
-                onClick={() => setReviewMode(true)}
-                className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs transition-colors shrink-0"
-              >
-                Change Disposition
-              </button>
-            </div>
-          )}
-        </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => setShowPlaybookModal(true)}
+                    className="px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 font-mono font-bold text-xs transition-colors flex items-center gap-1.5 shrink-0"
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                    Launch Playbook
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setReviewMode(true)}
+                    className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono font-semibold text-xs transition-colors shrink-0"
+                  >
+                    Change Disposition
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
-        {/* Footer Warning */}
-        <div className="p-3 border-t border-border bg-surface-secondary/60 text-[11px] font-mono text-foreground-muted flex items-center justify-between">
-          <span>Advisory recommendation only. Execution queued for Section 29 Playbooks.</span>
-          <span className="text-primary font-bold">CyberGuard XAI</span>
+          {/* Footer Warning */}
+          <div className="p-3 border-t border-border bg-surface-secondary/60 text-[11px] font-mono text-foreground-muted flex items-center justify-between">
+            <span>Deterministic Response Playbook · Section 29 Integration</span>
+            <span className="text-primary font-bold">CyberGuard XAI</span>
+          </div>
         </div>
       </div>
-    </div>
+
+      {showPlaybookModal && (
+        <PlaybookExecutionModal
+          recommendation={recommendation}
+          onClose={() => setShowPlaybookModal(false)}
+        />
+      )}
+    </>
   );
 };
