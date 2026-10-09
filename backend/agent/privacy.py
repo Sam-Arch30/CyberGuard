@@ -28,18 +28,22 @@ SENSITIVE_KEY_PATTERNS = {
     ]
 }
 
-# Value-level pattern detectors for credentials inadvertently embedded in strings
+# Value-level pattern detectors for credentials inadvertently embedded in strings or command lines
 SECRET_VALUE_PATTERNS = [
+    # Command line credentials e.g. curl -u user:password
+    (re.compile(r"(-u\s+[a-zA-Z0-9_\-\.]+):([^\s]+)", re.IGNORECASE), r"\1:[REDACTED]"),
+    # Command line --password=secret or -p secret
+    (re.compile(r"(--password(?:=|\s+)|-p(?:=|\s+))([^\s]+)", re.IGNORECASE), r"\1[REDACTED]"),
     # Bearer tokens
-    (re.compile(r"Bearer\s+([a-zA-Z0-9_\-\.]{16,})", re.IGNORECASE), "Bearer [REDACTED]"),
+    (re.compile(r"Bearer\s+([a-zA-Z0-9_\-\.]{8,})", re.IGNORECASE), "Bearer [REDACTED]"),
     # Basic auth
     (re.compile(r"Basic\s+([a-zA-Z0-9+/=]{16,})", re.IGNORECASE), "Basic [REDACTED]"),
     # Private Key blocks
     (re.compile(r"-----BEGIN [A-Z ]+ PRIVATE KEY-----.*?-----END [A-Z ]+ PRIVATE KEY-----", re.DOTALL), "[REDACTED_PRIVATE_KEY]"),
     # AWS/Cloud API Key patterns
     (re.compile(r"(AKIA[0-9A-Z]{16})"), "[REDACTED_AWS_KEY]"),
-    # Generic API key pattern
-    (re.compile(r"(key|secret|token)=([a-zA-Z0-9_\-]{16,})", re.IGNORECASE), r"\1=[REDACTED]"),
+    # Generic API key / token / password assignments in command lines or URLs
+    (re.compile(r"(key|secret|token|password|passwd|api_?key)=([^\s&]+)", re.IGNORECASE), r"\1=[REDACTED]"),
 ]
 
 

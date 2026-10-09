@@ -797,12 +797,60 @@ class EndpointAgentService:
             )
             db.add(telemetry_record)
 
-            # 4. Normalize to ThreatEvent
-            sev = "HIGH" if raw_ev.priority in (EventPriorityEnum.CRITICAL, EventPriorityEnum.HIGH) else "LOW"
+            # 4. Threat Memory & Novelty Enrichment
+            pld = raw_ev.payload or {}
+            tm_matched = False
+            tm_details = None
+            indicator_candidate = pld.get("sha256") or pld.get("executable_hash") or pld.get("remote_address") or pld.get("queried_domain")
+            if indicator_candidate and indicator_candidate not in ("UNKNOWN", "OVERSIZED_SKIPPED"):
+                try:
+                    from backend.services.threat_memory_service import ThreatMemoryService
+                    tm_entry = ThreatMemoryService.lookup_indicator(db=db, workspace_id=agent.workspace_id, value=indicator_candidate)
+                    if tm_entry:
+                        tm_matched = True
+                        tm_details = {
+                            "canonical_key": tm_entry.canonical_key,
+                            "threat_type": tm_entry.subject_type,
+                            "confidence": tm_entry.confidence
+                        }
+                except Exception:
+                    pass
+
+            # Novelty evaluation for process on device
+            proc_name = pld.get("process_name")
+            is_novel_proc = False
+            if proc_name and raw_ev.event_type.value == "PROCESS":
+                try:
+                    prior_count = db.query(EndpointTelemetryEventModel).filter(
+                        and_(
+                            EndpointTelemetryEventModel.device_id == device.id,
+                            EndpointTelemetryEventModel.event_type == "PROCESS",
+                            EndpointTelemetryEventModel.payload_json.like(f'%"{proc_name}"%')
+                        )
+                    ).count()
+                    if prior_count <= 1:
+                        is_novel_proc = True
+                except Exception:
+                    pass
+
+            # Determine severity
+            if tm_matched:
+                sev = "CRITICAL"
+            elif raw_ev.priority in (EventPriorityEnum.CRITICAL, EventPriorityEnum.HIGH):
+                sev = "HIGH"
+            elif is_novel_proc:
+                sev = "MEDIUM"
+            else:
+                sev = "LOW"
+
+            target_desc = f" ({proc_name})" if proc_name else (f" ({pld.get('queried_domain')})" if pld.get('queried_domain') else (f" ({pld.get('remote_address')})" if pld.get('remote_address') else ""))
             summary_text = (
-                f"Endpoint {raw_ev.event_type.value} event on {agent.hostname} "
+                f"Endpoint {raw_ev.event_type.value}{target_desc} event on {agent.hostname} "
                 f"({device.platform}) from collector {raw_ev.collector_id}"
             )
+            if tm_matched:
+                summary_text += f" [ALERT: Matched prior Threat Memory {tm_details.get('canonical_key')}]"
+
             meta = {
                 "source": "ENDPOINT_AGENT",
                 "agent_id": agent.agent_id,
@@ -814,6 +862,8 @@ class EndpointAgentService:
                 "sequence_number": raw_ev.sequence_number,
                 "client_event_id": raw_ev.event_id,
                 "clock_offset_ms": clock_offset_ms,
+                "is_novel_process": is_novel_proc,
+                "threat_memory_match": tm_details,
                 "raw_payload": raw_ev.payload
             }
 
@@ -823,7 +873,7 @@ class EndpointAgentService:
                     event_type=f"endpoint_{raw_ev.event_type.value.lower()}",
                     timestamp=raw_ev.event_time,
                     severity=sev,
-                    risk_score=75.0 if sev == "HIGH" else 15.0,
+                    risk_score=90.0 if sev == "CRITICAL" else (75.0 if sev == "HIGH" else (40.0 if sev == "MEDIUM" else 15.0)),
                     confidence=1.0,
                     status="OPEN",
                     summary=summary_text,
@@ -835,8 +885,9 @@ class EndpointAgentService:
                 telemetry_record.threat_event_id = threat_ev.id
                 telemetry_record.status = "NORMALIZED"
 
-                # 5. Security Knowledge Graph link: Device -> HAS_EVENT -> ThreatEvent
-                rel = RelationshipModel(
+                # 5. Security Knowledge Graph Multi-Hop Relationships
+                # Device -> HAS_EVENT -> ThreatEvent
+                db.add(RelationshipModel(
                     id=generate_uuid(),
                     source_type="DEVICE",
                     source_id=device.id,
@@ -849,12 +900,148 @@ class EndpointAgentService:
                     workspace_id=agent.workspace_id,
                     first_seen=server_time,
                     last_seen=server_time,
+                    evidence_reference=raw_ev.event_id,
                     method="ENDPOINT_TELEMETRY",
                     metadata_json=json.dumps({"collector": raw_ev.collector_id, "sequence": raw_ev.sequence_number}),
                     created_at=server_time,
                     updated_at=server_time
-                )
-                db.add(rel)
+                ))
+
+                # Process -> RUNNING_ON -> Device
+                if proc_name:
+                    db.add(RelationshipModel(
+                        id=generate_uuid(),
+                        source_type="PROCESS",
+                        source_id=f"proc:{proc_name}",
+                        relationship_type="RUNNING_ON",
+                        target_type="DEVICE",
+                        target_id=device.id,
+                        confidence=1.0,
+                        origin="OBSERVED",
+                        status="ACTIVE",
+                        workspace_id=agent.workspace_id,
+                        first_seen=server_time,
+                        last_seen=server_time,
+                        evidence_reference=raw_ev.event_id,
+                        method="ENDPOINT_TELEMETRY",
+                        metadata_json=json.dumps({"pid": pld.get("process_id", 0)}),
+                        created_at=server_time,
+                        updated_at=server_time
+                    ))
+
+                # Process -> EXECUTED_BY -> User
+                user = pld.get("username")
+                if proc_name and user:
+                    db.add(RelationshipModel(
+                        id=generate_uuid(),
+                        source_type="PROCESS",
+                        source_id=f"proc:{proc_name}",
+                        relationship_type="EXECUTED_BY",
+                        target_type="USER",
+                        target_id=f"user:{user}",
+                        confidence=1.0,
+                        origin="OBSERVED",
+                        status="ACTIVE",
+                        workspace_id=agent.workspace_id,
+                        first_seen=server_time,
+                        last_seen=server_time,
+                        evidence_reference=raw_ev.event_id,
+                        method="ENDPOINT_TELEMETRY",
+                        metadata_json=json.dumps({"pid": pld.get("process_id", 0)}),
+                        created_at=server_time,
+                        updated_at=server_time
+                    ))
+
+                # Network: Process -> CONNECTED_TO -> IP
+                rem_ip = pld.get("remote_address")
+                if rem_ip:
+                    db.add(RelationshipModel(
+                        id=generate_uuid(),
+                        source_type="PROCESS",
+                        source_id=f"proc:{proc_name or 'endpoint_process'}",
+                        relationship_type="CONNECTED_TO",
+                        target_type="IP",
+                        target_id=rem_ip,
+                        confidence=1.0,
+                        origin="OBSERVED",
+                        status="ACTIVE",
+                        workspace_id=agent.workspace_id,
+                        first_seen=server_time,
+                        last_seen=server_time,
+                        evidence_reference=raw_ev.event_id,
+                        method="ENDPOINT_TELEMETRY",
+                        metadata_json=json.dumps({"port": pld.get("remote_port", 0), "proto": pld.get("protocol", "TCP")}),
+                        created_at=server_time,
+                        updated_at=server_time
+                    ))
+
+                # DNS: Process -> QUERIED -> Domain
+                q_domain = pld.get("queried_domain")
+                if q_domain:
+                    db.add(RelationshipModel(
+                        id=generate_uuid(),
+                        source_type="PROCESS",
+                        source_id=f"proc:{proc_name or 'endpoint_resolver'}",
+                        relationship_type="QUERIED",
+                        target_type="DOMAIN",
+                        target_id=q_domain,
+                        confidence=1.0,
+                        origin="OBSERVED",
+                        status="ACTIVE",
+                        workspace_id=agent.workspace_id,
+                        first_seen=server_time,
+                        last_seen=server_time,
+                        evidence_reference=raw_ev.event_id,
+                        method="ENDPOINT_TELEMETRY",
+                        metadata_json=json.dumps({"query_type": pld.get("query_type", "A")}),
+                        created_at=server_time,
+                        updated_at=server_time
+                    ))
+
+                # File: File -> CREATED_ON -> Device
+                fpath = pld.get("file_path") or pld.get("filename")
+                if fpath and raw_ev.event_type.value in ("FILE", "FILE_METADATA"):
+                    db.add(RelationshipModel(
+                        id=generate_uuid(),
+                        source_type="FILE",
+                        source_id=fpath,
+                        relationship_type="CREATED_ON",
+                        target_type="DEVICE",
+                        target_id=device.id,
+                        confidence=1.0,
+                        origin="OBSERVED",
+                        status="ACTIVE",
+                        workspace_id=agent.workspace_id,
+                        first_seen=server_time,
+                        last_seen=server_time,
+                        evidence_reference=raw_ev.event_id,
+                        method="ENDPOINT_TELEMETRY",
+                        metadata_json=json.dumps({"action": pld.get("action", "METADATA")}),
+                        created_at=server_time,
+                        updated_at=server_time
+                    ))
+
+                # Auth: User -> LOGGED_INTO -> Device
+                if user and raw_ev.event_type.value == "AUTHENTICATION":
+                    db.add(RelationshipModel(
+                        id=generate_uuid(),
+                        source_type="USER",
+                        source_id=f"user:{user}",
+                        relationship_type="LOGGED_INTO",
+                        target_type="DEVICE",
+                        target_id=device.id,
+                        confidence=1.0,
+                        origin="OBSERVED",
+                        status="ACTIVE",
+                        workspace_id=agent.workspace_id,
+                        first_seen=server_time,
+                        last_seen=server_time,
+                        evidence_reference=raw_ev.event_id,
+                        method="ENDPOINT_TELEMETRY",
+                        metadata_json=json.dumps({"action": pld.get("action", "LOGIN")}),
+                        created_at=server_time,
+                        updated_at=server_time
+                    ))
 
             except Exception as e:
                 logger.error(f"Failed to normalize telemetry {raw_ev.event_id} into ThreatEvent: {e}")
@@ -926,3 +1113,49 @@ class EndpointAgentService:
             "devices_total": devices_total,
             "events_received": events_total
         }
+
+    @classmethod
+    def get_collector_capabilities(cls, platform: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Returns capabilities and availability states across all 7 Section 32 collectors."""
+        from backend.agent.collectors import (
+            ProcessTelemetryCollector,
+            NetworkTelemetryCollector,
+            DNSTelemetryCollector,
+            AuthenticationTelemetryCollector,
+            SystemSecurityTelemetryCollector,
+            FileMetadataTelemetryCollector,
+            DeviceHealthTelemetryCollector,
+            get_platform_adapter
+        )
+        adapter = get_platform_adapter(force_platform=platform)
+        collectors = [
+            ProcessTelemetryCollector(adapter=adapter),
+            NetworkTelemetryCollector(adapter=adapter),
+            DNSTelemetryCollector(adapter=adapter),
+            AuthenticationTelemetryCollector(adapter=adapter),
+            SystemSecurityTelemetryCollector(adapter=adapter),
+            FileMetadataTelemetryCollector(adapter=adapter),
+            DeviceHealthTelemetryCollector(adapter=adapter)
+        ]
+        return [c.health() for c in collectors]
+
+    @classmethod
+    def query_telemetry(
+        cls,
+        db: Session,
+        workspace_id: str = "default",
+        device_id: Optional[str] = None,
+        agent_id: Optional[str] = None,
+        event_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[EndpointTelemetryEventModel]:
+        """Queries raw and normalized endpoint observations with forensic filtering."""
+        q = db.query(EndpointTelemetryEventModel).filter(EndpointTelemetryEventModel.workspace_id == workspace_id)
+        if device_id:
+            q = q.filter(EndpointTelemetryEventModel.device_id == device_id)
+        if agent_id:
+            q = q.filter(EndpointTelemetryEventModel.agent_id == agent_id)
+        if event_type:
+            q = q.filter(EndpointTelemetryEventModel.event_type == event_type.strip().upper())
+        return q.order_by(desc(EndpointTelemetryEventModel.received_at)).offset(offset).limit(limit).all()

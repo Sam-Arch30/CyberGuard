@@ -359,3 +359,77 @@ def get_endpoint_metrics(
     db: Session = Depends(get_db)
 ):
     return EndpointAgentService.get_metrics(db=db, workspace_id=workspace_id)
+
+
+@router.get(
+    "/capabilities",
+    summary="Get Collector Capabilities and States"
+)
+def get_collector_capabilities(
+    platform: Optional[str] = Query(None)
+):
+    """
+    Returns capability states (AVAILABLE, UNAVAILABLE, etc.) for all Section 32 collectors.
+    """
+    return EndpointAgentService.get_collector_capabilities(platform=platform)
+
+
+@router.get(
+    "/telemetry",
+    summary="Query Endpoint Observations"
+)
+def query_endpoint_telemetry(
+    workspace_id: str = Query("default"),
+    device_id: Optional[str] = Query(None),
+    agent_id: Optional[str] = Query(None),
+    event_type: Optional[str] = Query(None),
+    limit: int = Query(50, le=200),
+    offset: int = Query(0),
+    db: Session = Depends(get_db)
+):
+    """
+    Queries raw and normalized host telemetry observations with forensic filtering.
+    """
+    records = EndpointAgentService.query_telemetry(
+        db=db,
+        workspace_id=workspace_id,
+        device_id=device_id,
+        agent_id=agent_id,
+        event_type=event_type,
+        limit=limit,
+        offset=offset
+    )
+    return [
+        {
+            "id": r.id,
+            "workspace_id": r.workspace_id,
+            "agent_id": r.agent_id,
+            "device_id": r.device_id,
+            "event_id": r.event_id,
+            "sequence_number": r.sequence_number,
+            "event_type": r.event_type,
+            "event_time": r.event_time,
+            "received_at": r.received_at,
+            "collector_id": r.collector_id,
+            "priority": r.priority,
+            "threat_event_id": r.threat_event_id,
+            "payload": json.loads(r.payload_json or "{}")
+        }
+        for r in records
+    ]
+
+
+@router.post(
+    "/telemetry",
+    response_model=BatchTelemetryIngestResponse,
+    summary="Ingest Raw Telemetry Batch (Alias)"
+)
+def ingest_telemetry_alias(
+    batch: BatchTelemetryIngestRequest,
+    auth: Tuple[EndpointAgentModel, DeviceModel, EndpointAgentCredentialModel] = Depends(get_authenticated_agent),
+    db: Session = Depends(get_db)
+):
+    """
+    Alias route for POST /api/v1/endpoint/events.
+    """
+    return ingest_events(batch=batch, auth=auth, db=db)

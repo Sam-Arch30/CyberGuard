@@ -15,6 +15,23 @@ from backend.agent.health import AgentHealthReporter
 from backend.agent.synthetic import SyntheticCollector
 from backend.agent.runtime import AgentRuntime, SecurityViolationException
 
+from backend.agent.collectors import (
+    BaseTelemetryCollector,
+    ProcessTelemetryCollector,
+    NetworkTelemetryCollector,
+    DNSTelemetryCollector,
+    AuthenticationTelemetryCollector,
+    SystemSecurityTelemetryCollector,
+    FileMetadataTelemetryCollector,
+    DeviceHealthTelemetryCollector,
+    PlatformAdapter,
+    MacOSAdapter,
+    LinuxAdapter,
+    WindowsAdapter,
+    get_platform_adapter,
+    BinaryHashCache
+)
+
 __all__ = [
     "EndpointCollector",
     "CollectorCapability",
@@ -26,5 +43,19 @@ __all__ = [
     "AgentHealthReporter",
     "SyntheticCollector",
     "AgentRuntime",
-    "SecurityViolationException"
+    "SecurityViolationException",
+    "BaseTelemetryCollector",
+    "ProcessTelemetryCollector",
+    "NetworkTelemetryCollector",
+    "DNSTelemetryCollector",
+    "AuthenticationTelemetryCollector",
+    "SystemSecurityTelemetryCollector",
+    "FileMetadataTelemetryCollector",
+    "DeviceHealthTelemetryCollector",
+    "PlatformAdapter",
+    "MacOSAdapter",
+    "LinuxAdapter",
+    "WindowsAdapter",
+    "get_platform_adapter",
+    "BinaryHashCache"
 ]
