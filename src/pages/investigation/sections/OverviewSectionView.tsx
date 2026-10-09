@@ -39,7 +39,7 @@ const defang = (val?: string): string => {
 };
 
 export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email }) => {
-  const { setSection, openCopilotDrawer } = useInvestigation();
+  const { setSection, setSubTab, openCopilotDrawer } = useInvestigation();
   const [copiedIndicator, setCopiedIndicator] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState<boolean>(false);
 
@@ -735,6 +735,17 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
         </div>
 
         <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <button
+            type="button"
+            onClick={() => {
+              setSection('investigation');
+              setSubTab('recommendations');
+            }}
+            className="px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
+          >
+            <ShieldAlert className="w-3 h-3 text-amber-400" />
+            <span>Response Proposals</span>
+          </button>
           <button
             type="button"
             onClick={() => setSection(isMalicious ? 'analysis' : 'email')}

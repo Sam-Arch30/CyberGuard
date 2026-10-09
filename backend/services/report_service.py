@@ -971,20 +971,25 @@ class ReportService:
         story.append(Paragraph("11. Prescriptive Recommendations & Containment Actions", styles["SectionHeader"]))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
 
-        rec_actions = [
-            "1. Block observed sender address and domain at the secure email gateway (SEG).",
-            "2. Enforce domain-level DNS sinkholing for all identified suspicious/lookalike URLs.",
-            "3. Revoke active user session tokens if credentials were submitted to target endpoints.",
-            "4. Search tenant mailboxes for identical Message-ID, Subject, or attachment hashes to purge residual exposure.",
-            "5. Submit extracted attachment hashes to Endpoint Detection and Response (EDR) blocklists."
-        ]
-        if ai_data and ai_data.get("recommended_actions"):
-            ai_recs = ai_data.get("recommended_actions")
-            if isinstance(ai_recs, list) and len(ai_recs) > 0:
-                rec_actions = [f"{idx+1}. {r}" for idx, r in enumerate(ai_recs[:6])]
+        # Check for Section 28 structured response recommendations
+        recs_data = analysis.get("response_recommendations") or analysis.get("recommendations")
+        if recs_data and isinstance(recs_data, list) and len(recs_data) > 0:
+            story.extend(cls._format_response_recommendations_section(recs_data, styles))
+        else:
+            rec_actions = [
+                "1. Block observed sender address and domain at the secure email gateway (SEG).",
+                "2. Enforce domain-level DNS sinkholing for all identified suspicious/lookalike URLs.",
+                "3. Revoke active user session tokens if credentials were submitted to target endpoints.",
+                "4. Search tenant mailboxes for identical Message-ID, Subject, or attachment hashes to purge residual exposure.",
+                "5. Submit extracted attachment hashes to Endpoint Detection and Response (EDR) blocklists."
+            ]
+            if ai_data and ai_data.get("recommended_actions"):
+                ai_recs = ai_data.get("recommended_actions")
+                if isinstance(ai_recs, list) and len(ai_recs) > 0:
+                    rec_actions = [f"{idx+1}. {r}" for idx, r in enumerate(ai_recs[:6])]
 
-        story.append(Paragraph("<br/>".join([f"<b>[ ]</b> {html.escape(r)}" for r in rec_actions]), styles["Body"]))
-        story.append(Spacer(1, 10))
+            story.append(Paragraph("<br/>".join([f"<b>[ ]</b> {html.escape(r)}" for r in rec_actions]), styles["Body"]))
+            story.append(Spacer(1, 10))
 
         # Section 27: Explainable AI (XAI) Evidence-Grounded Reasoning
         xai_data = analysis.get("xai_explanation") or analysis.get("explanation")
@@ -2053,6 +2058,62 @@ class ReportService:
             flowables.append(Spacer(1, 6))
 
         flowables.append(Spacer(1, 8))
+        return flowables
+
+    @classmethod
+    def _format_response_recommendations_section(
+        cls,
+        recommendations_data: List[Any],
+        styles: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """
+        Formats Section 28 Response Recommendation Engine prioritized actions for PDF reports.
+        Visualizes Priority (P0..P4), Action Type, Approval Boundary, Rationale, and Operational Impact.
+        """
+        flowables: List[Any] = []
+        if not recommendations_data:
+            return flowables
+
+        rec_table_data = [
+            [
+                Paragraph("<b>PRIORITY</b>", styles["TableHead"]),
+                Paragraph("<b>ACTION TYPE</b>", styles["TableHead"]),
+                Paragraph("<b>APPROVAL</b>", styles["TableHead"]),
+                Paragraph("<b>DEFENSIVE RECOMMENDATION & RATIONALE</b>", styles["TableHead"]),
+                Paragraph("<b>IMPACT</b>", styles["TableHead"]),
+            ]
+        ]
+
+        for r in recommendations_data[:8]:
+            r_dict = r if isinstance(r, dict) else (r.model_dump() if hasattr(r, "model_dump") else {})
+            prio = r_dict.get("priority", "P2")
+            atype = r_dict.get("action_type", "INVESTIGATION")
+            appr = "REQUIRED" if r_dict.get("approval_required") else "ADVISORY"
+            appr_color = "#DC2626" if appr == "REQUIRED" else "#16A34A"
+            title = r_dict.get("title", "")
+            rationale = r_dict.get("rationale", "")
+            impact = r_dict.get("impact", "LOW")
+
+            prio_color = "#DC2626" if prio == "P0" else ("#EA580C" if prio == "P1" else "#2563EB")
+
+            rec_table_data.append([
+                Paragraph(f"<font color='{prio_color}'><b>{prio}</b></font>", styles["TableCellBold"]),
+                Paragraph(f"<font name='Courier'><b>{html.escape(str(atype))}</b></font>", styles["TableCell"]),
+                Paragraph(f"<font color='{appr_color}'><b>{appr}</b></font>", styles["TableCellBold"]),
+                Paragraph(f"<b>{html.escape(str(title))}</b><br/><font color='#64748B'><i>{html.escape(str(rationale))}</i></font>", styles["TableCell"]),
+                Paragraph(html.escape(str(impact)), styles["TableCell"]),
+            ])
+
+        rtable = Table(rec_table_data, colWidths=[55, 115, 65, 235, 70])
+        rtable.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+            ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 3),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+        ]))
+        flowables.append(rtable)
+        flowables.append(Spacer(1, 10))
         return flowables
 
 

@@ -5,6 +5,7 @@ import {
   Network,
   GitMerge,
   ShieldCheck,
+  ShieldAlert,
   Briefcase,
   Sparkles,
   Plus,
@@ -27,12 +28,13 @@ import { AddToCaseModal } from '../../../components/case/AddToCaseModal';
 import { CampaignGraphView } from '../../../components/campaign/CampaignGraphView';
 import { CampaignTimeline } from '../../../components/campaign/CampaignTimeline';
 import { ExplainableAIPanel } from '../../../components/forensic/explanation';
+import { ResponseWorkspacePanel } from '../../../components/forensic/recommendation';
 
 interface InvestigationSectionViewProps {
   email: EmailAnalysis;
 }
 
-type InvestigationSubTab = 'graph' | 'campaigns' | 'cross_email' | 'evidence' | 'cases' | 'explanation' | 'copilot';
+type InvestigationSubTab = 'graph' | 'campaigns' | 'cross_email' | 'evidence' | 'cases' | 'explanation' | 'recommendations' | 'copilot';
 
 export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> = ({ email }) => {
   const {
@@ -102,6 +104,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
     { id: 'cross_email', label: 'Related Emails Workspace', icon: GitMerge, count: 16 },
     { id: 'evidence', label: 'Evidence & Audit Chain', icon: ShieldCheck },
     { id: 'explanation', label: 'Explainable AI (XAI)', icon: Layers, count: 'PROVENANCE', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
+    { id: 'recommendations', label: 'Response Proposals', icon: ShieldAlert, count: 'ADVISORY', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
     { id: 'cases', label: 'Case Relationships', icon: Briefcase },
     { id: 'copilot', label: 'Investigation Copilot', icon: Sparkles, count: 'AI', badgeColor: 'text-primary bg-primary/10 border-primary/30' }
   ];
@@ -421,6 +424,18 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
               scopeId={email.id}
               riskScore={email.threat_score?.score}
               riskLevel={email.threat_score?.severity}
+            />
+          </div>
+        )}
+
+        {/* Section 28: Response Recommendation Engine Sub-Tab */}
+        {currentSubTab === 'recommendations' && (
+          <div className="space-y-4">
+            <ResponseWorkspacePanel
+              scopeType="EVENT"
+              scopeId={email.id}
+              threatEventId={email.evidence_id || email.id}
+              email={email}
             />
           </div>
         )}

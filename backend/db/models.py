@@ -1904,6 +1904,7 @@ class RiskAssessmentModel(Base):
     analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
     parent_assessment = relationship("RiskAssessmentModel", remote_side=[id])
     explanations = relationship("ExplanationModel", back_populates="risk_assessment", cascade="all, delete-orphan", lazy="selectin")
+    recommendations = relationship("ResponseRecommendationModel", back_populates="risk_assessment", cascade="all, delete-orphan", lazy="selectin")
 
     __table_args__ = (
         Index("ix_ra_ws_scope", "workspace_id", "scope_type", "scope_id"),
@@ -2103,6 +2104,7 @@ class ExplanationModel(Base):
     parent_explanation = relationship("ExplanationModel", remote_side=[id])
     snapshots = relationship("ExplanationSnapshotModel", back_populates="explanation", cascade="all, delete-orphan", lazy="selectin")
     feedbacks = relationship("ExplanationFeedbackModel", back_populates="explanation", cascade="all, delete-orphan", lazy="selectin")
+    recommendations = relationship("ResponseRecommendationModel", back_populates="explanation", cascade="all, delete-orphan", lazy="selectin")
 
     __table_args__ = (
         Index("ix_expl_ws_scope", "workspace_id", "scope_type", "scope_id"),
@@ -2279,6 +2281,152 @@ class ExplanationFeedbackModel(Base):
     @property
     def correction_payload(self) -> Dict[str, Any]:
         return json.loads(self.correction_payload_json or "{}")
+
+
+# ============================================================================
+# SECTION 28: RESPONSE RECOMMENDATION ENGINE MODELS
+# ============================================================================
+
+class ResponseRecommendationModel(Base):
+    """
+    Section 28: Response Recommendation Engine.
+    Structured, prioritized, evidence-backed defensive action recommendations.
+    Advisory only; consequential execution belongs strictly behind human approval.
+    """
+    __tablename__ = "response_recommendations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    scope_type = Column(String(30), nullable=False, default="EVENT", index=True)  # EVENT, INVESTIGATION, INCIDENT, CAMPAIGN, ENTITY, ATTACK_PATH
+    scope_id = Column(String(128), nullable=False, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    threat_event_id = Column(String(36), ForeignKey("threat_events.id", ondelete="SET NULL"), nullable=True, index=True)
+    risk_assessment_id = Column(String(36), ForeignKey("risk_assessments.id", ondelete="SET NULL"), nullable=True, index=True)
+    explanation_id = Column(String(36), ForeignKey("explanations.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    action_type = Column(String(50), nullable=False, index=True)  # Controlled taxonomy (e.g., BLOCK_DOMAIN, REVOKE_SESSION)
+    category = Column(String(40), nullable=False, default="INVESTIGATION", index=True)  # IMMEDIATE, CONTAINMENT, INVESTIGATION, EVIDENCE_PRESERVATION, IDENTITY_SECURITY, NETWORK_SECURITY, ENDPOINT_SECURITY, COMMUNICATION, RECOVERY, FOLLOW_UP
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    rationale = Column(Text, nullable=False)
+
+    priority = Column(String(10), nullable=False, default="P2", index=True)  # P0, P1, P2, P3, P4
+    urgency = Column(String(20), nullable=False, default="NORMAL", index=True)  # IMMEDIATE, URGENT, SOON, NORMAL, DEFERRED
+    expected_effect = Column(Text, nullable=False)
+
+    prerequisites_json = Column(Text, default="[]", nullable=False)
+    affected_entities_json = Column(Text, default="[]", nullable=False)
+    evidence_refs_json = Column(Text, default="[]", nullable=False)
+    risk_refs_json = Column(Text, default="[]", nullable=False)
+    attack_path_refs_json = Column(Text, default="[]", nullable=False)
+    mitre_refs_json = Column(Text, default="[]", nullable=False)
+
+    confidence = Column(Float, default=1.0, nullable=False)
+    confidence_level = Column(String(20), default="HIGH", nullable=False)
+
+    applicability = Column(String(30), default="APPLICABLE", nullable=False)  # APPLICABLE, NOT_APPLICABLE, UNKNOWN, NOT_READY
+    applicability_reason = Column(Text, nullable=False, default="Prerequisites and targets validated.")
+
+    reversibility = Column(String(30), default="REVERSIBLE", nullable=False)  # REVERSIBLE, PARTIALLY_REVERSIBLE, IRREVERSIBLE, UNKNOWN
+    impact = Column(String(20), default="LOW", nullable=False)  # NONE, LOW, MEDIUM, HIGH, CRITICAL, UNKNOWN
+
+    approval_required = Column(Boolean, default=False, nullable=False)
+    safety_class = Column(String(30), default="INFORMATIONAL", nullable=False)  # INFORMATIONAL, LOW_IMPACT, REVERSIBLE, CONTAINMENT, HIGH_IMPACT, DESTRUCTIVE
+    execution_mode = Column(String(30), default="MANUAL", nullable=False)  # MANUAL, AUTOMATED_VIA_PLAYBOOK, HUMAN_IN_THE_LOOP
+
+    status = Column(String(30), default="GENERATED", nullable=False, index=True)  # GENERATED, REVIEW_REQUIRED, APPROVED, REJECTED, EXPIRED, SUPERSEDED, DEFERRED
+    status_reason = Column(Text, nullable=True)
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+
+    recommendation_version = Column(Integer, default=1, nullable=False)
+    superseded_by_id = Column(String(36), nullable=True)
+
+    depends_on_json = Column(Text, default="[]", nullable=False)
+    conflicts_with_json = Column(Text, default="[]", nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+    expires_at = Column(DateTime, nullable=True, index=True)
+
+    # Relationships
+    threat_event = relationship("ThreatEventModel", foreign_keys=[threat_event_id])
+    incident = relationship("IncidentModel", foreign_keys=[incident_id])
+    risk_assessment = relationship("RiskAssessmentModel", foreign_keys=[risk_assessment_id], back_populates="recommendations")
+    explanation = relationship("ExplanationModel", foreign_keys=[explanation_id], back_populates="recommendations")
+
+    __table_args__ = (
+        Index("ix_rr_ws_scope", "workspace_id", "scope_type", "scope_id"),
+        Index("ix_rr_status_priority", "workspace_id", "status", "priority"),
+    )
+
+    @property
+    def prerequisites(self) -> List[Dict[str, Any]]:
+        return json.loads(self.prerequisites_json or "[]")
+
+    @property
+    def affected_entities(self) -> List[Dict[str, Any]]:
+        return json.loads(self.affected_entities_json or "[]")
+
+    @property
+    def evidence_refs(self) -> List[str]:
+        return json.loads(self.evidence_refs_json or "[]")
+
+    @property
+    def risk_refs(self) -> List[str]:
+        return json.loads(self.risk_refs_json or "[]")
+
+    @property
+    def attack_path_refs(self) -> List[str]:
+        return json.loads(self.attack_path_refs_json or "[]")
+
+    @property
+    def mitre_refs(self) -> List[str]:
+        return json.loads(self.mitre_refs_json or "[]")
+
+    @property
+    def depends_on(self) -> List[str]:
+        return json.loads(self.depends_on_json or "[]")
+
+    @property
+    def conflicts_with(self) -> List[Dict[str, Any]]:
+        return json.loads(self.conflicts_with_json or "[]")
+
+    @property
+    def metadata_payload(self) -> Dict[str, Any]:
+        return json.loads(self.metadata_json or "{}")
+
+
+class ResponseCapabilityModel(Base):
+    """
+    Section 28: Response Capability Registry.
+    Tracks available environment capabilities, integration states, and approval policies.
+    """
+    __tablename__ = "response_capabilities"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    action_type = Column(String(50), nullable=False, index=True)
+    provider = Column(String(100), nullable=False)
+    environment = Column(String(50), default="PRODUCTION", nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+    reversible = Column(Boolean, default=True, nullable=False)
+    approval_required = Column(Boolean, default=True, nullable=False)
+    capability_state = Column(String(30), default="AVAILABLE", nullable=False)  # AVAILABLE, UNAVAILABLE, UNKNOWN, DISABLED, REQUIRES_CONFIGURATION
+    state_reason = Column(Text, nullable=True)
+    configuration_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_rc_ws_action", "workspace_id", "action_type"),
+    )
+
+    @property
+    def configuration(self) -> Dict[str, Any]:
+        return json.loads(self.configuration_json or "{}")
+
 
 
 
