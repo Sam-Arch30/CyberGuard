@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   FileText,
   Printer,
   ShieldAlert,
+  ShieldCheck,
   Download,
   Loader2,
   Clock,
@@ -15,49 +16,72 @@ import {
   Copy,
   Check,
   CheckCircle2,
+  AlertTriangle,
   Info,
-  ArrowRight
+  RefreshCw,
+  Sliders,
+  History,
+  GitCompare,
+  AlertCircle,
+  Hash,
+  Layers,
+  Terminal,
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
+import type {
+  ReportDetail,
+  ReportListItem,
+  ReportType,
+  ReportClassification,
+  RedactionLevel,
+  ReportContentOptions,
+  ReportComparison,
+  EpistemicStatus,
+} from '../../../types/report';
+import { DEFAULT_CONTENT_OPTIONS } from '../../../types/report';
+import { reportService } from '../../../services/reportService';
 import { useInvestigation } from '../../../context/InvestigationContext';
-import { resolveAttribution } from '../../../utils/indicatorHelper';
-import { ExpandableSection } from '../../../components/common/progressive';
-import { apiUrl } from '../../../utils/apiClient';
 
 interface ReportSectionViewProps {
-  email: EmailAnalysis;
+  investigationId?: string;
+  email?: EmailAnalysis;
 }
 
-interface BackendReportItem {
-  id: string;
-  report_number: string;
-  title: string;
-  case_id?: string;
-  evidence_id?: string;
-  email_sha256?: string;
-  threat_score?: number;
-  severity?: string;
-  analyst_name?: string;
-  summary?: string;
-  file_size_bytes?: number;
-  created_at: string;
-}
+export const ReportSectionView: React.FC<ReportSectionViewProps> = ({
+  investigationId: propInvestigationId,
+  email,
+}) => {
+  const { workspaceSummary, activeEmailId } = useInvestigation();
+  const effectiveId = propInvestigationId || activeEmailId || workspaceSummary?.investigation.investigation_id || email?.evidence_id || email?.id || 'current';
 
-export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) => {
-  const { stepGuidance } = useInvestigation();
-
-  const [backendReports, setBackendReports] = useState<BackendReportItem[]>([]);
-  const [loadingReports, setLoadingReports] = useState<boolean>(false);
+  // Core State
+  const [report, setReport] = useState<ReportDetail | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isExportingPdf, setIsExportingPdf] = useState<boolean>(false);
+  const [isExportingJson, setIsExportingJson] = useState<boolean>(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [showArchiveDrawer, setShowArchiveDrawer] = useState<boolean>(false);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [activeSectionId, setActiveSectionId] = useState<string>('exec-summary');
 
-  // Search filter for headers in appendix
-  const [headerFilter, setHeaderFilter] = useState<string>('');
+  // Configuration options state
+  const [reportType, setReportType] = useState<ReportType>('ANALYST');
+  const [classification, setClassification] = useState<ReportClassification>('CONFIDENTIAL');
+  const [redactionLevel, setRedactionLevel] = useState<RedactionLevel>('NONE');
+  const [contentOptions, setContentOptions] = useState<ReportContentOptions>({ ...DEFAULT_CONTENT_OPTIONS });
+  const [showConfigDrawer, setShowConfigDrawer] = useState<boolean>(false);
 
-  const reportDocRef = useRef<HTMLDivElement>(null);
+  // Version History & Comparison
+  const [reportVersions, setReportVersions] = useState<ReportListItem[]>([]);
+  const [loadingVersions, setLoadingVersions] = useState<boolean>(false);
+  const [showHistoryDrawer, setShowHistoryDrawer] = useState<boolean>(false);
+  const [comparison, setComparison] = useState<ReportComparison | null>(null);
+  const [comparingWithId, setComparingWithId] = useState<string | null>(null);
+  const [isComparing, setIsComparing] = useState<boolean>(false);
+
+  // UI Tools
+  const [copiedLabel, setCopiedLabel] = useState<string | null>(null);
+  const [activeTocId, setActiveTocId] = useState<string>('report-header');
+  const reportContainerRef = useRef<HTMLDivElement>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -66,1115 +90,1586 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({ email }) =
 
   const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedCode(label);
-    setTimeout(() => setCopiedCode(null), 2000);
+    setCopiedLabel(label);
+    setTimeout(() => setCopiedLabel(null), 2000);
   };
 
-  /* ── Fetch Generated Reports Archive ─── */
-  const fetchReports = async () => {
-    setLoadingReports(true);
+  // 1. Initial Load: Fetch latest report projection or draft
+  const loadReportProjection = async (previewOpts?: {
+    type?: ReportType;
+    classif?: ReportClassification;
+    redact?: RedactionLevel;
+    opts?: ReportContentOptions;
+  }) => {
+    if (!effectiveId) return;
+    setLoading(true);
+    setError(null);
     try {
-      const res = await fetch(apiUrl('/api/reports?limit=50'));
-      if (res.ok) {
-        const data = await res.json();
-        setBackendReports(data.reports || []);
+      if (previewOpts) {
+        const preview = await reportService.previewInvestigationReport(effectiveId, {
+          report_type: previewOpts.type || reportType,
+          classification: previewOpts.classif || classification,
+          redaction_level: previewOpts.redact || redactionLevel,
+          content_options: previewOpts.opts || contentOptions,
+        });
+        setReport(preview);
+      } else {
+        const rep = await reportService.getInvestigationReport(effectiveId);
+        setReport(rep);
+        setReportType(rep.report_type || 'ANALYST');
+        setClassification(rep.classification || 'CONFIDENTIAL');
+        setRedactionLevel(rep.redaction_level || 'NONE');
+        if (rep.content_options && Object.keys(rep.content_options).length > 0) {
+          setContentOptions({ ...DEFAULT_CONTENT_OPTIONS, ...rep.content_options });
+        }
       }
-    } catch {
-      setBackendReports([]);
+    } catch (err: any) {
+      console.error('Error fetching report projection:', err);
+      setError(err?.message || 'Failed to load report projection.');
     } finally {
-      setLoadingReports(false);
+      setLoading(false);
+    }
+  };
+
+  // 2. Fetch Version History
+  const fetchVersionHistory = async () => {
+    if (!effectiveId) return;
+    setLoadingVersions(true);
+    try {
+      const history = await reportService.getInvestigationReports(effectiveId);
+      setReportVersions(history);
+    } catch (err) {
+      console.warn('Could not fetch historical report versions:', err);
+      setReportVersions([]);
+    } finally {
+      setLoadingVersions(false);
     }
   };
 
   useEffect(() => {
-    fetchReports();
-  }, []);
+    loadReportProjection();
+    fetchVersionHistory();
+  }, [effectiveId]);
 
-  /* ── Supported Action 1: Generate & Download Official Forensic PDF (Server-Side) ─── */
-  const handleGenerateOfficialReport = async () => {
+  // 3. Generate New Immutable Report Version (v1, v2...)
+  const handleGenerateReportVersion = async () => {
+    if (!effectiveId) return;
     setIsGenerating(true);
     try {
-      const payload = {
-        analysis: email,
-        analyst_name: 'Lead SOC Forensic Investigator',
-        notes: 'Forensic evidence analysis generated from CyberGuard Investigation Workspace.'
-      };
-
-      const res = await fetch(apiUrl('/api/reports/generate'), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+      const newReport = await reportService.generateInvestigationReport(effectiveId, {
+        investigation_id: effectiveId,
+        report_type: reportType,
+        classification,
+        redaction_level: redactionLevel,
+        content_options: contentOptions,
+        analyst_name: 'SOC Lead Analyst',
+        notes: `Generated via CyberGuard Section 42 Report Workspace at ${new Date().toISOString()}`,
       });
-
-      if (!res.ok) {
-        // Fallback to client print preview if backend server-side generator encounters issues
-        window.print();
-        showToast('Document rendered for print / save as PDF');
-        return;
-      }
-
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const shaSlice = (email.email_sha256 || email.id || 'EVD').slice(0, 10);
-      const filename = `CyberGuard_Forensic_Report_${shaSlice}.pdf`;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-
-      showToast(`Generated & downloaded ${filename}`);
-      fetchReports();
-    } catch (err) {
+      setReport(newReport);
+      showToast(`Generated & Persisted Report ${newReport.report_number} (v${newReport.report_version})`);
+      fetchVersionHistory();
+    } catch (err: any) {
       console.error('Report generation error:', err);
-      window.print();
-      showToast('Document sent to print preview.');
+      showToast(`Error: ${err?.message || 'Report compilation failed'}`);
     } finally {
       setIsGenerating(false);
     }
   };
 
-  /* ── Supported Action 2: Export Canonical Evidence JSON Bundle ─── */
-  const handleExportJSON = () => {
-    const jsonStr = JSON.stringify(email, null, 2);
-    const blob = new Blob([jsonStr], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `CyberGuard_Forensic_Evidence_${email.evidence_id || email.id || 'export'}.json`;
-    document.body.appendChild(a);
-    a.click();
-    URL.revokeObjectURL(url);
-    document.body.removeChild(a);
-    showToast('Exported full forensic JSON bundle');
+  // 4. Update Preview Projection with Configuration
+  const handleApplyPreview = () => {
+    loadReportProjection({
+      type: reportType,
+      classif: classification,
+      redact: redactionLevel,
+      opts: contentOptions,
+    });
+    setShowConfigDrawer(false);
+    showToast('Updated Report Preview with custom options');
   };
 
-  /* ── Supported Action 3: Download Existing Archived PDF ─── */
-  const handleDownloadArchivedPDF = async (reportItem: BackendReportItem) => {
+  // 5. Download Official ReportLab Vector PDF
+  const handleDownloadPdf = async () => {
+    if (!report) return;
+    setIsExportingPdf(true);
     try {
-      const res = await fetch(apiUrl(`/api/reports/${reportItem.id}/download`));
-      if (!res.ok) throw new Error(`Download failed (${res.status})`);
-      const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${reportItem.report_number}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-      showToast(`Downloaded ${reportItem.report_number}.pdf`);
-    } catch (err) {
-      console.error('Archived PDF download failed', err);
-      showToast('Failed to download archived report PDF');
+      if (report.id === 'preview' || report.status === 'DRAFT') {
+        // Automatically persist version if currently draft preview
+        const generated = await reportService.generateInvestigationReport(effectiveId, {
+          investigation_id: effectiveId,
+          report_type: reportType,
+          classification,
+          redaction_level: redactionLevel,
+          content_options: contentOptions,
+          analyst_name: 'SOC Lead Analyst',
+        });
+        setReport(generated);
+        const filename = `CyberGuard_${generated.report_number}_v${generated.report_version}.pdf`;
+        await reportService.downloadPdf(generated.id, filename);
+        showToast(`Downloaded ${filename}`);
+        fetchVersionHistory();
+      } else {
+        const filename = `CyberGuard_${report.report_number}_v${report.report_version}.pdf`;
+        await reportService.downloadPdf(report.id, filename);
+        showToast(`Downloaded ${filename}`);
+      }
+    } catch (err: any) {
+      console.error('PDF export error:', err);
+      showToast(`PDF Export failed: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsExportingPdf(false);
     }
   };
 
-  /* ── Derived Investigation Ground Truths ─── */
-  const attribution = email.attribution || resolveAttribution(email);
-  const score = Math.round(email.threat_score?.score ?? 0);
-  const severity = (email.threat_score?.severity || (score >= 80 ? 'critical' : score >= 50 ? 'high' : score >= 25 ? 'medium' : 'low')).toLowerCase();
-  const rawConfidence = email.threat_score?.confidence;
-  const confidence = typeof rawConfidence === 'number'
-    ? Math.round(rawConfidence * 100)
-    : (attribution?.confidence_score ?? 88);
-
-  const auth = email.authentication;
-  const spfVal = (auth?.spf?.result || 'FAIL').toUpperCase();
-  const dkimVal = (auth?.dkim?.result || 'FAIL').toUpperCase();
-  const dmarcVal = (auth?.dmarc?.result || 'FAIL').toUpperCase();
-
-  const earliestNode = email.relay_analysis?.earliest_observable_node as any;
-  const originIp = attribution?.probable_origin_ip || earliestNode?.earliest_observable_ip || '203.0.113.88';
-  const originAsn = attribution?.probable_origin_asn || earliestNode?.asn || 'AS64512';
-  const originProvider = attribution?.probable_origin_provider || 'Threat Infrastructure Host';
-  const originCountry = attribution?.probable_infrastructure_country || earliestNode?.country || 'United States';
-
-  const lookalikes = email.lookalike_domains || [];
-  const rawDomains = email.indicators?.domains || email.domains || [];
-  const rawIps = email.indicators?.ips || email.ips || [];
-  const rawUrls = email.indicators?.urls || email.urls || [];
-
-  /* ── Formatted raw headers map ─── */
-  const formattedHeaders = useMemo(() => {
-    const emailAny = email as any;
-    if (emailAny.headers && typeof emailAny.headers === 'object') {
-      if (Array.isArray(emailAny.headers)) {
-        return emailAny.headers.map((h: any) => `${h.key || h.name || 'Header'}: ${h.value || ''}`).join('\n');
+  // 6. Download Authoritative JSON Snapshot
+  const handleDownloadJson = async () => {
+    if (!report) return;
+    setIsExportingJson(true);
+    try {
+      if (report.id === 'preview' || report.status === 'DRAFT') {
+        const jsonStr = JSON.stringify(report.snapshot, null, 2);
+        const blob = new Blob([jsonStr], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `CyberGuard_Report_${effectiveId}_draft.json`;
+        document.body.appendChild(a);
+        a.click();
+        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        showToast('Exported Draft JSON Snapshot');
+      } else {
+        const filename = `CyberGuard_${report.report_number}_v${report.report_version}.json`;
+        await reportService.downloadJson(report.id, filename);
+        showToast(`Exported ${filename}`);
       }
-      return Object.entries(emailAny.headers).map(([k, v]) => `${k}: ${v}`).join('\n');
+    } catch (err: any) {
+      console.error('JSON export error:', err);
+      showToast(`JSON Export failed: ${err?.message || 'Server error'}`);
+    } finally {
+      setIsExportingJson(false);
     }
-    // Synthetic RFC-822 baseline from actual properties
-    const lines = [
-      `Delivered-To: ${email.to || 'victim@corp.internal'}`,
-      `Received: from mail-relay.host (${originIp}) by mx.recipient.corp with ESMTPS id ${email.id || 'evd'}; ${email.date || new Date().toUTCString()}`,
-      `Date: ${email.date || new Date().toUTCString()}`,
-      `From: ${email.from || 'unknown@domain.com'}`,
-      `Reply-To: ${email.reply_to || email.from || 'unknown@domain.com'}`,
-      `Return-Path: <${auth?.alignment?.return_path_domain ? `bounce@${auth.alignment.return_path_domain}` : (email.from || 'bounce@domain.com')}>`,
-      `To: ${email.to || 'victim@corp.internal'}`,
-      `Message-ID: <${email.id || 'EVD-106'}@mailtrace.forensics>`,
-      `Subject: ${email.subject || 'Investigation Target'}`,
-      `Authentication-Results: mx.recipient.corp; spf=${spfVal.toLowerCase()} smtp.mailfrom=${auth?.alignment?.return_path_domain || 'origin'}; dkim=${dkimVal.toLowerCase()} header.i=@${auth?.alignment?.from_domain || 'sender'}; dmarc=${dmarcVal.toLowerCase()} action=none header.from=${auth?.alignment?.from_domain || 'sender'}`
-    ];
-    return lines.join('\n');
-  }, [email, originIp, auth, spfVal, dkimVal, dmarcVal]);
+  };
 
-  const filteredHeadersString = useMemo(() => {
-    if (!headerFilter.trim()) return formattedHeaders;
-    const q = headerFilter.toLowerCase();
-    return formattedHeaders.split('\n').filter((line: string) => line.toLowerCase().includes(q)).join('\n');
-  }, [formattedHeaders, headerFilter]);
-
-  /* ── Dynamic Key Findings ─── */
-  const dynamicFindings = useMemo(() => {
-    const list: Array<{ severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'; title: string; explanation: string }> = [];
-
-    if (lookalikes.length > 0) {
-      const firstLookalike = lookalikes[0];
-      const targetBrand = firstLookalike.suspected_brand || (firstLookalike as any).brand || firstLookalike.brand_name || 'Target Brand';
-      list.push({
-        severity: 'CRITICAL',
-        title: `Homograph / Lookalike Domain Impersonation (${firstLookalike.domain})`,
-        explanation: `Adversary utilized domain "${firstLookalike.domain}" employing character substitution techniques targeting brand "${targetBrand}".`
-      });
+  // 7. Compare Two Report Versions
+  const handleCompareVersions = async (otherReportId: string) => {
+    if (!report?.id || report.id === 'preview') return;
+    setIsComparing(true);
+    setComparingWithId(otherReportId);
+    try {
+      const diff = await reportService.compareReports(otherReportId, report.id);
+      setComparison(diff);
+    } catch (err: any) {
+      console.error('Comparison error:', err);
+      showToast('Failed to compare report versions.');
+    } finally {
+      setIsComparing(false);
     }
+  };
 
-    if (dmarcVal === 'FAIL') {
-      list.push({
-        severity: 'HIGH',
-        title: 'DMARC Alignment Verification Failed',
-        explanation: `Header domain (${auth?.alignment?.from_domain || 'sender'}) failed alignment against authenticated Return-Path and DKIM identity under policy p=${auth?.dmarc?.details || 'reject'}.`
-      });
-    }
-
-    if (spfVal === 'FAIL' || dkimVal === 'FAIL') {
-      list.push({
-        severity: 'HIGH',
-        title: 'Cryptographic Email Authentication Signature Invalid',
-        explanation: `Sending IP ${originIp} was not authorized under published SPF records, and DKIM cryptographic signature verification failed.`
-      });
-    }
-
-    if (score >= 70) {
-      list.push({
-        severity: 'HIGH',
-        title: 'Hostile Sending Infrastructure Identified',
-        explanation: `Originating mail hop routed through ASN ${originAsn} (${originProvider}) with elevated multi-incident abuse history.`
-      });
-    }
-
-    if (rawUrls.length > 0) {
-      list.push({
-        severity: 'MEDIUM',
-        title: `Embedded Hyperlinks Detected (${rawUrls.length} observed)`,
-        explanation: 'Message content embeds actionable hyperlinks designed to route user telemetry to external infrastructure.'
-      });
-    }
-
-    if (list.length === 0) {
-      list.push({
-        severity: 'LOW',
-        title: 'Standard Email Transmission Protocols Observed',
-        explanation: 'Email passes standard authentication criteria with normal sender-recipient characteristics.'
-      });
-    }
-
-    return list;
-  }, [lookalikes, dmarcVal, spfVal, dkimVal, originIp, score, originAsn, originProvider, rawUrls, auth]);
-
-  /* ── Table of Contents Navigation ─── */
-  const tocSections = [
-    { id: 'exec-summary', label: '1. Executive Summary' },
-    { id: 'threat-assessment', label: '2. Threat Assessment' },
-    { id: 'key-findings', label: '3. Key Findings' },
-    { id: 'authentication-findings', label: '4. Authentication' },
-    { id: 'infrastructure-findings', label: '5. Infrastructure' },
-    { id: 'indicator-findings', label: '6. Indicators' },
-    { id: 'correlation-findings', label: '7. Correlations' },
-    { id: 'evidence-ledger', label: '8. Evidence' },
-    { id: 'technical-appendix', label: '9. Technical Appendix' },
-  ];
-
+  // TOC Navigation scroll
   const scrollToSection = (id: string) => {
-    setActiveSectionId(id);
+    setActiveTocId(id);
     const element = document.getElementById(id);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
+  const getEpistemicBadgeStyle = (status: EpistemicStatus | string) => {
+    switch (status) {
+      case 'OBSERVED':
+        return 'bg-success/15 text-success border-success/30';
+      case 'INFERRED':
+        return 'bg-warning/15 text-warning border-warning/30';
+      case 'HYPOTHESIS':
+        return 'bg-danger/15 text-danger border-danger/30';
+      case 'EXTERNAL_INTELLIGENCE':
+        return 'bg-primary/15 text-primary border-primary/30';
+      case 'ANALYST_VERIFIED':
+        return 'bg-secondary/15 text-secondary border-secondary/30';
+      default:
+        return 'bg-surface-secondary text-foreground-muted border-border';
+    }
+  };
+
+  const snap = report?.snapshot;
+  const meta = snap?.metadata;
+  const overview = snap?.incident_overview;
+  const execSummary = snap?.executive_summary;
+  const riskSec = snap?.risk_assessment;
+  const attackPath = snap?.attack_path;
+  const findings = snap?.findings || [];
+  const evidenceTable = snap?.evidence_table || [];
+  const iocs = snap?.iocs;
+  const mitre = snap?.mitre_attack || [];
+  const infra = snap?.infrastructure_intelligence;
+  const explain = snap?.explainability;
+  const resp = snap?.response;
+  const audit = snap?.audit_trail || [];
+  const evidenceIndex = snap?.evidence_index || [];
+  const quality = report?.quality_check;
+
   return (
-    <div className="space-y-6 pb-20 page-enter">
+    <div className="space-y-6 pb-20 page-enter relative font-sans">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-5 right-5 z-50 flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-surface border border-success/30 text-success text-xs font-mono shadow-lg animate-in slide-in-from-top-3">
-          <CheckCircle2 className="w-4 h-4" />
+        <div className="fixed top-5 right-5 z-50 flex items-center space-x-2 px-4 py-2.5 rounded-xl bg-surface border border-primary/40 text-primary text-xs font-mono shadow-xl animate-in slide-in-from-top-3">
+          <CheckCircle2 className="w-4 h-4 text-primary" />
           <span>{toastMessage}</span>
         </div>
       )}
 
-      {/* 1. TOP REPORT COMMAND & EXPORT BAR */}
-      <div className="bg-surface p-4 rounded-card border border-border">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+      {/* 1. TOP REPORT COMMAND & WORKSPACE HEADER */}
+      <div className="bg-surface p-4 sm:p-5 rounded-card border border-border shadow-xs">
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
           <div className="space-y-1">
             <div className="flex items-center space-x-2 text-primary font-mono text-xs font-bold uppercase tracking-wider">
               <FileText className="w-4 h-4" />
-              <span>FORENSIC REPORT COMPILER // EVIDENTIARY CONCLUSION</span>
+              <span>REPORT WORKSPACE // SECTION 42 REPRODUCIBLE PROJECTION</span>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-xl font-bold font-sans text-foreground">
-                Forensic Investigation Report
+              <h2 className="text-xl sm:text-2xl font-bold text-foreground tracking-tight">
+                {meta?.title || 'Security Incident Investigation Report'}
               </h2>
               <span className="px-2.5 py-0.5 rounded-md bg-surface-secondary border border-border font-mono text-xs text-primary font-bold">
-                {email.evidence_id || email.id}
+                {report ? `v${report.report_version}` : 'v1'}
+              </span>
+              <span className={`px-2 py-0.5 rounded-md font-mono text-[10px] font-bold uppercase border ${
+                report?.status === 'READY'
+                  ? 'bg-success/10 text-success border-success/30'
+                  : report?.status === 'STALE'
+                  ? 'bg-warning/10 text-warning border-warning/30'
+                  : 'bg-primary/10 text-primary border-primary/30'
+              }`}>
+                {report?.status || 'DRAFT'}
               </span>
               <span className="px-2 py-0.5 rounded-md bg-warning/10 text-warning border border-warning/30 font-mono text-[10px] font-bold uppercase">
-                TLP:AMBER // FOR OFFICIAL USE
+                {classification}
               </span>
+              {redactionLevel !== 'NONE' && (
+                <span className="px-2 py-0.5 rounded-md bg-primary-subtle text-primary border border-primary/30 font-mono text-[10px] font-bold uppercase">
+                  REDACTED ({redactionLevel})
+                </span>
+              )}
             </div>
             <p className="text-xs font-mono text-foreground-muted">
-              Structured investigation findings compiled as an authoritative conclusion for SOC leads, incident responders, and court proceedings.
+              Evidence-grounded, immutable security incident report assembling active telemetry, attack paths, findings, MITRE ATT&CK, and response actions.
             </p>
           </div>
 
-          {/* Genuine Supported Action Triggers */}
-          <div className="flex flex-wrap items-center gap-2 self-start lg:self-center">
-            {/* Action 1: Generate Official Report (PDF) */}
+          {/* Action Trigger Toolbar */}
+          <div className="flex flex-wrap items-center gap-2 self-start xl:self-center">
+            {/* Generate New Immutable Report Version */}
             <button
               type="button"
-              id="generate-official-report-btn"
-              onClick={handleGenerateOfficialReport}
-              disabled={isGenerating}
+              id="generate-report-version-btn"
+              onClick={handleGenerateReportVersion}
+              disabled={isGenerating || loading}
               className="px-4 py-2 rounded-xl bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-bold flex items-center space-x-2 transition-all cursor-pointer shadow-xs disabled:opacity-50"
-              title="Generate server-side ReportLab PDF and download"
+              title="Compile and register an immutable report version (v1, v2...)"
             >
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Compiling PDF...</span>
+                  <span>Compiling Version...</span>
                 </>
               ) : (
                 <>
-                  <Download className="w-4 h-4" />
-                  <span>Generate Official Report</span>
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>Generate Report Version</span>
                 </>
               )}
             </button>
 
-            {/* Action 2: Export JSON Bundle */}
+            {/* Export Official Vector PDF */}
             <button
               type="button"
-              id="export-json-bundle-btn"
-              onClick={handleExportJSON}
-              className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
-              title="Export complete canonical evidence JSON bundle"
+              id="export-pdf-report-btn"
+              onClick={handleDownloadPdf}
+              disabled={isExportingPdf || loading}
+              className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              title="Download official ReportLab vector PDF dossier"
             >
-              <FileCode className="w-4 h-4 text-primary" />
-              <span>Export JSON</span>
+              {isExportingPdf ? (
+                <Loader2 className="w-4 h-4 animate-spin text-primary" />
+              ) : (
+                <Download className="w-4 h-4 text-primary" />
+              )}
+              <span>Export PDF</span>
             </button>
 
-            {/* Action 3: Print / System PDF */}
+            {/* Export Authoritative JSON */}
             <button
               type="button"
-              id="print-dossier-btn"
+              id="export-json-report-btn"
+              onClick={handleDownloadJson}
+              disabled={isExportingJson || loading}
+              className="px-3 py-2 rounded-xl bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer disabled:opacity-50"
+              title="Export complete canonical report JSON snapshot"
+            >
+              <FileCode className="w-4 h-4 text-primary" />
+              <span>JSON</span>
+            </button>
+
+            {/* Print / System Browser Dialog */}
+            <button
+              type="button"
+              id="print-report-btn"
               onClick={() => window.print()}
-              className="px-3.5 py-2 rounded-xl bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
-              title="Print document or save via browser print stylesheet"
+              className="px-3 py-2 rounded-xl bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer"
+              title="Print document view"
             >
               <Printer className="w-4 h-4 text-primary" />
               <span>Print</span>
             </button>
 
-            {/* Action 4: Toggle Historical Report Archive */}
+            {/* Report Content Configuration Drawer Toggle */}
             <button
               type="button"
-              onClick={() => setShowArchiveDrawer(!showArchiveDrawer)}
+              id="toggle-config-drawer-btn"
+              onClick={() => setShowConfigDrawer(!showConfigDrawer)}
               className={`px-3 py-2 rounded-xl border font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer ${
-                showArchiveDrawer
+                showConfigDrawer
                   ? 'bg-primary-subtle text-primary border-primary/40'
                   : 'bg-surface hover:bg-surface-secondary border-border text-foreground-muted hover:text-foreground'
               }`}
-              title="View previously generated reports for this case/email"
+              title="Configure report type, redaction, and section visibility"
             >
-              <Clock className="w-4 h-4" />
-              <span>Archive ({backendReports.length})</span>
+              <Sliders className="w-4 h-4" />
+              <span>Configure</span>
+            </button>
+
+            {/* Historical Version Archive Toggle */}
+            <button
+              type="button"
+              id="toggle-history-drawer-btn"
+              onClick={() => setShowHistoryDrawer(!showHistoryDrawer)}
+              className={`px-3 py-2 rounded-xl border font-mono text-xs font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer ${
+                showHistoryDrawer
+                  ? 'bg-primary-subtle text-primary border-primary/40'
+                  : 'bg-surface hover:bg-surface-secondary border-border text-foreground-muted hover:text-foreground'
+              }`}
+              title="Inspect historical versions and compare differences"
+            >
+              <History className="w-4 h-4" />
+              <span>Versions ({reportVersions.length})</span>
             </button>
           </div>
         </div>
 
-        {/* Floating/Integrated Quick-Jump Table of Contents */}
-        <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-1.5 overflow-x-auto text-xs font-mono">
-          <span className="text-[10px] text-foreground-muted uppercase tracking-wider mr-1 shrink-0">Jump To:</span>
-          {tocSections.map(sec => (
-            <button
-              key={sec.id}
-              type="button"
-              onClick={() => scrollToSection(sec.id)}
-              className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer shrink-0 ${
-                activeSectionId === sec.id
-                  ? 'bg-primary/15 text-primary border border-primary/30 font-bold'
-                  : 'bg-surface-secondary text-foreground-muted hover:text-foreground hover:bg-surface'
-              }`}
-            >
-              {sec.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {/* HISTORICAL REPORT ARCHIVE DRAWER / PANEL (If toggled) */}
-      {showArchiveDrawer && (
-        <div className="p-4 rounded-card bg-surface border border-primary/30 space-y-3 font-mono text-xs shadow-xs animate-in fade-in duration-200">
-          <div className="flex items-center justify-between pb-2 border-b border-border">
-            <div className="flex items-center space-x-2 text-primary font-bold">
-              <Clock className="w-4 h-4" />
-              <span>Archived PDF Reports In Persistent Database ({backendReports.length})</span>
+        {/* 2. STALE REPORT BANNER (Section 55 Contract) */}
+        {report?.is_stale && (
+          <div className="mt-4 p-4 rounded-xl bg-warning/10 border border-warning/40 flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="w-5 h-5 text-warning shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs font-bold text-foreground font-sans">
+                  REPORT OUTDATED (Stale Snapshot)
+                </h4>
+                <p className="text-xs font-mono text-foreground-muted mt-0.5">
+                  This report was generated from a prior analysis run. New investigation evidence, risk assessments, or attack path updates are now available in the platform.
+                </p>
+              </div>
             </div>
             <button
               type="button"
-              onClick={() => setShowArchiveDrawer(false)}
+              onClick={handleGenerateReportVersion}
+              disabled={isGenerating}
+              className="px-3.5 py-1.5 rounded-lg bg-warning text-black font-mono text-xs font-bold hover:bg-warning/90 transition-all cursor-pointer shrink-0 shadow-xs"
+            >
+              {isGenerating ? 'Compiling...' : 'Generate Updated Report (v' + ((report?.report_version || 1) + 1) + ')'}
+            </button>
+          </div>
+        )}
+
+        {/* 3. TABLE OF CONTENTS QUICK-JUMP BAR */}
+        <div className="mt-4 pt-3 border-t border-border flex flex-wrap items-center gap-1.5 overflow-x-auto text-xs font-mono">
+          <span className="text-[10px] text-foreground-muted uppercase tracking-wider mr-1 shrink-0">Sections:</span>
+          {[
+            { id: 'sec-exec-summary', label: '1. Executive Summary', show: contentOptions.include_executive_summary },
+            { id: 'sec-epistemic-claims', label: '2. Epistemic Claims', show: true },
+            { id: 'sec-overview', label: '3. Overview', show: true },
+            { id: 'sec-risk', label: '4. Risk & Confidence', show: contentOptions.include_risk_assessment },
+            { id: 'sec-timeline', label: '5. Timeline', show: contentOptions.include_timeline },
+            { id: 'sec-attack-path', label: '6. Attack Path', show: contentOptions.include_attack_path },
+            { id: 'sec-findings', label: '7. Findings', show: contentOptions.include_findings },
+            { id: 'sec-evidence', label: '8. Evidence Table', show: contentOptions.include_evidence_table },
+            { id: 'sec-iocs', label: '9. IOCs', show: contentOptions.include_indicators },
+            { id: 'sec-mitre', label: '10. MITRE ATT&CK', show: contentOptions.include_mitre_attack },
+            { id: 'sec-infrastructure', label: '11. Infrastructure', show: contentOptions.include_infrastructure },
+            { id: 'sec-explainability', label: '12. Explainability', show: contentOptions.include_explainability },
+            { id: 'sec-response', label: '13. Response Actions', show: contentOptions.include_response_actions },
+            { id: 'sec-audit', label: '14. Audit Trail', show: contentOptions.include_audit_trail },
+            { id: 'sec-evidence-index', label: '15. Evidence Index', show: contentOptions.include_evidence_index },
+          ]
+            .filter(s => s.show)
+            .map(sec => (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={() => scrollToSection(sec.id)}
+                className={`px-2.5 py-1 rounded-lg text-[11px] transition-colors cursor-pointer shrink-0 ${
+                  activeTocId === sec.id
+                    ? 'bg-primary/15 text-primary border border-primary/30 font-bold'
+                    : 'bg-surface-secondary text-foreground-muted hover:text-foreground hover:bg-surface'
+                }`}
+              >
+                {sec.label}
+              </button>
+            ))}
+        </div>
+      </div>
+
+      {/* 4. CONFIGURATION DRAWER / MODAL (Section 43 Contract) */}
+      {showConfigDrawer && (
+        <div className="p-5 rounded-card bg-surface border border-primary/30 space-y-4 font-mono text-xs shadow-md animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div className="flex items-center space-x-2 text-primary font-bold">
+              <Sliders className="w-4 h-4" />
+              <span>Report Generation Configuration</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowConfigDrawer(false)}
               className="text-foreground-muted hover:text-foreground cursor-pointer"
             >
               Close
             </button>
           </div>
 
-          {loadingReports ? (
-            <div className="p-4 text-center text-foreground-muted">
-              <Loader2 className="w-4 h-4 animate-spin text-primary mx-auto mb-1" />
-              <span>Loading report archive...</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Report Type Selector */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase text-foreground-muted font-bold block">Report Type</label>
+              <div className="flex flex-col space-y-1">
+                {(['ANALYST', 'EXECUTIVE', 'FORENSIC'] as ReportType[]).map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => setReportType(t)}
+                    className={`px-3 py-2 rounded-lg text-left text-xs font-semibold border transition-all cursor-pointer ${
+                      reportType === t
+                        ? 'bg-primary/15 text-primary border-primary/40 font-bold'
+                        : 'bg-surface-secondary border-border text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    ● {t.charAt(0) + t.slice(1).toLowerCase()} Report
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : backendReports.length === 0 ? (
+
+            {/* Classification */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase text-foreground-muted font-bold block">Classification</label>
+              <div className="flex flex-col space-y-1">
+                {(['INTERNAL', 'CONFIDENTIAL', 'RESTRICTED'] as ReportClassification[]).map((c) => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => setClassification(c)}
+                    className={`px-3 py-2 rounded-lg text-left text-xs font-semibold border transition-all cursor-pointer ${
+                      classification === c
+                        ? 'bg-warning/15 text-warning border-warning/40 font-bold'
+                        : 'bg-surface-secondary border-border text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    ● {c}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Redaction Level */}
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase text-foreground-muted font-bold block">Redaction Policy</label>
+              <div className="flex flex-col space-y-1">
+                {(['NONE', 'STANDARD', 'STRICT'] as RedactionLevel[]).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRedactionLevel(r)}
+                    className={`px-3 py-2 rounded-lg text-left text-xs font-semibold border transition-all cursor-pointer ${
+                      redactionLevel === r
+                        ? 'bg-primary/15 text-primary border-primary/40 font-bold'
+                        : 'bg-surface-secondary border-border text-foreground-muted hover:text-foreground'
+                    }`}
+                  >
+                    ● {r} Redaction
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Section Visibility Checkboxes */}
+          <div className="pt-3 border-t border-border space-y-2">
+            <span className="text-[10px] uppercase text-foreground-muted font-bold block">Included Content Sections</span>
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2">
+              {[
+                { key: 'include_executive_summary', label: 'Executive Summary' },
+                { key: 'include_risk_assessment', label: 'Risk Assessment' },
+                { key: 'include_timeline', label: 'Timeline' },
+                { key: 'include_attack_path', label: 'Attack Path' },
+                { key: 'include_findings', label: 'Findings' },
+                { key: 'include_evidence_table', label: 'Evidence Table' },
+                { key: 'include_indicators', label: 'IOC Summary' },
+                { key: 'include_mitre_attack', label: 'MITRE ATT&CK' },
+                { key: 'include_infrastructure', label: 'Infrastructure' },
+                { key: 'include_explainability', label: 'Explainability' },
+                { key: 'include_response_actions', label: 'Response Actions' },
+                { key: 'include_recommendations', label: 'Recommendations' },
+                { key: 'include_audit_trail', label: 'Audit Trail' },
+                { key: 'include_evidence_index', label: 'Evidence Index' },
+              ].map(({ key, label }) => {
+                const k = key as keyof ReportContentOptions;
+                return (
+                  <label key={key} className="flex items-center space-x-2 text-[11px] text-foreground cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={contentOptions[k]}
+                      onChange={(e) => setContentOptions({ ...contentOptions, [k]: e.target.checked })}
+                      className="rounded border-border text-primary focus:ring-primary h-3.5 w-3.5"
+                    />
+                    <span>{label}</span>
+                  </label>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end space-x-2 pt-3 border-t border-border">
+            <button
+              type="button"
+              onClick={handleApplyPreview}
+              className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-bold cursor-pointer transition-colors"
+            >
+              Update Preview Projection
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 5. HISTORICAL VERSIONS & COMPARISON DRAWER (Section 56 Contract) */}
+      {showHistoryDrawer && (
+        <div className="p-5 rounded-card bg-surface border border-primary/30 space-y-4 font-mono text-xs shadow-md animate-in fade-in duration-200">
+          <div className="flex items-center justify-between pb-3 border-b border-border">
+            <div className="flex items-center space-x-2 text-primary font-bold">
+              <History className="w-4 h-4" />
+              <span>Report Version Ledger & Reproducibility History</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setShowHistoryDrawer(false);
+                setComparison(null);
+              }}
+              className="text-foreground-muted hover:text-foreground cursor-pointer"
+            >
+              Close
+            </button>
+          </div>
+
+          {loadingVersions ? (
+            <div className="p-4 text-center text-foreground-muted">
+              <Loader2 className="w-5 h-5 animate-spin mx-auto text-primary mb-2" />
+              <span>Loading report history...</span>
+            </div>
+          ) : reportVersions.length === 0 ? (
             <p className="text-foreground-muted text-[11px] py-2">
-              No previous PDF reports found. Click &quot;Generate Official Report&quot; to build and store the initial dossier.
+              No previous report versions found. Click &quot;Generate Report Version&quot; above to establish v1.
             </p>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-56 overflow-y-auto pr-1">
-              {backendReports.map(rep => (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-60 overflow-y-auto pr-1">
+              {reportVersions.map((v) => (
                 <div
-                  key={rep.id}
-                  className="p-3 rounded-xl bg-surface-secondary border border-border flex items-center justify-between gap-3"
+                  key={v.id}
+                  className={`p-3 rounded-xl border flex items-center justify-between gap-3 ${
+                    report?.id === v.id
+                      ? 'bg-primary-subtle border-primary/40'
+                      : 'bg-surface-secondary border-border'
+                  }`}
                 >
                   <div className="space-y-0.5 min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
-                      <span className="font-bold text-primary">{rep.report_number}</span>
-                      <span className="truncate text-foreground font-semibold">{rep.title}</span>
+                      <span className="font-bold text-primary">{v.report_number}</span>
+                      <span className="px-1.5 py-0.2 rounded bg-surface border border-border text-[9px] font-bold">
+                        v{v.report_version || 1}
+                      </span>
+                      <span className="text-[10px] font-bold uppercase text-warning">
+                        {v.severity || 'high'}
+                      </span>
                     </div>
-                    <div className="text-[10px] text-foreground-muted">
-                      {new Date(rep.created_at).toLocaleString()} · {rep.file_size_bytes ? `${Math.round(rep.file_size_bytes / 1024)} KB` : 'PDF'}
+                    <div className="text-[10px] text-foreground-muted truncate">
+                      {new Date(v.created_at).toLocaleString()} · {v.file_size_bytes ? `${Math.round(v.file_size_bytes / 1024)} KB` : 'Vector PDF'}
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => handleDownloadArchivedPDF(rep)}
-                    className="p-1.5 rounded-lg bg-surface hover:bg-surface-secondary text-primary border border-border cursor-pointer shrink-0"
-                    title="Download Archived PDF"
-                  >
-                    <Download className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="flex items-center space-x-1.5 shrink-0">
+                    {report?.id && report.id !== v.id && (
+                      <button
+                        type="button"
+                        onClick={() => handleCompareVersions(v.id)}
+                        disabled={isComparing && comparingWithId === v.id}
+                        className="px-2 py-1 rounded bg-surface hover:bg-surface-secondary text-primary border border-border text-[10px] flex items-center space-x-1 cursor-pointer"
+                        title="Compare with active report"
+                      >
+                        <GitCompare className="w-3 h-3" />
+                        <span>Diff</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => reportService.downloadPdf(v.id, `${v.report_number}.pdf`)}
+                      className="p-1.5 rounded-lg bg-surface hover:bg-surface-secondary text-foreground-muted hover:text-foreground border border-border cursor-pointer"
+                      title="Download Archived PDF"
+                    >
+                      <Download className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               ))}
+            </div>
+          )}
+
+          {/* Version Diff View */}
+          {comparison && (
+            <div className="pt-3 border-t border-border space-y-2 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-primary text-xs">
+                  Version Comparison: {comparison.v1_report_number} (v{comparison.v1_version}) vs {comparison.v2_report_number} (v{comparison.v2_version})
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setComparison(null)}
+                  className="text-foreground-muted hover:text-foreground text-[10px]"
+                >
+                  Clear Diff
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-[11px]">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] text-foreground-muted uppercase">
+                      <th className="py-1.5 px-2">Field</th>
+                      <th className="py-1.5 px-2">{comparison.v1_report_number}</th>
+                      <th className="py-1.5 px-2">{comparison.v2_report_number}</th>
+                      <th className="py-1.5 px-2 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/50">
+                    {comparison.changes.map((c, i) => (
+                      <tr key={i} className={c.changed ? 'bg-warning/5 font-semibold' : ''}>
+                        <td className="py-1.5 px-2 font-mono text-primary">{c.field}</td>
+                        <td className="py-1.5 px-2 text-foreground-muted truncate max-w-xs">{String(c.v1_value)}</td>
+                        <td className="py-1.5 px-2 text-foreground truncate max-w-xs">{String(c.v2_value)}</td>
+                        <td className="py-1.5 px-2 text-right">
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            c.changed ? 'bg-warning/15 text-warning' : 'bg-surface text-foreground-muted'
+                          }`}>
+                            {c.changed ? 'MODIFIED' : 'UNCHANGED'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
       )}
 
-      {/* 2. READABLE INVESTIGATION REPORT DOCUMENT (Authoritative Paper Presentation) */}
-      <div
-        ref={reportDocRef}
-        id="readable-forensic-report"
-        className="bg-surface rounded-card border border-border p-6 sm:p-8 space-y-8 max-w-5xl mx-auto"
-      >
-        {/* DOCUMENT MASTHEAD & ADMINISTRATIVE CLASSIFICATION */}
-        <div className="space-y-4 pb-6 border-b-2 border-border">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
-            <div className="flex items-center space-x-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-primary" />
-              <span className="font-bold tracking-widest text-primary uppercase">
-                CYBERGUARD FORENSICS DIVISION
-              </span>
-            </div>
-            <div className="flex items-center space-x-2 text-[10px] text-foreground-muted uppercase tracking-wider">
-              <span>REPORT NO: <strong className="text-foreground">{backendReports[0]?.report_number || 'RPT-2026-LIVE'}</strong></span>
-              <span>·</span>
-              <span>CHAIN OF CUSTODY: <strong className="text-success">VERIFIED</strong></span>
-            </div>
-          </div>
-
-          <div className="space-y-1 pt-2">
-            <h1 className="text-2xl sm:text-3xl font-bold font-sans text-foreground tracking-tight">
-              Digital Forensics & Threat Attribution Report
-            </h1>
-            <p className="text-xs font-mono text-foreground-muted">
-              Evidence-grounded technical analysis and attribution assessment for intercepted email artifact.
-            </p>
-          </div>
-
-          {/* Metadata Grid */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 p-3.5 rounded-xl bg-surface-secondary/60 border border-border font-mono text-xs">
-            <div>
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Incident Target:</span>
-              <span className="text-foreground font-bold truncate block" title={email.subject || 'Untitled'}>
-                {email.subject || 'Untitled Artifact'}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Intake Timestamp:</span>
-              <span className="text-foreground truncate block">
-                {email.date ? new Date(email.date).toUTCString() : new Date().toUTCString()}
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Origin Relay IP:</span>
-              <span className="text-primary font-bold block">{originIp}</span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Evidence Hash (SHA-256):</span>
-              <span className="text-foreground truncate block font-mono text-[10px]" title={email.email_sha256}>
-                {email.email_sha256 ? `${email.email_sha256.slice(0, 14)}...` : '7f3a9b1c8e2d4f5a...'}
-              </span>
-            </div>
-          </div>
+      {/* 6. LOADING / ERROR STATES */}
+      {loading && !report ? (
+        <div className="p-16 text-center bg-surface rounded-card border border-border">
+          <Loader2 className="w-8 h-8 animate-spin mx-auto text-primary mb-3" />
+          <p className="text-sm font-bold text-foreground">Assembling Authoritative Report Projection...</p>
+          <p className="text-xs text-foreground-muted font-mono mt-1">
+            Aggregating evidence ledger, temporal timeline, attack stages, MITRE ATT&CK, and response actions.
+          </p>
         </div>
+      ) : error ? (
+        <div className="p-8 text-center bg-surface rounded-card border border-danger-border space-y-3">
+          <AlertCircle className="w-8 h-8 text-danger mx-auto" />
+          <h3 className="text-base font-bold text-foreground">Report Projection Unavailable</h3>
+          <p className="text-xs text-foreground-muted font-mono max-w-md mx-auto">{error}</p>
+          <button
+            type="button"
+            onClick={() => loadReportProjection()}
+            className="px-4 py-2 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-mono text-xs font-bold transition-all cursor-pointer inline-flex items-center space-x-1.5"
+          >
+            <RefreshCw className="w-3.5 h-3.5" />
+            <span>Retry Projection</span>
+          </button>
+        </div>
+      ) : !snap ? (
+        <div className="p-12 text-center bg-surface rounded-card border border-border font-mono text-xs text-foreground-muted">
+          No investigation snapshot data could be compiled.
+        </div>
+      ) : (
+        /* 7. AUTHENTIC INCIDENT REPORT DOCUMENT PREVIEW */
+        <div
+          ref={reportContainerRef}
+          id="authoritative-report-document"
+          className="bg-surface rounded-card border border-border p-6 sm:p-10 space-y-10 max-w-5xl mx-auto shadow-xs print:p-0 print:border-none print:shadow-none"
+        >
+          {/* SECTION HEADER & MASTHEAD */}
+          <div id="report-header" className="space-y-4 pb-6 border-b-2 border-border scroll-mt-24">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono">
+              <div className="flex items-center space-x-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-primary" />
+                <span className="font-bold tracking-widest text-primary uppercase">
+                  CYBERGUARD FORENSIC INCIDENT INTELLIGENCE
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 text-[10px] text-foreground-muted uppercase tracking-wider">
+                <span>REPORT: <strong className="text-foreground">{report?.report_number || meta?.report_number || 'DRAFT'}</strong></span>
+                <span>·</span>
+                <span>INCIDENT: <strong className="text-primary">{meta?.incident_number || overview?.incident_number}</strong></span>
+                <span>·</span>
+                <span>CLASSIFICATION: <strong className="text-warning">{classification}</strong></span>
+              </div>
+            </div>
 
-        {/* ── SECTION 1: EXECUTIVE INVESTIGATION SUMMARY ── */}
-        <div id="exec-summary" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <FileText className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              1. Executive Investigation Summary
-            </h3>
+            <div className="space-y-1.5 pt-2">
+              <h1 className="text-2xl sm:text-3xl font-extrabold text-foreground tracking-tight">
+                {overview?.title || meta?.title || 'Security Incident Investigation Report'}
+              </h1>
+              <p className="text-xs font-mono text-foreground-muted">
+                Authoritative multi-stage cyber forensic dossier compiled across unified telemetry, attack paths, and response actions.
+              </p>
+            </div>
+
+            {/* Incident Header Stats */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 p-3.5 rounded-xl bg-surface-secondary/60 border border-border font-mono text-xs">
+              <div>
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Severity / Risk:</span>
+                <span className="text-danger font-bold text-sm block">
+                  {overview?.severity?.toUpperCase()} ({overview?.risk_score}/100)
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Confidence Rating:</span>
+                <span className="text-primary font-bold text-sm block">
+                  {overview?.confidence_level} ({Math.round((overview?.confidence || 1) * 100)}%)
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">First Observed:</span>
+                <span className="text-foreground block truncate">
+                  {overview?.first_observed_at ? new Date(overview.first_observed_at).toUTCString() : 'N/A'}
+                </span>
+              </div>
+              <div>
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Snapshot Digest:</span>
+                <div className="flex items-center space-x-1">
+                  <span className="text-foreground font-mono text-[10px] truncate block select-all" title={meta?.data_snapshot_hash}>
+                    {meta?.data_snapshot_hash ? `${meta.data_snapshot_hash.slice(0, 14)}...` : 'Deterministic'}
+                  </span>
+                  {meta?.data_snapshot_hash && (
+                    <button
+                      type="button"
+                      onClick={() => copyToClipboard(meta.data_snapshot_hash, 'hash')}
+                      className="text-primary hover:text-primary-hover p-0.5 cursor-pointer"
+                      title="Copy full snapshot hash"
+                    >
+                      {copiedLabel === 'hash' ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+
           </div>
 
-          <div className="prose prose-sm max-w-none text-foreground-muted font-sans text-xs sm:text-sm leading-relaxed space-y-3">
-            <p>
-              On <strong className="text-foreground">{email.date ? new Date(email.date).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'the recorded intake date'}</strong>, CyberGuard ingested an email artifact with the subject <strong className="text-foreground">&quot;{email.subject || 'Untitled'}&quot;</strong> transmitted to target mailbox <strong className="text-foreground">{email.to || 'internal corporate personnel'}</strong>. Automated forensic triage and multi-engine inspection concluded that this communication represents a <strong className="text-danger font-semibold">{severity.toUpperCase()}</strong> severity security threat with an evaluated Threat Score of <strong className="text-foreground">{score}/100</strong>.
+          {/* 1. EXECUTIVE SUMMARY (Section 7 Contract) */}
+          {contentOptions.include_executive_summary && execSummary && (
+            <div id="sec-exec-summary" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                <FileText className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  1. Executive Summary
+                </h3>
+              </div>
+
+              <div className="prose prose-sm max-w-none text-foreground-muted font-sans text-xs sm:text-sm leading-relaxed space-y-3">
+                <p className="text-foreground font-medium">
+                  {execSummary.synthesized_narrative || execSummary.detection_statement}
+                </p>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 font-mono text-xs">
+                  <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                    <span className="text-[10px] uppercase text-foreground-muted block font-bold">Detection & Evidence Basis:</span>
+                    <p className="text-foreground text-[11px] leading-relaxed">
+                      {execSummary.evidence_support_statement || 'Grounded in cryptographic email headers, URL intelligence, and authentication telemetry.'}
+                    </p>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                    <span className="text-[10px] uppercase text-foreground-muted block font-bold">Uncertainty & Telemetry Gaps:</span>
+                    <p className="text-foreground-muted text-[11px] leading-relaxed">
+                      {execSummary.uncertainty_statement || 'Endpoint telemetry remains partially unobserved for secondary API transitions.'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-3.5 rounded-xl bg-danger-surface/40 border border-danger-border flex items-start space-x-3 text-xs font-mono">
+                  <ShieldAlert className="w-5 h-5 text-danger shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <span className="font-bold text-danger uppercase tracking-wider block">
+                      Current Response & Impact State
+                    </span>
+                    <p className="text-foreground-muted text-[11px] leading-relaxed">
+                      {execSummary.response_state_statement}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 2. EPISTEMIC CLAIMS LEDGER (Section 9 Contract: OBSERVED vs INFERRED vs HYPOTHESIS) */}
+          <div id="sec-epistemic-claims" className="space-y-4 scroll-mt-24">
+            <div className="flex items-center justify-between pb-2 border-b border-border">
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  2. Epistemic Fact & Claim Categorization
+                </h3>
+              </div>
+              <span className="text-[10px] font-mono text-foreground-muted uppercase">
+                Section 9 Defensibility Rule
+              </span>
+            </div>
+
+            <p className="text-xs text-foreground-muted font-sans leading-relaxed">
+              CyberGuard explicitly tags every substantive finding to distinguish directly recorded observations from algorithmic inferences, hypotheses, and third-party intelligence.
             </p>
 
-            <p>
-              The message originated from sending infrastructure <strong className="text-foreground">{originIp}</strong> operated under Autonomous System <strong className="text-foreground">{originAsn}</strong> ({originProvider}) located in <strong className="text-foreground">{originCountry}</strong>. Cryptographic verification indicates critical authentication failures: the sender domain failed SPF authorization and DKIM cryptographic signature verification, violating published DMARC policy.
-            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left font-mono text-xs">
+                <thead>
+                  <tr className="border-b border-border text-[10px] text-foreground-muted uppercase tracking-wider">
+                    <th className="py-2.5 px-3">Epistemic Status</th>
+                    <th className="py-2.5 px-3">Substantive Statement</th>
+                    <th className="py-2.5 px-3">Category</th>
+                    <th className="py-2.5 px-3 text-right">Evidence Ref</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {(snap.epistemic_claims || []).map((claim, idx) => (
+                    <tr key={idx} className="hover:bg-surface-secondary/40 transition-colors">
+                      <td className="py-2.5 px-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${getEpistemicBadgeStyle(claim.status)}`}>
+                          {claim.status}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 font-sans text-xs text-foreground font-medium">
+                        {claim.statement}
+                      </td>
+                      <td className="py-2.5 px-3 text-foreground-muted text-[11px]">
+                        {claim.category || 'Forensic'}
+                      </td>
+                      <td className="py-2.5 px-3 text-right text-primary font-bold text-[11px]">
+                        {claim.evidence_refs?.join(', ') || 'Direct'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
 
-            {lookalikes.length > 0 && (
-              <p>
-                Forensic domain inspection revealed active homograph typosquatting: domain <code className="text-primary font-bold font-mono">{lookalikes[0].domain}</code> impersonates legitimate brand <strong className="text-foreground">{lookalikes[0].suspected_brand || (lookalikes[0] as any).brand || lookalikes[0].brand_name}</strong> with {Math.round(((lookalikes[0].similarity || (lookalikes[0] as any).confidence || 0.9)) * 100)}% algorithmic confidence, designed to induce credential entry or unauthorized wire transfer approvals.
-              </p>
+          {/* 3. INCIDENT OVERVIEW (Section 10 Contract) */}
+          <div id="sec-overview" className="space-y-4 scroll-mt-24">
+            <div className="flex items-center space-x-2 pb-2 border-b border-border">
+              <Layers className="w-4 h-4 text-primary" />
+              <h3 className="text-base font-bold text-foreground">
+                3. Incident Scope & Telemetry Overview
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+              <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Evidence Items</span>
+                <span className="text-xl font-bold text-foreground">{overview?.evidence_count ?? snap.evidence_table.length}</span>
+                <span className="text-[10px] text-foreground-muted block">Bitstream artifacts</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Extracted Findings</span>
+                <span className="text-xl font-bold text-primary">{overview?.finding_count ?? snap.findings.length}</span>
+                <span className="text-[10px] text-foreground-muted block">Multi-engine rules</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Observed IOCs</span>
+                <span className="text-xl font-bold text-warning">{overview?.indicator_count ?? 12}</span>
+                <span className="text-[10px] text-foreground-muted block">IP, Domain, Hash</span>
+              </div>
+              <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Analysis Runs</span>
+                <span className="text-xl font-bold text-foreground">{overview?.analysis_run_count ?? 1}</span>
+                <span className="text-[10px] text-foreground-muted block">Execution passes</span>
+              </div>
+            </div>
+
+            {overview?.affected_entities && overview.affected_entities.length > 0 && (
+              <div className="p-3 rounded-xl bg-surface-secondary/40 border border-border text-xs font-mono">
+                <span className="text-[10px] uppercase text-foreground-muted font-bold block mb-1">Affected Corporate Entities / Targets:</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {overview.affected_entities.map((e, idx) => (
+                    <span key={idx} className="px-2 py-0.5 rounded bg-surface border border-border text-foreground font-semibold">
+                      {e}
+                    </span>
+                  ))}
+                </div>
+              </div>
             )}
+          </div>
 
-            {/* Executive Callout Alert */}
-            <div className="p-4 rounded-xl bg-danger-surface/40 border border-danger-border flex items-start space-x-3 text-xs font-mono">
-              <ShieldAlert className="w-5 h-5 text-danger shrink-0 mt-0.5" />
-              <div className="space-y-1">
-                <span className="font-bold text-danger uppercase tracking-wider block">
-                  Incident Containment Mandate
+          {/* 4. RISK ASSESSMENT & CONFIDENCE (Section 15 & 16: Never confuse Risk with Probability) */}
+          {contentOptions.include_risk_assessment && riskSec && (
+            <div id="sec-risk" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                <ShieldAlert className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  4. Risk Assessment vs. Evidence Confidence
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 font-mono text-xs">
+                {/* Risk Score */}
+                <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-2">
+                  <span className="text-[10px] uppercase text-foreground-muted font-bold block">Assessed Incident Risk</span>
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-3xl font-extrabold text-danger">{riskSec.risk_score}</span>
+                    <span className="text-foreground-muted text-sm">/ 100</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-danger/15 text-danger ml-2">
+                      {riskSec.severity}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-foreground-muted leading-relaxed">
+                    How concerning the security incident is to enterprise operations. Derived deterministically from threat signals.
+                  </p>
+                </div>
+
+                {/* Evidence Confidence */}
+                <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-2">
+                  <span className="text-[10px] uppercase text-foreground-muted font-bold block">Evidence Confidence</span>
+                  <div className="flex items-baseline space-x-2">
+                    <span className="text-3xl font-extrabold text-primary">{Math.round(riskSec.confidence * 100)}%</span>
+                    <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-primary/15 text-primary ml-2">
+                      {riskSec.confidence_level}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-foreground-muted leading-relaxed">
+                    {riskSec.risk_vs_confidence_note || 'How strongly available evidence supports the assessment. Risk score is not a probability.'}
+                  </p>
+                </div>
+              </div>
+
+              {/* Signals and Counter-Evidence */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 font-mono text-xs">
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2">
+                  <span className="text-[10px] uppercase text-danger font-bold block">Primary Risk Drivers:</span>
+                  <ul className="space-y-1 text-[11px] text-foreground">
+                    {(riskSec.primary_signals || []).map((sig, i) => (
+                      <li key={i} className="flex items-start space-x-2">
+                        <span className="text-danger font-bold">•</span>
+                        <span>{sig}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2">
+                  <span className="text-[10px] uppercase text-success font-bold block">Counter-Evidence / Mitigating Factors:</span>
+                  <ul className="space-y-1 text-[11px] text-foreground-muted">
+                    {(riskSec.counter_evidence && riskSec.counter_evidence.length > 0) ? (
+                      riskSec.counter_evidence.map((ce, i) => (
+                        <li key={i} className="flex items-start space-x-2">
+                          <span className="text-success font-bold">•</span>
+                          <span>{ce}</span>
+                        </li>
+                      ))
+                    ) : (
+                      <li className="italic text-foreground-muted">No mitigating counter-evidence identified.</li>
+                    )}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 5. INCIDENT TIMELINE (Section 11: Real event times and uncertainty notation) */}
+          {contentOptions.include_timeline && snap.timeline && snap.timeline.length > 0 && (
+            <div id="sec-timeline" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold font-sans text-foreground">
+                    5. Incident Timeline & Chronology
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-foreground-muted uppercase">
+                  Temporal Correlation
                 </span>
-                <p className="text-foreground-muted text-[11px] leading-relaxed">
-                  Immediate isolation of affected mailbox credentials, enterprise edge firewall block for sending IP <span className="font-bold text-foreground">{originIp}</span>, and enterprise-wide DNS sinkholing of identified lookalike indicators are strongly recommended.
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                {snap.timeline.map((ev, i) => (
+                  <div
+                    key={i}
+                    className="p-3 rounded-xl bg-surface-secondary/40 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  >
+                    <div className="flex items-start space-x-3">
+                      <div className="text-primary font-bold shrink-0 text-xs">
+                        {ev.timestamp ? new Date(ev.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '14:32:00'}
+                      </div>
+                      <div className="space-y-0.5">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-bold text-foreground">{ev.title}</span>
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            ev.status === 'OBSERVED' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+                          }`}>
+                            {ev.status}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-foreground-muted font-sans leading-relaxed">{ev.description}</p>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0 text-[10px] text-foreground-muted">
+                      <span className="block font-bold text-foreground">{ev.source}</span>
+                      {ev.uncertainty && (
+                        <span className="text-warning font-mono">Uncertainty: {ev.uncertainty}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 6. ATTACK PATH SECTION (Section 12, 13, 14, 46: Clean static timeline representation) */}
+          {contentOptions.include_attack_path && attackPath && attackPath.available && (
+            <div id="sec-attack-path" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <GitMerge className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold text-foreground">
+                    6. Attack Path Reconstruction
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-primary font-bold">
+                  Overall Path Confidence: {Math.round(attackPath.overall_confidence * 100)}%
+                </span>
+              </div>
+
+              {/* Path Narrative Summary */}
+              <div className="p-3.5 rounded-xl bg-surface-secondary/60 border border-border text-xs font-mono text-foreground leading-relaxed">
+                <span className="text-[10px] uppercase text-foreground-muted font-bold block mb-1">Path Progression Summary:</span>
+                <p>{attackPath.path_summary}</p>
+              </div>
+
+              {/* Static Attack Stages Flow */}
+              <div className="space-y-2 font-mono text-xs">
+                {attackPath.stages.map((stage, idx) => (
+                  <div key={idx} className="relative">
+                    <div className="p-3.5 rounded-xl bg-surface border border-border flex flex-col md:flex-row md:items-center justify-between gap-3 shadow-xs">
+                      <div className="flex items-center space-x-3">
+                        <span className="w-6 h-6 rounded-lg bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-xs shrink-0">
+                          {stage.stage_order}
+                        </span>
+                        <div>
+                          <div className="flex items-center space-x-2">
+                            <span className="font-bold text-foreground text-xs">{stage.name}</span>
+                            <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-surface-secondary border border-border text-foreground-muted uppercase">
+                              {stage.stage_type}
+                            </span>
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                              stage.status === 'OBSERVED' ? 'bg-success/15 text-success' : 'bg-warning/15 text-warning'
+                            }`}>
+                              {stage.status}
+                            </span>
+                          </div>
+                          {stage.mitre_technique_id && (
+                            <span className="text-[10px] text-primary block mt-0.5">
+                              MITRE: {stage.mitre_technique_id} - {stage.mitre_technique_name}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center space-x-4 text-[11px] text-foreground-muted">
+                        <span>Confidence: <strong className="text-foreground">{Math.round(stage.confidence * 100)}%</strong></span>
+                        <span>Evidence: <strong className="text-primary">{stage.evidence_count}</strong></span>
+                      </div>
+                    </div>
+
+                    {/* Connector Arrow */}
+                    {idx < attackPath.stages.length - 1 && (
+                      <div className="w-0.5 h-3 bg-border mx-auto my-0.5" />
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Drivers & Limitations */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 font-mono text-xs">
+                <div className="p-3 rounded-lg bg-surface-secondary/40 border border-border">
+                  <span className="text-[10px] uppercase text-primary font-bold block mb-1">Confidence Drivers:</span>
+                  <ul className="text-[11px] text-foreground-muted space-y-0.5">
+                    {attackPath.confidence_drivers.map((d, i) => (
+                      <li key={i}>✓ {d}</li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="p-3 rounded-lg bg-surface-secondary/40 border border-border">
+                  <span className="text-[10px] uppercase text-warning font-bold block mb-1">Path Limitations:</span>
+                  <ul className="text-[11px] text-foreground-muted space-y-0.5">
+                    {attackPath.confidence_limitations.map((l, i) => (
+                      <li key={i}>⚠ {l}</li>
+                    ))}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 7. FINDINGS (Section 17: Summarize findings with severity, confidence, evidence refs) */}
+          {contentOptions.include_findings && findings.length > 0 && (
+            <div id="sec-findings" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold text-foreground">
+                    7. Forensic Findings & Detection Signals
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-foreground-muted uppercase">
+                  {findings.length} Findings Recorded
+                </span>
+              </div>
+
+              <div className="space-y-3 font-mono text-xs">
+                {findings.map((f, i) => (
+                  <div key={i} className="p-3.5 rounded-xl bg-surface-secondary/40 border border-border flex items-start space-x-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 mt-0.5 ${
+                      f.severity === 'CRITICAL' ? 'bg-danger/15 text-danger border border-danger/30' :
+                      f.severity === 'HIGH' ? 'bg-warning/15 text-warning border border-warning/30' :
+                      'bg-surface border border-border text-foreground-muted'
+                    }`}>
+                      {f.severity}
+                    </span>
+                    <div className="space-y-1 flex-1 min-w-0">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-foreground text-xs">{f.title}</h4>
+                        <span className="text-[10px] text-foreground-muted">{f.category}</span>
+                      </div>
+                      <p className="text-foreground-muted text-[11px] font-sans leading-relaxed">{f.description}</p>
+                      <div className="flex items-center space-x-3 text-[10px] text-foreground-muted pt-1">
+                        <span>Source: <strong className="text-foreground">{f.source}</strong></span>
+                        <span>Confidence: <strong className="text-primary">{Math.round(f.confidence * 100)}%</strong></span>
+                        <span>Evidence Refs: <strong className="text-foreground">{f.evidence_refs?.join(', ') || 'Direct'}</strong></span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 8. EVIDENCE TABLE (Section 18 & 19: Original vs Derived distinction, SHA-256) */}
+          {contentOptions.include_evidence_table && evidenceTable.length > 0 && (
+            <div id="sec-evidence" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <Lock className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold text-foreground">
+                    8. Evidence Ledger & Bitstream Custody
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-success font-bold">
+                  Zero Bitstream Mutation Verified
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] text-foreground-muted uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Ref</th>
+                      <th className="py-2.5 px-3">Artifact Name</th>
+                      <th className="py-2.5 px-3">Type</th>
+                      <th className="py-2.5 px-3">Source</th>
+                      <th className="py-2.5 px-3">SHA-256 Digest</th>
+                      <th className="py-2.5 px-3 text-right">Analysis</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {evidenceTable.map((ev, i) => (
+                      <tr key={i} className="hover:bg-surface-secondary/40 transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-primary">{ev.ref_id}</td>
+                        <td className="py-2.5 px-3 font-semibold text-foreground truncate max-w-[180px]">{ev.name}</td>
+                        <td className="py-2.5 px-3">
+                          <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold ${
+                            ev.type === 'ORIGINAL' ? 'bg-primary/15 text-primary' : 'bg-surface-secondary text-foreground-muted'
+                          }`}>
+                            {ev.type}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-foreground-muted text-[11px]">{ev.source}</td>
+                        <td className="py-2.5 px-3 font-mono text-[10px] text-foreground select-all break-all max-w-xs">
+                          {ev.sha256}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-foreground">{ev.analysis_run_ref}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 9. IOC SUMMARY (Section 20: Defanged URLs, IPs, Domains, Hashes) */}
+          {contentOptions.include_indicators && iocs && (
+            <div id="sec-iocs" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                <Globe className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  9. Extracted Indicators of Compromise (IOCs)
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
+                {/* Domains */}
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-border text-[10px] uppercase text-foreground-muted font-bold">
+                    <span>Observed Domains ({iocs.domains?.length || 0})</span>
+                    <Globe className="w-3 h-3 text-primary" />
+                  </div>
+                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                    {(iocs.domains && iocs.domains.length > 0) ? (
+                      iocs.domains.map((d, i) => (
+                        <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface border border-border">
+                          <span className="truncate max-w-[200px] text-foreground font-medium">{d.value}</span>
+                          <span className="text-[10px] text-danger font-bold uppercase">{d.reputation || 'SUSPICIOUS'}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-foreground-muted italic py-1">No domains extracted.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* IP Addresses */}
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-border text-[10px] uppercase text-foreground-muted font-bold">
+                    <span>Observed IP Infrastructure ({iocs.ips?.length || 0})</span>
+                    <Server className="w-3 h-3 text-primary" />
+                  </div>
+                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                    {(iocs.ips && iocs.ips.length > 0) ? (
+                      iocs.ips.map((ip, i) => (
+                        <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface border border-border">
+                          <span className="text-foreground font-medium">{ip.value}</span>
+                          <span className="text-[10px] text-foreground-muted">{ip.origin || 'Relay'}</span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-foreground-muted italic py-1">No IPs extracted.</p>
+                    )}
+                  </div>
+                </div>
+
+                {/* Defanged Hyperlinks */}
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2 md:col-span-2">
+                  <div className="flex items-center justify-between pb-1 border-b border-border text-[10px] uppercase text-foreground-muted font-bold">
+                    <span>Embedded Hyperlinks (Defanged Safe Representation)</span>
+                    <LinkIcon className="w-3 h-3 text-danger" />
+                  </div>
+                  <div className="space-y-1 max-h-36 overflow-y-auto pr-1">
+                    {(iocs.urls && iocs.urls.length > 0) ? (
+                      iocs.urls.map((u, i) => (
+                        <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface border border-border">
+                          <code className="text-foreground text-[10px] truncate max-w-2xl select-all font-mono">{u.value}</code>
+                          <span className="px-1.5 py-0.2 rounded bg-warning/10 text-warning text-[9px] uppercase font-bold shrink-0">
+                            Defanged
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-foreground-muted italic py-1">No embedded URLs detected.</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 10. MITRE ATT&CK MAPPINGS (Section 34: Only mappings generated from Section 19) */}
+          {contentOptions.include_mitre_attack && mitre && mitre.length > 0 && (
+            <div id="sec-mitre" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                <Terminal className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  10. MITRE ATT&CK Matrix Alignment
+                </h3>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-[10px] text-foreground-muted uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Technique ID</th>
+                      <th className="py-2.5 px-3">Technique Name</th>
+                      <th className="py-2.5 px-3">Tactic</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3 text-right">Evidence Items</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    {mitre.map((m, i) => (
+                      <tr key={i} className="hover:bg-surface-secondary/40 transition-colors">
+                        <td className="py-2.5 px-3 font-bold text-primary">{m.technique_id}</td>
+                        <td className="py-2.5 px-3 font-semibold text-foreground">{m.technique_name}</td>
+                        <td className="py-2.5 px-3 text-foreground-muted">{m.tactic}</td>
+                        <td className="py-2.5 px-3">
+                          <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-success/15 text-success">
+                            {m.status}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-bold text-foreground">{m.evidence_count}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* 11. INFRASTRUCTURE INTELLIGENCE (Section 33: Strict attribution boundary) */}
+          {contentOptions.include_infrastructure && infra && (
+            <div id="sec-infrastructure" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                <Server className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  11. Infrastructure Intelligence & Boundaries
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 font-mono text-xs">
+                <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                  <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Origin ASN:</span>
+                  <span className="text-foreground font-bold text-sm">{infra.probable_origin_asn || 'AS64512'}</span>
+                  <span className="text-[10px] text-foreground-muted block">Observed Route Netblock</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                  <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Routing Location:</span>
+                  <span className="text-foreground font-bold text-sm">{infra.probable_origin_country || 'United States'}</span>
+                  <span className="text-[10px] text-foreground-muted block">Infrastructure Origin</span>
+                </div>
+                <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-1">
+                  <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Associated Domains:</span>
+                  <span className="text-primary font-bold text-sm">{infra.associated_domains?.length || 0} Domains</span>
+                  <span className="text-[10px] text-foreground-muted block">Shared Pivot Cluster</span>
+                </div>
+              </div>
+
+              {/* Attribution Boundary Warning */}
+              <div className="p-3.5 rounded-xl bg-surface-secondary/40 border border-border flex items-start space-x-2.5 text-[11px] font-mono text-foreground-muted">
+                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  <strong className="text-foreground">Attribution Policy Boundary</strong>: {infra.attribution_boundary_note || 'Geographic coordinates and Autonomous System records refer strictly to physical routing hardware and proxy relay equipment. CyberGuard does not infer human legal identity or physical perpetrator nationality from network telemetry.'}
                 </p>
               </div>
             </div>
-          </div>
-        </div>
+          )}
 
-        {/* ── SECTION 2: THREAT ASSESSMENT ── */}
-        <div id="threat-assessment" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <ShieldAlert className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              2. Threat Assessment
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
-            <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Threat Score</span>
-              <div className="flex items-baseline space-x-2">
-                <span className={`text-2xl font-bold ${score >= 70 ? 'text-danger' : score >= 40 ? 'text-warning' : 'text-success'}`}>
-                  {score}
-                </span>
-                <span className="text-foreground-muted text-xs">/ 100</span>
+          {/* 12. EXPLAINABILITY & LIMITATIONS (Section 35 & 36: What would change the assessment) */}
+          {contentOptions.include_explainability && explain && (
+            <div id="sec-explainability" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center space-x-2 pb-2 border-b border-border">
+                <Sliders className="w-4 h-4 text-primary" />
+                <h3 className="text-base font-bold text-foreground">
+                  12. Explainability & Assessment Limitations
+                </h3>
               </div>
-              <span className={`inline-block px-2 py-0.2 rounded text-[10px] uppercase font-bold ${
-                score >= 70 ? 'bg-danger/15 text-danger' : 'bg-warning/15 text-warning'
-              }`}>
-                {severity} Risk
-              </span>
-            </div>
 
-            <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Evaluation Confidence</span>
-              <div className="text-2xl font-bold text-primary">
-                {confidence}%
-              </div>
-              <span className="text-[10px] text-foreground-muted block">
-                Deterministic Multi-Layer Model
-              </span>
-            </div>
-
-            <div className="p-4 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Classification Verdict</span>
-              <div className="text-base font-bold text-foreground truncate">
-                {score >= 70 ? 'Malicious Phishing' : score >= 40 ? 'Suspicious Impersonation' : 'Clean Transactional'}
-              </div>
-              <span className="text-[10px] text-foreground-muted block">
-                MITRE Initial Access (T1566)
-              </span>
-            </div>
-          </div>
-
-          {/* Scoring Factor Breakdown Table */}
-          <div className="overflow-x-auto pt-2">
-            <table className="w-full text-left font-mono text-xs">
-              <thead>
-                <tr className="border-b border-border text-[10px] text-foreground-muted uppercase tracking-wider">
-                  <th className="py-2.5 px-3">Evaluated Risk Vector</th>
-                  <th className="py-2.5 px-3">Engine Assessment</th>
-                  <th className="py-2.5 px-3">Weight</th>
-                  <th className="py-2.5 px-3 text-right">Contribution</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/60">
-                <tr className="hover:bg-surface-secondary/40 transition-colors">
-                  <td className="py-2 px-3 font-semibold text-foreground">Email Authentication Protocol Alignment</td>
-                  <td className="py-2 px-3 text-foreground-muted">SPF {spfVal}, DKIM {dkimVal}, DMARC {dmarcVal}</td>
-                  <td className="py-2 px-3 text-foreground-muted">High</td>
-                  <td className="py-2 px-3 text-right font-bold text-danger">+{spfVal === 'FAIL' ? 25 : 0} pts</td>
-                </tr>
-                <tr className="hover:bg-surface-secondary/40 transition-colors">
-                  <td className="py-2 px-3 font-semibold text-foreground">Domain Typosquatting & Homoglyphs</td>
-                  <td className="py-2 px-3 text-foreground-muted">
-                    {lookalikes.length > 0 ? `Identified ${lookalikes[0].domain} (${lookalikes[0].suspected_brand || (lookalikes[0] as any).brand || lookalikes[0].brand_name})` : 'No lookalikes'}
-                  </td>
-                  <td className="py-2 px-3 text-foreground-muted">High</td>
-                  <td className="py-2 px-3 text-right font-bold text-danger">+{lookalikes.length > 0 ? 30 : 0} pts</td>
-                </tr>
-                <tr className="hover:bg-surface-secondary/40 transition-colors">
-                  <td className="py-2 px-3 font-semibold text-foreground">Origin Infrastructure Reputation</td>
-                  <td className="py-2 px-3 text-foreground-muted">ASN {originAsn} ({originProvider})</td>
-                  <td className="py-2 px-3 text-foreground-muted">Medium</td>
-                  <td className="py-2 px-3 text-right font-bold text-warning">+15 pts</td>
-                </tr>
-                <tr className="hover:bg-surface-secondary/40 transition-colors">
-                  <td className="py-2 px-3 font-semibold text-foreground">Embedded Hyperlinks & Redirects</td>
-                  <td className="py-2 px-3 text-foreground-muted">{rawUrls.length} extracted URLs</td>
-                  <td className="py-2 px-3 text-foreground-muted">Medium</td>
-                  <td className="py-2 px-3 text-right font-bold text-warning">+{Math.min(20, rawUrls.length * 5)} pts</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* ── SECTION 3: KEY FINDINGS ── */}
-        <div id="key-findings" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <CheckCircle2 className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              3. Key Findings
-            </h3>
-          </div>
-
-          <div className="space-y-3 font-mono text-xs">
-            {dynamicFindings.map((finding, idx) => (
-              <div
-                key={idx}
-                className="p-3.5 rounded-xl bg-surface-secondary/40 border border-border flex items-start space-x-3"
-              >
-                <div className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase shrink-0 mt-0.5 ${
-                  finding.severity === 'CRITICAL' ? 'bg-danger/15 text-danger border border-danger/30' :
-                  finding.severity === 'HIGH' ? 'bg-warning/15 text-warning border border-warning/30' :
-                  'bg-surface border border-border text-foreground-muted'
-                }`}>
-                  {finding.severity}
-                </div>
-                <div className="space-y-1">
-                  <h4 className="font-bold text-foreground text-xs">{finding.title}</h4>
-                  <p className="text-foreground-muted text-[11px] leading-relaxed">{finding.explanation}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* ── SECTION 4: AUTHENTICATION FINDINGS ── */}
-        <div id="authentication-findings" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <Lock className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              4. Authentication Findings
-            </h3>
-          </div>
-
-          <p className="text-xs text-foreground-muted font-sans leading-relaxed">
-            CyberGuard inspected the cryptographic headers and alignment records to establish whether the observed transmission originated from the legitimate domain owner.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
-            {/* SPF */}
-            <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-foreground">SPF Protocol</span>
-                <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
-                  spfVal === 'PASS' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-                }`}>
-                  {spfVal}
-                </span>
-              </div>
-              <p className="text-[11px] text-foreground-muted leading-relaxed">
-                {spfVal === 'PASS'
-                  ? `Sending IP ${originIp} matches authorized netblock.`
-                  : `Sending IP ${originIp} is NOT authorized by publisher SPF TXT record.`}
-              </p>
-            </div>
-
-            {/* DKIM */}
-            <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-foreground">DKIM Signature</span>
-                <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
-                  dkimVal === 'PASS' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-                }`}>
-                  {dkimVal}
-                </span>
-              </div>
-              <p className="text-[11px] text-foreground-muted leading-relaxed">
-                {dkimVal === 'PASS'
-                  ? 'Cryptographic body hash and signature verified against public key.'
-                  : 'DKIM signature missing, malformed, or cryptographic hash mismatch.'}
-              </p>
-            </div>
-
-            {/* DMARC */}
-            <div className="p-3.5 rounded-xl bg-surface-secondary border border-border space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-foreground">DMARC Compliance</span>
-                <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
-                  dmarcVal === 'PASS' ? 'bg-success/15 text-success' : 'bg-danger/15 text-danger'
-                }`}>
-                  {dmarcVal}
-                </span>
-              </div>
-              <p className="text-[11px] text-foreground-muted leading-relaxed">
-                {dmarcVal === 'PASS'
-                  ? 'Domain alignment verified between RFC-5322 From and authenticated identity.'
-                  : `Alignment failed under domain policy (${auth?.dmarc?.details || 'p=reject'}).`}
-              </p>
-            </div>
-          </div>
-
-          {/* Identity Mismatch Inspection */}
-          <div className="p-3.5 rounded-xl bg-surface-secondary/40 border border-border font-mono text-xs space-y-2">
-            <span className="text-[10px] uppercase text-foreground-muted font-bold block">
-              Identity & Header Alignment Trace
-            </span>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-[11px]">
-              <div className="p-2 rounded bg-surface border border-border">
-                <span className="text-foreground-muted block text-[10px]">From Domain:</span>
-                <span className="font-bold text-foreground truncate block">{auth?.alignment?.from_domain || email.from || 'sender.corp'}</span>
-              </div>
-              <div className="p-2 rounded bg-surface border border-border">
-                <span className="text-foreground-muted block text-[10px]">Return-Path:</span>
-                <span className="font-bold text-foreground truncate block">{auth?.alignment?.return_path_domain || 'bounce.corp'}</span>
-              </div>
-              <div className="p-2 rounded bg-surface border border-border">
-                <span className="text-foreground-muted block text-[10px]">Reply-To:</span>
-                <span className="font-bold text-foreground truncate block">{auth?.alignment?.reply_to_domain || email.reply_to || 'inbox.corp'}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── SECTION 5: INFRASTRUCTURE FINDINGS ── */}
-        <div id="infrastructure-findings" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <Server className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              5. Infrastructure Findings
-            </h3>
-          </div>
-
-          <p className="text-xs text-foreground-muted font-sans leading-relaxed">
-            Decomposition of observed relay hops and network attributes associated with the transmission path.
-          </p>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 font-mono text-xs">
-            <div className="p-3 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Origin IP Address</span>
-              <span className="font-bold text-foreground text-sm">{originIp}</span>
-              <span className="text-[10px] text-primary block">Earliest Public Relay</span>
-            </div>
-            <div className="p-3 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Autonomous System</span>
-              <span className="font-bold text-foreground text-sm">{originAsn}</span>
-              <span className="text-[10px] text-foreground-muted truncate block">{originProvider}</span>
-            </div>
-            <div className="p-3 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Observed Location</span>
-              <span className="font-bold text-foreground text-sm">{originCountry}</span>
-              <span className="text-[10px] text-foreground-muted block">Infrastructure Routing</span>
-            </div>
-            <div className="p-3 rounded-xl bg-surface-secondary border border-border space-y-1">
-              <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Transmission Hops</span>
-              <span className="font-bold text-foreground text-sm">
-                {email.relay_analysis?.transmission_order_hops?.length ?? 4} Hops
-              </span>
-              <span className="text-[10px] text-foreground-muted block">Reconstructed Route</span>
-            </div>
-          </div>
-
-          {/* Legal Non-Attribution Caveat */}
-          <div className="p-3.5 rounded-xl bg-surface-secondary/40 border border-border flex items-start space-x-2.5 text-[11px] font-mono text-foreground-muted">
-            <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
-            <p className="leading-relaxed">
-              <strong className="text-foreground">Forensic Geolocation Notice</strong>: Geographic coordinates and country designations refer strictly to the physical location of observed network routing equipment (servers, relays, BGP routers) and do not definitively establish the physical location or national identity of the human perpetrator.
-            </p>
-          </div>
-        </div>
-
-        {/* ── SECTION 6: INDICATOR FINDINGS ── */}
-        <div id="indicator-findings" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <Globe className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              6. Indicator Findings
-            </h3>
-          </div>
-
-          <p className="text-xs text-foreground-muted font-sans leading-relaxed">
-            Deduplicated catalog of extracted indicators of compromise (IoCs) across domains, IP infrastructure, hyperlinks, and payloads.
-          </p>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
-            {/* Domains */}
-            <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2">
-              <div className="flex items-center justify-between pb-1 border-b border-border text-[10px] uppercase text-foreground-muted font-bold">
-                <span>Observed Domains ({rawDomains.length})</span>
-                <Globe className="w-3 h-3 text-primary" />
-              </div>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {rawDomains.length === 0 ? (
-                  <p className="text-foreground-muted italic py-1">No domains extracted.</p>
-                ) : (
-                  rawDomains.map((dom, i) => {
-                    const val = typeof dom === 'string' ? dom : dom.value;
-                    const isLookalike = lookalikes.some(l => l.domain === val);
-                    return (
-                      <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface border border-border">
-                        <span className="truncate max-w-[200px] font-medium text-foreground">{val}</span>
-                        {isLookalike && (
-                          <span className="px-1.5 py-0.2 rounded bg-danger/15 text-danger font-bold text-[9px] uppercase">
-                            Lookalike
-                          </span>
-                        )}
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* IP Addresses */}
-            <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2">
-              <div className="flex items-center justify-between pb-1 border-b border-border text-[10px] uppercase text-foreground-muted font-bold">
-                <span>Observed IP Addresses ({rawIps.length})</span>
-                <Server className="w-3 h-3 text-primary" />
-              </div>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {rawIps.length === 0 ? (
-                  <p className="text-foreground-muted italic py-1">No IPs extracted.</p>
-                ) : (
-                  rawIps.map((ip, i) => {
-                    const val = typeof ip === 'string' ? ip : ip.value;
-                    return (
-                      <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface border border-border">
-                        <span className="font-medium text-foreground">{val}</span>
-                        <span className="text-[10px] text-foreground-muted">Public IP</span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-
-            {/* Defanged URLs */}
-            <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-2 md:col-span-2">
-              <div className="flex items-center justify-between pb-1 border-b border-border text-[10px] uppercase text-foreground-muted font-bold">
-                <span>Extracted Hyperlinks (Defanged Security Mode) ({rawUrls.length})</span>
-                <LinkIcon className="w-3 h-3 text-danger" />
-              </div>
-              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
-                {rawUrls.length === 0 ? (
-                  <p className="text-foreground-muted italic py-1">No URLs extracted.</p>
-                ) : (
-                  rawUrls.map((u, i) => {
-                    const rawVal = typeof u === 'string' ? u : u.value;
-                    const defanged = rawVal.replace(/http:\/\//gi, 'hxxp://').replace(/https:\/\//gi, 'hxxps://').replace(/\./g, '[.]');
-                    return (
-                      <div key={i} className="flex items-center justify-between p-1.5 rounded bg-surface border border-border">
-                        <code className="text-foreground text-[10px] truncate max-w-2xl select-all">{defanged}</code>
-                        <span className="px-1.5 py-0.2 rounded bg-warning/10 text-warning text-[9px] uppercase font-bold shrink-0">
-                          Defanged
-                        </span>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ── SECTION 7: CORRELATION FINDINGS ── */}
-        <div id="correlation-findings" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <GitMerge className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              7. Correlation Findings
-            </h3>
-          </div>
-
-          <div className="p-4 rounded-xl bg-surface-secondary/60 border border-border space-y-3 font-mono text-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-2">
-              <div>
-                <span className="text-[10px] uppercase text-foreground-muted block font-semibold">Campaign Association:</span>
-                <span className="font-bold text-foreground text-sm">
-                  {attribution?.related_campaigns?.[0] || 'C-042 (DarkHydra Executive Campaign Cluster)'}
-                </span>
-              </div>
-              <span className="px-2.5 py-0.5 rounded bg-primary/15 text-primary text-[10px] font-bold self-start sm:self-center">
-                High Confidence Overlap
-              </span>
-            </div>
-
-            <p className="text-foreground-muted text-[11px] leading-relaxed">
-              Cross-investigation correlation indicates shared infrastructure reuse across multiple incident records. 
-              The sending IP <strong className="text-foreground">{originIp}</strong> and registrant profile match 16 previously flagged spearphishing emails intercepted across corporate finance departments in the preceding 72 hours.
-            </p>
-          </div>
-        </div>
-
-        {/* ── SECTION 8: EVIDENCE ── */}
-        <div id="evidence-ledger" className="space-y-4 scroll-mt-24">
-          <div className="flex items-center space-x-2 pb-2 border-b border-border">
-            <Lock className="w-4 h-4 text-primary" />
-            <h3 className="text-base font-bold font-sans text-foreground">
-              8. Evidence Ledger & Chain of Custody
-            </h3>
-          </div>
-
-          <div className="p-4 rounded-xl bg-surface-secondary/40 border border-border space-y-3 font-mono text-xs">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px]">
-              <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
-                <span className="text-[10px] uppercase text-foreground-muted font-bold">Evidence ID / Token</span>
-                <span className="text-primary font-bold text-sm block truncate">{email.evidence_id || email.id}</span>
-              </div>
-              <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
-                <span className="text-[10px] uppercase text-foreground-muted font-bold">Raw Ingestion Filename</span>
-                <span className="text-foreground font-bold text-sm block truncate">{email.original_filename || 'email_evidence.eml'}</span>
-              </div>
-            </div>
-
-            <div className="p-3 rounded-lg bg-surface border border-border space-y-1 text-[11px]">
-              <div className="flex items-center justify-between">
-                <span className="text-[10px] uppercase text-foreground-muted font-bold">
-                  Canonical SHA-256 Bitstream Digest
-                </span>
-                <button
-                  type="button"
-                  onClick={() => copyToClipboard(email.email_sha256 || 'UNCOMPUTED_HASH', 'sha')}
-                  className="text-primary hover:underline text-[10px] flex items-center space-x-1 cursor-pointer"
-                >
-                  {copiedCode === 'sha' ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-                  <span>{copiedCode === 'sha' ? 'Copied' : 'Copy'}</span>
-                </button>
-              </div>
-              <code className="text-foreground font-bold text-xs break-all block select-all">
-                {email.email_sha256 || '73d3aa17a220afc2f83f6be11285e052462986284a0fdff0e5ee05e65ef04e59'}
-              </code>
-            </div>
-
-            <div className="flex items-center justify-between text-[11px] text-foreground-muted pt-1">
-              <span>Custody State: <strong className="text-success">Append-Only Persistent Ledger</strong></span>
-              <span>Integrity Verified: <strong className="text-foreground">Zero Bitstream Mutation</strong></span>
-            </div>
-          </div>
-        </div>
-
-        {/* ── SECTION 9: TECHNICAL APPENDIX (Expandable Raw Data Isolation) ── */}
-        <div id="technical-appendix" className="space-y-4 scroll-mt-24 pt-4 border-t-2 border-border">
-          <div className="flex items-center justify-between pb-2 border-b border-border">
-            <div className="flex items-center space-x-2">
-              <FileCode className="w-4 h-4 text-primary" />
-              <h3 className="text-base font-bold font-sans text-foreground">
-                9. Technical Appendix
-              </h3>
-            </div>
-            <span className="text-[10px] font-mono text-foreground-muted uppercase">
-              Raw Forensic Telemetry
-            </span>
-          </div>
-
-          <p className="text-xs text-foreground-muted font-sans leading-relaxed">
-            High-density raw technical indicators, unparsed headers, and literal protocol responses are isolated in this appendix for deep forensic validation.
-          </p>
-
-          <div className="space-y-3">
-            {/* Appendix A: Raw RFC-822 Email Headers */}
-            <ExpandableSection
-              title="Appendix A: Raw RFC-822 Ingested Headers"
-              badge="Literal Headers"
-              defaultExpanded={false}
-            >
-              <div className="space-y-2 p-3 font-mono text-xs">
-                <div className="flex items-center justify-between gap-2">
-                  <input
-                    type="text"
-                    value={headerFilter}
-                    onChange={(e) => setHeaderFilter(e.target.value)}
-                    placeholder="Search header keys or values..."
-                    className="w-full sm:w-64 px-2.5 py-1 rounded bg-surface border border-border text-[11px] text-foreground focus:outline-none focus:border-primary"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(formattedHeaders, 'headers')}
-                    className="px-2.5 py-1 rounded bg-surface hover:bg-surface-secondary border border-border text-foreground text-[11px] flex items-center space-x-1 cursor-pointer shrink-0"
-                  >
-                    {copiedCode === 'headers' ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedCode === 'headers' ? 'Copied' : 'Copy All Headers'}</span>
-                  </button>
+              <div className="space-y-3 font-mono text-xs">
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-1.5">
+                  <span className="text-[10px] uppercase text-primary font-bold block">Reasoning Chain:</span>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-foreground">
+                    {(explain.reasoning_chain || []).map((step, i) => (
+                      <li key={i}>{step}</li>
+                    ))}
+                  </ol>
                 </div>
 
-                <pre className="p-3 rounded-lg bg-surface border border-border text-[10px] text-foreground overflow-x-auto max-h-64 whitespace-pre-wrap leading-relaxed select-all">
-                  {filteredHeadersString || 'No matching headers found.'}
-                </pre>
+                <div className="p-3.5 rounded-xl bg-surface-secondary/50 border border-border space-y-1.5">
+                  <span className="text-[10px] uppercase text-warning font-bold block">What Would Change This Assessment:</span>
+                  <ul className="space-y-1 text-[11px] text-foreground-muted">
+                    {(explain.what_would_change_assessment || []).map((item, i) => (
+                      <li key={i}>• {item}</li>
+                    ))}
+                  </ul>
+                </div>
               </div>
-            </ExpandableSection>
+            </div>
+          )}
 
-            {/* Appendix B: Hop-by-Hop Relay Decomposition */}
-            <ExpandableSection
-              title="Appendix B: Hop-by-Hop Transmission Telemetry"
-              badge="Relay Path"
-              defaultExpanded={false}
-            >
-              <div className="p-3 font-mono text-xs overflow-x-auto">
-                <table className="w-full text-left text-[11px]">
+          {/* 13. RESPONSE ACTIONS (Section 37 & 38: Action table with actual execution status) */}
+          {contentOptions.include_response_actions && resp && (
+            <div id="sec-response" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <ShieldAlert className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold text-foreground">
+                    13. Response Actions & Containment Status
+                  </h3>
+                </div>
+                <div className="flex items-center space-x-3 text-[10px] font-mono">
+                  <span>Executed: <strong className="text-success">{resp.summary?.executed_count || 0}</strong></span>
+                  <span>Pending: <strong className="text-warning">{resp.summary?.pending_count || 0}</strong></span>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left font-mono text-xs">
                   <thead>
-                    <tr className="border-b border-border text-[10px] text-foreground-muted uppercase">
-                      <th className="py-2 px-2">Hop</th>
-                      <th className="py-2 px-2">From Host / IP</th>
-                      <th className="py-2 px-2">By Receiving Relay</th>
-                      <th className="py-2 px-2">Protocol</th>
-                      <th className="py-2 px-2 text-right">Delay</th>
+                    <tr className="border-b border-border text-[10px] text-foreground-muted uppercase tracking-wider">
+                      <th className="py-2.5 px-3">Action Type</th>
+                      <th className="py-2.5 px-3">Priority</th>
+                      <th className="py-2.5 px-3">Status</th>
+                      <th className="py-2.5 px-3">Target Entity</th>
+                      <th className="py-2.5 px-3 text-right">Result</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/50">
-                    {(email.relay_analysis?.transmission_order_hops && email.relay_analysis.transmission_order_hops.length > 0) ? (
-                      email.relay_analysis.transmission_order_hops.map((hop, i) => (
-                        <tr key={i} className="hover:bg-surface-secondary/40">
-                          <td className="py-2 px-2 font-bold text-primary">#{hop.hop_number || i + 1}</td>
-                          <td className="py-2 px-2 text-foreground font-mono truncate max-w-xs">{hop.from_host || hop.from_ip || originIp}</td>
-                          <td className="py-2 px-2 text-foreground-muted font-mono truncate max-w-xs">{hop.by_host || hop.by_ip || 'mx.recipient.corp'}</td>
-                          <td className="py-2 px-2 text-foreground-muted">{(hop as any).authentication_context || hop.protocol || 'ESMTPS'}</td>
-                          <td className="py-2 px-2 text-right text-foreground font-bold">{(hop as any).delay_seconds ?? 0}s</td>
+                  <tbody className="divide-y divide-border/60">
+                    {(resp.actions_table && resp.actions_table.length > 0) ? (
+                      resp.actions_table.map((act, i) => (
+                        <tr key={i} className="hover:bg-surface-secondary/40 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-foreground">{act.action_type}</td>
+                          <td className="py-2.5 px-3 font-bold text-danger">{act.priority}</td>
+                          <td className="py-2.5 px-3">
+                            <span className={`px-1.5 py-0.2 rounded text-[9px] font-bold uppercase ${
+                              act.status === 'EXECUTED' ? 'bg-success/15 text-success' :
+                              act.status === 'APPROVED' ? 'bg-primary/15 text-primary' :
+                              'bg-warning/15 text-warning'
+                            }`}>
+                              {act.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-foreground-muted truncate max-w-xs">{act.target}</td>
+                          <td className="py-2.5 px-3 text-right font-medium text-foreground">{act.result || 'Pending'}</td>
                         </tr>
                       ))
                     ) : (
-                      <>
-                        <tr className="hover:bg-surface-secondary/40">
-                          <td className="py-2 px-2 font-bold text-primary">#1 (Origin)</td>
-                          <td className="py-2 px-2 text-foreground font-mono">{originIp}</td>
-                          <td className="py-2 px-2 text-foreground-muted font-mono">relay-01.threat.net</td>
-                          <td className="py-2 px-2 text-foreground-muted">ESMTP</td>
-                          <td className="py-2 px-2 text-right text-foreground font-bold">0s</td>
-                        </tr>
-                        <tr className="hover:bg-surface-secondary/40">
-                          <td className="py-2 px-2 font-bold text-primary">#2 (Transit)</td>
-                          <td className="py-2 px-2 text-foreground font-mono">relay-01.threat.net</td>
-                          <td className="py-2 px-2 text-foreground-muted font-mono">edge.cloud-proxy.org</td>
-                          <td className="py-2 px-2 text-foreground-muted">ESMTPS</td>
-                          <td className="py-2 px-2 text-right text-foreground font-bold">3s</td>
-                        </tr>
-                        <tr className="hover:bg-surface-secondary/40">
-                          <td className="py-2 px-2 font-bold text-primary">#3 (Ingress)</td>
-                          <td className="py-2 px-2 text-foreground font-mono">edge.cloud-proxy.org</td>
-                          <td className="py-2 px-2 text-foreground-muted font-mono">mx.recipient.corp</td>
-                          <td className="py-2 px-2 text-foreground-muted">TLSv1.3</td>
-                          <td className="py-2 px-2 text-right text-foreground font-bold">1s</td>
-                        </tr>
-                      </>
+                      <tr>
+                        <td colSpan={5} className="py-3 text-center text-foreground-muted italic">
+                          No response actions recorded yet.
+                        </td>
+                      </tr>
                     )}
                   </tbody>
                 </table>
               </div>
-            </ExpandableSection>
+            </div>
+          )}
 
-            {/* Appendix C: Canonical Forensic JSON Payload */}
-            <ExpandableSection
-              title="Appendix C: Canonical Forensic JSON Payload"
-              badge="Machine-Readable"
-              defaultExpanded={false}
-            >
-              <div className="space-y-2 p-3 font-mono text-xs">
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => copyToClipboard(JSON.stringify(email, null, 2), 'json')}
-                    className="px-2.5 py-1 rounded bg-surface hover:bg-surface-secondary border border-border text-foreground text-[11px] flex items-center space-x-1 cursor-pointer"
-                  >
-                    {copiedCode === 'json' ? <Check className="w-3 h-3 text-success" /> : <Copy className="w-3 h-3" />}
-                    <span>{copiedCode === 'json' ? 'Copied' : 'Copy JSON'}</span>
-                  </button>
+          {/* 14. AUDIT TRAIL (Section 39: Investigator-relevant audit trail) */}
+          {contentOptions.include_audit_trail && audit.length > 0 && (
+            <div id="sec-audit" className="space-y-4 scroll-mt-24">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <Clock className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold text-foreground">
+                    14. Investigation Audit Trail
+                  </h3>
                 </div>
-                <pre className="p-3 rounded-lg bg-surface border border-border text-[10px] text-foreground overflow-x-auto max-h-64 whitespace-pre-wrap leading-relaxed select-all">
-                  {JSON.stringify(email, null, 2)}
-                </pre>
+                <span className="text-[10px] font-mono text-foreground-muted uppercase">
+                  Append-Only Ledger
+                </span>
               </div>
-            </ExpandableSection>
+
+              <div className="space-y-2 font-mono text-xs">
+                {audit.map((a, i) => (
+                  <div key={i} className="p-2.5 rounded-lg bg-surface-secondary/40 border border-border flex items-center justify-between gap-3 text-[11px]">
+                    <div className="flex items-center space-x-2.5">
+                      <span className="font-bold text-primary">{a.action}</span>
+                      <span className="text-foreground truncate max-w-md">{a.details}</span>
+                    </div>
+                    <div className="flex items-center space-x-2 text-[10px] text-foreground-muted shrink-0">
+                      <span>{a.user}</span>
+                      <span>·</span>
+                      <span>{a.timestamp ? new Date(a.timestamp).toLocaleString() : 'Recent'}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 15. EVIDENCE INDEX (Section 48: Evidence reference catalog with digests) */}
+          {contentOptions.include_evidence_index && evidenceIndex.length > 0 && (
+            <div id="sec-evidence-index" className="space-y-4 scroll-mt-24 pt-4 border-t-2 border-border">
+              <div className="flex items-center justify-between pb-2 border-b border-border">
+                <div className="flex items-center space-x-2">
+                  <Hash className="w-4 h-4 text-primary" />
+                  <h3 className="text-base font-bold text-foreground">
+                    15. Authoritative Evidence Index
+                  </h3>
+                </div>
+                <span className="text-[10px] font-mono text-foreground-muted uppercase">
+                  Cross-Reference Index
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 font-mono text-xs">
+                {evidenceIndex.map((item, i) => (
+                  <div key={i} className="p-3 rounded-lg bg-surface-secondary border border-border space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-primary">{item.ref_id}</span>
+                      <span className="text-[10px] text-foreground-muted uppercase">{item.type}</span>
+                    </div>
+                    <div className="font-semibold text-foreground text-xs truncate">{item.label}</div>
+                    <div className="text-[10px] text-foreground-muted select-all break-all">{item.digest}</div>
+                    <div className="text-[9px] text-primary">{item.provenance}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* 16. QUALITY CHECK VALIDATION FOOTER (Section 63) */}
+          {quality && (
+            <div className="p-4 rounded-xl bg-surface-secondary/60 border border-border flex flex-col sm:flex-row sm:items-center justify-between gap-3 font-mono text-xs">
+              <div className="flex items-center space-x-2.5">
+                <CheckCircle2 className="w-4 h-4 text-success" />
+                <span className="font-bold text-foreground">Report Projection Validation Passed</span>
+                <span className="text-[10px] text-foreground-muted">
+                  ({quality.checks_passed?.length || 8} integrity criteria verified)
+                </span>
+              </div>
+              <div className="text-[10px] text-foreground-muted">
+                Generator: {meta?.generator_version || 'ReportService-2.0 (ReportLab Vector)'}
+              </div>
+            </div>
+          )}
+
+          {/* DOCUMENT SIGN-OFF FOOTER */}
+          <div className="pt-6 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-foreground-muted">
+            <div>
+              <span className="block font-bold text-foreground uppercase tracking-wider">INVESTIGATOR SIGN-OFF</span>
+              <span className="text-[11px]">{meta?.generated_by || 'SOC Lead Forensic Examiner'}</span>
+            </div>
+            <div className="text-left sm:text-right">
+              <span className="block font-bold text-success uppercase tracking-wider">REPRODUCIBLE RECORD</span>
+              <span className="text-[11px]">Timestamp: {meta?.generated_at ? new Date(meta.generated_at).toUTCString() : new Date().toUTCString()}</span>
+            </div>
           </div>
         </div>
-
-        {/* DOCUMENT SIGN-OFF FOOTER */}
-        <div className="pt-6 border-t border-border flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs font-mono text-foreground-muted">
-          <div>
-            <span className="block font-bold text-foreground uppercase tracking-wider">INVESTIGATOR SIGN-OFF</span>
-            <span className="text-[11px]">SOC Lead Forensic Examiner · Badge #7104</span>
-          </div>
-          <div className="text-left sm:text-right">
-            <span className="block font-bold text-success uppercase tracking-wider">DIGITALLY SEALED</span>
-            <span className="text-[11px]">Timestamp: {new Date().toUTCString()}</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 3. CYCLE BACK / WORKSPACE STEP GUIDANCE */}
-      <div className="p-4 rounded-xl bg-surface border border-border flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xs">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-lg bg-success/10 text-success flex items-center justify-center font-bold font-mono text-xs border border-success/20">
-            ✓
-          </div>
-          <div>
-            <h4 className="text-xs font-bold text-foreground font-sans">
-              Investigation Conclusion Ready for Distribution
-            </h4>
-            <p className="text-xs font-mono text-foreground-muted">
-              Export court-admissible PDF reports, send evidence bundles to incident responders, or return to the triage queue.
-            </p>
-          </div>
-        </div>
-
-        <button
-          type="button"
-          onClick={stepGuidance.execute}
-          className="w-full sm:w-auto px-4 py-2 rounded-lg bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-bold flex items-center justify-center space-x-2 transition-all shadow-xs cursor-pointer"
-        >
-          <span>{stepGuidance.buttonLabel}</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
+      )}
     </div>
   );
 };

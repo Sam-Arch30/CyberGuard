@@ -150,13 +150,7 @@ export const InvestigationWorkspace: React.FC = () => {
           <ResponseSectionView />
         )}
         {activeSection === 'report' && (
-          activeEmail ? (
-            <ReportSectionView email={activeEmail} />
-          ) : (
-            <div className="bg-surface border border-border rounded-xl p-8 text-center text-xs font-mono text-foreground-muted">
-              No forensic report generated yet.
-            </div>
-          )
+          <ReportSectionView investigationId={effectiveId || ''} email={activeEmail || undefined} />
         )}
 
         {/* Backward-compatible legacy aliases */}

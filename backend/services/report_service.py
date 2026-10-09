@@ -2116,6 +2116,566 @@ class ReportService:
         flowables.append(Spacer(1, 10))
         return flowables
 
+    @classmethod
+    def generate_investigation_report(
+        cls,
+        snapshot: Dict[str, Any],
+        report_type: str = "ANALYST",
+        redaction_level: str = "NONE",
+        content_options: Optional[Dict[str, bool]] = None,
+    ) -> bytes:
+        """
+        Section 42: Compiles a reproducible, vector PDF incident report from an
+        immutable structured investigation snapshot.
+        """
+        cls.ensure_reports_dir()
+
+        buffer = io.BytesIO()
+        doc = SimpleDocTemplate(
+            buffer,
+            pagesize=letter,
+            leftMargin=36,
+            rightMargin=36,
+            topMargin=46,
+            bottomMargin=50
+        )
+
+        styles = cls._create_styles()
+        story = []
+
+        opts = content_options or {}
+        include_exec = opts.get("include_executive_summary", True)
+        include_timeline = opts.get("include_timeline", True)
+        include_attack_path = opts.get("include_attack_path", True)
+        include_risk = opts.get("include_risk_assessment", True)
+        include_findings = opts.get("include_findings", True)
+        include_evidence = opts.get("include_evidence_table", True)
+        include_iocs = opts.get("include_indicators", True)
+        include_mitre = opts.get("include_mitre_attack", True)
+        include_infra = opts.get("include_infrastructure", True)
+        include_xai = opts.get("include_explainability", True)
+        include_resp = opts.get("include_response_actions", True)
+        include_recs = opts.get("include_recommendations", True)
+        include_audit = opts.get("include_audit_trail", True)
+        include_idx = opts.get("include_evidence_index", True)
+
+        meta = snapshot.get("metadata", {})
+        overview = snapshot.get("incident_overview", {})
+        exec_sum = snapshot.get("executive_summary", {})
+        risk_data = snapshot.get("risk_assessment", {})
+
+        rpt_num = meta.get("report_number") or f"RPT-{datetime.now(timezone.utc).strftime('%Y%m%d')}-001"
+        inv_num = meta.get("incident_number") or overview.get("incident_number") or "INV-UNKNOWN"
+        rpt_ver = meta.get("report_version", 1)
+        classification = meta.get("classification", "CONFIDENTIAL")
+        rtype = (meta.get("report_type") or report_type).upper()
+        title = meta.get("title") or overview.get("title") or "Security Incident Report"
+
+        # -------------------------------------------------------------
+        # 1. DOCUMENT HEADER & CLASSIFICATION BANNER
+        # -------------------------------------------------------------
+        story.append(Paragraph(f"CYBERGUARD // AI SECURITY INCIDENT REPORT [{classification}]", styles["DocSubtitle"]))
+        story.append(Spacer(1, 2))
+        story.append(Paragraph(f"{rtype} REPORT: {html.escape(title[:70])}", styles["DocTitle"]))
+        story.append(Spacer(1, 6))
+
+        # Metadata banner table
+        score_val = risk_data.get("risk_score", overview.get("risk_score", 0.0))
+        sev_val = str(risk_data.get("severity", overview.get("severity", "MEDIUM"))).upper()
+        conf_val = str(risk_data.get("confidence_level", overview.get("confidence_level", "MODERATE"))).upper()
+        status_val = str(overview.get("status", "INVESTIGATING")).upper()
+
+        meta_table_data = [
+            [
+                Paragraph("<b>REPORT REF:</b>", styles["TableCellBold"]),
+                Paragraph(cls._format_token(f"{rpt_num} (v{rpt_ver})"), styles["TableCellBold"]),
+                Paragraph("<b>INVESTIGATION ID:</b>", styles["TableCellBold"]),
+                Paragraph(cls._format_token(inv_num), styles["TableCellBold"]),
+            ],
+            [
+                Paragraph("<b>SEVERITY / RISK:</b>", styles["TableCellBold"]),
+                Paragraph(f"<b>{sev_val}</b> ({score_val:.0f}/100)", styles["TableCellBold"]),
+                Paragraph("<b>CONFIDENCE:</b>", styles["TableCellBold"]),
+                Paragraph(f"<b>{conf_val}</b>", styles["TableCellBold"]),
+            ],
+            [
+                Paragraph("<b>STATUS:</b>", styles["TableCellBold"]),
+                Paragraph(cls._format_token(status_val), styles["TableCell"]),
+                Paragraph("<b>GENERATED (UTC):</b>", styles["TableCellBold"]),
+                Paragraph(cls._format_token(meta.get("generated_at", "Now")), styles["TableCell"]),
+            ],
+            [
+                Paragraph("<b>INVESTIGATOR:</b>", styles["TableCellBold"]),
+                Paragraph(cls._format_token(meta.get("generated_by", "SOC Lead Analyst")), styles["TableCell"]),
+                Paragraph("<b>REDACTION:</b>", styles["TableCellBold"]),
+                Paragraph(f"Policy: {meta.get('redaction_level', redaction_level)}", styles["TableCell"]),
+            ],
+        ]
+        meta_table = Table(meta_table_data, colWidths=[110, 160, 110, 160])
+        meta_table.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BOX", (0, 0), (-1, -1), 0.75, colors.HexColor("#CBD5E1")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+            ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+            ("LEFTPADDING", (0, 0), (-1, -1), 5),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ]))
+        story.append(meta_table)
+        story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 2. EXECUTIVE SUMMARY
+        # -------------------------------------------------------------
+        if include_exec:
+            story.append(Paragraph("1. Executive Summary", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            narrative = exec_sum.get("synthesized_narrative") or "Investigation telemetry reviewed."
+            story.append(Paragraph(html.escape(narrative), styles["Body"]))
+            story.append(Spacer(1, 6))
+
+            exec_box_data = [
+                [
+                    Paragraph("<b>What Was Detected:</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(exec_sum.get("detection_statement", "Security incident detected.")), styles["TableCell"]),
+                ],
+                [
+                    Paragraph("<b>Risk & Impact:</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(exec_sum.get("impact_statement", "Impact evaluated.")), styles["TableCell"]),
+                ],
+                [
+                    Paragraph("<b>Evidentiary Foundation:</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(exec_sum.get("evidence_support_statement", "Backed by immutable artifacts.")), styles["TableCell"]),
+                ],
+                [
+                    Paragraph("<b>Response Posture:</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(exec_sum.get("response_state_statement", "Containment in progress.")), styles["TableCell"]),
+                ],
+                [
+                    Paragraph("<b>Major Uncertainty:</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(exec_sum.get("uncertainty_statement", "No critical gaps identified.")), styles["TableCell"]),
+                ],
+            ]
+            exec_box = Table(exec_box_data, colWidths=[130, 410])
+            exec_box.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(exec_box)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 3. FACT / INFERENCE / HYPOTHESIS LABELING
+        # -------------------------------------------------------------
+        claims = snapshot.get("epistemic_claims", [])
+        if claims and rtype != "EXECUTIVE":
+            story.append(Paragraph("2. Factuality & Epistemic Status", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+            claim_rows = [
+                [
+                    Paragraph("<b>CLAIM REF</b>", styles["TableHead"]),
+                    Paragraph("<b>EPISTEMIC STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>SUBSTANTIVE STATEMENT</b>", styles["TableHead"]),
+                    Paragraph("<b>EVIDENCE</b>", styles["TableHead"]),
+                ]
+            ]
+            for c in claims[:8]:
+                status_color = "#16A34A" if c.get("status") == "OBSERVED" else ("#2563EB" if c.get("status") == "INFERRED" else "#EA580C")
+                claim_rows.append([
+                    Paragraph(c.get("id", "CLM"), styles["TableCellBold"]),
+                    Paragraph(f"<font color='{status_color}'><b>{c.get('status', 'OBSERVED')}</b></font>", styles["TableCellBold"]),
+                    Paragraph(html.escape(c.get("statement", "")), styles["TableCell"]),
+                    Paragraph(", ".join(c.get("evidence_refs", [])) or "Context", styles["TableCellMuted"]),
+                ])
+            claim_table = Table(claim_rows, colWidths=[70, 95, 310, 65])
+            claim_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(claim_table)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 4. RISK ASSESSMENT & SIGNALS
+        # -------------------------------------------------------------
+        if include_risk:
+            sec_num = "3" if (claims and rtype != "EXECUTIVE") else "2"
+            story.append(Paragraph(f"{sec_num}. Risk Assessment & Threat Signals", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            risk_note = risk_data.get("risk_vs_confidence_note", "Risk score is not a mathematical probability.")
+            story.append(Paragraph(f"<i>Notice: {html.escape(risk_note)}</i>", styles["BodyMuted"]))
+            story.append(Spacer(1, 4))
+
+            signals = risk_data.get("primary_signals", [])
+            counter_ev = risk_data.get("counter_evidence", [])
+            risk_box_data = [
+                [
+                    Paragraph("<b>Risk Score:</b>", styles["TableCellBold"]),
+                    Paragraph(f"{score_val:.0f} / 100 ({sev_val})", styles["TableCellBold"]),
+                    Paragraph("<b>Evidentiary Confidence:</b>", styles["TableCellBold"]),
+                    Paragraph(f"{conf_val}", styles["TableCellBold"]),
+                ],
+                [
+                    Paragraph("<b>Primary Signals:</b>", styles["TableCellBold"]),
+                    Paragraph("; ".join(signals) if signals else "None reported", styles["TableCell"]),
+                    Paragraph("<b>Counter-Evidence:</b>", styles["TableCellBold"]),
+                    Paragraph("; ".join(counter_ev) if counter_ev else "None observed", styles["TableCell"]),
+                ]
+            ]
+            rbox = Table(risk_box_data, colWidths=[100, 170, 110, 160])
+            rbox.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 3),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 3),
+                ("LEFTPADDING", (0, 0), (-1, -1), 5),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+            ]))
+            story.append(rbox)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 5. CHRONOLOGICAL TIMELINE
+        # -------------------------------------------------------------
+        timeline_items = snapshot.get("timeline", [])
+        if include_timeline and timeline_items and rtype != "EXECUTIVE":
+            story.append(Paragraph("4. Chronological Incident Timeline", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            t_rows = [
+                [
+                    Paragraph("<b>TIMESTAMP (UTC)</b>", styles["TableHead"]),
+                    Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>EVENT TITLE & DETAIL</b>", styles["TableHead"]),
+                    Paragraph("<b>SOURCE</b>", styles["TableHead"]),
+                ]
+            ]
+            for t in timeline_items[:12]:
+                stat = t.get("status", "OBSERVED")
+                stat_col = "#16A34A" if stat == "OBSERVED" else "#2563EB"
+                t_rows.append([
+                    Paragraph(f"{t.get('timestamp', '')}<br/><font color='#64748B'>{t.get('uncertainty', '')}</font>", styles["TableCell"]),
+                    Paragraph(f"<font color='{stat_col}'><b>{stat}</b></font>", styles["TableCellBold"]),
+                    Paragraph(f"<b>{html.escape(t.get('title', ''))}</b><br/>{html.escape(t.get('description', ''))}", styles["TableCell"]),
+                    Paragraph(html.escape(t.get("source", "")), styles["TableCellMuted"]),
+                ])
+            ttable = Table(t_rows, colWidths=[120, 65, 275, 80])
+            ttable.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(ttable)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 6. ATTACK PATH PROJECTION (Static View)
+        # -------------------------------------------------------------
+        ap_data = snapshot.get("attack_path", {})
+        ap_stages = ap_data.get("stages", [])
+        if include_attack_path and ap_stages:
+            story.append(Paragraph("5. Reconstructed Attack Path Progression", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            if ap_data.get("path_summary"):
+                story.append(Paragraph(html.escape(ap_data["path_summary"]), styles["Body"]))
+                story.append(Spacer(1, 4))
+
+            ap_rows = [
+                [
+                    Paragraph("<b>STAGE #</b>", styles["TableHead"]),
+                    Paragraph("<b>ATTACK STAGE</b>", styles["TableHead"]),
+                    Paragraph("<b>TYPE</b>", styles["TableHead"]),
+                    Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>MITRE TECHNIQUE</b>", styles["TableHead"]),
+                    Paragraph("<b>EVID.</b>", styles["TableHead"]),
+                ]
+            ]
+            for s in ap_stages:
+                s_stat = s.get("status", "OBSERVED")
+                s_col = "#16A34A" if s_stat == "OBSERVED" else "#2563EB"
+                mitre_label = f"{s.get('mitre_technique_id', 'N/A')}: {s.get('mitre_technique_name', '')}"
+                ap_rows.append([
+                    Paragraph(f"<b>Stage {s.get('stage_order', 1)}</b>", styles["TableCellBold"]),
+                    Paragraph(f"<b>{html.escape(s.get('name', ''))}</b>", styles["TableCellBold"]),
+                    Paragraph(html.escape(str(s.get("stage_type", ""))), styles["TableCell"]),
+                    Paragraph(f"<font color='{s_col}'><b>{s_stat}</b></font>", styles["TableCellBold"]),
+                    Paragraph(cls._format_token(mitre_label), styles["TableCellMuted"]),
+                    Paragraph(str(s.get("evidence_count", 1)), styles["TableCell"]),
+                ])
+            aptable = Table(ap_rows, colWidths=[55, 125, 95, 75, 150, 40])
+            aptable.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(aptable)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 7. KEY FINDINGS
+        # -------------------------------------------------------------
+        findings = snapshot.get("findings", [])
+        if include_findings and findings:
+            story.append(Paragraph("6. Key Investigative Findings", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            f_rows = [
+                [
+                    Paragraph("<b>REF ID</b>", styles["TableHead"]),
+                    Paragraph("<b>SEVERITY</b>", styles["TableHead"]),
+                    Paragraph("<b>CATEGORY</b>", styles["TableHead"]),
+                    Paragraph("<b>FINDING TITLE & DESCRIPTION</b>", styles["TableHead"]),
+                    Paragraph("<b>SOURCE</b>", styles["TableHead"]),
+                ]
+            ]
+            for f in findings[:10]:
+                f_sev = f.get("severity", "MEDIUM")
+                f_col = "#DC2626" if f_sev in {"CRITICAL", "HIGH"} else ("#D97706" if f_sev == "MEDIUM" else "#16A34A")
+                f_rows.append([
+                    Paragraph(f.get("ref_id", "F-001"), styles["TableCellBold"]),
+                    Paragraph(f"<font color='{f_col}'><b>{f_sev}</b></font>", styles["TableCellBold"]),
+                    Paragraph(f.get("category", "SEC"), styles["TableCell"]),
+                    Paragraph(f"<b>{html.escape(f.get('title', ''))}</b><br/>{html.escape(f.get('description', ''))}", styles["TableCell"]),
+                    Paragraph(html.escape(f.get("source", "Analyzer")), styles["TableCellMuted"]),
+                ])
+            ftable = Table(f_rows, colWidths=[55, 65, 75, 265, 80])
+            ftable.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(ftable)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 8. EVIDENCE SUMMARY & EVIDENCE TABLE
+        # -------------------------------------------------------------
+        ev_table = snapshot.get("evidence_table", [])
+        if include_evidence and ev_table:
+            story.append(Paragraph("7. Evidence Registry & Artifact Hashes", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            ev_rows = [
+                [
+                    Paragraph("<b>REF</b>", styles["TableHead"]),
+                    Paragraph("<b>TYPE</b>", styles["TableHead"]),
+                    Paragraph("<b>NAME / SOURCE</b>", styles["TableHead"]),
+                    Paragraph("<b>SHA-256 HASH</b>", styles["TableHead"]),
+                    Paragraph("<b>RUN REF</b>", styles["TableHead"]),
+                ]
+            ]
+            for e in ev_table[:10]:
+                e_type_col = "#0284C7" if e.get("type") == "ORIGINAL" else "#64748B"
+                ev_rows.append([
+                    Paragraph(e.get("ref_id", "E-001"), styles["TableCellBold"]),
+                    Paragraph(f"<font color='{e_type_col}'><b>{e.get('type', 'ORIGINAL')}</b></font>", styles["TableCellBold"]),
+                    Paragraph(f"<b>{html.escape(e.get('name', ''))}</b><br/><font color='#64748B'>{html.escape(e.get('source', ''))}</font>", styles["TableCell"]),
+                    Paragraph(cls._format_token(e.get("sha256", "N/A"), max_chunk=24), styles["TableCell"]),
+                    Paragraph(e.get("analysis_run_ref", "Run #1"), styles["TableCellMuted"]),
+                ])
+            etable = Table(ev_rows, colWidths=[45, 65, 140, 220, 70])
+            etable.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(etable)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 9. MITRE ATT&CK & INFRASTRUCTURE
+        # -------------------------------------------------------------
+        mitre_data = snapshot.get("mitre_attack", [])
+        if include_mitre and mitre_data:
+            story.append(Paragraph("8. MITRE ATT&CK Framework Mappings", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+            m_rows = [
+                [
+                    Paragraph("<b>TECHNIQUE ID</b>", styles["TableHead"]),
+                    Paragraph("<b>TECHNIQUE NAME</b>", styles["TableHead"]),
+                    Paragraph("<b>TACTIC</b>", styles["TableHead"]),
+                    Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>EVID.</b>", styles["TableHead"]),
+                ]
+            ]
+            for m in mitre_data:
+                m_rows.append([
+                    Paragraph(m.get("technique_id", ""), styles["TableCellBold"]),
+                    Paragraph(m.get("technique_name", ""), styles["TableCell"]),
+                    Paragraph(m.get("tactic", ""), styles["TableCell"]),
+                    Paragraph("<font color='#16A34A'><b>SUPPORTED</b></font>", styles["TableCellBold"]),
+                    Paragraph(str(m.get("evidence_count", 1)), styles["TableCell"]),
+                ])
+            mtable = Table(m_rows, colWidths=[90, 180, 140, 80, 50])
+            mtable.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(mtable)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 10. DEFENSIVE RESPONSE & RECOMMENDATIONS
+        # -------------------------------------------------------------
+        resp_data = snapshot.get("response", {})
+        resp_actions = resp_data.get("actions_table", [])
+        if include_resp and resp_actions:
+            story.append(Paragraph("9. Defensive Containment Actions & Response", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            act_rows = [
+                [
+                    Paragraph("<b>ACTION</b>", styles["TableHead"]),
+                    Paragraph("<b>PRIORITY</b>", styles["TableHead"]),
+                    Paragraph("<b>STATUS</b>", styles["TableHead"]),
+                    Paragraph("<b>TARGET ASSET</b>", styles["TableHead"]),
+                    Paragraph("<b>RESULT / CONFIRMATION</b>", styles["TableHead"]),
+                ]
+            ]
+            for a in resp_actions[:8]:
+                a_stat = a.get("status", "PENDING")
+                a_col = "#16A34A" if a_stat == "EXECUTED" else ("#2563EB" if a_stat == "APPROVED" else "#EA580C")
+                act_rows.append([
+                    Paragraph(f"<b>{html.escape(a.get('action_type', ''))}</b>", styles["TableCellBold"]),
+                    Paragraph(a.get("priority", "P1"), styles["TableCellBold"]),
+                    Paragraph(f"<font color='{a_col}'><b>{a_stat}</b></font>", styles["TableCellBold"]),
+                    Paragraph(html.escape(a.get("target", "")), styles["TableCell"]),
+                    Paragraph(html.escape(a.get("result", "")), styles["TableCellMuted"]),
+                ])
+            act_table = Table(act_rows, colWidths=[120, 55, 75, 140, 150])
+            act_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2.5),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2.5),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(act_table)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 11. AUDIT TRAIL
+        # -------------------------------------------------------------
+        audit_items = snapshot.get("audit_trail", [])
+        if include_audit and audit_items and rtype == "FORENSIC":
+            story.append(Paragraph("10. Investigator Audit Trail", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            aud_rows = [
+                [
+                    Paragraph("<b>TIMESTAMP (UTC)</b>", styles["TableHead"]),
+                    Paragraph("<b>ACTION</b>", styles["TableHead"]),
+                    Paragraph("<b>USER / ACTOR</b>", styles["TableHead"]),
+                    Paragraph("<b>AUDIT EVENT DETAILS</b>", styles["TableHead"]),
+                ]
+            ]
+            for aud in audit_items[:8]:
+                aud_rows.append([
+                    Paragraph(aud.get("timestamp", ""), styles["TableCell"]),
+                    Paragraph(f"<b>{aud.get('action', '')}</b>", styles["TableCellBold"]),
+                    Paragraph(aud.get("user", "System"), styles["TableCell"]),
+                    Paragraph(html.escape(aud.get("details", "")), styles["TableCell"]),
+                ])
+            aud_table = Table(aud_rows, colWidths=[110, 110, 90, 230])
+            aud_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(aud_table)
+            story.append(Spacer(1, 10))
+
+        # -------------------------------------------------------------
+        # 12. EVIDENCE INDEX (FORENSIC DOSSIER STAMP)
+        # -------------------------------------------------------------
+        ev_idx = snapshot.get("evidence_index", [])
+        if include_idx and ev_idx and rtype != "EXECUTIVE":
+            story.append(Paragraph("11. Evidentiary Index Registry", styles["SectionHeader"]))
+            story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=5))
+
+            idx_rows = [
+                [
+                    Paragraph("<b>INDEX REF</b>", styles["TableHead"]),
+                    Paragraph("<b>TYPE</b>", styles["TableHead"]),
+                    Paragraph("<b>IDENTIFIER / LABEL</b>", styles["TableHead"]),
+                    Paragraph("<b>CRYPTOGRAPHIC DIGEST / PROVENANCE</b>", styles["TableHead"]),
+                ]
+            ]
+            for item in ev_idx[:12]:
+                idx_rows.append([
+                    Paragraph(item.get("ref_id", ""), styles["TableCellBold"]),
+                    Paragraph(item.get("type", ""), styles["TableCellMuted"]),
+                    Paragraph(f"<b>{html.escape(item.get('label', ''))}</b>", styles["TableCell"]),
+                    Paragraph(cls._format_token(item.get("digest", "") or item.get("provenance", ""), max_chunk=28), styles["TableCell"]),
+                ])
+            idx_table = Table(idx_rows, colWidths=[65, 65, 170, 240])
+            idx_table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.append(idx_table)
+            story.append(Spacer(1, 10))
+
+        # Final signature and integrity block
+        hash_val = meta.get("data_snapshot_hash") or "N/A"
+        story.append(KeepTogether([
+            HRFlowable(width="100%", thickness=1, color=colors.HexColor("#94A3B8"), spaceBefore=6, spaceAfter=4),
+            Paragraph(f"<b>INTEGRITY HASH:</b> <font name='Courier'>{cls._format_token(hash_val, max_chunk=32)}</font>", styles["TableCellMuted"]),
+            Paragraph(f"CyberGuard Forensic Engine v{meta.get('generator_version', '2.0')} // Reproducible Snapshot Ver. {rpt_ver}", styles["TableCellMuted"])
+        ]))
+
+        # Build document
+        doc.build(story, canvasmaker=NumberedCanvas)
+        pdf_bytes = buffer.getvalue()
+        buffer.close()
+        return pdf_bytes
+
 
 
 

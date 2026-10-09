@@ -16,14 +16,28 @@ from backend.schemas.investigation_workspace import (
     InvestigationTimelineEventItem,
     InvestigationWorkspaceSummary,
 )
+from datetime import datetime, timezone
+from backend.db.models import ReportModel
 from backend.schemas.attack_path_projection import AttackPathDetailResponse
 from backend.schemas.response_recommendation import ResponseRecommendationResponse
+from backend.schemas.report import (
+    ReportDetailResponse,
+    ReportListItemResponse,
+    InvestigationReportGenerateRequest,
+    InvestigationReportPreviewRequest,
+)
 from backend.services.attack_path_service import AttackPathService
 from backend.services.investigation_workspace_service import (
     InvestigationWorkspaceService,
 )
+from backend.services.report_projection_service import ReportProjectionService
 from backend.services.response_recommendation_engine import ResponseRecommendationEngine
 from backend.api.routes.response_recommendations import _serialize_rec
+from backend.api.routes.reports import (
+    _serialize_report_detail,
+    _serialize_report_item,
+    generate_investigation_report_endpoint,
+)
 
 router = APIRouter(prefix="/api/investigations", tags=["Investigation Workspace"])
 
@@ -224,3 +238,194 @@ def get_investigation_response_recommendations(
         force_regenerate=False,
     )
     return [_serialize_rec(r) for r in recs]
+
+
+# -----------------------------------------------------------------------------
+# Section 42: Investigation Report Workspace Routes
+# -----------------------------------------------------------------------------
+
+@router.get(
+    "/{identifier}/report",
+    response_model=ReportDetailResponse,
+    summary="Get Investigation Report Snapshot or Live Draft Preview",
+    description="Returns the latest immutable report version for this investigation, or a live draft projection if none has been persisted yet.",
+)
+def get_investigation_report(
+    identifier: str,
+    db: Session = Depends(get_db),
+):
+    incident, run, artifact, case = InvestigationWorkspaceService.resolve_context(db, identifier)
+    if not incident and not run and not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Investigation with identifier '{identifier}' was not found.",
+        )
+
+    inv_key = incident.id if incident else (run.id if run else identifier)
+    latest_report = (
+        db.query(ReportModel)
+        .filter((ReportModel.investigation_id == inv_key) | (ReportModel.investigation_id == identifier))
+        .order_by(ReportModel.report_version.desc())
+        .first()
+    )
+
+    if latest_report:
+        is_stale = ReportProjectionService.check_staleness(db, latest_report)
+        return _serialize_report_detail(latest_report, is_stale=is_stale)
+
+    # If no report persisted yet, build draft projection on the fly
+    snapshot = ReportProjectionService.build_projection(
+        db=db,
+        identifier=identifier,
+        report_type="ANALYST",
+        classification="CONFIDENTIAL",
+        redaction_level="NONE",
+        report_version=0,
+    )
+    score_val = snapshot["risk_assessment"].get("risk_score", 0.0)
+    sev_val = snapshot["risk_assessment"].get("severity", "medium").lower()
+
+    return ReportDetailResponse(
+        id="draft",
+        report_number="DRAFT-PREVIEW",
+        title=snapshot["metadata"].get("title", "Draft Incident Report"),
+        investigation_id=inv_key,
+        incident_number=snapshot["metadata"].get("incident_number", "INV-DRAFT"),
+        case_id=case.id if case else None,
+        evidence_id=artifact.id if artifact else None,
+        email_sha256=artifact.sha256 if artifact else None,
+        threat_score=score_val,
+        severity=sev_val,
+        confidence=snapshot["risk_assessment"].get("confidence", 1.0),
+        report_type="ANALYST",
+        status="DRAFT",
+        report_version=0,
+        classification="CONFIDENTIAL",
+        redaction_level="NONE",
+        is_stale=False,
+        analyst_name="SOC Lead Analyst",
+        summary=snapshot["executive_summary"].get("synthesized_narrative", ""),
+        file_size_bytes=0,
+        created_at=datetime.now(timezone.utc),
+        download_url="/api/reports/draft/download",
+        json_url="/api/reports/draft/json",
+        content_options={},
+        quality_check=snapshot.get("quality_check", {}),
+        snapshot=snapshot,
+        provenance=snapshot.get("provenance", {}),
+    )
+
+
+@router.post(
+    "/{identifier}/report/generate",
+    response_model=ReportDetailResponse,
+    summary="Generate New Immutable Report Version for Investigation",
+    description="Compiles and persists an immutable report version (e.g., v1, v2) for this investigation.",
+)
+def generate_report_for_investigation(
+    identifier: str,
+    payload: InvestigationReportGenerateRequest,
+    format: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    req = payload.model_copy(update={"investigation_id": identifier})
+    return generate_investigation_report_endpoint(request=req, format=format, db=db)
+
+
+@router.post(
+    "/{identifier}/report/preview",
+    response_model=ReportDetailResponse,
+    summary="Preview Investigation Report Projection With Custom Options",
+    description="Generates an ephemeral report preview projection without persisting to the database.",
+)
+def preview_investigation_report(
+    identifier: str,
+    payload: InvestigationReportPreviewRequest,
+    db: Session = Depends(get_db),
+):
+    incident, run, artifact, case = InvestigationWorkspaceService.resolve_context(db, identifier)
+    if not incident and not run and not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Investigation with identifier '{identifier}' was not found.",
+        )
+
+    content_opts_dict = payload.content_options.model_dump() if payload.content_options else {}
+    snapshot = ReportProjectionService.build_projection(
+        db=db,
+        identifier=identifier,
+        report_type=payload.report_type,
+        classification=payload.classification,
+        redaction_level=payload.redaction_level,
+        content_options=content_opts_dict,
+        analyst_name=payload.analyst_name or "SOC Lead Analyst",
+        notes=payload.notes,
+        report_version=0,
+    )
+
+    inv_key = incident.id if incident else (run.id if run else identifier)
+    score_val = snapshot["risk_assessment"].get("risk_score", 0.0)
+    sev_val = snapshot["risk_assessment"].get("severity", "medium").lower()
+
+    return ReportDetailResponse(
+        id="preview",
+        report_number="PREVIEW",
+        title=snapshot["metadata"].get("title", "Preview Incident Report"),
+        investigation_id=inv_key,
+        incident_number=snapshot["metadata"].get("incident_number", "INV-PREVIEW"),
+        case_id=case.id if case else None,
+        evidence_id=artifact.id if artifact else None,
+        email_sha256=artifact.sha256 if artifact else None,
+        threat_score=score_val,
+        severity=sev_val,
+        confidence=snapshot["risk_assessment"].get("confidence", 1.0),
+        report_type=payload.report_type,
+        status="DRAFT",
+        report_version=0,
+        classification=payload.classification,
+        redaction_level=payload.redaction_level,
+        is_stale=False,
+        analyst_name=payload.analyst_name or "SOC Lead Analyst",
+        summary=snapshot["executive_summary"].get("synthesized_narrative", ""),
+        file_size_bytes=0,
+        created_at=datetime.now(timezone.utc),
+        download_url="/api/reports/preview/download",
+        json_url="/api/reports/preview/json",
+        content_options=content_opts_dict,
+        quality_check=snapshot.get("quality_check", {}),
+        snapshot=snapshot,
+        provenance=snapshot.get("provenance", {}),
+    )
+
+
+@router.get(
+    "/{identifier}/reports",
+    response_model=List[ReportListItemResponse],
+    summary="List all report versions for this investigation",
+    description="Returns all chronological report snapshots (v1, v2...) generated for this investigation.",
+)
+def list_investigation_report_versions(
+    identifier: str,
+    db: Session = Depends(get_db),
+):
+    incident, run, artifact, case = InvestigationWorkspaceService.resolve_context(db, identifier)
+    if not incident and not run and not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Investigation with identifier '{identifier}' was not found.",
+        )
+
+    inv_key = incident.id if incident else (run.id if run else identifier)
+    reports = (
+        db.query(ReportModel)
+        .filter((ReportModel.investigation_id == inv_key) | (ReportModel.investigation_id == identifier))
+        .order_by(ReportModel.report_version.desc())
+        .all()
+    )
+
+    out = []
+    for r in reports:
+        is_stale = ReportProjectionService.check_staleness(db, r)
+        out.append(_serialize_report_item(r, is_stale=is_stale))
+    return out
+

@@ -74,6 +74,18 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE campaigns ADD COLUMN correlation_summary TEXT;",
                     "ALTER TABLE threat_events ADD COLUMN risk_assessment_id VARCHAR(64);",
                     "ALTER TABLE attack_paths ADD COLUMN workspace_id VARCHAR(64) DEFAULT 'default';",
+                    "ALTER TABLE reports ADD COLUMN investigation_id VARCHAR(128);",
+                    "ALTER TABLE reports ADD COLUMN report_type VARCHAR(30) DEFAULT 'ANALYST';",
+                    "ALTER TABLE reports ADD COLUMN status VARCHAR(30) DEFAULT 'READY';",
+                    "ALTER TABLE reports ADD COLUMN report_version INTEGER DEFAULT 1;",
+                    "ALTER TABLE reports ADD COLUMN classification VARCHAR(30) DEFAULT 'CONFIDENTIAL';",
+                    "ALTER TABLE reports ADD COLUMN redaction_level VARCHAR(30) DEFAULT 'NONE';",
+                    "ALTER TABLE reports ADD COLUMN confidence FLOAT DEFAULT 1.0;",
+                    "ALTER TABLE reports ADD COLUMN content_options_json TEXT DEFAULT '{}';",
+                    "ALTER TABLE reports ADD COLUMN snapshot_data_json TEXT DEFAULT '{}';",
+                    "ALTER TABLE reports ADD COLUMN quality_check_json TEXT DEFAULT '{}';",
+                    "ALTER TABLE reports ADD COLUMN superseded_by VARCHAR(36);",
+                    "ALTER TABLE reports ADD COLUMN workspace_id VARCHAR(128) DEFAULT 'default';",
                 ]
                 for stmt in column_migrations:
                     try:
