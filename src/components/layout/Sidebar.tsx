@@ -20,7 +20,8 @@ import {
   Network,
   KeyRound,
   Binary,
-  Link2
+  Link2,
+  Laptop
 } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { useInvestigation } from '../../context/InvestigationContext';
@@ -129,6 +130,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
       path: '/url-intelligence',
       icon: Link2,
       badge: 'SEC-07'
+    },
+    {
+      name: 'Endpoint Telemetry',
+      path: '/endpoints',
+      icon: Laptop,
+      badge: 'SEC-31'
     }
   ];
 

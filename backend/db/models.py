@@ -2879,14 +2879,230 @@ class SocCopilotFeedbackModel(Base):
     )
 
 
+# ============================================================================
+# SECTION 31: ENDPOINT AGENT ARCHITECTURE MODELS
+# ============================================================================
+
+class DeviceModel(Base):
+    """
+    Section 31: Physical or Virtual Host Device Identity.
+    Maintains a stable device identity distinct from replaceable EndpointAgent installations.
+    """
+    __tablename__ = "devices"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    device_uid = Column(String(128), nullable=False, index=True)  # Hardware UUID / machine-id
+    hostname = Column(String(255), nullable=False, index=True)
+    platform = Column(String(32), nullable=False, index=True)  # macos, windows, linux
+    os_version = Column(String(128), nullable=True)
+    architecture = Column(String(64), nullable=True)  # x86_64, arm64, etc.
+    manufacturer = Column(String(128), nullable=True)
+    model = Column(String(128), nullable=True)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # ACTIVE, OFFLINE, DECOMMISSIONED
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    agents = relationship("EndpointAgentModel", back_populates="device", cascade="all, delete-orphan", lazy="selectin")
+    telemetry_events = relationship("EndpointTelemetryEventModel", back_populates="device", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_devices_ws_uid", "workspace_id", "device_uid", unique=True),
+        Index("ix_devices_ws_status", "workspace_id", "status"),
+    )
 
 
+class EndpointAgentModel(Base):
+    """
+    Section 31: Authorized Endpoint Telemetry Agent.
+    Manages agent runtime identity, enrollment status, heartbeat, and versioning.
+    """
+    __tablename__ = "endpoint_agents"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    agent_id = Column(String(64), nullable=False, index=True)  # AGT-XXXXXXXX
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    device_id = Column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True)
+    hostname = Column(String(255), nullable=False)
+    platform = Column(String(32), nullable=False, index=True)
+    platform_version = Column(String(128), nullable=True)
+    architecture = Column(String(64), nullable=True)
+    agent_version = Column(String(32), nullable=False, default="1.0.0", index=True)
+    status = Column(String(32), nullable=False, default="ENROLLING", index=True)  # ENROLLING, ACTIVE, DEGRADED, OFFLINE, REVOKED, DISABLED
+    enrollment_state = Column(String(32), nullable=False, default="ENROLLED", index=True)  # ENROLLED, PENDING_VERIFICATION, REVOKED
+    configuration_version = Column(String(32), nullable=False, default="1.0.0", index=True)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_heartbeat_at = Column(DateTime, nullable=True)
+    last_event_time = Column(DateTime, nullable=True)
+    clock_offset_ms = Column(Float, nullable=False, default=0.0)
+    enrolled_at = Column(DateTime, default=get_utc_now, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+    revocation_reason = Column(Text, nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    device = relationship("DeviceModel", back_populates="agents")
+    credentials = relationship("EndpointAgentCredentialModel", back_populates="agent", cascade="all, delete-orphan", lazy="selectin")
+    configurations = relationship("EndpointAgentConfigurationModel", back_populates="agent", lazy="selectin")
+    heartbeats = relationship("EndpointAgentHeartbeatModel", back_populates="agent", cascade="all, delete-orphan", lazy="selectin")
+    telemetry_events = relationship("EndpointTelemetryEventModel", back_populates="agent", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_ep_agents_ws_agent_id", "workspace_id", "agent_id", unique=True),
+        Index("ix_ep_agents_status_seen", "status", "last_seen_at"),
+    )
 
 
+class EndpointEnrollmentTokenModel(Base):
+    """
+    Section 31: Cryptographically Secure Endpoint Enrollment Token.
+    Short-lived, single-use, auditable, and revocable credential exchange token.
+    """
+    __tablename__ = "endpoint_enrollment_tokens"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    token_prefix = Column(String(16), nullable=False, index=True)
+    token_hash = Column(String(64), nullable=False, index=True)  # SHA-256 of raw enrollment token
+    description = Column(String(255), nullable=True)
+    created_by = Column(String(100), nullable=False, default="admin")
+    expires_at = Column(DateTime, nullable=False, index=True)
+    max_uses = Column(Integer, nullable=False, default=1)
+    use_count = Column(Integer, nullable=False, default=0)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # ACTIVE, EXHAUSTED, EXPIRED, REVOKED
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ep_tokens_ws_status", "workspace_id", "status"),
+    )
 
 
+class EndpointAgentCredentialModel(Base):
+    """
+    Section 31: Long-lived Agent Mutual Authentication Credential.
+    Supports HMAC shared secret hash or public key verification with rotation lifecycle.
+    """
+    __tablename__ = "endpoint_agent_credentials"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    agent_id = Column(String(36), ForeignKey("endpoint_agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    credential_type = Column(String(32), nullable=False, default="HMAC_KEY", index=True)  # HMAC_KEY, BEARER_TOKEN, MTLS_CERT
+    key_id = Column(String(64), nullable=False, index=True)
+    secret_hash = Column(String(64), nullable=False)  # SHA-256 of credential secret
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # ACTIVE, ROTATED, EXPIRED, REVOKED
+    expires_at = Column(DateTime, nullable=True)
+    rotated_at = Column(DateTime, nullable=True)
+    revoked_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    agent = relationship("EndpointAgentModel", back_populates="credentials")
+
+    __table_args__ = (
+        Index("ix_ep_cred_agent_status", "agent_id", "status"),
+        Index("ix_ep_cred_key_id", "key_id", unique=True),
+    )
 
 
+class EndpointAgentConfigurationModel(Base):
+    """
+    Section 31: Versioned, Validated, and Signed Agent Configuration.
+    Controls telemetry collectors, batching, buffer thresholds, and privacy redaction.
+    """
+    __tablename__ = "endpoint_agent_configurations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    configuration_id = Column(String(64), nullable=False, index=True)  # CFG-XXXX
+    agent_id = Column(String(36), ForeignKey("endpoint_agents.id", ondelete="SET NULL"), nullable=True, index=True)
+    version = Column(String(32), nullable=False, default="1.0.0", index=True)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # DRAFT, VALIDATING, ACTIVE, SUPERSEDED, REVOKED
+    collection_policy_json = Column(Text, default="{}", nullable=False)
+    sampling_policy_json = Column(Text, default="{}", nullable=False)
+    privacy_policy_json = Column(Text, default="{}", nullable=False)
+    batch_size = Column(Integer, nullable=False, default=50)
+    flush_interval_seconds = Column(Float, nullable=False, default=10.0)
+    max_buffer_size_events = Column(Integer, nullable=False, default=5000)
+    max_buffer_size_bytes = Column(Integer, nullable=False, default=20971520)  # 20MB
+    server_endpoint = Column(String(500), nullable=False, default="/api/v1/endpoint")
+    enabled_collectors_json = Column(Text, default="[]", nullable=False)
+    signature = Column(String(256), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    activated_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
+
+    agent = relationship("EndpointAgentModel", back_populates="configurations")
+
+    __table_args__ = (
+        Index("ix_ep_cfg_ws_ver", "workspace_id", "version"),
+    )
 
 
+class EndpointTelemetryEventModel(Base):
+    """
+    Section 31: Raw Endpoint Telemetry Event Evidence.
+    Preserves raw host observations, client sequence numbers, timestamps, and provenance
+    before feeding into the Universal Ingestion Gateway and ThreatEvent model.
+    """
+    __tablename__ = "endpoint_telemetry_events"
 
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    agent_id = Column(String(36), ForeignKey("endpoint_agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    device_id = Column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_id = Column(String(64), nullable=False, index=True)  # Client event UUID
+    sequence_number = Column(Integer, nullable=False, index=True)
+    event_type = Column(String(64), nullable=False, index=True)  # PROCESS, NETWORK, DNS, AUTHENTICATION, SYSTEM, FILE_METADATA, SECURITY_AUDIT
+    event_time = Column(DateTime, nullable=False, index=True)  # Endpoint timestamp
+    received_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)  # Backend timestamp
+    collector_id = Column(String(64), nullable=False, index=True)
+    collector_version = Column(String(32), nullable=False, default="1.0.0")
+    configuration_version = Column(String(32), nullable=False, default="1.0.0")
+    agent_version = Column(String(32), nullable=False, default="1.0.0")
+    schema_version = Column(String(32), nullable=False, default="1.0.0")
+    priority = Column(String(32), nullable=False, default="NORMAL", index=True)  # CRITICAL, HIGH, NORMAL, LOW
+    threat_event_id = Column(String(36), ForeignKey("threat_events.id", ondelete="SET NULL"), nullable=True, index=True)
+    payload_json = Column(Text, default="{}", nullable=False)
+    integrity_hash = Column(String(64), nullable=True)
+    status = Column(String(32), nullable=False, default="ACCEPTED", index=True)  # ACCEPTED, NORMALIZED, REJECTED, DUPLICATE
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    agent = relationship("EndpointAgentModel", back_populates="telemetry_events")
+    device = relationship("DeviceModel", back_populates="telemetry_events")
+    threat_event = relationship("ThreatEventModel", foreign_keys=[threat_event_id])
+
+    __table_args__ = (
+        Index("ix_ep_events_dedup", "agent_id", "sequence_number", "event_id", unique=True),
+        Index("ix_ep_events_ws_type_time", "workspace_id", "event_type", "event_time"),
+    )
+
+
+class EndpointAgentHeartbeatModel(Base):
+    """
+    Section 31: Endpoint Agent Periodic Health & Metric Report.
+    Audits collector health states, queue depth, buffer metrics, and host performance.
+    """
+    __tablename__ = "endpoint_agent_heartbeats"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    agent_id = Column(String(36), ForeignKey("endpoint_agents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    health_state = Column(String(32), nullable=False, default="HEALTHY", index=True)  # HEALTHY, DEGRADED, OFFLINE, UNAUTHORIZED, MISCONFIGURED, BUFFER_PRESSURE, COLLECTOR_FAILURE
+    collector_states_json = Column(Text, default="{}", nullable=False)
+    buffer_events_count = Column(Integer, nullable=False, default=0)
+    buffer_bytes = Column(Integer, nullable=False, default=0)
+    cpu_usage_percent = Column(Float, nullable=False, default=0.0)
+    memory_usage_mb = Column(Float, nullable=False, default=0.0)
+    last_event_time = Column(DateTime, nullable=True)
+    received_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    agent = relationship("EndpointAgentModel", back_populates="heartbeats")
+
+    __table_args__ = (
+        Index("ix_ep_hb_agent_time", "agent_id", "received_at"),
+    )
