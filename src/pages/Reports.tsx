@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import {
   FileText,
   Printer,
@@ -20,6 +20,7 @@ import { reportService } from '../services/reportService';
 export const Reports: React.FC = () => {
   const navigate = useNavigate();
   const { id: routeReportId } = useParams<{ id?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   // State
   const [reportsList, setReportsList] = useState<ReportListItem[]>([]);
@@ -31,9 +32,21 @@ export const Reports: React.FC = () => {
   const [isDownloadingJson, setIsDownloadingJson] = useState<boolean>(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
-  // Filters & Search
-  const [searchTerm, setSearchTerm] = useState<string>('');
+  // Filters & Search synced with URL
+  const initialSearch = searchParams.get('q') || searchParams.get('search') || '';
+  const [searchTerm, setSearchTerm] = useState<string>(initialSearch);
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    if (searchTerm.trim()) {
+      params.set('q', searchTerm.trim());
+    } else {
+      params.delete('q');
+      params.delete('search');
+    }
+    setSearchParams(params, { replace: true });
+  }, [searchTerm, setSearchParams]);
 
   const showToast = (msg: string) => {
     setSuccessToast(msg);

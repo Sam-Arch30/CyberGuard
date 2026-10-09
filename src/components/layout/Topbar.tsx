@@ -8,14 +8,15 @@ import {
   Sparkles,
   RotateCcw,
   Menu,
+  Search,
 } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../../context/ThemeContext';
 import { useDemoTour } from '../../context/DemoTourContext';
 import { useInvestigation } from '../../context/InvestigationContext';
-import { SearchInput } from '../ui';
 import { Breadcrumbs } from './Breadcrumbs';
 import { cn } from '../../utils/cn';
+import { GlobalSearchModal, IndicatorDetailDrawer } from '../search';
 
 export interface TopbarProps {
   onToggleMobileSidebar?: () => void;
@@ -25,7 +26,8 @@ export interface TopbarProps {
 export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
+  const [drawerIndicator, setDrawerIndicator] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -36,6 +38,18 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
 
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Global keyboard shortcut for search (⌘K / Ctrl+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsSearchModalOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -98,13 +112,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
     return list;
   }, [activeEmail]);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/history?search=${encodeURIComponent(searchQuery)}`);
-    }
-  };
-
   // Derive heading hierarchy based on current route (Section 13)
   const pageHeading = useMemo(() => {
     const path = location.pathname;
@@ -139,6 +146,7 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
   }, [location.pathname, activeEmailId, activeEmail]);
 
   return (
+    <>
     <header
       className={cn(
         'sticky top-0 z-30 bg-surface/90 backdrop-blur-md border-b border-border px-3 sm:px-6 h-16 flex items-center justify-between transition-colors select-none',
@@ -170,15 +178,22 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
           )}
         </div>
 
-        {/* Global Search Input */}
-        <form onSubmit={handleSearchSubmit} className="relative w-36 sm:w-60 md:w-72">
-          <SearchInput
-            value={searchQuery}
-            onChangeValue={setSearchQuery}
-            placeholder="Search indicator, sender, hash..."
-            size="sm"
-          />
-        </form>
+        {/* Global Search Trigger (⌘K) */}
+        <button
+          type="button"
+          onClick={() => setIsSearchModalOpen(true)}
+          className="relative flex items-center justify-between w-36 sm:w-60 md:w-72 px-3 py-1.5 rounded-control bg-surface-secondary/70 hover:bg-surface-secondary border border-border text-foreground-muted text-xs font-mono transition-colors cursor-pointer text-left"
+          aria-label="Open Global Search (⌘K)"
+          title="Search investigations, indicators, SHA-256, domains (⌘K)"
+        >
+          <div className="flex items-center space-x-2 truncate">
+            <Search className="w-3.5 h-3.5 text-foreground-muted shrink-0" />
+            <span className="truncate">Search CyberGuard...</span>
+          </div>
+          <kbd className="hidden sm:inline-flex items-center space-x-0.5 px-1.5 py-0.5 rounded text-[10px] bg-surface border border-border font-mono text-foreground-muted">
+            <span>⌘</span><span>K</span>
+          </kbd>
+        </button>
 
         {/* Active Investigation Context Tag */}
         {activeEmail && (
@@ -386,6 +401,22 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
         </div>
       </div>
     </header>
+
+    {/* Section 43 - Global Search Modal & Indicator Drawer */}
+    <GlobalSearchModal
+      isOpen={isSearchModalOpen}
+      onClose={() => setIsSearchModalOpen(false)}
+      onSelectIndicator={(indicatorVal) => {
+        setIsSearchModalOpen(false);
+        setDrawerIndicator(indicatorVal);
+      }}
+    />
+
+    <IndicatorDetailDrawer
+      indicatorValue={drawerIndicator}
+      onClose={() => setDrawerIndicator(null)}
+    />
+    </>
   );
 };
 

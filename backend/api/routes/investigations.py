@@ -38,8 +38,44 @@ from backend.api.routes.reports import (
     _serialize_report_item,
     generate_investigation_report_endpoint,
 )
+from backend.schemas.search import InvestigationListResponse
+from backend.services.search_service import SearchService
 
 router = APIRouter(prefix="/api/investigations", tags=["Investigation Workspace"])
+
+
+@router.get(
+    "",
+    response_model=InvestigationListResponse,
+    summary="List and Filter Historical Investigations",
+    description="Returns a paginated, searchable list of persistent investigations with real counts, risk scores, status, and filter facets.",
+)
+def list_investigations_endpoint(
+    q: Optional[str] = Query(None, description="Search keyword or identifier"),
+    risk: Optional[str] = Query(None, description="Risk level filter (CRITICAL, HIGH, MEDIUM, LOW)"),
+    severity: Optional[str] = Query(None, description="Severity filter"),
+    status: Optional[str] = Query(None, description="Status filter (OPEN, INVESTIGATING, CONTAINED, RESOLVED, CLOSED)"),
+    source: Optional[str] = Query(None, description="Source type filter (EMAIL, URL, FILE, NETWORK, API)"),
+    from_time: Optional[datetime] = Query(None, description="Created on or after"),
+    to_time: Optional[datetime] = Query(None, description="Created on or before"),
+    sort: str = Query("updated_desc", description="Sort order: updated_desc, created_desc, risk_desc"),
+    limit: int = Query(25, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    return SearchService.list_investigations(
+        db=db,
+        q=q,
+        risk_filter=risk,
+        severity_filter=severity,
+        status_filter=status,
+        source_filter=source,
+        from_time=from_time,
+        to_time=to_time,
+        sort_by=sort,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get(
