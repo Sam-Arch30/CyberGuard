@@ -424,6 +424,58 @@ class AnalysisRunModel(Base):
     artifact = relationship("ArtifactModel", back_populates="analysis_runs")
     findings = relationship("FindingModel", back_populates="analysis_run", cascade="all, delete-orphan", lazy="selectin")
     threat_events = relationship("ThreatEventModel", back_populates="analysis_run")
+    tasks = relationship("AnalysisTaskModel", back_populates="analysis_run", cascade="all, delete-orphan", lazy="selectin", order_by="AnalysisTaskModel.created_at")
+    events = relationship("AnalysisEventModel", back_populates="analysis_run", cascade="all, delete-orphan", lazy="selectin", order_by="AnalysisEventModel.timestamp")
+
+
+class AnalysisTaskModel(Base):
+    """
+    Represents an atomic analyzer execution task within an AnalysisRun DAG (Section 37).
+    """
+    __tablename__ = "analysis_tasks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    analyzer_id = Column(String(100), nullable=False, index=True)
+    task_type = Column(String(100), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="PENDING", index=True)  # PENDING, QUEUED, RUNNING, COMPLETED, SKIPPED, FAILED, BLOCKED, CANCELLED
+    dependency_ids_json = Column(Text, default="[]", nullable=False)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration_seconds = Column(Float, nullable=True)
+    progress = Column(Float, nullable=True)  # 0.0 - 100.0 or None
+    message = Column(String(255), nullable=True)
+    error = Column(Text, nullable=True)
+    result_count = Column(Integer, default=0, nullable=False)
+    version = Column(String(50), nullable=False, default="1.0.0")
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    analysis_run = relationship("AnalysisRunModel", back_populates="tasks")
+    events = relationship("AnalysisEventModel", back_populates="task")
+
+
+class AnalysisEventModel(Base):
+    """
+    Live event log emitted during execution of an AnalysisRun (Section 37).
+    """
+    __tablename__ = "analysis_events"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    task_id = Column(String(36), ForeignKey("analysis_tasks.id", ondelete="SET NULL"), nullable=True, index=True)
+    event_type = Column(String(50), nullable=False, index=True)  # RUN_STARTED, TASK_STARTED, TASK_PROGRESS, TASK_COMPLETED, TASK_FAILED, FINDING_PRODUCED, RISK_ASSESSED, RUN_COMPLETED, RUN_FAILED, RUN_CANCELLED
+    timestamp = Column(DateTime, default=get_utc_now, nullable=False)
+    task_status = Column(String(30), nullable=True)
+    message = Column(String(255), nullable=False)
+    result_count = Column(Integer, default=0, nullable=False)
+    error = Column(Text, nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+
+    analysis_run = relationship("AnalysisRunModel", back_populates="events")
+    task = relationship("AnalysisTaskModel", back_populates="events")
 
 
 class ModelVersionModel(Base):

@@ -72,6 +72,8 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE campaigns ADD COLUMN supporting_evidence_json TEXT DEFAULT '[]';",
                     "ALTER TABLE campaigns ADD COLUMN contradicting_evidence_json TEXT DEFAULT '[]';",
                     "ALTER TABLE campaigns ADD COLUMN correlation_summary TEXT;",
+                    "ALTER TABLE threat_events ADD COLUMN risk_assessment_id VARCHAR(64);",
+                    "ALTER TABLE attack_paths ADD COLUMN workspace_id VARCHAR(64) DEFAULT 'default';",
                 ]
                 for stmt in column_migrations:
                     try:

@@ -46,7 +46,7 @@ export const INVESTIGATION_SECTIONS: SectionMetadata[] = [
     label: 'Analysis',
     shortLabel: 'Analysis',
     description: 'Summary, indicators, URLs, domain similarity, content & scoring',
-    defaultSubTab: 'all'
+    defaultSubTab: 'live'
   },
   {
     id: 'intelligence',
@@ -153,7 +153,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
   const [subTabs, setSubTabs] = useState<Record<InvestigationSection, string>>({
     overview: 'executive',
     email: 'body',
-    analysis: 'scoring',
+    analysis: 'live',
     intelligence: 'all',
     investigation: 'graph',
     report: 'generate'

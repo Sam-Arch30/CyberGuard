@@ -338,7 +338,7 @@ export const UniversalDropZone: React.FC<UniversalDropZoneProps> = ({
     const targetId = result.investigation_id || result.evidence_id || result.artifact_id;
     if (targetId) {
       setActiveEmailId(targetId);
-      navigate(`/investigations/${targetId}/overview`);
+      navigate(`/investigations/${targetId}/analysis`);
     } else {
       navigate('/investigations');
     }

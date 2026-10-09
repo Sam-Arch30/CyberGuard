@@ -1,6 +1,6 @@
 import React from 'react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useInvestigation } from '../../context/InvestigationContext';
 import { ActiveInvestigationHeader } from '../../components/layout/ActiveInvestigationHeader';
 import { InvestigationAIDrawer } from '../../components/copilot/InvestigationAIDrawer';
@@ -11,12 +11,15 @@ import { AnalysisSectionView } from './sections/AnalysisSectionView';
 import { IntelligenceSectionView } from './sections/IntelligenceSectionView';
 import { InvestigationSectionView } from './sections/InvestigationSectionView';
 import { ReportSectionView } from './sections/ReportSectionView';
+import { LiveAnalysisView } from '../../components/analysis/LiveAnalysisView';
 
 import { CleanWorkspaceEmptyState } from './CleanWorkspaceEmptyState';
 
 export const InvestigationWorkspace: React.FC = () => {
+  const { id, section } = useParams<{ id?: string; section?: string }>();
   const {
     activeEmail,
+    activeEmailId,
     loading,
     error,
     activeSection,
@@ -26,7 +29,17 @@ export const InvestigationWorkspace: React.FC = () => {
   } = useInvestigation();
   const navigate = useNavigate();
 
+  const effectiveId = id || activeEmailId;
+  const isAnalysisRoute = section === 'analysis' || activeSection === 'analysis';
+
   if (!activeEmail) {
+    if (isAnalysisRoute && effectiveId && effectiveId !== 'analysis') {
+      return (
+        <div className="space-y-6 pb-16 page-enter relative">
+          <LiveAnalysisView investigationId={effectiveId} />
+        </div>
+      );
+    }
     if (loading) {
       return (
         <LoadingState

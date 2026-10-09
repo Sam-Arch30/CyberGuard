@@ -1060,6 +1060,13 @@ class UniversalIngestionService:
                     metadata={"candidate_analyzers": classification.candidate_analyzers},
                 )
                 analysis_run_id = run.id
+
+            if analysis_run_id:
+                try:
+                    from backend.services.analysis_orchestrator import AnalysisOrchestrator
+                    AnalysisOrchestrator.initialize_run_dag(db, analysis_run_id)
+                except Exception as exc:
+                    logger.warning("Failed to initialize DAG for run %s: %s", analysis_run_id, exc)
         except Exception as exc:
             logger.warning("Failed to record AnalysisRun: %s", exc)
 
@@ -1347,6 +1354,13 @@ class UniversalIngestionService:
                     metadata={"candidate_analyzers": classification.candidate_analyzers},
                 )
                 analysis_run_id = run.id
+
+            if analysis_run_id:
+                try:
+                    from backend.services.analysis_orchestrator import AnalysisOrchestrator
+                    AnalysisOrchestrator.initialize_run_dag(db, analysis_run_id)
+                except Exception as exc:
+                    logger.warning("Failed to initialize DAG for run %s: %s", analysis_run_id, exc)
         except Exception as exc:
             logger.warning("Failed to record AnalysisRun: %s", exc)
 
@@ -1577,6 +1591,13 @@ class UniversalIngestionService:
                     metadata={"candidate_analyzers": classification.candidate_analyzers},
                 )
                 analysis_run_id = run.id
+
+            if analysis_run_id:
+                try:
+                    from backend.services.analysis_orchestrator import AnalysisOrchestrator
+                    AnalysisOrchestrator.initialize_run_dag(db, analysis_run_id)
+                except Exception as exc:
+                    logger.warning("Failed to initialize DAG for run %s: %s", analysis_run_id, exc)
         except Exception as exc:
             logger.warning("Failed to record AnalysisRun: %s", exc)
 
