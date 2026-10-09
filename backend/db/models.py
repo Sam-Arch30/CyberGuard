@@ -1903,6 +1903,7 @@ class RiskAssessmentModel(Base):
     incident = relationship("IncidentModel", back_populates="risk_assessments", foreign_keys=[incident_id])
     analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
     parent_assessment = relationship("RiskAssessmentModel", remote_side=[id])
+    explanations = relationship("ExplanationModel", back_populates="risk_assessment", cascade="all, delete-orphan", lazy="selectin")
 
     __table_args__ = (
         Index("ix_ra_ws_scope", "workspace_id", "scope_type", "scope_id"),
@@ -2028,6 +2029,256 @@ class RiskConfigurationModel(Base):
     @property
     def contextual_modifiers(self) -> Dict[str, Any]:
         return json.loads(self.contextual_modifiers_json or "{}")
+
+
+# ============================================================================
+# Section 27: Explainable AI (XAI) Models
+# ============================================================================
+
+class ExplanationModel(Base):
+    """
+    Centralized Explainable AI (XAI) model (Section 27).
+    Converts CyberGuard's structured detection, intelligence, correlation, risk,
+    and attack-reconstruction outputs into traceable, evidence-backed explanations.
+    """
+    __tablename__ = "explanations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    scope_type = Column(String(30), nullable=False, default="EVENT", index=True)  # EVENT, INVESTIGATION, INCIDENT, CAMPAIGN, ENTITY, ATTACK_PATH, STAGE
+    scope_id = Column(String(128), nullable=False, index=True)
+    risk_assessment_id = Column(String(36), ForeignKey("risk_assessments.id", ondelete="SET NULL"), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    threat_event_id = Column(String(36), ForeignKey("threat_events.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    explanation_version = Column(Integer, nullable=False, default=1)
+    status = Column(String(30), nullable=False, default="CURRENT", index=True)  # CURRENT, SUPERSEDED, ARCHIVED
+    parent_explanation_id = Column(String(36), ForeignKey("explanations.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    # Narrative and summaries
+    summary = Column(Text, nullable=False)
+    executive_summary = Column(Text, nullable=True)
+    analyst_summary = Column(Text, nullable=True)
+    generated_text = Column(Text, nullable=True)
+
+    # Structured explanation fields (JSON-encoded)
+    conclusions_json = Column(Text, default="[]", nullable=False)
+    explanation_units_json = Column(Text, default="[]", nullable=False)
+    evidence_groups_json = Column(Text, default="[]", nullable=False)
+    contributors_json = Column(Text, default="[]", nullable=False)
+    counter_evidence_json = Column(Text, default="[]", nullable=False)
+    contradictions_json = Column(Text, default="[]", nullable=False)
+    uncertainty_json = Column(Text, default="[]", nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    missing_information_json = Column(Text, default="[]", nullable=False)
+    causal_links_json = Column(Text, default="[]", nullable=False)
+    detector_contributions_json = Column(Text, default="[]", nullable=False)
+    model_contributions_json = Column(Text, default="[]", nullable=False)
+    rule_contributions_json = Column(Text, default="[]", nullable=False)
+    mitre_explanations_json = Column(Text, default="[]", nullable=False)
+    attack_path_explanation_json = Column(Text, default="{}", nullable=False)
+    novelty_explanation_json = Column(Text, default="{}", nullable=False)
+    behavioral_explanation_json = Column(Text, default="{}", nullable=False)
+    threat_memory_explanation_json = Column(Text, default="{}", nullable=False)
+    assessment_change_guidance_json = Column(Text, default="{}", nullable=False)
+    evidence_graph_json = Column(Text, default="{}", nullable=False)
+
+    # Progressive disclosure levels
+    investigator_details_json = Column(Text, default="{}", nullable=False)
+    forensic_details_json = Column(Text, default="{}", nullable=False)
+
+    # Quality, Validation & Provenance
+    validation_status = Column(String(30), nullable=False, default="VALIDATED", index=True)  # VALIDATED, FALLBACK, REJECTED
+    validation_details_json = Column(Text, default="{}", nullable=False)
+    source_snapshot_json = Column(Text, default="{}", nullable=False)
+    provenance_json = Column(Text, default="{}", nullable=False)
+
+    created_by = Column(String(100), nullable=False, default="system")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    risk_assessment = relationship("RiskAssessmentModel", back_populates="explanations")
+    incident = relationship("IncidentModel", foreign_keys=[incident_id])
+    threat_event = relationship("ThreatEventModel", foreign_keys=[threat_event_id])
+    parent_explanation = relationship("ExplanationModel", remote_side=[id])
+    snapshots = relationship("ExplanationSnapshotModel", back_populates="explanation", cascade="all, delete-orphan", lazy="selectin")
+    feedbacks = relationship("ExplanationFeedbackModel", back_populates="explanation", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_expl_ws_scope", "workspace_id", "scope_type", "scope_id"),
+        Index("ix_expl_ws_status", "workspace_id", "status"),
+        Index("ix_expl_ws_val", "workspace_id", "validation_status"),
+    )
+
+    @property
+    def conclusions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.conclusions_json or "[]")
+
+    @property
+    def explanation_units(self) -> List[Dict[str, Any]]:
+        return json.loads(self.explanation_units_json or "[]")
+
+    @property
+    def evidence_groups(self) -> List[Dict[str, Any]]:
+        return json.loads(self.evidence_groups_json or "[]")
+
+    @property
+    def contributors(self) -> List[Dict[str, Any]]:
+        return json.loads(self.contributors_json or "[]")
+
+    @property
+    def counter_evidence(self) -> List[Dict[str, Any]]:
+        return json.loads(self.counter_evidence_json or "[]")
+
+    @property
+    def contradictions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.contradictions_json or "[]")
+
+    @property
+    def uncertainty(self) -> List[Dict[str, Any]]:
+        return json.loads(self.uncertainty_json or "[]")
+
+    @property
+    def limitations(self) -> List[str]:
+        return json.loads(self.limitations_json or "[]")
+
+    @property
+    def missing_information(self) -> List[Dict[str, Any]]:
+        return json.loads(self.missing_information_json or "[]")
+
+    @property
+    def causal_links(self) -> List[Dict[str, Any]]:
+        return json.loads(self.causal_links_json or "[]")
+
+    @property
+    def detector_contributions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.detector_contributions_json or "[]")
+
+    @property
+    def model_contributions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.model_contributions_json or "[]")
+
+    @property
+    def rule_contributions(self) -> List[Dict[str, Any]]:
+        return json.loads(self.rule_contributions_json or "[]")
+
+    @property
+    def mitre_explanations(self) -> List[Dict[str, Any]]:
+        return json.loads(self.mitre_explanations_json or "[]")
+
+    @property
+    def attack_path_explanation(self) -> Dict[str, Any]:
+        return json.loads(self.attack_path_explanation_json or "{}")
+
+    @property
+    def novelty_explanation(self) -> Dict[str, Any]:
+        return json.loads(self.novelty_explanation_json or "{}")
+
+    @property
+    def behavioral_explanation(self) -> Dict[str, Any]:
+        return json.loads(self.behavioral_explanation_json or "{}")
+
+    @property
+    def threat_memory_explanation(self) -> Dict[str, Any]:
+        return json.loads(self.threat_memory_explanation_json or "{}")
+
+    @property
+    def assessment_change_guidance(self) -> Dict[str, Any]:
+        return json.loads(self.assessment_change_guidance_json or "{}")
+
+    @property
+    def evidence_graph(self) -> Dict[str, Any]:
+        return json.loads(self.evidence_graph_json or "{}")
+
+    @property
+    def investigator_details(self) -> Dict[str, Any]:
+        return json.loads(self.investigator_details_json or "{}")
+
+    @property
+    def forensic_details(self) -> Dict[str, Any]:
+        return json.loads(self.forensic_details_json or "{}")
+
+    @property
+    def validation_details(self) -> Dict[str, Any]:
+        return json.loads(self.validation_details_json or "{}")
+
+    @property
+    def source_snapshot(self) -> Dict[str, Any]:
+        return json.loads(self.source_snapshot_json or "{}")
+
+    @property
+    def provenance(self) -> Dict[str, Any]:
+        return json.loads(self.provenance_json or "{}")
+
+
+class ExplanationSnapshotModel(Base):
+    """
+    Immutable historical snapshot of an explanation for audits and reports (Section 27).
+    """
+    __tablename__ = "explanation_snapshots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    explanation_id = Column(String(36), ForeignKey("explanations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    scope_type = Column(String(30), nullable=False)
+    scope_id = Column(String(128), nullable=False)
+    assessment_version = Column(Integer, nullable=False, default=1)
+    explanation_version = Column(Integer, nullable=False, default=1)
+
+    evidence_snapshot_json = Column(Text, default="[]", nullable=False)
+    risk_snapshot_json = Column(Text, default="{}", nullable=False)
+    attack_path_snapshot_json = Column(Text, default="{}", nullable=False)
+    model_versions_json = Column(Text, default="{}", nullable=False)
+    rule_versions_json = Column(Text, default="{}", nullable=False)
+    full_explanation_json = Column(Text, default="{}", nullable=False)
+    checksum = Column(String(64), nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    explanation = relationship("ExplanationModel", back_populates="snapshots")
+
+    __table_args__ = (
+        Index("ix_es_ws_expl_ver", "workspace_id", "explanation_id", "explanation_version"),
+    )
+
+    @property
+    def evidence_snapshot(self) -> List[Dict[str, Any]]:
+        return json.loads(self.evidence_snapshot_json or "[]")
+
+    @property
+    def risk_snapshot(self) -> Dict[str, Any]:
+        return json.loads(self.risk_snapshot_json or "{}")
+
+    @property
+    def full_explanation(self) -> Dict[str, Any]:
+        return json.loads(self.full_explanation_json or "{}")
+
+
+class ExplanationFeedbackModel(Base):
+    """
+    Structured human analyst feedback and corrections for explanations (Section 27).
+    Preserves audit trail without silently modifying original forensic records.
+    """
+    __tablename__ = "explanation_feedbacks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    explanation_id = Column(String(36), ForeignKey("explanations.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    analyst_id = Column(String(100), nullable=False, index=True)
+    feedback_type = Column(String(50), nullable=False, index=True)  # ANALYST_CONFIRMED, ANALYST_DISMISSED, ANALYST_CORRECTED, ANALYST_COMMENT
+    target_claim_id = Column(String(64), nullable=True, index=True)
+    notes = Column(Text, nullable=False)
+    correction_payload_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    explanation = relationship("ExplanationModel", back_populates="feedbacks")
+
+    __table_args__ = (
+        Index("ix_ef_ws_type", "workspace_id", "feedback_type"),
+    )
+
+    @property
+    def correction_payload(self) -> Dict[str, Any]:
+        return json.loads(self.correction_payload_json or "{}")
 
 
 

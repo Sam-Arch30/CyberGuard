@@ -9,7 +9,8 @@ import {
   Sparkles,
   Plus,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  Layers
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
@@ -25,12 +26,13 @@ import { EvidenceIntegritySection } from '../../../components/forensic/EvidenceI
 import { AddToCaseModal } from '../../../components/case/AddToCaseModal';
 import { CampaignGraphView } from '../../../components/campaign/CampaignGraphView';
 import { CampaignTimeline } from '../../../components/campaign/CampaignTimeline';
+import { ExplainableAIPanel } from '../../../components/forensic/explanation';
 
 interface InvestigationSectionViewProps {
   email: EmailAnalysis;
 }
 
-type InvestigationSubTab = 'graph' | 'campaigns' | 'cross_email' | 'evidence' | 'cases' | 'copilot';
+type InvestigationSubTab = 'graph' | 'campaigns' | 'cross_email' | 'evidence' | 'cases' | 'explanation' | 'copilot';
 
 export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> = ({ email }) => {
   const {
@@ -99,6 +101,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
     { id: 'campaigns', label: 'Campaign Correlation', icon: Network, count: 'CLUSTERS' },
     { id: 'cross_email', label: 'Related Emails Workspace', icon: GitMerge, count: 16 },
     { id: 'evidence', label: 'Evidence & Audit Chain', icon: ShieldCheck },
+    { id: 'explanation', label: 'Explainable AI (XAI)', icon: Layers, count: 'PROVENANCE', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
     { id: 'cases', label: 'Case Relationships', icon: Briefcase },
     { id: 'copilot', label: 'Investigation Copilot', icon: Sparkles, count: 'AI', badgeColor: 'text-primary bg-primary/10 border-primary/30' }
   ];
@@ -407,6 +410,18 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
                 <span className="text-[11px] text-foreground-muted">Click "Ask AI about this" on any finding, IOC, IP, domain, or graph node.</span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Section 27: Explainable AI Sub-Tab */}
+        {currentSubTab === 'explanation' && (
+          <div className="space-y-4">
+            <ExplainableAIPanel
+              scopeType="EVENT"
+              scopeId={email.id}
+              riskScore={email.threat_score?.score}
+              riskLevel={email.threat_score?.severity}
+            />
           </div>
         )}
       </div>

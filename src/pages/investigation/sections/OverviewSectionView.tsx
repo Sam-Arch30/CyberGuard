@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import { useInvestigation } from '../../../context/InvestigationContext';
+import { ExplainableAIPanel } from '../../../components/forensic/explanation';
 
 interface OverviewSectionViewProps {
   email: EmailAnalysis;
@@ -676,7 +677,18 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       </div>
 
       {/* =======================================================================
-          SECTION 5 — INVESTIGATION SUMMARY (Concise Backend/LLM Narrative)
+          SECTION 5 — EXPLAINABLE AI (XAI) LAYER
+          ======================================================================= */}
+      <ExplainableAIPanel
+        scopeType="EVENT"
+        scopeId={email.id}
+        riskScore={score}
+        riskLevel={severity}
+        confidence={genuineConfidence || undefined}
+      />
+
+      {/* =======================================================================
+          SECTION 5B — INVESTIGATION SUMMARY (Concise Backend/LLM Narrative)
           ======================================================================= */}
       <section className="bg-surface rounded-card border border-border p-4 space-y-3">
         <div className="flex items-center justify-between pb-2 border-b border-border">

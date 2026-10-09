@@ -986,6 +986,11 @@ class ReportService:
         story.append(Paragraph("<br/>".join([f"<b>[ ]</b> {html.escape(r)}" for r in rec_actions]), styles["Body"]))
         story.append(Spacer(1, 10))
 
+        # Section 27: Explainable AI (XAI) Evidence-Grounded Reasoning
+        xai_data = analysis.get("xai_explanation") or analysis.get("explanation")
+        if xai_data:
+            story.extend(cls._format_explainable_ai_section(xai_data, styles))
+
         story.append(Paragraph("12. Evidentiary Limitations & Chain-of-Custody Certification", styles["SectionHeader"]))
         story.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
 
@@ -1933,6 +1938,119 @@ class ReportService:
                 ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
             ]))
             flowables.append(ct)
+
+        flowables.append(Spacer(1, 8))
+        return flowables
+
+    @classmethod
+    def _format_explainable_ai_section(
+        cls,
+        explanation_data: Optional[Dict[str, Any] | Any],
+        styles: Dict[str, ParagraphStyle],
+    ) -> List[Any]:
+        """
+        Formats Section 27 Explainable AI (XAI) evidence-grounded reasoning section for PDF reports.
+        Visualizes Why CyberGuard Flagged This, Grounded Claims, Counter-Evidence, Contradictions,
+        Uncertainty, and Assessment-Change Guidance.
+        """
+        flowables: List[Any] = []
+        if not explanation_data:
+            return flowables
+
+        data = explanation_data if isinstance(explanation_data, dict) else (
+            explanation_data.model_dump() if hasattr(explanation_data, "model_dump") else {}
+        )
+
+        flowables.append(Paragraph("<b>EXPLAINABLE AI (XAI) EVIDENCE-GROUNDED REASONING (SECTION 27)</b>", styles["SectionHeader"]))
+        flowables.append(HRFlowable(width="100%", thickness=1, color=colors.HexColor("#CBD5E1"), spaceBefore=1, spaceAfter=6))
+
+        summary = data.get("analyst_summary") or data.get("summary") or "Evidence-grounded synthesis completed."
+        exec_sum = data.get("executive_summary") or ""
+        score = data.get("risk_score", 0.0)
+        level = data.get("risk_level", "INFO")
+        conf = data.get("confidence_level", "HIGH")
+        unc = data.get("uncertainty", "LOW")
+
+        # Callout Box
+        callout_data = [
+            [
+                Paragraph(f"<b>WHY CYBERGUARD FLAGGED THIS:</b><br/>{html.escape(str(exec_sum or summary))}", styles["TableCellBold"]),
+                Paragraph(f"<b>RISK LEVEL:</b> {level} ({score:.0f}/100)<br/><b>CONFIDENCE:</b> {conf}<br/><b>UNCERTAINTY:</b> {unc}", styles["TableCell"]),
+            ]
+        ]
+        ctable = Table(callout_data, colWidths=[360, 180])
+        ctable.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#F8FAFC")),
+            ("BOX", (0, 0), (-1, -1), 1.0, colors.HexColor("#0284C7")),
+            ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+            ("TOPPADDING", (0, 0), (-1, -1), 4),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+        ]))
+        flowables.append(ctable)
+        flowables.append(Spacer(1, 6))
+
+        # Grounded Claims Table
+        claims = data.get("explanation_units") or []
+        if claims:
+            flowables.append(Paragraph("<b>Evidence-Backed Analytical Claims:</b>", styles["TableCellBold"]))
+            claim_table_data = [
+                [
+                    Paragraph("<b>CLAIM / TYPE</b>", styles["TableHead"]),
+                    Paragraph("<b>SUPPORT LEVEL</b>", styles["TableHead"]),
+                    Paragraph("<b>EVIDENCE REFS</b>", styles["TableHead"]),
+                    Paragraph("<b>GROUNDED ASSERTION</b>", styles["TableHead"]),
+                ]
+            ]
+            for c in claims[:6]:
+                c_dict = c if isinstance(c, dict) else (c.model_dump() if hasattr(c, "model_dump") else {})
+                cid = c_dict.get("id", "CLAIM")
+                ctype = c_dict.get("claim_type", "DETECTION")
+                supp = c_dict.get("support_level", "HIGH")
+                refs = ", ".join(c_dict.get("evidence_refs", [])[:3]) or "Direct Telemetry"
+                txt = c_dict.get("claim", "")
+                claim_table_data.append([
+                    Paragraph(f"<b>{html.escape(cid)}</b><br/>{html.escape(str(ctype))}", styles["TableCellBold"]),
+                    Paragraph(html.escape(str(supp)), styles["TableCell"]),
+                    Paragraph(html.escape(str(refs)), styles["TableCell"]),
+                    Paragraph(html.escape(str(txt)), styles["TableCell"]),
+                ])
+
+            cl_t = Table(claim_table_data, colWidths=[100, 80, 110, 250])
+            cl_t.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#F1F5F9")),
+                ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#CBD5E1")),
+                ("INNERGRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#E2E8F0")),
+                ("TOPPADDING", (0, 0), (-1, -1), 2),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ]))
+            flowables.append(cl_t)
+            flowables.append(Spacer(1, 6))
+
+        # Counter-Evidence & Contradictions
+        counter_ev = data.get("counter_evidence") or []
+        contras = data.get("contradictions") or []
+        if counter_ev or contras:
+            flowables.append(Paragraph("<b>Counter-Evidence & Contradictions Observed:</b>", styles["TableCellBold"]))
+            for ce in counter_ev[:2]:
+                ce_dict = ce if isinstance(ce, dict) else (ce.model_dump() if hasattr(ce, "model_dump") else {})
+                flowables.append(Paragraph(f"• <b>[Counter-Evidence]</b> {html.escape(str(ce_dict.get('claim', '')))} — <i>{html.escape(str(ce_dict.get('interpretation', '')))}</i>", styles["TableCell"]))
+            for cr in contras[:2]:
+                cr_dict = cr if isinstance(cr, dict) else (cr.model_dump() if hasattr(cr, "model_dump") else {})
+                flowables.append(Paragraph(f"• <b>[Contradiction]</b> {html.escape(str(cr_dict.get('claim', '')))} vs {html.escape(str(cr_dict.get('conflicting_signal', '')))}", styles["TableCell"]))
+            flowables.append(Spacer(1, 6))
+
+        # What Would Change This Assessment
+        change_guidance = data.get("assessment_change_guidance") or {}
+        cg_dict = change_guidance if isinstance(change_guidance, dict) else (change_guidance.model_dump() if hasattr(change_guidance, "model_dump") else {})
+        weaken = cg_dict.get("what_would_weaken") or []
+        strengthen = cg_dict.get("what_would_strengthen") or []
+        if weaken or strengthen:
+            flowables.append(Paragraph("<b>Assessment Modification Guidance:</b>", styles["TableCellBold"]))
+            if strengthen:
+                flowables.append(Paragraph(f"• <b>Strengthen if:</b> {html.escape(str(strengthen[0]))}", styles["TableCell"]))
+            if weaken:
+                flowables.append(Paragraph(f"• <b>Weaken if:</b> {html.escape(str(weaken[0]))}", styles["TableCell"]))
+            flowables.append(Spacer(1, 6))
 
         flowables.append(Spacer(1, 8))
         return flowables
