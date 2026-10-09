@@ -4,12 +4,38 @@ from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
 from backend.services.dashboard_service import DashboardService
+from backend.services.soc_dashboard_service import SocDashboardService
 from backend.schemas.dashboard import (
     DashboardSummaryResponse,
     DashboardEmailListResponse
 )
+from backend.schemas.soc_overview import SocOverviewResponse
 
 router = APIRouter(prefix="/api/dashboard", tags=["Analyst Dashboard"])
+
+
+@router.get(
+    "/overview",
+    response_model=SocOverviewResponse,
+    status_code=status.HTTP_200_OK,
+    summary="Get unified SOC Overview telemetry and priority queue",
+    description="Returns Section 44 operational dashboard telemetry: Security Posture metrics, deterministic Priority Queue, Risk Distribution, Audit Activity, Threat Intelligence, and System/Fleet Health from authoritative persistent models."
+)
+def get_soc_overview(
+    time_window: str = Query("30d", description="Time window for metric aggregation: 24h, 7d, 30d, all"),
+    workspace_id: str = Query("default", description="Workspace tenant identifier"),
+    limit_queue: int = Query(10, ge=1, le=50, description="Max priority queue items to return"),
+    limit_activity: int = Query(15, ge=1, le=50, description="Max recent activity events to return"),
+    db: Session = Depends(get_db)
+):
+    return SocDashboardService.get_overview(
+        db=db,
+        time_window=time_window,
+        workspace_id=workspace_id,
+        limit_queue=limit_queue,
+        limit_activity=limit_activity,
+    )
+
 
 
 @router.get(
