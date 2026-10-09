@@ -481,7 +481,8 @@ def test_15_eml_ingestion_still_works(client: TestClient):
 
 def test_16_existing_analysis_remains_accessible(client: TestClient, db):
     """Verifies that previously ingested analyses remain accessible via /api/emails/{id}/analysis."""
-    evd = db.query(EvidenceModel).first()
+    sample_sha = hashlib.sha256(SAMPLE_SAFE_RFC822_EML).hexdigest().lower()
+    evd = db.query(EvidenceModel).filter(EvidenceModel.sha256 == sample_sha).first()
     assert evd is not None, "Evidence should exist from previous ingestion test"
 
     response = client.get(f"/api/emails/{evd.evidence_id}/analysis")
@@ -540,7 +541,8 @@ def test_17_new_normalized_records_produced_from_eml(db):
 
 def test_18_existing_report_generation_still_works(client: TestClient, db):
     """Verifies that PDF report generation endpoint continues functioning normally."""
-    evd = db.query(EvidenceModel).first()
+    sample_sha = hashlib.sha256(SAMPLE_SAFE_RFC822_EML).hexdigest().lower()
+    evd = db.query(EvidenceModel).filter(EvidenceModel.sha256 == sample_sha).first()
     assert evd is not None
 
     payload_rec = db.query(AnalysisPayloadModel).filter(AnalysisPayloadModel.evidence_id == evd.evidence_id).first()

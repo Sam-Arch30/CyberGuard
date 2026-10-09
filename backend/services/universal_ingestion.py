@@ -38,10 +38,13 @@ from backend.db.models import (
     IndicatorModel,
     RelationshipModel,
     ThreatEventModel,
+    EmailAnalysisModel,
+    AnalysisRunModel,
 )
 from backend.schemas.unified import (
     ArtifactTypeEnum,
     AnalysisStatusEnum,
+    AnalysisTriggerEnum,
     InputModeEnum,
     IndicatorTypeEnum,
     RelationshipTypeEnum,
@@ -77,6 +80,8 @@ from backend.services.unified_service import (
     IndicatorService,
     RelationshipService,
     ThreatEventService,
+    IncidentService,
+    AnalysisService,
     get_utc_now,
     generate_uuid,
 )
@@ -930,7 +935,13 @@ class UniversalIngestionService:
             logger.error("Storage persistence failed for %s: %s", safe_name, e)
             raise StorageFailureError(f"Failed to persist evidence to storage: {str(e)}")
 
-        # 4. Create or retrieve ArtifactModel
+        # 4. Check duplicate against existing artifacts
+        clean_sha = storage_res.sha256
+        is_duplicate = db.query(ArtifactModel).filter(ArtifactModel.sha256 == clean_sha).first() is not None
+        if is_duplicate:
+            classification.warnings.append("Duplicate artifact: This content has been previously observed and analyzed in CyberGuard.")
+
+        # 5. Create or retrieve ArtifactModel
         artifact = ArtifactService.create_or_get_artifact(
             db=db,
             artifact_type=classification.artifact_type,
@@ -938,7 +949,7 @@ class UniversalIngestionService:
             source=source,
             mime_type=classification.detected_mime or reported_mime,
             size=storage_res.size,
-            sha256=storage_res.sha256,
+            sha256=clean_sha,
             sha1=storage_res.sha1,
             md5=storage_res.md5,
             storage_reference=storage_res.storage_key,
@@ -950,7 +961,7 @@ class UniversalIngestionService:
             },
         )
 
-        # 5. Record physical storage record
+        # 6. Record physical storage record
         StorageRecordService.create_or_get_storage_record(
             db=db,
             artifact_id=artifact.id,
@@ -962,7 +973,7 @@ class UniversalIngestionService:
             integrity_status="VERIFIED",
         )
 
-        # 6. Record discrete Ingestion provenance
+        # 7. Record discrete Ingestion provenance
         ingestion = IngestionService.record_ingestion(
             db=db,
             artifact_id=artifact.id,
@@ -974,13 +985,50 @@ class UniversalIngestionService:
             metadata={"classification": classification.model_dump()},
         )
 
-        # 7. Establish association to incident or case if provided
-        if incident_id:
+        # 8. Record chain-of-custody EvidenceModel
+        ev_record = AuditService.record_evidence(
+            db=db,
+            sha256=clean_sha,
+            original_filename=safe_name,
+            size=storage_res.size,
+            uploader=uploader_name,
+        )
+
+        # 9. Establish association to incident or case (or auto-create incident)
+        target_incident_id = incident_id
+        if not target_incident_id and is_duplicate:
+            existing_rel = (
+                db.query(RelationshipModel)
+                .filter(
+                    RelationshipModel.target_type == "ARTIFACT",
+                    RelationshipModel.target_id == artifact.id,
+                    RelationshipModel.source_type == "INCIDENT",
+                )
+                .first()
+            )
+            if existing_rel:
+                target_incident_id = existing_rel.source_id
+
+        if not target_incident_id:
+            try:
+                inc = IncidentService.create_incident(
+                    db=db,
+                    title=f"Investigation: {safe_name}",
+                    description=f"Evidence artifact '{safe_name}' ({classification.artifact_type.value}) ingested via Universal Gateway.",
+                    severity=SeverityEnum.MEDIUM,
+                    risk_score=0.0,
+                    assigned_to=uploader_name,
+                )
+                target_incident_id = inc.id
+            except Exception as exc:
+                logger.warning("Auto incident creation failed: %s", exc)
+
+        if target_incident_id:
             try:
                 RelationshipService.create_relationship(
                     db=db,
                     source_type="INCIDENT",
-                    source_id=incident_id,
+                    source_id=target_incident_id,
                     relationship_type=RelationshipTypeEnum.ASSOCIATED_WITH,
                     target_type="ARTIFACT",
                     target_id=artifact.id,
@@ -989,6 +1037,61 @@ class UniversalIngestionService:
                 )
             except Exception:
                 pass
+
+        # 10. AnalysisRun record (use existing if duplicate has one, otherwise create new)
+        analysis_run_id = None
+        try:
+            if is_duplicate:
+                existing_run = (
+                    db.query(AnalysisRunModel)
+                    .filter(AnalysisRunModel.artifact_id == artifact.id)
+                    .order_by(AnalysisRunModel.started_at.desc())
+                    .first()
+                )
+                if existing_run:
+                    analysis_run_id = existing_run.id
+
+            if not analysis_run_id:
+                run = AnalysisService.create_analysis_run(
+                    db=db,
+                    artifact_id=artifact.id,
+                    status=AnalysisStatusEnum.QUEUED,
+                    trigger=AnalysisTriggerEnum.USER,
+                    metadata={"candidate_analyzers": classification.candidate_analyzers},
+                )
+                analysis_run_id = run.id
+        except Exception as exc:
+            logger.warning("Failed to record AnalysisRun: %s", exc)
+
+        # 11. For EMAIL artifacts, parse and save to EmailAnalysisModel & EML storage for instant dashboard/workspace visibility
+        if classification.artifact_type == ArtifactTypeEnum.EMAIL:
+            try:
+                from backend.services.email_parser import EmailParserService
+                from backend.services.eml_storage_service import EMLStorageService
+                from backend.services.dashboard_service import DashboardService
+
+                EMLStorageService.save_eml(
+                    evidence_id=ev_record.evidence_id,
+                    sha256=clean_sha,
+                    original_filename=safe_name,
+                    content_bytes=content_bytes,
+                )
+
+                existing_ea = (
+                    db.query(EmailAnalysisModel)
+                    .filter(EmailAnalysisModel.evidence_id == ev_record.evidence_id)
+                    .first()
+                )
+                if not existing_ea:
+                    parsed_email = EmailParserService.parse_eml_bytes(content_bytes, filename=safe_name)
+                    DashboardService.record_email_analysis(
+                        db=db,
+                        evidence_record=ev_record,
+                        analysis_result=parsed_email,
+                        raw_sha256=clean_sha,
+                    )
+            except Exception as exc:
+                logger.warning("Email analysis auto-record failed: %s", exc)
 
         AuditService.log_audit(
             db=db,
@@ -1017,6 +1120,10 @@ class UniversalIngestionService:
             warnings=classification.warnings,
             metadata=json.loads(artifact.metadata_json or "{}"),
             created_at=ingestion.received_at,
+            evidence_id=ev_record.evidence_id if ev_record else None,
+            investigation_id=target_incident_id,
+            analysis_run_id=analysis_run_id,
+            duplicate=is_duplicate,
         )
 
     @classmethod
@@ -1100,7 +1207,13 @@ class UniversalIngestionService:
             logger.error("Storage persistence failed for text input: %s", e)
             raise StorageFailureError(f"Failed to persist text evidence: {str(e)}")
 
-        # 4. Create or retrieve ArtifactModel
+        # 4. Check duplicate against existing artifacts
+        clean_sha = storage_res.sha256
+        is_duplicate = db.query(ArtifactModel).filter(ArtifactModel.sha256 == clean_sha).first() is not None
+        if is_duplicate:
+            classification.warnings.append("Duplicate artifact: This content has been previously observed and analyzed in CyberGuard.")
+
+        # 5. Create or retrieve ArtifactModel
         artifact = ArtifactService.create_or_get_artifact(
             db=db,
             artifact_type=classification.artifact_type,
@@ -1108,7 +1221,7 @@ class UniversalIngestionService:
             source=source,
             mime_type="text/plain",
             size=len(text_bytes),
-            sha256=storage_res.sha256,
+            sha256=clean_sha,
             sha1=storage_res.sha1,
             md5=storage_res.md5,
             storage_reference=storage_res.storage_key,
@@ -1121,7 +1234,7 @@ class UniversalIngestionService:
             },
         )
 
-        # 5. Record physical storage record
+        # 6. Record physical storage record
         StorageRecordService.create_or_get_storage_record(
             db=db,
             artifact_id=artifact.id,
@@ -1133,7 +1246,7 @@ class UniversalIngestionService:
             integrity_status="VERIFIED",
         )
 
-        # 6. Record discrete Ingestion record
+        # 7. Record discrete Ingestion record
         ingestion = IngestionService.record_ingestion(
             db=db,
             artifact_id=artifact.id,
@@ -1145,7 +1258,16 @@ class UniversalIngestionService:
             metadata={"classification": classification.model_dump()},
         )
 
-        # 7. Upsert normalized Indicator if applicable
+        # 8. Record chain-of-custody EvidenceModel
+        ev_record = AuditService.record_evidence(
+            db=db,
+            sha256=clean_sha,
+            original_filename=safe_filename,
+            size=len(text_bytes),
+            uploader=uploader_name,
+        )
+
+        # 9. Upsert normalized Indicator if applicable
         if classification.artifact_type in (ArtifactTypeEnum.IP, ArtifactTypeEnum.DOMAIN, ArtifactTypeEnum.URL) or classification.metadata.get("subtype") == "EMAIL_ADDRESS":
             ind_type = (
                 IndicatorTypeEnum.EMAIL_ADDRESS if classification.metadata.get("subtype") == "EMAIL_ADDRESS"
@@ -1159,13 +1281,41 @@ class UniversalIngestionService:
                 metadata={"source_artifact": artifact.id},
             )
 
-        # 8. Link to incident if provided
-        if incident_id:
+        # 10. Establish association to incident or case (or auto-create incident)
+        target_incident_id = incident_id
+        if not target_incident_id and is_duplicate:
+            existing_rel = (
+                db.query(RelationshipModel)
+                .filter(
+                    RelationshipModel.target_type == "ARTIFACT",
+                    RelationshipModel.target_id == artifact.id,
+                    RelationshipModel.source_type == "INCIDENT",
+                )
+                .first()
+            )
+            if existing_rel:
+                target_incident_id = existing_rel.source_id
+
+        if not target_incident_id:
+            try:
+                inc = IncidentService.create_incident(
+                    db=db,
+                    title=f"Investigation: {norm_val[:60]}",
+                    description=f"Evidence text/URL '{norm_val[:120]}' ({classification.artifact_type.value}) ingested via Universal Gateway.",
+                    severity=SeverityEnum.MEDIUM,
+                    risk_score=0.0,
+                    assigned_to=uploader_name,
+                )
+                target_incident_id = inc.id
+            except Exception as exc:
+                logger.warning("Auto incident creation failed: %s", exc)
+
+        if target_incident_id:
             try:
                 RelationshipService.create_relationship(
                     db=db,
                     source_type="INCIDENT",
-                    source_id=incident_id,
+                    source_id=target_incident_id,
                     relationship_type=RelationshipTypeEnum.ASSOCIATED_WITH,
                     target_type="ARTIFACT",
                     target_id=artifact.id,
@@ -1174,6 +1324,31 @@ class UniversalIngestionService:
                 )
             except Exception:
                 pass
+
+        # 11. AnalysisRun record (use existing if duplicate has one, otherwise create new)
+        analysis_run_id = None
+        try:
+            if is_duplicate:
+                existing_run = (
+                    db.query(AnalysisRunModel)
+                    .filter(AnalysisRunModel.artifact_id == artifact.id)
+                    .order_by(AnalysisRunModel.started_at.desc())
+                    .first()
+                )
+                if existing_run:
+                    analysis_run_id = existing_run.id
+
+            if not analysis_run_id:
+                run = AnalysisService.create_analysis_run(
+                    db=db,
+                    artifact_id=artifact.id,
+                    status=AnalysisStatusEnum.QUEUED,
+                    trigger=AnalysisTriggerEnum.USER,
+                    metadata={"candidate_analyzers": classification.candidate_analyzers},
+                )
+                analysis_run_id = run.id
+        except Exception as exc:
+            logger.warning("Failed to record AnalysisRun: %s", exc)
 
         AuditService.log_audit(
             db=db,
@@ -1204,6 +1379,10 @@ class UniversalIngestionService:
             warnings=classification.warnings,
             metadata=json.loads(artifact.metadata_json or "{}"),
             created_at=ingestion.received_at,
+            evidence_id=ev_record.evidence_id if ev_record else None,
+            investigation_id=target_incident_id,
+            analysis_run_id=analysis_run_id,
+            duplicate=is_duplicate,
         )
 
     @classmethod
@@ -1256,7 +1435,13 @@ class UniversalIngestionService:
             logger.error("Storage persistence failed for structured event: %s", e)
             raise StorageFailureError(f"Failed to persist event evidence: {str(e)}")
 
-        # 3. Create ArtifactModel
+        # 3. Check duplicate against existing artifacts
+        clean_sha = storage_res.sha256
+        is_duplicate = db.query(ArtifactModel).filter(ArtifactModel.sha256 == clean_sha).first() is not None
+        if is_duplicate:
+            classification.warnings.append("Duplicate artifact: This content has been previously observed and analyzed in CyberGuard.")
+
+        # 4. Create ArtifactModel
         artifact = ArtifactService.create_or_get_artifact(
             db=db,
             artifact_type=classification.artifact_type,
@@ -1264,7 +1449,7 @@ class UniversalIngestionService:
             source=source,
             mime_type="application/json",
             size=len(json_bytes),
-            sha256=storage_res.sha256,
+            sha256=clean_sha,
             sha1=storage_res.sha1,
             md5=storage_res.md5,
             storage_reference=storage_res.storage_key,
@@ -1276,7 +1461,7 @@ class UniversalIngestionService:
             },
         )
 
-        # 4. Storage & Ingestion records
+        # 5. Storage & Ingestion records
         StorageRecordService.create_or_get_storage_record(
             db=db,
             artifact_id=artifact.id,
@@ -1299,12 +1484,22 @@ class UniversalIngestionService:
             metadata={"classification": classification.model_dump()},
         )
 
-        # 5. Extract ThreatEvent if event resembles an authentication failure or suspicious access
+        # 6. Record chain-of-custody EvidenceModel
+        ev_record = AuditService.record_evidence(
+            db=db,
+            sha256=clean_sha,
+            original_filename=safe_filename,
+            size=len(json_bytes),
+            uploader=uploader_name,
+        )
+
+        # 7. Extract ThreatEvent if event resembles an authentication failure or suspicious access
+        te_id = None
         if classification.artifact_type == ArtifactTypeEnum.AUTH_LOG:
             event_type = event_dict.get("event_type") or event_dict.get("action") or "authentication_attempt"
             summary = event_dict.get("summary") or event_dict.get("message") or f"Auth event for user {event_dict.get('user', 'unknown')}"
             sev = SeverityEnum.HIGH if "fail" in str(event_type).lower() or event_dict.get("status") == "failure" else SeverityEnum.LOW
-            ThreatEventService.create_threat_event(
+            te = ThreatEventService.create_threat_event(
                 db=db,
                 event_type=str(event_type),
                 summary=str(summary),
@@ -1312,14 +1507,45 @@ class UniversalIngestionService:
                 source_artifact_id=artifact.id,
                 metadata={"raw_keys": list(event_dict.keys())},
             )
+            te_id = te.id
 
-        # 6. Incident relationship if provided
-        if incident_id:
+        # 8. Establish association to incident or case (or auto-create incident)
+        target_incident_id = incident_id
+        if not target_incident_id and is_duplicate:
+            existing_rel = (
+                db.query(RelationshipModel)
+                .filter(
+                    RelationshipModel.target_type == "ARTIFACT",
+                    RelationshipModel.target_id == artifact.id,
+                    RelationshipModel.source_type == "INCIDENT",
+                )
+                .first()
+            )
+            if existing_rel:
+                target_incident_id = existing_rel.source_id
+
+        if not target_incident_id:
+            try:
+                inc = IncidentService.create_incident(
+                    db=db,
+                    title=f"Investigation: {artifact.name}",
+                    description=f"Structured security event ({classification.artifact_type.value}) ingested via Universal Gateway.",
+                    severity=SeverityEnum.MEDIUM,
+                    risk_score=0.0,
+                    assigned_to=uploader_name,
+                )
+                target_incident_id = inc.id
+                if te_id:
+                    IncidentService.attach_threat_event(db=db, incident_id=inc.id, threat_event_id=te_id)
+            except Exception as exc:
+                logger.warning("Auto incident creation failed: %s", exc)
+
+        if target_incident_id:
             try:
                 RelationshipService.create_relationship(
                     db=db,
                     source_type="INCIDENT",
-                    source_id=incident_id,
+                    source_id=target_incident_id,
                     relationship_type=RelationshipTypeEnum.ASSOCIATED_WITH,
                     target_type="ARTIFACT",
                     target_id=artifact.id,
@@ -1328,6 +1554,31 @@ class UniversalIngestionService:
                 )
             except Exception:
                 pass
+
+        # 9. AnalysisRun record (use existing if duplicate has one, otherwise create new)
+        analysis_run_id = None
+        try:
+            if is_duplicate:
+                existing_run = (
+                    db.query(AnalysisRunModel)
+                    .filter(AnalysisRunModel.artifact_id == artifact.id)
+                    .order_by(AnalysisRunModel.started_at.desc())
+                    .first()
+                )
+                if existing_run:
+                    analysis_run_id = existing_run.id
+
+            if not analysis_run_id:
+                run = AnalysisService.create_analysis_run(
+                    db=db,
+                    artifact_id=artifact.id,
+                    status=AnalysisStatusEnum.QUEUED,
+                    trigger=AnalysisTriggerEnum.USER,
+                    metadata={"candidate_analyzers": classification.candidate_analyzers},
+                )
+                analysis_run_id = run.id
+        except Exception as exc:
+            logger.warning("Failed to record AnalysisRun: %s", exc)
 
         AuditService.log_audit(
             db=db,
@@ -1356,6 +1607,10 @@ class UniversalIngestionService:
             warnings=classification.warnings,
             metadata=json.loads(artifact.metadata_json or "{}"),
             created_at=ingestion.received_at,
+            evidence_id=ev_record.evidence_id if ev_record else None,
+            investigation_id=target_incident_id,
+            analysis_run_id=analysis_run_id,
+            duplicate=is_duplicate,
         )
 
     @classmethod

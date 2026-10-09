@@ -1,780 +1,464 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Upload,
-  FileText,
-  Shield,
   ShieldAlert,
   ShieldCheck,
-  AlertTriangle,
-  ArrowRight,
-  Clock,
   RefreshCw,
-  FileCode,
-  Sparkles,
-  Search,
-  FolderLock,
+  Activity,
   Layers,
-  X,
-  Download,
-  Network,
-  KeyRound,
-  Binary,
-  Link2
+  Server,
+  Terminal,
+  ChevronRight,
+  FileCheck2,
+  HardDrive
 } from 'lucide-react';
 import type { DashboardSummary } from '../types/dashboard';
-import type { EmailAnalysis } from '../types/forensic';
-import { getAllAvailableAnalyses, saveAnalysisResult } from '../utils/forensicStore';
-import { decodeRfc2047 } from '../utils/indicatorHelper';
-import { apiUrl, extractErrorMessage } from '../utils/apiClient';
+import { getAllAvailableAnalyses } from '../utils/forensicStore';
 import {
-  SCENARIO_1_LEGITIMATE,
-  SCENARIO_2_PHISHING,
-  SCENARIO_3_PRIMARY_EMAIL
-} from '../data/sihScenariosData';
+  DashboardService,
+  type SystemHealthStatus,
+  type EnrolledAgentSummary
+} from '../services/dashboardService';
+import { UniversalDropZone } from '../components/dashboard/UniversalDropZone';
+import {
+  Button,
+  SearchInput,
+  Badge,
+  EmptyState,
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell
+} from '../components/ui';
+import {
+  SeverityIndicator,
+  ThreatScore,
+  Timestamp,
+  SourceBadge
+} from '../components/security';
+import { useInvestigation } from '../context/InvestigationContext';
 
-interface RecentRowItem {
+interface InvestigationRowItem {
   id: string;
   evidenceId?: string;
-  originalFilename?: string;
-  subject: string;
-  sender: string;
-  timestamp?: string;
-  threatScore?: number;
-  severity?: string;
+  title: string;
+  source: string;
+  riskScore: number;
+  severity: string;
   status: string;
+  updatedAt?: string;
 }
-
-const formatTimeAgo = (isoString?: string): string => {
-  if (!isoString) return 'Recent';
-  try {
-    const d = new Date(isoString);
-    if (isNaN(d.getTime())) return isoString;
-    const now = new Date();
-    const diffMs = now.getTime() - d.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    const diffHours = Math.floor(diffMins / 60);
-    if (diffHours < 24) return `${diffHours}h ago`;
-    const diffDays = Math.floor(diffHours / 24);
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  } catch {
-    return isoString;
-  }
-};
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { setActiveEmailId } = useInvestigation();
 
-  // Ingestion state
-  const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
-  const [dragOver, setDragOver] = useState<boolean>(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [showPasteArea, setShowPasteArea] = useState<boolean>(false);
-  const [pastedText, setPastedText] = useState<string>('');
-
-  // Dashboard summary & recent rows
+  // Operational server state
   const [summary, setSummary] = useState<DashboardSummary | null>(null);
-  const [recentRows, setRecentRows] = useState<RecentRowItem[]>([]);
+  const [health, setHealth] = useState<SystemHealthStatus | null>(null);
+  const [agents, setAgents] = useState<EnrolledAgentSummary[]>([]);
+  const [investigations, setInvestigations] = useState<InvestigationRowItem[]>([]);
+  const [refreshing, setRefreshing] = useState<boolean>(false);
+
+  // Local UI state
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(true);
 
-  // Load stored analyses and optional backend summary
-  const loadRecentData = useCallback(async () => {
-    setLoading(true);
-
-    // 1. Local stored analyses (strictly real ingested emails)
-    const localAnalyses = getAllAvailableAnalyses(false);
-    const rowsMap = new Map<string, RecentRowItem>();
-
-    localAnalyses
-      .filter((a) => !a.id?.startsWith('scenario-'))
-      .forEach((a) => {
-        const rowId = a.id || a.evidence_id || 'unknown';
-        rowsMap.set(rowId, {
-          id: rowId,
-          subject: a.subject || a.original_filename || 'Untitled Investigation',
-          sender: a.from || 'Unknown sender',
-          timestamp: a.upload_timestamp || a.date,
-          threatScore: a.threat_score?.score,
-          severity: a.threat_score?.severity || (a.threat_score?.score !== undefined ? (a.threat_score.score >= 80 ? 'critical' : a.threat_score.score >= 50 ? 'high' : 'low') : undefined),
-          status: 'Analyzed'
-        });
-      });
-
-    // 2. Fetch backend summary if available
+  // Fetch all authentic operational data from backend
+  const loadOperationalData = useCallback(async () => {
     try {
-      const res = await fetch(apiUrl('/api/dashboard/summary?days=30&recent_limit=10'));
+      const [summaryRes, healthRes, agentsRes] = await Promise.all([
+        DashboardService.getSummary(30, 20),
+        DashboardService.getHealth(),
+        DashboardService.getEnrolledAgents()
+      ]);
 
-      if (res && res.ok) {
-        const liveSummary: DashboardSummary = await res.json();
-        setSummary(liveSummary);
+      setSummary(summaryRes);
+      setHealth(healthRes);
+      setAgents(agentsRes);
 
-        // Merge any recent backend emails not already in local store (filter out synthetic scenarios)
-        if (liveSummary.recent_emails) {
-          liveSummary.recent_emails
-            .filter((be) => !be.id.startsWith('scenario-'))
-            .forEach((be) => {
-              if (!rowsMap.has(be.id)) {
-                rowsMap.set(be.id, {
-                  id: be.id,
-                  evidenceId: be.evidence_id || be.id,
-                  originalFilename: be.original_filename || `${be.evidence_id || be.id}.eml`,
-                  subject: be.subject || 'Incident Target EML',
-                  sender: be.sender || 'Unknown',
-                  timestamp: be.timestamp,
-                  threatScore: be.threat_score,
-                  severity: be.severity,
-                  status: 'Analyzed'
-                });
-              }
-            });
-        }
+      const rowsMap = new Map<string, InvestigationRowItem>();
+
+      // 1. Ingested local analyses (real only, excluding demo scenarios)
+      const localAnalyses = getAllAvailableAnalyses(false);
+      localAnalyses
+        .filter((a) => !a.id?.startsWith('scenario-'))
+        .forEach((a) => {
+          const rowId = a.id || a.evidence_id || 'unknown';
+          const score = a.threat_score?.score ?? 0;
+          const sev = a.threat_score?.severity || (score >= 80 ? 'critical' : score >= 50 ? 'high' : 'low');
+          rowsMap.set(rowId, {
+            id: rowId,
+            evidenceId: a.evidence_id || undefined,
+            title: a.subject || a.original_filename || 'Forensic Investigation',
+            source: 'EMAIL',
+            riskScore: score,
+            severity: sev.toLowerCase(),
+            status: 'ANALYZED',
+            updatedAt: a.upload_timestamp || a.date
+          });
+        });
+
+      // 2. Real backend recent emails
+      if (summaryRes?.recent_emails) {
+        summaryRes.recent_emails
+          .filter((be) => !be.id.startsWith('scenario-'))
+          .forEach((be) => {
+            if (!rowsMap.has(be.id)) {
+              rowsMap.set(be.id, {
+                id: be.id,
+                evidenceId: be.evidence_id || undefined,
+                title: be.subject || be.original_filename || 'Security Investigation',
+                source: 'EMAIL',
+                riskScore: be.threat_score,
+                severity: be.severity.toLowerCase(),
+                status: 'ANALYZED',
+                updatedAt: be.timestamp
+              });
+            }
+          });
       }
-    } catch {
-      // Gracefully silent fallback to local analyses
-    }
 
-    setRecentRows(Array.from(rowsMap.values()));
-    setLoading(false);
+      // 3. Real backend cases/incidents
+      if (summaryRes?.recent_cases) {
+        summaryRes.recent_cases.forEach((bc) => {
+          if (!rowsMap.has(bc.id)) {
+            rowsMap.set(bc.id, {
+              id: bc.id,
+              title: bc.title || `Case ${bc.case_number}`,
+              source: 'INCIDENT',
+              riskScore: bc.severity === 'critical' ? 90 : bc.severity === 'high' ? 70 : 40,
+              severity: bc.severity.toLowerCase(),
+              status: bc.status.toUpperCase(),
+              updatedAt: bc.updated_at
+            });
+          }
+        });
+      }
+
+      setInvestigations(Array.from(rowsMap.values()));
+    } catch {
+      // Graceful fallback to empty
+    } finally {
+      setRefreshing(false);
+    }
   }, []);
 
   useEffect(() => {
-    loadRecentData();
-  }, [loadRecentData]);
+    loadOperationalData();
+  }, [loadOperationalData]);
 
-  // Ingestion pipeline: processes .eml file or raw blob
-  const processEmailIngestion = async (fileOrBlob: Blob, filename: string, rawText?: string) => {
-    setIsAnalyzing(true);
-    setErrorMessage(null);
-    const analysisId = `analysis-${Date.now()}`;
-
-    try {
-      const formData = new FormData();
-      formData.append('file', fileOrBlob, filename);
-
-      const res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
-
-      if (res && res.ok) {
-        const data = await res.json();
-        const textFallback = rawText || '';
-        const parsedAnalysis: EmailAnalysis = {
-          id: analysisId,
-          evidence_id: data.evidence_id || (data.email_sha256 ? `EVD-${data.email_sha256.slice(0, 10).toUpperCase()}` : `EVD-${analysisId.slice(-8).toUpperCase()}`),
-          email_sha256: data.email_sha256,
-          original_filename: data.original_filename || filename,
-          upload_timestamp: data.upload_timestamp || new Date().toISOString(),
-          size: data.size || fileOrBlob.size,
-          uploader: data.uploader || 'SOC Analyst',
-          authentication: data.authentication,
-          relay_analysis: data.relay_analysis,
-          indicators: data.indicators,
-          subject: decodeRfc2047(data.subject || data.headers?.subject || filename),
-          from: decodeRfc2047(data.from || data.from_header || data.headers?.from || ''),
-          to: decodeRfc2047(Array.isArray(data.to) ? data.to.join(', ') : (data.to || data.headers?.to || '')),
-          cc: decodeRfc2047(Array.isArray(data.cc) ? data.cc.join(', ') : (data.cc || data.headers?.cc || '')),
-          date: decodeRfc2047(data.date || data.headers?.date || ''),
-          reply_to: decodeRfc2047(data.reply_to || data.headers?.reply_to || ''),
-          return_path: decodeRfc2047(data.return_path || data.headers?.return_path || ''),
-          message_id: decodeRfc2047(data.message_id || data.headers?.message_id || ''),
-          received: data.received || data.headers?.received || [],
-          authentication_results: data.authentication_results || data.headers?.authentication_results || '',
-          plain_text_body: data.plain_text_body || data.body?.plain_text || textFallback,
-          html_body: data.html_body || data.body?.html || '',
-          raw_email: data.raw_email || textFallback,
-          urls: data.urls || [],
-          ips: data.ips || [],
-          domains: data.domains || [],
-          emails: data.emails || [],
-          attachments: data.attachments || [],
-          ip_intelligence: data.ip_intelligence || {},
-          domain_intelligence: data.domain_intelligence || {},
-          lookalike_domains: data.lookalike_domains || [],
-          url_analysis: data.url_analysis || [],
-          threat_score: data.threat_score,
-          ml_phishing_probability: data.ml_phishing_probability,
-          ml_assessment: data.ml_assessment,
-          ai_analyst: data.ai_analyst,
-          attribution: data.attribution,
-          investigation_graph: data.investigation_graph
-        };
-
-        saveAnalysisResult(analysisId, parsedAnalysis);
-        navigate(`/investigate/${analysisId}/overview`);
-        return;
-      } else {
-        const errDetail = await extractErrorMessage(res, 'Analysis request failed');
-        setErrorMessage(`Forensic analysis failed: ${errDetail}`);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : 'Network error';
-      setErrorMessage(`Error connecting to analysis engine: ${msg}`);
-    } finally {
-      setIsAnalyzing(false);
-    }
+  const handleRefresh = () => {
+    setRefreshing(true);
+    loadOperationalData();
   };
 
-  // Drag and drop handlers
-  const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(true);
+  const handleOpenInvestigation = (id: string) => {
+    setActiveEmailId(id);
+    navigate(`/investigations/${id}/overview`);
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-  };
+  // Filtered investigations for search
+  const filteredInvestigations = useMemo(() => {
+    if (!searchQuery.trim()) return investigations;
+    const q = searchQuery.toLowerCase();
+    return investigations.filter(
+      (inv) =>
+        inv.title.toLowerCase().includes(q) ||
+        inv.id.toLowerCase().includes(q) ||
+        inv.source.toLowerCase().includes(q) ||
+        inv.status.toLowerCase().includes(q)
+    );
+  }, [investigations, searchQuery]);
 
-  const handleDrop = async (e: React.DragEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragOver(false);
-
-    const files = Array.from(e.dataTransfer.files);
-    if (files.length === 0) return;
-    const file = files[0];
-    let textContent = '';
-    try {
-      textContent = await file.text();
-    } catch {
-      // Binary blob fallback
-    }
-    await processEmailIngestion(file, file.name, textContent);
-  };
-
-  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    let textContent = '';
-    try {
-      textContent = await file.text();
-    } catch {
-      // Binary blob fallback
-    }
-    await processEmailIngestion(file, file.name, textContent);
-  };
-
-  const handlePasteSubmit = async () => {
-    const text = pastedText.trim();
-    if (!text) {
-      setErrorMessage('Please paste raw RFC-822 email content or headers.');
-      return;
-    }
-    const blob = new Blob([text], { type: 'message/rfc822' });
-    await processEmailIngestion(blob, 'pasted_message.eml', text);
-  };
-
-  // Pre-loaded sample launch
-  const handleLoadSample = (scenarioId: string) => {
-    if (scenarioId === 'scenario-2-phish') {
-      saveAnalysisResult('scenario-2-phish', { ...SCENARIO_2_PHISHING, is_demo: true });
-      navigate('/investigate/scenario-2-phish/overview');
-    } else if (scenarioId === 'scenario-3-campaign') {
-      saveAnalysisResult('scenario-3-campaign', { ...SCENARIO_3_PRIMARY_EMAIL, is_demo: true });
-      navigate('/investigate/scenario-3-campaign/overview');
-    } else if (scenarioId === 'scenario-1-legit') {
-      saveAnalysisResult('scenario-1-legit', { ...SCENARIO_1_LEGITIMATE, is_demo: true });
-      navigate('/investigate/scenario-1-legit/overview');
-    }
-  };
-
-  // Compute operational summary metrics without inventing data
-  const totalAnalyzed = summary?.metrics?.emails_analyzed ?? recentRows.length;
-  const highRiskCount = summary?.metrics?.critical_emails ?? recentRows.filter((r) => (r.threatScore ?? 0) >= 70 || r.severity === 'critical' || r.severity === 'high').length;
-  const activeCasesCount = summary?.metrics?.open_cases ?? 0;
-
-  // Filter recent investigations by query
-  const filteredRows = searchQuery.trim()
-    ? recentRows.filter((r) =>
-        r.subject.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.sender.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        r.id.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : recentRows;
+  // Active / Attention Required investigations
+  const attentionRequired = useMemo(() => {
+    return investigations.filter(
+      (inv) =>
+        inv.severity === 'critical' ||
+        inv.severity === 'high' ||
+        inv.riskScore >= 60 ||
+        inv.status === 'OPEN' ||
+        inv.status === 'INVESTIGATING'
+    );
+  }, [investigations]);
 
   return (
-    <div className="max-w-5xl lg:max-w-6xl w-full mx-auto py-6 px-4 sm:px-6 space-y-6 animate-fadeIn">
+    <div className="max-w-6xl w-full mx-auto py-6 px-4 sm:px-6 space-y-7 animate-fadeIn">
       {/* =========================================================================
-          TOP: CyberGuard Unified Platform Branding & Global Context
+          1. HEADER: Professional Workstation Heading
           ========================================================================= */}
-      <header className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
-        <div className="space-y-1">
-          <div className="flex items-center space-x-2.5">
-            <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary">
-              <Shield className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <h1 className="text-xl font-bold tracking-tight text-foreground font-sans">
-                  CyberGuard
-                </h1>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20 font-medium">
-                  v2.0 Unified
-                </span>
-              </div>
-              <p className="text-xs text-foreground-muted font-mono">
-                Unified Threat Intelligence & Multi-Telemetry Forensic Security
-              </p>
-            </div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/70">
+        <div>
+          <div className="flex items-center space-x-2 text-primary font-mono text-xs font-semibold uppercase tracking-wider">
+            <Activity className="w-3.5 h-3.5 text-primary" />
+            <span>OPERATIONAL WORKSTATION</span>
+          </div>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground font-sans mt-0.5">
+            Dashboard
+          </h1>
+          <p className="text-xs text-foreground-muted font-mono mt-1">
+            Analyze evidence, investigate threats, and track active cases.
+          </p>
+        </div>
+
+        <div className="flex items-center space-x-3 text-xs font-mono">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="flex items-center space-x-1.5 cursor-pointer"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin text-primary' : ''}`} />
+            <span>Refresh</span>
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => navigate('/investigations')}
+            className="flex items-center space-x-1.5 cursor-pointer"
+          >
+            <Layers className="w-3.5 h-3.5 text-foreground-muted" />
+            <span>All Investigations</span>
+          </Button>
+        </div>
+      </div>
+
+      {/* =========================================================================
+          2. TRUTHFUL QUICK METRICS & SYSTEM HEALTH BAR
+          ========================================================================= */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {/* Active Investigations */}
+        <div className="p-3.5 rounded-card bg-surface border border-border shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[11px] font-mono uppercase tracking-wider">Active Cases</span>
+            <FileCheck2 className="w-3.5 h-3.5 text-primary" />
+          </div>
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-xl font-bold font-mono text-foreground">
+              {summary ? summary.metrics.open_cases : investigations.length}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-subtle">cases</span>
           </div>
         </div>
 
-        {/* Minimal Navigation & Operational Status */}
-        <div className="flex items-center space-x-3 text-xs font-mono">
-          <button
-            onClick={() => navigate('/history')}
-            className="px-3 py-1.5 rounded-lg border border-border hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors flex items-center space-x-1.5 cursor-pointer"
-          >
-            <Layers className="w-3.5 h-3.5 text-primary" />
-            <span>Triage Queue</span>
-          </button>
-          <button
-            onClick={() => navigate('/cases')}
-            className="px-3 py-1.5 rounded-lg border border-border hover:bg-surface-secondary text-foreground-muted hover:text-foreground transition-colors flex items-center space-x-1.5 cursor-pointer"
-          >
-            <FolderLock className="w-3.5 h-3.5 text-foreground-muted" />
-            <span>Cases</span>
-          </button>
+        {/* High / Critical Threats */}
+        <div className="p-3.5 rounded-card bg-surface border border-border shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[11px] font-mono uppercase tracking-wider">High / Critical</span>
+            <ShieldAlert className="w-3.5 h-3.5 text-rose-500" />
+          </div>
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-xl font-bold font-mono text-rose-500">
+              {summary
+                ? summary.metrics.critical_emails
+                : attentionRequired.length}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-subtle">threats</span>
+          </div>
         </div>
-      </header>
+
+        {/* Endpoint Fleet Agents */}
+        <div className="p-3.5 rounded-card bg-surface border border-border shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[11px] font-mono uppercase tracking-wider">Fleet Agents</span>
+            <Terminal className="w-3.5 h-3.5 text-foreground-muted" />
+          </div>
+          <div className="mt-2 flex items-baseline space-x-2">
+            <span className="text-xl font-bold font-mono text-foreground">
+              {agents.length}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-subtle">enrolled</span>
+          </div>
+        </div>
+
+        {/* System & Engine Health */}
+        <div className="p-3.5 rounded-card bg-surface border border-border shadow-xs flex flex-col justify-between">
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[11px] font-mono uppercase tracking-wider">Analysis Engine</span>
+            <Server className="w-3.5 h-3.5 text-foreground-muted" />
+          </div>
+          <div className="mt-2 flex items-center space-x-1.5">
+            <span
+              className={`w-2 h-2 rounded-full ${
+                health?.status === 'ok'
+                  ? 'bg-emerald-500'
+                  : health?.status === 'degraded'
+                  ? 'bg-amber-500'
+                  : 'bg-rose-500'
+              }`}
+            />
+            <span className="text-xs font-semibold font-mono text-foreground uppercase">
+              {health?.status === 'ok'
+                ? 'Operational'
+                : health?.status === 'degraded'
+                ? 'Degraded'
+                : health?.status || 'Online'}
+            </span>
+          </div>
+        </div>
+      </div>
 
       {/* =========================================================================
-          MULTI-TELEMETRY DETECTION ENGINES
+          3. UNIVERSAL INGESTION SURFACE (VISUALLY DOMINATES THE LANDING PAGE)
+          ========================================================================= */}
+      <section className="space-y-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center gap-2">
+            <span>Analyze something</span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">
+              UNIVERSAL GATEWAY
+            </span>
+          </h2>
+          <span className="text-[11px] font-mono text-foreground-subtle">
+            Drop evidence, paste a URL, or upload a file
+          </span>
+        </div>
+
+        <UniversalDropZone onIngestionSuccess={loadOperationalData} />
+      </section>
+
+      {/* =========================================================================
+          4. ACTIVE / ATTENTION REQUIRED
           ========================================================================= */}
       <section className="space-y-3">
         <div className="flex items-center justify-between">
           <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center gap-2">
-            <span>Specialized Telemetry & Analysis Engines</span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-bold">4 ENGINES</span>
+            <span>Active / Attention Required</span>
+            {attentionRequired.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-500 font-mono font-bold">
+                {attentionRequired.length} ITEMS
+              </span>
+            )}
           </h2>
-          <span className="text-xs font-mono text-foreground-subtle">Engines 7 – 10 Online</span>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <div
-            onClick={() => navigate('/network-security')}
-            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div className="w-8 h-8 rounded-lg bg-primary/10 border border-primary/20 flex items-center justify-center text-primary group-hover:scale-105 transition-transform">
-                <Network className="w-4 h-4" />
-              </div>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-10</span>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Network & Traffic</h3>
-              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Beaconing CV jitter, DNS tunneling entropy, exfiltration & port anomalies</p>
-            </div>
-            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
-              <span>Launch Engine</span>
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-            </div>
+        {attentionRequired.length === 0 ? (
+          <div className="p-4 rounded-card bg-surface border border-border text-center text-xs font-mono text-foreground-muted flex items-center justify-center space-x-2">
+            <ShieldCheck className="w-4 h-4 text-emerald-500" />
+            <span>Nothing requires attention</span>
           </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {attentionRequired.slice(0, 4).map((item) => (
+              <div
+                key={item.id}
+                onClick={() => handleOpenInvestigation(item.id)}
+                className="p-4 rounded-card bg-surface border border-border hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-1 min-w-0">
+                    <div className="flex items-center space-x-2">
+                      <SourceBadge source={item.source} size="sm" />
+                      <SeverityIndicator severity={item.severity} showText size="sm" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                      {item.title}
+                    </h3>
+                  </div>
+                  <ThreatScore score={item.riskScore} variant="compact" />
+                </div>
 
-          <div
-            onClick={() => navigate('/auth-security')}
-            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-500 group-hover:scale-105 transition-transform">
-                <KeyRound className="w-4 h-4" />
+                <div className="flex items-center justify-between text-[11px] font-mono text-foreground-muted pt-2 border-t border-border/50">
+                  <div className="flex items-center space-x-1.5">
+                    <Timestamp date={item.updatedAt || new Date()} format="relative" />
+                  </div>
+                  <span className="text-primary flex items-center space-x-0.5 group-hover:translate-x-0.5 transition-transform">
+                    <span>Investigate</span>
+                    <ChevronRight className="w-3 h-3" />
+                  </span>
+                </div>
               </div>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-09</span>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">Authentication & ATO</h3>
-              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Brute-force, password spraying, impossible travel velocity & ASN shifts</p>
-            </div>
-            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
-              <span>Launch Engine</span>
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-            </div>
+            ))}
           </div>
-
-          <div
-            onClick={() => navigate('/file-security')}
-            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div className="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform">
-                <Binary className="w-4 h-4" />
-              </div>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-08</span>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">File & Attachment</h3>
-              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Safe static analysis, MIME spoofing, double extensions & Shannon entropy</p>
-            </div>
-            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
-              <span>Launch Engine</span>
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </div>
-
-          <div
-            onClick={() => navigate('/url-intelligence')}
-            className="p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-3"
-          >
-            <div className="flex items-center justify-between">
-              <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform">
-                <Link2 className="w-4 h-4" />
-              </div>
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface-secondary border border-border text-foreground-subtle">SEC-07</span>
-            </div>
-            <div>
-              <h3 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">URL & Domain Intel</h3>
-              <p className="text-xs text-foreground-muted line-clamp-2 mt-1">Homoglyphs, punycode, redirects, brand impersonation & safe DOM crawl</p>
-            </div>
-            <div className="flex items-center text-[11px] font-mono text-primary font-medium gap-1 pt-1">
-              <span>Launch Engine</span>
-              <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-          </div>
-        </div>
+        )}
       </section>
 
       {/* =========================================================================
-          OPTIONAL COMPACT SUMMARY: Single-Line Operational Context
-          ========================================================================= */}
-      {(totalAnalyzed > 0 || activeCasesCount > 0) && (
-        <div className="flex flex-wrap items-center justify-between py-2.5 px-4 rounded-xl bg-surface-secondary/40 border border-border/50 text-xs font-mono text-foreground-muted">
-          <div className="flex items-center space-x-4 divide-x divide-border/60">
-            <div className="flex items-center space-x-1.5">
-              <span className="w-2 h-2 rounded-full bg-primary" />
-              <span className="font-semibold text-foreground">{totalAnalyzed}</span>
-              <span>analyzed emails</span>
-            </div>
-            {highRiskCount > 0 && (
-              <div className="pl-4 flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-danger" />
-                <span className="font-semibold text-danger">{highRiskCount}</span>
-                <span>high-risk threats</span>
-              </div>
-            )}
-            {activeCasesCount > 0 && (
-              <div className="pl-4 flex items-center space-x-1.5">
-                <span className="w-2 h-2 rounded-full bg-warning" />
-                <span className="font-semibold text-foreground">{activeCasesCount}</span>
-                <span>active cases</span>
-              </div>
-            )}
-          </div>
-
-          <button
-            onClick={loadRecentData}
-            title="Refresh telemetry"
-            className="text-[11px] text-foreground-muted hover:text-foreground flex items-center space-x-1 cursor-pointer transition-colors"
-          >
-            <RefreshCw className="w-3 h-3 text-foreground-muted" />
-            <span>Synced</span>
-          </button>
-        </div>
-      )}
-
-      {/* =========================================================================
-          PRIMARY ACTION: Ingestion / New Investigation Area
+          5. RECENT INVESTIGATIONS
           ========================================================================= */}
       <section className="space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted">
-            New Investigation
-          </h2>
-          <button
-            onClick={() => setShowPasteArea(!showPasteArea)}
-            className="text-xs font-mono text-primary hover:underline flex items-center space-x-1 cursor-pointer"
-          >
-            <FileCode className="w-3.5 h-3.5" />
-            <span>{showPasteArea ? 'Hide RFC-822 Text Input' : 'Paste Raw RFC-822'}</span>
-          </button>
-        </div>
-
-        {/* Drag & Drop Target Area */}
-        <div
-          onDragOver={handleDragOver}
-          onDragLeave={handleDragLeave}
-          onDrop={handleDrop}
-          onClick={() => !isAnalyzing && fileInputRef.current?.click()}
-          className={`relative border-2 border-dashed rounded-2xl p-8 text-center transition-all cursor-pointer ${
-            dragOver
-              ? 'border-primary bg-primary/5 shadow-md ring-2 ring-primary/20'
-              : 'border-border hover:border-primary/50 bg-surface hover:bg-surface-secondary/40'
-          } ${isAnalyzing ? 'opacity-70 pointer-events-none' : ''}`}
-        >
-          <input
-            type="file"
-            ref={fileInputRef}
-            onChange={handleFileInputChange}
-            accept=".eml,.msg,message/rfc822,text/plain"
-            className="hidden"
-          />
-
-          <div className="flex flex-col items-center justify-center space-y-3">
-            <div className={`w-12 h-12 rounded-xl flex items-center justify-center transition-colors ${
-              dragOver ? 'bg-primary text-primary-foreground' : 'bg-surface-secondary text-primary border border-border'
-            }`}>
-              {isAnalyzing ? (
-                <RefreshCw className="w-5 h-5 animate-spin" />
-              ) : (
-                <Upload className="w-5 h-5" />
-              )}
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-sm font-semibold text-foreground">
-                {isAnalyzing
-                  ? 'Analyzing MIME headers, IOCs, and threat signals...'
-                  : dragOver
-                  ? 'Drop .eml file to begin analysis'
-                  : 'Drag and drop an .eml file here'}
-              </p>
-              <p className="text-xs font-mono text-foreground-muted">
-                {isAnalyzing
-                  ? 'Reconstructing transmission relay path and scoring risk'
-                  : 'or click to browse your computer (.eml, RFC-822)'}
-              </p>
-            </div>
-
-            {!isAnalyzing && (
-              <button
-                type="button"
-                className="mt-2 px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground text-xs font-semibold font-mono tracking-wide shadow-xs transition-colors"
-              >
-                Browse .EML File
-              </button>
-            )}
-          </div>
-        </div>
-
-        {/* Optional Collapsible Paste Area */}
-        {showPasteArea && (
-          <div className="p-4 rounded-xl bg-surface border border-border space-y-3 animate-fadeIn">
-            <div className="flex items-center justify-between text-xs font-mono text-foreground-muted">
-              <span>Paste Raw Email Headers and Content</span>
-              <button
-                onClick={() => setShowPasteArea(false)}
-                className="text-foreground-muted hover:text-foreground cursor-pointer"
-              >
-                <X className="w-3.5 h-3.5" />
-              </button>
-            </div>
-            <textarea
-              value={pastedText}
-              onChange={(e) => setPastedText(e.target.value)}
-              placeholder="Received: from mail.example.com ...&#10;From: sender@example.com&#10;To: victim@company.com&#10;Subject: Urgent..."
-              rows={5}
-              className="w-full text-xs font-mono p-3 rounded-lg bg-surface-secondary border border-border text-foreground placeholder:text-foreground-muted focus:outline-hidden focus:ring-1 focus:ring-primary resize-y"
-            />
-            <div className="flex justify-end">
-              <button
-                onClick={handlePasteSubmit}
-                disabled={isAnalyzing || !pastedText.trim()}
-                className="px-4 py-1.5 rounded-lg bg-primary hover:bg-primary-hover disabled:opacity-50 text-primary-foreground text-xs font-semibold font-mono flex items-center space-x-1.5 cursor-pointer transition-colors"
-              >
-                <FileText className="w-3.5 h-3.5" />
-                <span>Begin Analysis</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Error Feedback */}
-        {errorMessage && (
-          <div className="p-3 rounded-xl bg-danger-surface border border-danger-border text-danger text-xs font-mono flex items-center justify-between">
-            <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-            <button
-              onClick={() => setErrorMessage(null)}
-              className="text-danger hover:underline cursor-pointer ml-2"
-            >
-              Dismiss
-            </button>
-          </div>
-        )}
-
-        {/* Quick Sample Launchers */}
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-[11px] font-mono text-foreground-muted">
-            Quick Scenarios:
-          </span>
-          <button
-            onClick={() => handleLoadSample('scenario-2-phish')}
-            className="px-2.5 py-1 rounded-md bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-[11px] font-mono text-foreground hover:text-danger flex items-center space-x-1.5 transition-colors cursor-pointer"
-          >
-            <ShieldAlert className="w-3 h-3 text-danger" />
-            <span>CEO Wire Redirection (Critical)</span>
-          </button>
-          <button
-            onClick={() => handleLoadSample('scenario-3-campaign')}
-            className="px-2.5 py-1 rounded-md bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-[11px] font-mono text-foreground hover:text-warning flex items-center space-x-1.5 transition-colors cursor-pointer"
-          >
-            <Sparkles className="w-3 h-3 text-warning" />
-            <span>Credential Phish (High)</span>
-          </button>
-          <button
-            onClick={() => handleLoadSample('scenario-1-legit')}
-            className="px-2.5 py-1 rounded-md bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-[11px] font-mono text-foreground hover:text-success flex items-center space-x-1.5 transition-colors cursor-pointer"
-          >
-            <ShieldCheck className="w-3 h-3 text-success" />
-            <span>Verified Memo (Benign)</span>
-          </button>
-        </div>
-      </section>
-
-      {/* =========================================================================
-          SECONDARY AREA: Recent Investigations (Compact Rows)
-          ========================================================================= */}
-      <section className="space-y-3 pt-2">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <div className="flex items-center space-x-2">
-            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted">
-              Recent Investigations
-            </h2>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-surface-secondary text-foreground-muted border border-border/60">
-              {filteredRows.length}
-            </span>
+          <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted">
+            Recent Investigations
+          </h2>
+
+          <div className="w-full sm:w-64">
+            <SearchInput
+              value={searchQuery}
+              onChangeValue={(val) => setSearchQuery(val)}
+              onClear={() => setSearchQuery('')}
+              placeholder="Search investigations..."
+              size="sm"
+            />
           </div>
-
-          {/* Search Filter */}
-          {recentRows.length > 3 && (
-            <div className="relative w-full sm:w-56">
-              <Search className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground-muted" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Filter investigations..."
-                className="w-full text-xs font-mono pl-8 pr-3 py-1 rounded-lg bg-surface border border-border text-foreground placeholder:text-foreground-muted focus:outline-hidden focus:ring-1 focus:ring-primary"
-              />
-            </div>
-          )}
         </div>
 
-        {/* Compact Table Container */}
-        <div className="rounded-xl border border-border bg-surface overflow-hidden shadow-xs">
-          {loading ? (
-            <div className="p-8 text-center text-xs font-mono text-foreground-muted">
-              <RefreshCw className="w-4 h-4 animate-spin mx-auto mb-2 text-primary" />
-              Loading investigations...
-            </div>
-          ) : filteredRows.length === 0 ? (
-            <div className="p-10 text-center space-y-2">
-              <FileText className="w-6 h-6 text-foreground-muted mx-auto" />
-              <p className="text-xs font-semibold text-foreground">No investigations found</p>
-              <p className="text-[11px] font-mono text-foreground-muted">
-                {searchQuery ? 'No records match your filter criteria.' : 'Drop an .eml file above to initiate your first forensic analysis.'}
-              </p>
-            </div>
-          ) : (
-            <div className="divide-y divide-border/60">
-              {filteredRows.slice(0, 10).map((row) => {
-                const score = row.threatScore;
-                const isCritical = (score !== undefined && score >= 80) || row.severity === 'critical';
-                const isHigh = !isCritical && ((score !== undefined && score >= 50) || row.severity === 'high');
-                const isBenign = score !== undefined && score < 20;
-
-                return (
-                  <div
+        {filteredInvestigations.length === 0 ? (
+          <EmptyState
+            icon={<HardDrive className="w-6 h-6" />}
+            title="No investigations yet"
+            description="Drop an email, URL, file, log, or media artifact above to begin."
+            className="py-12 bg-surface rounded-card border border-border"
+          />
+        ) : (
+          <div className="rounded-card border border-border bg-surface overflow-hidden shadow-xs">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="font-mono text-xs">Investigation</TableHead>
+                  <TableHead className="font-mono text-xs">Source</TableHead>
+                  <TableHead className="font-mono text-xs">Threat Score</TableHead>
+                  <TableHead className="font-mono text-xs">Severity</TableHead>
+                  <TableHead className="font-mono text-xs">Status</TableHead>
+                  <TableHead className="font-mono text-xs text-right">Updated</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredInvestigations.slice(0, 10).map((row) => (
+                  <TableRow
                     key={row.id}
-                    onClick={() => navigate(`/investigate/${row.id}/overview`)}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between p-3.5 hover:bg-surface-secondary/60 transition-colors cursor-pointer group gap-3"
+                    onClick={() => handleOpenInvestigation(row.id)}
+                    className="cursor-pointer hover:bg-surface-secondary/50 transition-colors group"
                   >
-                    {/* Left: Email Subject & Sender */}
-                    <div className="min-w-0 flex-1 space-y-0.5">
-                      <div className="flex items-center space-x-2">
-                        <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
-                        <span className="text-xs font-semibold text-foreground truncate group-hover:text-primary transition-colors">
-                          {row.subject}
-                        </span>
+                    <TableCell>
+                      <div className="flex items-center space-x-2 min-w-0">
+                        <div className="truncate">
+                          <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors">
+                            {row.title}
+                          </span>
+                          <span className="block text-[10px] font-mono text-foreground-subtle">
+                            ID: {row.evidenceId || row.id}
+                          </span>
+                        </div>
                       </div>
-                      <div className="text-[11px] font-mono text-foreground-muted truncate pl-5">
-                        {row.sender}
+                    </TableCell>
+                    <TableCell>
+                      <SourceBadge source={row.source} size="sm" />
+                    </TableCell>
+                    <TableCell>
+                      <ThreatScore score={row.riskScore} variant="compact" />
+                    </TableCell>
+                    <TableCell>
+                      <SeverityIndicator severity={row.severity} showText size="sm" />
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="neutral" size="sm" className="font-mono text-[10px]">
+                        {row.status}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <div className="text-[11px] font-mono text-foreground-muted">
+                        <Timestamp date={row.updatedAt || new Date()} format="relative" />
                       </div>
-                    </div>
-
-                    {/* Right: Timestamp, Score Badge, and Action */}
-                    <div className="flex items-center space-x-3 shrink-0 self-end sm:self-auto text-xs font-mono">
-                      <div className="flex items-center space-x-1 text-[11px] text-foreground-muted">
-                        <Clock className="w-3 h-3 text-foreground-muted" />
-                        <span>{formatTimeAgo(row.timestamp)}</span>
-                      </div>
-
-                      {/* Threat Score / Risk Classification Badge */}
-                      {score !== undefined ? (
-                        <span
-                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${
-                            isCritical
-                              ? 'bg-danger-surface text-danger border border-danger-border'
-                              : isHigh
-                              ? 'bg-warning-surface text-warning border border-warning-border'
-                              : isBenign
-                              ? 'bg-success-surface text-success border border-success-border'
-                              : 'bg-surface-secondary text-foreground-muted border border-border'
-                          }`}
-                        >
-                          {score}/100 {isCritical ? 'Critical' : isHigh ? 'High' : isBenign ? 'Clean' : 'Elevated'}
-                        </span>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] bg-surface-secondary text-foreground-muted border border-border">
-                          {row.severity ? row.severity.toUpperCase() : 'Analyzed'}
-                        </span>
-                      )}
-
-                      {/* Quick Actions: Correlate & Download .EML */}
-                      <div className="flex items-center space-x-1" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/investigate/${encodeURIComponent(row.evidenceId || row.id)}/investigation?subtab=campaigns`);
-                          }}
-                          className="p-1 rounded bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-primary transition-colors cursor-pointer"
-                          title="Correlate this .EML across Campaigns & Cases"
-                        >
-                          <Network className="w-3 h-3 text-primary" />
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            window.open(apiUrl(`/api/emails/${encodeURIComponent(row.evidenceId || row.id)}/download`), '_blank');
-                          }}
-                          className="p-1 rounded bg-surface-secondary hover:bg-surface border border-border text-foreground-muted hover:text-primary transition-colors cursor-pointer"
-                          title="Download Stored RFC-822 .EML File"
-                        >
-                          <Download className="w-3 h-3 text-primary" />
-                        </button>
-                      </div>
-
-                      {/* Open Action Arrow */}
-                      <span className="text-foreground-muted group-hover:text-primary group-hover:translate-x-0.5 transition-all">
-                        <ArrowRight className="w-3.5 h-3.5" />
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Footer Link to Full Triage Queue */}
-        {recentRows.length > 5 && (
-          <div className="flex justify-end pt-1">
-            <button
-              onClick={() => navigate('/history')}
-              className="text-xs font-mono text-foreground-muted hover:text-primary flex items-center space-x-1 transition-colors cursor-pointer"
-            >
-              <span>View complete queue in Ingested .EML History</span>
-              <ArrowRight className="w-3 h-3" />
-            </button>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </div>
         )}
       </section>

@@ -823,7 +823,16 @@ class IngestionResult(BaseModel):
     analysis_status: AnalysisStatusEnum = AnalysisStatusEnum.INGESTED
     candidate_analyzers: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+    validation_errors: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    evidence_id: Optional[str] = None
+    investigation_id: Optional[str] = None
+    analysis_run_id: Optional[str] = None
+    duplicate: bool = False
+
+    @property
+    def detected_type(self) -> str:
+        return self.artifact_type.value
 
     model_config = ConfigDict(from_attributes=True)
