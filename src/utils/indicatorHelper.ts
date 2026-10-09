@@ -374,7 +374,7 @@ export const resolveEmailIndicators = (email: EmailAnalysis): EmailAnalysis => {
       try {
         const host = new URL(u).hostname;
         if (host && host.includes('.') && host !== 'localhost') domainSet.add(host.toLowerCase());
-      } catch (e) {}
+      } catch {}
     });
     emailStrings.forEach(e => {
       if (e.includes('@')) {

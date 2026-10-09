@@ -21,14 +21,14 @@ export const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
   onClose,
   onStatusUpdated
 }) => {
-  if (!recommendation) return null;
-
   const [reviewMode, setReviewMode] = useState<boolean>(false);
   const [disposition, setDisposition] = useState<'APPROVED' | 'REJECTED' | 'DEFERRED'>('APPROVED');
   const [notes, setNotes] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [showPlaybookModal, setShowPlaybookModal] = useState<boolean>(false);
+
+  if (!recommendation) return null;
 
   const handleReviewSubmit = async () => {
     if (!notes.trim()) {

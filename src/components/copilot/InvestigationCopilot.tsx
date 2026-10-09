@@ -181,7 +181,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
           }
         }
       }
-    } catch (e) {
+    } catch {
       // Keep localAnalyses on network error
     }
     setAvailableEmails(localAnalyses);
@@ -437,7 +437,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         } else {
           throw new Error(`v1 endpoint returned ${v1Res.status}`);
         }
-      } catch (err) {
+      } catch {
         // Fall back to legacy /api/copilot/query
         const response = await fetch(apiUrl('/api/copilot/query'), {
           method: 'POST',
@@ -465,7 +465,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       };
 
       setMessages((prev) => [...prev, copilotMsg]);
-    } catch (err: any) {
+    } catch {
       // Local fallback in case network error
       const fallbackResponse: CopilotQueryResponse = {
         query: queryText,
@@ -566,7 +566,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
 
       setAddedReportIds((prev) => new Set(prev).add(msgId));
       showNotification('AI-Assisted Investigation Summary appended to report with provenance.');
-    } catch (e) {
+    } catch {
       setAddedReportIds((prev) => new Set(prev).add(msgId));
       showNotification('AI-Assisted Investigation Summary staged for report.');
     }
@@ -599,7 +599,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       });
       setFeedbackState((prev) => ({ ...prev, [messageId]: rating }));
       showNotification(`Analyst feedback recorded: ${rating}`);
-    } catch (err) {
+    } catch {
       setFeedbackState((prev) => ({ ...prev, [messageId]: rating }));
       showNotification(`Feedback staged: ${rating}`);
     }

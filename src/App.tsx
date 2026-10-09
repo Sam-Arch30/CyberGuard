@@ -23,6 +23,7 @@ import { AuthSecurityView } from './pages/AuthSecurityView';
 import { FileSecurityView } from './pages/FileSecurityView';
 import { UrlSecurityView } from './pages/UrlSecurityView';
 import { EndpointAgentView } from './pages/EndpointAgentView';
+import { DesignSystemPreview } from './pages/DesignSystemPreview';
 
 function AppContent() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -89,6 +90,7 @@ function AppContent() {
               <Route path="/reports" element={<Reports />} />
               <Route path="/benchmarks" element={<BenchmarkEvaluation />} />
               <Route path="/settings" element={<Settings />} />
+              <Route path="/design-system" element={<DesignSystemPreview />} />
 
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/investigate/overview" replace />} />
