@@ -43,6 +43,7 @@ from backend.api.routes.response_recommendations import router as response_recom
 from backend.api.routes.response_playbooks import router as response_playbooks_router
 from backend.api.routes.soc_copilot import router as soc_copilot_router
 from backend.api.routes.endpoint_agent import router as endpoint_agent_router
+from backend.api.routes.device_incident_correlation import router as device_incident_correlation_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -142,6 +143,7 @@ app.include_router(response_recommendations_router)
 app.include_router(response_playbooks_router)
 app.include_router(soc_copilot_router)
 app.include_router(endpoint_agent_router)
+app.include_router(device_incident_correlation_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

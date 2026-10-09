@@ -2,3 +2,5 @@ export { InvestigationRelationshipSummary } from './InvestigationRelationshipSum
 export { ProgressiveInvestigationGraph } from './ProgressiveInvestigationGraph';
 export { GraphNodeDetailPanel } from './GraphNodeDetailPanel';
 export { CampaignCorrelationPanel } from './CampaignCorrelationPanel';
+export { DeviceIncidentSection } from './DeviceIncidentSection';
+

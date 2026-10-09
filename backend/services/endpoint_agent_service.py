@@ -1050,6 +1050,26 @@ class EndpointAgentService:
 
         db.commit()
 
+        # Section 33: Trigger Device-to-Incident Correlation Reassessment
+        try:
+            from backend.services.device_incident_correlation_service import DeviceIncidentCorrelationService
+            candidates = DeviceIncidentCorrelationService.find_candidate_incidents(
+                db=db,
+                device_id=device.id,
+                workspace_id=agent.workspace_id,
+                window_hours=72,
+                limit=10
+            )
+            for c_inc in candidates:
+                DeviceIncidentCorrelationService.correlate_device_with_incident(
+                    db=db,
+                    device=device,
+                    incident=c_inc,
+                    workspace_id=agent.workspace_id
+                )
+        except Exception as e:
+            logger.warning(f"Device-to-incident correlation hook encountered error: {e}")
+
         return BatchTelemetryIngestResponse(
             batch_id=batch.batch_id,
             accepted_count=len(accepted_ids),

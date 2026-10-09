@@ -664,6 +664,7 @@ class IncidentModel(Base):
     emerging_patterns = relationship("EmergingPatternCandidateModel", back_populates="incident", lazy="selectin")
     threat_memory_observations = relationship("ThreatMemoryObservationModel", back_populates="incident", lazy="selectin")
     risk_assessments = relationship("RiskAssessmentModel", back_populates="incident", foreign_keys="RiskAssessmentModel.incident_id", cascade="all, delete-orphan", lazy="selectin")
+    device_correlations = relationship("DeviceIncidentCorrelationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
 
 
 class IncidentCorrelationModel(Base):
@@ -2908,6 +2909,7 @@ class DeviceModel(Base):
 
     agents = relationship("EndpointAgentModel", back_populates="device", cascade="all, delete-orphan", lazy="selectin")
     telemetry_events = relationship("EndpointTelemetryEventModel", back_populates="device", lazy="selectin")
+    correlations = relationship("DeviceIncidentCorrelationModel", back_populates="device", cascade="all, delete-orphan", lazy="selectin")
 
     __table_args__ = (
         Index("ix_devices_ws_uid", "workspace_id", "device_uid", unique=True),
@@ -3106,3 +3108,56 @@ class EndpointAgentHeartbeatModel(Base):
     __table_args__ = (
         Index("ix_ep_hb_agent_time", "agent_id", "received_at"),
     )
+
+
+# ============================================================================
+# SECTION 33: DEVICE-TO-INCIDENT CORRELATION MODELS
+# ============================================================================
+
+class DeviceIncidentCorrelationModel(Base):
+    """
+    Section 33: Evidence-Backed Device-to-Incident Correlation.
+    Maintains bidirectional, auditable, and versioned associations between
+    managed endpoint devices and security incidents.
+    """
+    __tablename__ = "device_incident_correlations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    device_id = Column(String(36), ForeignKey("devices.id", ondelete="CASCADE"), nullable=False, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    correlation_type = Column(String(64), nullable=False, index=True)  # DIRECT_IDENTIFIER, INDICATOR_MATCH, FILE_HASH_MATCH, DOMAIN_MATCH, IP_MATCH, USER_MATCH, TEMPORAL_SEQUENCE, GRAPH_PATH, MULTI_SIGNAL_CORRELATION, etc.
+    correlation_score = Column(Float, nullable=False, default=0.0)      # 0.0 - 1.0 (strength)
+    confidence = Column(Float, nullable=False, default=1.0)             # 0.0 - 1.0
+    status = Column(String(32), nullable=False, default="OBSERVED", index=True)  # OBSERVED, RELATED, SUSPECTED, SUPPORTED, CONFIRMED, DISMISSED
+    version = Column(Integer, nullable=False, default=1, index=True)
+    is_current = Column(Boolean, nullable=False, default=True, index=True)
+    first_observed_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_observed_at = Column(DateTime, default=get_utc_now, nullable=False)
+    supporting_event_ids_json = Column(Text, default="[]", nullable=False)
+    supporting_evidence_ids_json = Column(Text, default="[]", nullable=False)
+    supporting_entity_ids_json = Column(Text, default="[]", nullable=False)
+    supporting_relationship_ids_json = Column(Text, default="[]", nullable=False)
+    matched_indicators_json = Column(Text, default="[]", nullable=False)
+    matched_behaviors_json = Column(Text, default="[]", nullable=False)
+    temporal_context_json = Column(Text, default="{}", nullable=False)
+    reason_codes_json = Column(Text, default="[]", nullable=False)
+    counter_evidence_json = Column(Text, default="[]", nullable=False)
+    limitations_json = Column(Text, default="[]", nullable=False)
+    structured_explanation_json = Column(Text, default="{}", nullable=False)
+    correlation_engine_version = Column(String(32), nullable=False, default="1.0.0")
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    device = relationship("DeviceModel", back_populates="correlations")
+    incident = relationship("IncidentModel", back_populates="device_correlations")
+
+    __table_args__ = (
+        Index("ix_dev_inc_corr_lookup", "workspace_id", "device_id", "incident_id", "is_current"),
+        Index("ix_dev_inc_corr_status", "workspace_id", "status"),
+        Index("ix_dev_inc_corr_score", "workspace_id", "correlation_score"),
+    )
+

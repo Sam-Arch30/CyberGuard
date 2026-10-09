@@ -11,7 +11,8 @@ import {
   Plus,
   ArrowRight,
   RefreshCw,
-  Layers
+  Layers,
+  Laptop
 } from 'lucide-react';
 import type { EmailAnalysis } from '../../../types/forensic';
 import type { CampaignAlertData, CampaignDetail } from '../../../types/campaign';
@@ -20,7 +21,8 @@ import { apiUrl } from '../../../utils/apiClient';
 import {
   InvestigationRelationshipSummary,
   ProgressiveInvestigationGraph,
-  CampaignCorrelationPanel
+  CampaignCorrelationPanel,
+  DeviceIncidentSection
 } from '../../../components/forensic/investigation';
 import { CrossEmailWorkspace } from '../../../components/forensic/CrossEmailWorkspace';
 import { EvidenceIntegritySection } from '../../../components/forensic/EvidenceIntegritySection';
@@ -34,7 +36,7 @@ interface InvestigationSectionViewProps {
   email: EmailAnalysis;
 }
 
-type InvestigationSubTab = 'graph' | 'campaigns' | 'cross_email' | 'evidence' | 'cases' | 'explanation' | 'recommendations' | 'copilot';
+type InvestigationSubTab = 'graph' | 'campaigns' | 'cross_email' | 'evidence' | 'cases' | 'explanation' | 'recommendations' | 'devices' | 'copilot';
 
 export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> = ({ email }) => {
   const {
@@ -105,6 +107,7 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
     { id: 'evidence', label: 'Evidence & Audit Chain', icon: ShieldCheck },
     { id: 'explanation', label: 'Explainable AI (XAI)', icon: Layers, count: 'PROVENANCE', badgeColor: 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' },
     { id: 'recommendations', label: 'Response Proposals', icon: ShieldAlert, count: 'ADVISORY', badgeColor: 'text-amber-400 bg-amber-500/10 border-amber-500/30' },
+    { id: 'devices', label: 'Correlated Devices', icon: Laptop, count: 'HOSTS', badgeColor: 'text-cyan-400 bg-cyan-500/10 border-cyan-500/30' },
     { id: 'cases', label: 'Case Relationships', icon: Briefcase },
     { id: 'copilot', label: 'Investigation Copilot', icon: Sparkles, count: 'AI', badgeColor: 'text-primary bg-primary/10 border-primary/30' }
   ];
@@ -436,6 +439,16 @@ export const InvestigationSectionView: React.FC<InvestigationSectionViewProps> =
               scopeId={email.id}
               threatEventId={email.evidence_id || email.id}
               email={email}
+            />
+          </div>
+        )}
+
+        {/* Section 33: Device-to-Incident Correlation Sub-Tab */}
+        {currentSubTab === 'devices' && (
+          <div className="space-y-4">
+            <DeviceIncidentSection
+              incidentId={email.id}
+              emailId={email.id}
             />
           </div>
         )}
