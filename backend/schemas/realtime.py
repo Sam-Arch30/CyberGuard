@@ -50,6 +50,11 @@ class RealtimeEventTypeEnum(str, Enum):
     REPORT_READY = "REPORT_READY"
     REPORT_FAILED = "REPORT_FAILED"
 
+    # Section 47: Notifications & Security Alerts
+    NOTIFICATION_CREATED = "NOTIFICATION_CREATED"
+    NOTIFICATION_READ = "NOTIFICATION_READ"
+    ALERT_ACKNOWLEDGED = "ALERT_ACKNOWLEDGED"
+
 
 class RealtimeResourceScopeEnum(str, Enum):
     ANALYSIS_RUN = "ANALYSIS_RUN"
@@ -57,6 +62,8 @@ class RealtimeResourceScopeEnum(str, Enum):
     INVESTIGATION = "INVESTIGATION"
     REPORT = "REPORT"
     WORKSPACE = "WORKSPACE"
+    NOTIFICATION = "NOTIFICATION"
+
 
 
 class RealtimeEventPayload(BaseModel):

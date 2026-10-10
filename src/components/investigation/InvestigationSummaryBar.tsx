@@ -237,6 +237,17 @@ export const InvestigationSummaryBar: React.FC<InvestigationSummaryBarProps> = (
             )}
           </div>
 
+          {/* Section 47: Security Alert Indicator */}
+          {(investigation?.severity === 'CRITICAL' || investigation?.severity === 'HIGH' || (risk?.score && risk.score >= 60)) && (
+            <div
+              className="flex items-center space-x-1 px-2 py-1 rounded-control bg-threat-critical/10 border border-threat-critical/30 text-[11px] font-mono text-threat-critical font-bold animate-pulse"
+              title="Active security alert registered for this investigation"
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-threat-critical shrink-0" />
+              <span>ALERT</span>
+            </div>
+          )}
+
           {/* Metric Pill: Findings */}
           <div
             className="flex items-center space-x-1.5 px-2 py-1 rounded-control bg-surface-secondary border border-border text-[11px] font-mono text-foreground"

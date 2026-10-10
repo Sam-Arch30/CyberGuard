@@ -251,6 +251,17 @@ def generate_investigation_report_endpoint(
     db.commit()
     db.refresh(report_record)
 
+    # Section 47: Dispatch report completion notification
+    try:
+        from backend.services.notification_service import NotificationService
+        NotificationService.on_report_completed(
+            db=db,
+            report=report_record,
+            workspace_id="default",
+        )
+    except Exception as ne:
+        logger.warning("Notification on report creation failed: %s", ne)
+
     # 7. Audit trail logging
     AuditService.log_audit(
         db=db,

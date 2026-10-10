@@ -37,6 +37,7 @@ import type {
 import { IndicatorDetailDrawer } from '../components/search';
 import { RealtimeService } from '../services/realtimeService';
 import type { RealtimeConnectionStatus } from '../types/realtime';
+import { NotificationClientService } from '../services/notificationService';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -52,6 +53,7 @@ export const Dashboard: React.FC = () => {
   const [selectedIndicator, setSelectedIndicator] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>('DISCONNECTED');
+  const [unreadAlertsCount, setUnreadAlertsCount] = useState<number>(0);
 
   // Interval timer ref
   const timerRef = useRef<any>(null);
@@ -64,6 +66,12 @@ export const Dashboard: React.FC = () => {
       setError(null);
       const res = await SocOverviewService.getOverview(timeWindow, 'default');
       setData(res);
+      try {
+        const notifCounts = await NotificationClientService.getUnreadCount();
+        setUnreadAlertsCount(notifCounts.alerts_unread);
+      } catch {
+        // Suppress notification counter errors
+      }
       setLastUpdated(new Date());
       setSecondsAgo(0);
     } catch (err: any) {
@@ -250,6 +258,17 @@ export const Dashboard: React.FC = () => {
             )}
             <span className="hidden sm:inline opacity-60">({lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
           </div>
+
+          {/* Section 47: Unread Security Alerts Pill */}
+          {unreadAlertsCount > 0 && (
+            <div
+              className="flex items-center space-x-1 px-2.5 py-1 rounded-md bg-threat-critical/15 text-threat-critical border border-threat-critical/30 text-[11px] font-mono font-bold animate-pulse"
+              title={`${unreadAlertsCount} unread security alert(s) requiring analyst attention`}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>{unreadAlertsCount} Alert{unreadAlertsCount > 1 ? 's' : ''}</span>
+            </div>
+          )}
 
           {/* Refresh Button */}
           <Button

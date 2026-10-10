@@ -192,6 +192,21 @@ class JobLifecycleManager:
             )
             db.add(event)
             db.flush()
+
+        # Section 47: Dispatch notification on job failure
+        if target_status == JobStatusEnum.FAILED.value:
+            try:
+                from backend.services.notification_service import NotificationService
+                NotificationService.on_job_failed(
+                    db=db,
+                    job=job,
+                    workspace_id=job.workspace_id,
+                    error_message=sanitized_error,
+                    investigation_id=job.resource_id if job.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+                )
+            except Exception as ex:
+                logger.warning("Failed to dispatch job failure notification: %s", ex)
+
         return job
 
 

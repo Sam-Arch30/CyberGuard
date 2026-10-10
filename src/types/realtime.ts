@@ -42,7 +42,11 @@ export type RealtimeEventType =
   // Reports
   | 'REPORT_GENERATION_STARTED'
   | 'REPORT_READY'
-  | 'REPORT_FAILED';
+  | 'REPORT_FAILED'
+  // Section 47: Notifications & Alerts
+  | 'NOTIFICATION_CREATED'
+  | 'NOTIFICATION_READ'
+  | 'ALERT_ACKNOWLEDGED';
 
 export interface RealtimeEventPayload {
   finding_id?: string;

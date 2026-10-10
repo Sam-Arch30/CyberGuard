@@ -428,6 +428,18 @@ async def handle_report_generation(ctx: JobExecutionContext, db: Session) -> Dic
             "download_url": f"/api/reports/{report_id}/download",
         },
     )
+
+    # Section 47: Dispatch report completion notification
+    try:
+        from backend.services.notification_service import NotificationService
+        NotificationService.on_report_completed(
+            db=db,
+            report=report_record if not existing_report else existing_report,
+            workspace_id=ctx.workspace_id,
+        )
+    except Exception as ne:
+        logger.warning("Failed to dispatch report notification: %s", ne)
+
     return {
         "report_id": report_id,
         "report_number": report_number,

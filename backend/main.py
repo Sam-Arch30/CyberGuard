@@ -48,6 +48,7 @@ from backend.api.routes.analysis_live import router as analysis_live_router
 from backend.api.routes.investigations import router as investigations_router
 from backend.api.routes.search import router as search_router
 from backend.api.routes.jobs import router as jobs_router
+from backend.api.routes.notifications import router as notifications_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -160,6 +161,7 @@ app.include_router(analysis_live_router)
 app.include_router(investigations_router)
 app.include_router(search_router)
 app.include_router(jobs_router)
+app.include_router(notifications_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

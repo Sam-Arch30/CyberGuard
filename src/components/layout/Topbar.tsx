@@ -17,6 +17,9 @@ import { useInvestigation } from '../../context/InvestigationContext';
 import { Breadcrumbs } from './Breadcrumbs';
 import { cn } from '../../utils/cn';
 import { GlobalSearchModal, IndicatorDetailDrawer } from '../search';
+import { NotificationDrawer } from '../notifications/NotificationDrawer';
+import { NotificationClientService } from '../../services/notificationService';
+import { RealtimeService } from '../../services/realtimeService';
 
 export interface TopbarProps {
   onToggleMobileSidebar?: () => void;
@@ -28,6 +31,9 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [drawerIndicator, setDrawerIndicator] = useState<string | null>(null);
+  const [isNotificationDrawerOpen, setIsNotificationDrawerOpen] = useState(false);
+  const [unreadTotal, setUnreadTotal] = useState<number>(0);
+  const [unreadAlerts, setUnreadAlerts] = useState<number>(0);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -38,6 +44,44 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
 
   const themeMenuRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
+
+  // Section 47: Fetch unread counts from authoritative API
+  const fetchUnreadCounts = useCallback(async () => {
+    try {
+      const res = await NotificationClientService.getUnreadCount();
+      setUnreadTotal(res.total_unread);
+      setUnreadAlerts(res.alerts_unread);
+    } catch {
+      // Ignore network failure on initial load
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUnreadCounts();
+  }, [fetchUnreadCounts]);
+
+  // Section 46 & 47: Real-time notification subscriber
+  useEffect(() => {
+    const unsubscribe = RealtimeService.subscribe({
+      url: '/api/dashboard/stream',
+      onEvent: (evt) => {
+        if (
+          evt.event_type === 'NOTIFICATION_CREATED' ||
+          evt.event_type === 'NOTIFICATION_READ' ||
+          evt.event_type === 'ALERT_ACKNOWLEDGED'
+        ) {
+          fetchUnreadCounts();
+        }
+      },
+      onAuthoritativeRefetch: () => {
+        fetchUnreadCounts();
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [fetchUnreadCounts]);
 
   // Global keyboard shortcut for search (⌘K / Ctrl+K)
   useEffect(() => {
@@ -316,88 +360,27 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
           )}
         </div>
 
-        {/* Notifications */}
-        <div className="relative" ref={notifRef}>
+        {/* Section 47: Notifications & Alert Center Entrypoint */}
+        <div className="relative">
           <button
             type="button"
-            onClick={() => setShowNotifications(!showNotifications)}
+            onClick={() => setIsNotificationDrawerOpen(true)}
             className="relative p-2 rounded-control bg-surface hover:bg-surface-secondary border border-border text-foreground-muted hover:text-foreground transition-colors btn-press cursor-pointer"
-            aria-label="View security notifications"
+            aria-label="View notifications and security alerts"
+            title="Open Notifications & Alert Center"
           >
             <Bell className="w-4 h-4" />
-            {alerts.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-threat-critical text-[9px] font-bold text-white flex items-center justify-center animate-pulse">
-                {alerts.length}
+            {unreadTotal > 0 && (
+              <span
+                className={cn(
+                  'absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full text-[9px] font-mono font-bold text-white flex items-center justify-center',
+                  unreadAlerts > 0 ? 'bg-threat-critical animate-pulse' : 'bg-primary'
+                )}
+              >
+                {unreadTotal > 99 ? '99+' : unreadTotal}
               </span>
             )}
           </button>
-
-          {showNotifications && (
-            <div className="absolute right-0 mt-2 w-80 md:w-96 bg-surface-elevated border border-border rounded-card shadow-popover p-3.5 z-50 animate-in fade-in slide-in-from-top-1 duration-150">
-              <div className="flex items-center justify-between mb-2.5 pb-2 border-b border-border">
-                <div className="flex items-center space-x-1.5">
-                  <ShieldAlert className="w-4 h-4 text-threat-critical" />
-                  <h4 className="text-xs font-mono font-bold text-foreground uppercase tracking-wide">
-                    Active Security Alerts
-                  </h4>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowNotifications(false)}
-                  className="text-xs text-foreground-muted hover:text-foreground cursor-pointer"
-                >
-                  Close
-                </button>
-              </div>
-
-              {alerts.length === 0 ? (
-                <div className="py-6 text-center text-xs font-mono text-foreground-muted space-y-1">
-                  <ShieldCheck className="w-6 h-6 text-threat-safe mx-auto mb-1.5" />
-                  <p className="font-semibold text-foreground">No Active Security Alerts</p>
-                  <p className="text-[11px] text-foreground-muted">System standby. Telemetry streams within baselines.</p>
-                </div>
-              ) : (
-                <div className="space-y-1.5 max-h-80 overflow-y-auto">
-                  {alerts.map((alt) => (
-                    <div
-                      key={alt.id}
-                      onClick={() => {
-                        setShowNotifications(false);
-                        if (activeEmailId) {
-                          navigate(`/investigations/${activeEmailId}/overview`);
-                        } else {
-                          navigate('/investigations');
-                        }
-                      }}
-                      className="p-2.5 rounded-control bg-surface-secondary/70 border border-border hover:border-primary/60 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-1">
-                        <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-badge bg-threat-critical-surface text-threat-critical border border-threat-critical-border">
-                          {alt.level}
-                        </span>
-                        <span className="text-[10px] text-foreground-muted font-mono">{alt.time}</span>
-                      </div>
-                      <div className="text-xs font-medium text-foreground">{alt.title}</div>
-                      <div className="text-[11px] font-mono text-foreground-muted mt-0.5 truncate">
-                        {alt.sender}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <button
-                type="button"
-                onClick={() => {
-                  setShowNotifications(false);
-                  navigate('/investigations');
-                }}
-                className="w-full mt-2.5 py-1 text-center text-xs font-mono text-primary hover:text-primary-hover font-medium cursor-pointer"
-              >
-                View All Investigations &rarr;
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </header>
@@ -415,6 +398,13 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
     <IndicatorDetailDrawer
       indicatorValue={drawerIndicator}
       onClose={() => setDrawerIndicator(null)}
+    />
+
+    {/* Section 47 - Global Notifications & Alert Center Drawer */}
+    <NotificationDrawer
+      isOpen={isNotificationDrawerOpen}
+      onClose={() => setIsNotificationDrawerOpen(false)}
+      onUnreadChange={fetchUnreadCounts}
     />
     </>
   );

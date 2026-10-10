@@ -529,6 +529,16 @@ class AnalysisOrchestrator:
 
         art_type = (artifact.artifact_type or "FILE").upper() if artifact else "FILE"
 
+        workspace_id = "default"
+        investigation_id = None
+        if artifact and artifact.metadata_json:
+            try:
+                art_meta = json.loads(artifact.metadata_json)
+                workspace_id = art_meta.get("workspace_id", "default")
+                investigation_id = art_meta.get("investigation_id")
+            except Exception:
+                pass
+
         completed_tasks_count = 0
         failed_tasks_count = 0
 
@@ -622,6 +632,14 @@ class AnalysisOrchestrator:
                         )
                         db.add(f)
                         db.flush()
+                        try:
+                            from backend.services.notification_service import NotificationService
+                            NotificationService.on_finding_persisted(
+                                db=db, finding=f, workspace_id=workspace_id, investigation_id=investigation_id
+                            )
+                        except Exception as ne:
+                            logger.warning("Notification on finding failed: %s", ne)
+
                         cls.emit_event(
                             db=db,
                             run_id=run.id,
@@ -664,6 +682,14 @@ class AnalysisOrchestrator:
                             )
                             db.add(f)
                             db.flush()
+                            try:
+                                from backend.services.notification_service import NotificationService
+                                NotificationService.on_finding_persisted(
+                                    db=db, finding=f, workspace_id=workspace_id, investigation_id=investigation_id
+                                )
+                            except Exception as ne:
+                                logger.warning("Notification on finding failed: %s", ne)
+
                             cls.emit_event(
                                 db=db,
                                 run_id=run.id,
@@ -718,6 +744,14 @@ class AnalysisOrchestrator:
                             )
                             db.add(f)
                             db.flush()
+                            try:
+                                from backend.services.notification_service import NotificationService
+                                NotificationService.on_finding_persisted(
+                                    db=db, finding=f, workspace_id=workspace_id, investigation_id=investigation_id
+                                )
+                            except Exception as ne:
+                                logger.warning("Notification on finding failed: %s", ne)
+
                             cls.emit_event(
                                 db=db,
                                 run_id=run.id,
@@ -766,6 +800,14 @@ class AnalysisOrchestrator:
                         )
                         db.add(f)
                         db.flush()
+                        try:
+                            from backend.services.notification_service import NotificationService
+                            NotificationService.on_finding_persisted(
+                                db=db, finding=f, workspace_id=workspace_id, investigation_id=investigation_id
+                            )
+                        except Exception as ne:
+                            logger.warning("Notification on finding failed: %s", ne)
+
                         cls.emit_event(
                             db=db,
                             run_id=run.id,
@@ -898,6 +940,18 @@ class AnalysisOrchestrator:
                 message=f"Analysis run concluded with status {run.status}.",
                 result_count=completed_tasks_count,
             )
+
+            # Section 47: Dispatch analysis run completed notification
+            try:
+                from backend.services.notification_service import NotificationService
+                NotificationService.on_analysis_run_completed(
+                    db=db,
+                    run=run,
+                    workspace_id=workspace_id,
+                    investigation_id=investigation_id,
+                )
+            except Exception as ne:
+                logger.warning("Failed to dispatch run completion notification: %s", ne)
 
         return run
 

@@ -3330,3 +3330,62 @@ class BackgroundJobEventModel(Base):
     )
 
 
+class NotificationModel(Base):
+    """
+    Section 47: Persistent Notification & Security Alert Model.
+    Distinguishes between user-facing notifications ('Something happened')
+    and actionable security alerts ('Potential threat requires investigation/action').
+    Tracks read/unread state, acknowledgement, authoritative provenance, and deduplication.
+    """
+    __tablename__ = "notifications"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    user_id = Column(String(100), nullable=True, index=True)
+
+    category = Column(String(32), nullable=False, default="NOTIFICATION", index=True)  # NOTIFICATION, SECURITY_ALERT
+    notification_type = Column(String(64), nullable=False, index=True)  # Controlled taxonomy
+    severity = Column(String(20), nullable=False, default="INFO", index=True)  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    status = Column(String(30), nullable=False, default="UNREAD", index=True)  # UNREAD, READ, ACKNOWLEDGED, DISMISSED
+
+    title = Column(String(255), nullable=False)
+    message = Column(Text, nullable=False)
+
+    # Authoritative Provenance & Navigation
+    source_type = Column(String(50), nullable=False, index=True)  # FINDING, ANALYSIS_RUN, REPORT, JOB, INVESTIGATION, INCIDENT
+    source_id = Column(String(128), nullable=False, index=True)
+    investigation_id = Column(String(128), nullable=True, index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
+    job_id = Column(String(36), ForeignKey("background_jobs.id", ondelete="SET NULL"), nullable=True, index=True)
+    report_id = Column(String(36), ForeignKey("reports.id", ondelete="SET NULL"), nullable=True, index=True)
+    navigation_target = Column(String(255), nullable=True)
+
+    # Deduplication & Suppression
+    deduplication_key = Column(String(190), nullable=False, index=True)
+
+    # Metadata & Explanations (sanitized JSON)
+    metadata_json = Column(Text, default="{}", nullable=False)
+
+    # Timestamps & Lifecycle
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    read_at = Column(DateTime, nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String(100), nullable=True)
+
+    # Relationships
+    analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
+    finding = relationship("FindingModel", foreign_keys=[finding_id])
+    job = relationship("BackgroundJobModel", foreign_keys=[job_id])
+    report = relationship("ReportModel", foreign_keys=[report_id])
+
+    __table_args__ = (
+        Index("ix_notif_ws_status", "workspace_id", "status"),
+        Index("ix_notif_ws_cat_status", "workspace_id", "category", "status"),
+        Index("ix_notif_ws_dedup", "workspace_id", "deduplication_key"),
+        Index("ix_notif_ws_created", "workspace_id", "created_at"),
+        Index("ix_notif_ws_inv", "workspace_id", "investigation_id"),
+    )
+
+
+
