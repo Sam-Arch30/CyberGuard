@@ -135,7 +135,14 @@ export interface IncidentItem {
   created_by: string | null;
   resolved_by: string | null;
   resolution_reason: string | null;
-  age_display: string;
+  age_display?: string;
+  escalation_level?: number;
+  sla_status?: string;
+  next_sla_deadline?: string | null;
+  time_remaining_mins?: number | null;
+  is_overdue?: boolean;
+  remaining_display?: string | null;
+  overdue_display?: string | null;
 }
 
 export interface IncidentDetail extends IncidentItem {
@@ -152,7 +159,8 @@ export interface IncidentDetail extends IncidentItem {
 export interface IncidentListResponse {
   items: IncidentItem[];
   total: number;
-  page: number;
+  page?: number;
+  offset?: number;
   limit: number;
 }
 
@@ -165,9 +173,14 @@ export interface IncidentMetrics {
   contained_incidents: number;
   resolved_incidents: number;
   closed_incidents: number;
-  avg_time_to_acknowledge_hours: number;
-  avg_time_to_contain_hours: number;
-  avg_time_to_resolve_hours: number;
+  avg_time_to_acknowledge_hours?: number;
+  avg_time_to_contain_hours?: number;
+  avg_time_to_resolve_hours?: number;
+  sla_breaches?: number;
+  approaching_sla?: number;
+  unacknowledged_critical?: number;
+  escalated_incidents?: number;
+  unassigned_critical?: number;
 }
 
 export interface IncidentCreatePayload {

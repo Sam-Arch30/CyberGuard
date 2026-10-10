@@ -739,6 +739,10 @@ class IncidentModel(Base):
     resolved_by = Column(String(100), nullable=True)
     resolution_reason = Column(Text, nullable=True)
     duplicate_of_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    sla_policy_id = Column(String(36), nullable=True, index=True)
+    escalation_level = Column(Integer, nullable=False, default=0, index=True)
+    sla_status = Column(String(30), nullable=False, default="HEALTHY", index=True)  # HEALTHY, WARNING, BREACHED, PAUSED, EXEMPT, MET
+    next_sla_deadline = Column(DateTime, nullable=True, index=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
@@ -762,6 +766,9 @@ class IncidentModel(Base):
     timeline_events = relationship("IncidentTimelineEventModel", back_populates="incident", cascade="all, delete-orphan", order_by="asc(IncidentTimelineEventModel.timestamp)", lazy="selectin")
     notes = relationship("IncidentNoteModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentNoteModel.created_at)", lazy="selectin")
     duplicate_of = relationship("IncidentModel", remote_side=[id], foreign_keys=[duplicate_of_id], lazy="selectin")
+    sla_state = relationship("IncidentSLAStateModel", back_populates="incident", uselist=False, cascade="all, delete-orphan", lazy="selectin")
+    workflow_executions = relationship("IncidentWorkflowExecutionModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentWorkflowExecutionModel.executed_at)", lazy="selectin")
+    sla_pause_logs = relationship("IncidentSLAPauseLogModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentSLAPauseLogModel.timestamp)", lazy="selectin")
 
 
 class IncidentTimelineEventModel(Base):
@@ -3357,6 +3364,20 @@ class BackgroundJobModel(Base):
     analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
     report = relationship("ReportModel", foreign_keys=[report_id])
 
+    @property
+    def payload(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.payload_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def result(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.result_json or "{}")
+        except Exception:
+            return {}
+
     __table_args__ = (
         Index("ix_bg_jobs_claim", "status", "scheduled_at", "priority_weight"),
         Index("ix_bg_jobs_ws_idemp", "workspace_id", "idempotency_key"),
@@ -3537,6 +3558,344 @@ class AlertClusterMemberModel(Base):
         Index("ix_clu_mem_clu_alert", "cluster_id", "alert_id", unique=True),
         Index("ix_clu_mem_ws_alert", "workspace_id", "alert_id"),
     )
+
+
+# ============================================================================
+# SECTION 51: INCIDENT SLA, ESCALATION & ANALYST WORKFLOW AUTOMATION MODELS
+# ============================================================================
+
+class IncidentSLAPolicyModel(Base):
+    """
+    Section 51: Persistent Incident SLA Policy.
+    Defines configurable acknowledgement, investigation, containment, and resolution
+    target durations along with warning thresholds.
+    """
+    __tablename__ = "incident_sla_policies"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    severity = Column(String(20), nullable=False, default="ANY", index=True)  # CRITICAL, HIGH, MEDIUM, LOW, INFO, ANY
+    priority = Column(String(20), nullable=False, default="ANY", index=True)  # P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW, ANY
+    category = Column(String(50), nullable=False, default="ANY", index=True)  # PHISHING, MALWARE, etc. or ANY
+    acknowledgement_target_minutes = Column(Integer, nullable=False, default=30)
+    investigation_target_minutes = Column(Integer, nullable=False, default=60)
+    containment_target_minutes = Column(Integer, nullable=False, default=120)
+    resolution_target_minutes = Column(Integer, nullable=False, default=480)
+    warning_threshold_pct = Column(Float, nullable=False, default=80.0)  # e.g. 80.0% of target
+    escalation_policy_id = Column(String(36), nullable=True, index=True)
+    is_default = Column(Boolean, nullable=False, default=False)
+    status = Column(String(20), nullable=False, default="ACTIVE", index=True)  # DRAFT, ACTIVE, DISABLED, ARCHIVED
+    version = Column(Integer, nullable=False, default=1)
+    created_by = Column(String(100), default="SYSTEM")
+    updated_by = Column(String(100), default="SYSTEM")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_sla_pol_ws_status", "workspace_id", "status"),
+        Index("ix_sla_pol_ws_sev", "workspace_id", "severity"),
+    )
+
+
+class IncidentEscalationPolicyModel(Base):
+    """
+    Section 51: Persistent Escalation Policy abstraction.
+    Groups ordered levels of escalation rules with loop cooldowns and max levels.
+    """
+    __tablename__ = "incident_escalation_policies"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    cooldown_minutes = Column(Integer, nullable=False, default=15)
+    max_escalation_level = Column(Integer, nullable=False, default=3)
+    status = Column(String(20), nullable=False, default="ACTIVE", index=True)  # DRAFT, ACTIVE, DISABLED, ARCHIVED
+    version = Column(Integer, nullable=False, default=1)
+    created_by = Column(String(100), default="SYSTEM")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    rules = relationship("IncidentEscalationRuleModel", back_populates="policy", cascade="all, delete-orphan", order_by="asc(IncidentEscalationRuleModel.level)", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_esc_pol_ws_status", "workspace_id", "status"),
+    )
+
+
+class IncidentEscalationRuleModel(Base):
+    """
+    Section 51: Individual level / condition / action rule inside an Escalation Policy.
+    """
+    __tablename__ = "incident_escalation_rules"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    policy_id = Column(String(36), ForeignKey("incident_escalation_policies.id", ondelete="CASCADE"), nullable=False, index=True)
+    level = Column(Integer, nullable=False, default=1)  # 1, 2, 3
+    condition_type = Column(String(50), nullable=False, default="SLA_BREACH")  # SLA_WARNING, SLA_BREACH, CRITICAL_UNACKNOWLEDGED, UNASSIGNED_TIMEOUT, PRIORITY_CRITICAL, REOPENED
+    milestone = Column(String(30), nullable=False, default="ANY")  # ACKNOWLEDGEMENT, INVESTIGATION, CONTAINMENT, RESOLUTION, ANY
+    action_type = Column(String(50), nullable=False, default="NOTIFY_TEAM")  # NOTIFY_OWNER, NOTIFY_TEAM, ASSIGN_TO_USER, ASSIGN_TO_TEAM, ESCALATE_PRIORITY, CREATE_TASK
+    target_role = Column(String(50), nullable=True)  # "SOC Lead", "Security Manager"
+    target_user = Column(String(100), nullable=True)  # Specific analyst or lead name
+    target_team = Column(String(64), nullable=True)  # Specific team name/id
+    escalate_priority_to = Column(String(20), nullable=True)  # P1_CRITICAL, P2_HIGH
+    note_template = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    policy = relationship("IncidentEscalationPolicyModel", back_populates="rules")
+
+    __table_args__ = (
+        Index("ix_esc_rule_pol_lvl", "policy_id", "level"),
+    )
+
+
+class IncidentRoutingRuleModel(Base):
+    """
+    Section 51: Analyst & Team Routing Rules.
+    Dispatches incoming or unassigned incidents using category, severity, and risk criteria.
+    """
+    __tablename__ = "incident_routing_rules"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    priority_order = Column(Integer, nullable=False, default=10)
+    category = Column(String(50), nullable=False, default="ANY")
+    severity = Column(String(20), nullable=False, default="ANY")
+    min_risk_score = Column(Float, nullable=False, default=0.0)
+    routing_strategy = Column(String(30), nullable=False, default="ROUND_ROBIN")  # DIRECT_USER, ROUND_ROBIN, LEAST_LOADED, TEAM_QUEUE
+    target_team_id = Column(String(64), nullable=True)
+    target_user_id = Column(String(100), nullable=True)
+    candidate_analysts_json = Column(Text, default="[]", nullable=False)  # JSON array of analyst usernames
+    enabled = Column(Boolean, nullable=False, default=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_rout_ws_enabled_prio", "workspace_id", "enabled", "priority_order"),
+    )
+
+
+class IncidentSLAStateModel(Base):
+    """
+    Section 51: Authoritative persistent SLA state linked 1-to-1 with an Incident.
+    Calculates elapsed times, milestone deadlines, pause duration, warnings, and breach markers.
+    """
+    __tablename__ = "incident_sla_states"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), unique=True, nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    policy_id = Column(String(36), nullable=True, index=True)
+    policy_name = Column(String(100), nullable=True)
+    policy_version = Column(Integer, nullable=False, default=1)
+    escalation_policy_id = Column(String(36), nullable=True)
+
+    # Acknowledgement Clock
+    ack_target_minutes = Column(Integer, nullable=False, default=30)
+    ack_deadline = Column(DateTime, nullable=True)
+    ack_status = Column(String(20), nullable=False, default="NOT_STARTED")  # NOT_STARTED, RUNNING, MET, WARNING, BREACHED, PAUSED, EXEMPT
+    ack_met_at = Column(DateTime, nullable=True)
+    ack_warning_sent_at = Column(DateTime, nullable=True)
+    ack_breached_at = Column(DateTime, nullable=True)
+
+    # Investigation Clock
+    inv_target_minutes = Column(Integer, nullable=False, default=60)
+    inv_deadline = Column(DateTime, nullable=True)
+    inv_status = Column(String(20), nullable=False, default="NOT_STARTED")
+    inv_met_at = Column(DateTime, nullable=True)
+    inv_warning_sent_at = Column(DateTime, nullable=True)
+    inv_breached_at = Column(DateTime, nullable=True)
+
+    # Containment Clock
+    cont_target_minutes = Column(Integer, nullable=False, default=120)
+    cont_deadline = Column(DateTime, nullable=True)
+    cont_status = Column(String(20), nullable=False, default="NOT_STARTED")
+    cont_met_at = Column(DateTime, nullable=True)
+    cont_warning_sent_at = Column(DateTime, nullable=True)
+    cont_breached_at = Column(DateTime, nullable=True)
+
+    # Resolution Clock
+    res_target_minutes = Column(Integer, nullable=False, default=480)
+    res_deadline = Column(DateTime, nullable=True)
+    res_status = Column(String(20), nullable=False, default="NOT_STARTED")
+    res_met_at = Column(DateTime, nullable=True)
+    res_warning_sent_at = Column(DateTime, nullable=True)
+    res_breached_at = Column(DateTime, nullable=True)
+
+    # Overall SLA status & Escalation Level
+    overall_sla_status = Column(String(20), nullable=False, default="HEALTHY", index=True)  # HEALTHY, WARNING, BREACHED, PAUSED, EXEMPT, MET
+    current_escalation_level = Column(Integer, nullable=False, default=0, index=True)
+    last_escalated_at = Column(DateTime, nullable=True)
+    last_escalation_reason = Column(Text, nullable=True)
+
+    # Pausing State
+    is_paused = Column(Boolean, nullable=False, default=False)
+    paused_at = Column(DateTime, nullable=True)
+    paused_by = Column(String(100), nullable=True)
+    pause_reason = Column(Text, nullable=True)
+    total_paused_seconds = Column(Integer, nullable=False, default=0)
+
+    # Exemption State
+    is_exempt = Column(Boolean, nullable=False, default=False)
+    exempt_at = Column(DateTime, nullable=True)
+    exempt_by = Column(String(100), nullable=True)
+    exempt_reason = Column(Text, nullable=True)
+
+    # High-Performance Deadline & Execution indexing
+    next_sla_deadline = Column(DateTime, nullable=True, index=True)
+    last_evaluated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="sla_state")
+
+    __table_args__ = (
+        Index("ix_sla_state_ws_status", "workspace_id", "overall_sla_status"),
+        Index("ix_sla_state_next_dl", "workspace_id", "next_sla_deadline"),
+    )
+
+
+class IncidentWorkflowExecutionModel(Base):
+    """
+    Section 51: Idempotency log for workflow actions and escalation rule executions.
+    Guarantees no duplicate execution of notifications, assignments, or escalations.
+    """
+    __tablename__ = "incident_workflow_executions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    execution_key = Column(String(190), unique=True, nullable=False, index=True)  # Deterministic idempotency key
+    policy_id = Column(String(36), nullable=True)
+    rule_id = Column(String(36), nullable=True)
+    escalation_level = Column(Integer, nullable=False, default=0)
+    action_type = Column(String(50), nullable=False)
+    target = Column(String(100), nullable=True)
+    status = Column(String(20), nullable=False, default="SUCCESS")  # SUCCESS, FAILED, SKIPPED
+    executed_at = Column(DateTime, default=get_utc_now, nullable=False)
+    details_json = Column(Text, default="{}", nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="workflow_executions")
+
+    __table_args__ = (
+        Index("ix_wf_exec_ws_inc", "workspace_id", "incident_id"),
+        Index("ix_wf_exec_time", "workspace_id", "executed_at"),
+    )
+
+
+class IncidentSLAPauseLogModel(Base):
+    """
+    Section 51: Forensic audit trail of every SLA pause, resume, or exemption change.
+    """
+    __tablename__ = "incident_sla_pause_logs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    action = Column(String(20), nullable=False)  # PAUSE, RESUME, EXEMPT, UNEXEMPT
+    actor = Column(String(100), nullable=False)
+    reason = Column(Text, nullable=False)
+    timestamp = Column(DateTime, default=get_utc_now, nullable=False)
+    paused_duration_seconds = Column(Integer, nullable=True)
+
+    incident = relationship("IncidentModel", back_populates="sla_pause_logs")
+
+    @property
+    def active(self) -> bool:
+        return self.action == "PAUSE"
+
+    @property
+    def paused_at(self):
+        return self.timestamp if self.action == "PAUSE" else None
+
+    @property
+    def resumed_at(self):
+        return self.timestamp if self.action == "RESUME" else None
+
+    __table_args__ = (
+        Index("ix_sla_pause_inc_time", "incident_id", "timestamp"),
+    )
+
+
+# ============================================================================
+# Section 52: Threat Intelligence & External Intelligence Enrichment
+# ============================================================================
+
+class ThreatIntelligenceRecordModel(Base):
+    """
+    Section 52: Persistent Threat Intelligence Enrichment Record.
+    Stores external or internal provider observations for observables (IP, DOMAIN, URL, HASH, EMAIL, ASN, etc.)
+    with strict provenance, freshness, confidence, verdict, and multi-tenant scoping.
+    """
+    __tablename__ = "threat_intelligence_records"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    indicator_type = Column(String(50), nullable=False, index=True)  # IP, DOMAIN, URL, SHA256, SHA1, MD5, EMAIL, CERTIFICATE, ASN, HOSTNAME
+    indicator_value = Column(Text, nullable=False)  # Raw observed value
+    normalized_value = Column(String(500), nullable=False, index=True)  # Normalized canonical representation
+    provider = Column(String(100), nullable=False, index=True)  # internal_memory, cyberguard_feed, virustotal, abuseipdb, alienvault
+    provider_record_id = Column(String(255), nullable=True)
+    verdict = Column(String(50), nullable=False, default="UNKNOWN", index=True)  # UNKNOWN, CLEAN, SUSPICIOUS, MALICIOUS, UNVERIFIED
+    confidence = Column(Float, nullable=False, default=0.5)  # 0.0 - 1.0 (distinct from risk)
+    severity = Column(String(20), nullable=False, default="NONE", index=True)  # NONE, LOW, MEDIUM, HIGH, CRITICAL
+    threat_types_json = Column(Text, nullable=False, default="[]")  # e.g. ["Phishing", "Botnet C2", "Malware"]
+    first_seen = Column(DateTime, nullable=True)
+    last_seen = Column(DateTime, nullable=True)
+    observed_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    retrieved_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    source_url = Column(String(1000), nullable=True)
+    raw_reference = Column(Text, nullable=True)
+    normalized_data_json = Column(Text, default="{}", nullable=False)
+    evidence_id = Column(String(36), nullable=True, index=True)
+    is_stale = Column(Boolean, default=False, nullable=False)
+    privacy_scope = Column(String(20), default="PUBLIC", nullable=False)  # PUBLIC, PRIVATE, INTERNAL, SENSITIVE, UNKNOWN
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ti_ws_type_norm_prov", "workspace_id", "indicator_type", "normalized_value", "provider"),
+        Index("ix_ti_norm_val", "normalized_value"),
+        Index("ix_ti_retrieved", "retrieved_at"),
+    )
+
+
+class ThreatIntelProviderConfigModel(Base):
+    """
+    Section 52: Threat Intelligence Provider Configuration & Operational State.
+    Defines provider capabilities, priority ordering, rate-limiting, and credentials.
+    """
+    __tablename__ = "threat_intel_provider_configs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    provider_name = Column(String(100), nullable=False, index=True)
+    display_name = Column(String(100), nullable=False)
+    enabled = Column(Boolean, default=True, nullable=False)
+    priority = Column(Integer, default=100, nullable=False)  # 1 = highest priority
+    supported_types_json = Column(Text, default="[]", nullable=False)  # JSON array of supported indicator types
+    rate_limit_per_minute = Column(Integer, default=60, nullable=False)
+    timeout_seconds = Column(Float, default=5.0, nullable=False)
+    api_key_ciphertext = Column(Text, nullable=True)  # Encrypted/masked server-side key
+    api_endpoint = Column(String(500), nullable=True)
+    status = Column(String(30), default="HEALTHY", nullable=False)  # HEALTHY, DEGRADED, RATE_LIMITED, UNAVAILABLE, MISCONFIGURED
+    last_health_check_at = Column(DateTime, nullable=True)
+    error_message = Column(Text, nullable=True)
+    capabilities_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tip_ws_prov", "workspace_id", "provider_name", unique=True),
+        Index("ix_tip_ws_priority", "workspace_id", "priority"),
+    )
+
+
 
 
 

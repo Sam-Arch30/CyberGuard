@@ -538,6 +538,15 @@ class RealtimePublisher:
             return None
 
     @classmethod
+    def publish_to_workspace(cls, workspace_id: str, event: RealtimeEvent) -> None:
+        """Broadcasts a realtime event to subscribers scoped to workspace."""
+        try:
+            event.workspace_id = workspace_id
+            cls._async_broadcast(event)
+        except Exception as e:
+            logger.warning("Failure isolated in publish_to_workspace: %s", e)
+
+    @classmethod
     def _async_broadcast(cls, event: RealtimeEvent) -> None:
         """Schedules broadcast in running event loop safely."""
         try:

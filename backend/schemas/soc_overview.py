@@ -17,6 +17,11 @@ class SocPostureMetrics(BaseModel):
     new_findings_count: int = Field(0, description="New evidence-backed findings detected within selected window")
     active_endpoint_agents: int = Field(0, description="Currently active and enrolled fleet endpoint agents")
     total_investigations: int = Field(0, description="Total historical investigations in database")
+    sla_breaches: int = Field(0, description="Active incidents currently in SLA BREACHED status")
+    approaching_sla: int = Field(0, description="Active incidents currently in SLA WARNING status")
+    unacknowledged_critical: int = Field(0, description="Unacknowledged CRITICAL severity incidents")
+    escalated_incidents: int = Field(0, description="Active incidents with escalation level > 0")
+    unassigned_critical: int = Field(0, description="Unassigned CRITICAL severity incidents")
 
 
 class SocRiskDistribution(BaseModel):
@@ -39,11 +44,13 @@ class SocPriorityQueueItem(BaseModel):
     risk_score: float = Field(0.0, description="Authoritative risk score 0.0 - 100.0")
     severity: str = Field("LOW", description="Severity taxonomy: CRITICAL, HIGH, MEDIUM, LOW, SAFE")
     status: str = Field("OPEN", description="Current lifecycle state")
-    resource_type: str = Field(..., description="Resource kind: INVESTIGATION, RECOMMENDATION, ANALYSIS_RUN, FINDING")
+    resource_type: str = Field(..., description="Resource kind: INVESTIGATION, RECOMMENDATION, ANALYSIS_RUN, FINDING, INCIDENT")
     reason_for_inclusion: str = Field(..., description="Deterministic reason why item is in the priority queue")
     urgency: str = Field("P2", description="Operational urgency: P0 (Critical), P1 (Urgent), P2 (Normal), P3 (Low)")
     updated_at: str = Field(..., description="ISO8601 UTC timestamp of last meaningful modification")
     navigation_target: str = Field(..., description="Canonical route to open the resource in workspace")
+    sla_status: Optional[str] = Field(None, description="SLA status if incident: HEALTHY, WARNING, BREACHED, PAUSED, EXEMPT")
+    time_remaining_mins: Optional[float] = Field(None, description="Minutes remaining until nearest SLA breach")
 
 
 class SocActivityItem(BaseModel):

@@ -44,6 +44,8 @@ DEFAULT_JOB_TIMEOUTS: Dict[str, int] = {
     JobTypeEnum.ENDPOINT_TELEMETRY_PROCESSING.value: 120,
     JobTypeEnum.EVIDENCE_EXPORT.value: 180,
     JobTypeEnum.MAINTENANCE.value: 600,
+    JobTypeEnum.INCIDENT_SLA_EVALUATION.value: 120,
+    JobTypeEnum.INCIDENT_ESCALATION.value: 120,
 }
 
 # Legal lifecycle state transition matrix

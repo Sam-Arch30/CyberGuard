@@ -10,6 +10,11 @@ export interface SocPostureMetrics {
   new_findings_count: number;
   active_endpoint_agents: number;
   total_investigations: number;
+  sla_breaches?: number;
+  approaching_sla?: number;
+  unacknowledged_critical?: number;
+  escalated_incidents?: number;
+  unassigned_critical?: number;
 }
 
 export interface SocRiskDistribution {
@@ -33,6 +38,10 @@ export interface SocPriorityQueueItem {
   urgency: 'P0' | 'P1' | 'P2' | 'P3' | string;
   updated_at: string;
   navigation_target: string;
+  sla_status?: string;
+  time_remaining_mins?: number | null;
+  sla_remaining_minutes?: number | null;
+  escalation_level?: number | null;
 }
 
 export interface SocActivityItem {

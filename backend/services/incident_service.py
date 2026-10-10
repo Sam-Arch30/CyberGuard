@@ -357,6 +357,22 @@ class IncidentService:
         db.commit()
         db.refresh(incident)
 
+        # 6b. Section 51: Automatic Analyst Routing if explicitly requested
+        if getattr(req, "auto_route", False) or req.assigned_to == "AUTO":
+            incident.assigned_to = None
+            try:
+                from backend.services.sla_service import IncidentSLAService
+                IncidentSLAService.route_incident(db, incident, workspace_id)
+            except Exception as r_err:
+                logger.debug("Analyst routing deferred: %s", r_err)
+
+        # 6c. Section 51: SLA Policy Matching & Initial Clock Evaluation
+        try:
+            from backend.services.sla_service import IncidentSLAService
+            IncidentSLAService.evaluate_incident(db, incident.id, workspace_id)
+        except Exception as s_err:
+            logger.debug("SLA clock evaluation deferred: %s", s_err)
+
         # 7. Audit & Real-time Broadcast
         AuditService.log_audit(
             db=db,
@@ -650,6 +666,8 @@ class IncidentService:
         )
         if is_reopening:
             incident.closed_at = None
+            incident.resolved_at = None
+            incident.resolution_reason = None
             cls._add_timeline_event(
                 db=db,
                 incident_id=incident.id,
@@ -713,7 +731,16 @@ class IncidentService:
         )
         cls._broadcast_incident_event(incident, event_name)
 
+        # Section 51: Re-evaluate operational SLA clocks after state transition
+        try:
+            from backend.services.sla_service import IncidentSLAService
+            IncidentSLAService.evaluate_incident(db, incident.id, workspace_id)
+        except Exception as s_err:
+            logger.debug("SLA re-evaluation after transition deferred: %s", s_err)
+
         return incident
+
+    update_status = transition_status
 
     @classmethod
     def assign_incident(
@@ -790,6 +817,13 @@ class IncidentService:
                 )
             except Exception as n_err:
                 logger.debug("Notification deferred: %s", n_err)
+
+        # Section 51: Re-evaluate SLA clocks after assignment change
+        try:
+            from backend.services.sla_service import IncidentSLAService
+            IncidentSLAService.evaluate_incident(db, incident.id, workspace_id)
+        except Exception as s_err:
+            logger.debug("SLA re-evaluation after assignment deferred: %s", s_err)
 
         return incident
 
@@ -1150,6 +1184,9 @@ class IncidentService:
             closed_at=incident.closed_at,
             created_at=incident.created_at,
             updated_at=incident.updated_at,
+            escalation_level=incident.escalation_level or 0,
+            sla_status=incident.sla_status or "HEALTHY",
+            next_sla_deadline=incident.next_sla_deadline,
             alert_count=len(related_alerts),
             cluster_count=len(related_clusters),
             findings_count=db.query(FindingModel).count(),
@@ -1172,12 +1209,13 @@ class IncidentService:
         priority: Optional[str] = None,
         category: Optional[str] = None,
         assigned_to: Optional[str] = None,
+        sla_status: Optional[str] = None,
         q: Optional[str] = None,
         sort_by: str = "severity_first",
         limit: int = 50,
         offset: int = 0,
     ) -> Tuple[List[IncidentItemResponse], int]:
-        """Server-side filtering, sorting, and pagination for the Incident Queue."""
+        """Server-side filtering, sorting, and pagination for the Incident Queue with SLA support."""
         query = db.query(IncidentModel).filter(IncidentModel.workspace_id == workspace_id)
 
         if status and status.upper() != "ALL":
@@ -1191,6 +1229,9 @@ class IncidentService:
 
         if category and category.upper() != "ALL":
             query = query.filter(IncidentModel.category == category.upper())
+
+        if sla_status and sla_status.upper() != "ALL":
+            query = query.filter(IncidentModel.sla_status == sla_status.upper())
 
         if assigned_to:
             if assigned_to == "UNASSIGNED":
@@ -1221,6 +1262,16 @@ class IncidentService:
             query = query.order_by(IncidentModel.created_at.desc())
         elif sort_by == "risk_desc":
             query = query.order_by(IncidentModel.risk_score.desc())
+        elif sort_by == "closest_deadline":
+            query = query.order_by(
+                IncidentModel.next_sla_deadline.asc().nulls_last(),
+                IncidentModel.created_at.desc(),
+            )
+        elif sort_by == "sla_breach_first":
+            query = query.order_by(
+                IncidentModel.sla_status.desc(),
+                IncidentModel.created_at.desc(),
+            )
         else:
             # Default: severity & recency
             query = query.order_by(
@@ -1229,48 +1280,65 @@ class IncidentService:
             )
 
         records = query.offset(offset).limit(limit).all()
+        now = datetime.now(timezone.utc)
 
-        items = [
-            IncidentItemResponse(
-                id=r.id,
-                incident_number=r.incident_number,
-                title=r.title,
-                description=r.description,
-                status=r.status,
-                severity=r.severity,
-                priority=r.priority,
-                category=r.category,
-                risk_score=r.risk_score,
-                confidence=r.confidence,
-                assigned_to=r.assigned_to,
-                team_id=r.team_id,
-                primary_alert_id=r.primary_alert_id,
-                primary_cluster_id=r.primary_cluster_id,
-                investigation_id=r.investigation_id,
-                report_id=r.report_id,
-                created_by=r.created_by,
-                resolution_reason=r.resolution_reason,
-                duplicate_of_id=r.duplicate_of_id,
-                first_seen_at=r.first_seen_at,
-                last_seen_at=r.last_seen_at,
-                opened_at=r.opened_at,
-                acknowledged_at=r.acknowledged_at,
-                contained_at=r.contained_at,
-                resolved_at=r.resolved_at,
-                closed_at=r.closed_at,
-                created_at=r.created_at,
-                updated_at=r.updated_at,
-                alert_count=1 if r.primary_alert_id else 0,
-                cluster_count=1 if r.primary_cluster_id else 0,
+        items = []
+        for r in records:
+            dl = r.next_sla_deadline
+            time_rem = None
+            is_overdue = False
+            if dl:
+                if dl.tzinfo is None:
+                    dl = dl.replace(tzinfo=timezone.utc)
+                diff_sec = (dl - now).total_seconds()
+                time_rem = round(max(0.0, diff_sec / 60.0), 1)
+                is_overdue = (diff_sec < 0 and r.status in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING"))
+
+            items.append(
+                IncidentItemResponse(
+                    id=r.id,
+                    incident_number=r.incident_number,
+                    title=r.title,
+                    description=r.description,
+                    status=r.status,
+                    severity=r.severity,
+                    priority=r.priority,
+                    category=r.category,
+                    risk_score=r.risk_score,
+                    confidence=r.confidence,
+                    assigned_to=r.assigned_to,
+                    team_id=r.team_id,
+                    primary_alert_id=r.primary_alert_id,
+                    primary_cluster_id=r.primary_cluster_id,
+                    investigation_id=r.investigation_id,
+                    report_id=r.report_id,
+                    created_by=r.created_by,
+                    resolution_reason=r.resolution_reason,
+                    duplicate_of_id=r.duplicate_of_id,
+                    first_seen_at=r.first_seen_at,
+                    last_seen_at=r.last_seen_at,
+                    opened_at=r.opened_at,
+                    acknowledged_at=r.acknowledged_at,
+                    contained_at=r.contained_at,
+                    resolved_at=r.resolved_at,
+                    closed_at=r.closed_at,
+                    created_at=r.created_at,
+                    updated_at=r.updated_at,
+                    alert_count=1 if r.primary_alert_id else 0,
+                    cluster_count=1 if r.primary_cluster_id else 0,
+                    escalation_level=r.escalation_level or 0,
+                    sla_status=r.sla_status or "HEALTHY",
+                    next_sla_deadline=r.next_sla_deadline,
+                    time_remaining_mins=time_rem,
+                    is_overdue=is_overdue,
+                )
             )
-            for r in records
-        ]
 
         return items, total
 
     @classmethod
     def get_metrics(cls, db: Session, workspace_id: str = "default") -> IncidentMetricsResponse:
-        """Calculates real operational metrics for the Incident dashboard."""
+        """Calculates real operational metrics for the Incident dashboard including SLA metrics."""
         all_incidents = db.query(IncidentModel).filter(IncidentModel.workspace_id == workspace_id).all()
 
         total = len(all_incidents)
@@ -1281,6 +1349,28 @@ class IncidentService:
         contained_count = sum(1 for i in all_incidents if i.status == "CONTAINED")
         resolved_count = sum(1 for i in all_incidents if i.status == "RESOLVED")
         closed_count = sum(1 for i in all_incidents if i.status == "CLOSED")
+
+        # Section 51 SLA Operational Metrics
+        sla_breaches = sum(
+            1 for i in all_incidents
+            if i.sla_status == "BREACHED" and i.status in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+        approaching_sla = sum(
+            1 for i in all_incidents
+            if i.sla_status == "WARNING" and i.status in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+        unack_critical = sum(
+            1 for i in all_incidents
+            if i.severity == "CRITICAL" and not i.acknowledged_at and i.status in ("NEW", "OPEN")
+        )
+        escalated_inc = sum(
+            1 for i in all_incidents
+            if (i.escalation_level or 0) > 0 and i.status in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+        unassigned_crit = sum(
+            1 for i in all_incidents
+            if i.severity == "CRITICAL" and (not i.assigned_to or i.assigned_to == "Unassigned") and i.status in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
 
         by_cat: Dict[str, int] = {}
         by_sev: Dict[str, int] = {}
@@ -1324,6 +1414,11 @@ class IncidentService:
             avg_time_to_acknowledge_sec=avg_ack,
             avg_time_to_contain_sec=avg_contain,
             avg_time_to_resolve_sec=avg_resolve,
+            sla_breaches=sla_breaches,
+            approaching_sla=approaching_sla,
+            unacknowledged_critical=unack_critical,
+            escalated_incidents=escalated_inc,
+            unassigned_critical=unassigned_crit,
             by_category=by_cat,
             by_severity=by_sev,
             by_priority=by_pri,

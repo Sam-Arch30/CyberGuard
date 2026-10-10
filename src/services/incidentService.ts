@@ -29,6 +29,7 @@ export interface IncidentListParams {
   priority?: IncidentPriority;
   category?: IncidentCategory;
   assigned_to?: string;
+  sla_status?: string;
   search?: string;
   limit?: number;
   offset?: number;
@@ -49,7 +50,8 @@ export class IncidentService {
     if (params?.priority) qp.append('priority', params.priority);
     if (params?.category) qp.append('category', params.category);
     if (params?.assigned_to) qp.append('assigned_to', params.assigned_to);
-    if (params?.search) qp.append('search', params.search);
+    if (params?.sla_status) qp.append('sla_status', params.sla_status);
+    if (params?.search) qp.append('q', params.search);
     if (params?.limit) qp.append('limit', String(params.limit));
     if (params?.offset) qp.append('offset', String(params.offset));
     if (params?.sort_by) qp.append('sort_by', params.sort_by);

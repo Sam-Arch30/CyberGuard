@@ -606,6 +606,191 @@ async def handle_maintenance(ctx: JobExecutionContext, db: Session) -> Dict[str,
     return {"status": "MAINTENANCE_OK", "reaped_jobs": reaped}
 
 
+@register_handler(JobTypeEnum.INCIDENT_SLA_EVALUATION.value)
+async def handle_incident_sla_evaluation(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 51: Asynchronous SLA evaluation background job worker.
+    Evaluates operational milestone clocks, detects warnings and deterministic breaches,
+    and updates indexed deadlines for scheduled execution.
+    """
+    ctx.update_progress(db, 10.0, "INITIALIZING", "Initializing incident SLA evaluation...")
+    from backend.services.sla_service import IncidentSLAService
+
+    incident_id = ctx.resource_id or ctx.payload.get("incident_id")
+    is_batch = ctx.payload.get("batch", False) or not incident_id
+
+    if incident_id and not is_batch:
+        ctx.update_progress(db, 50.0, "EVALUATING", f"Evaluating SLA clocks for incident {incident_id}...")
+        state = IncidentSLAService.evaluate_incident(db, incident_id, ctx.workspace_id)
+        ctx.update_progress(
+            db,
+            100.0,
+            "COMPLETED",
+            f"SLA evaluated for incident {incident_id}: overall={state.overall_sla_status}",
+        )
+        return {
+            "incident_id": incident_id,
+            "overall_status": state.overall_sla_status,
+            "current_escalation_level": state.current_escalation_level,
+        }
+    else:
+        batch_size = ctx.payload.get("batch_size", 50)
+        ctx.update_progress(db, 30.0, "BATCH_EVALUATION", f"Evaluating active incident SLAs in batch (size={batch_size})...")
+        res = IncidentSLAService.evaluate_all_active_slas(db, ctx.workspace_id, batch_size=batch_size)
+        ctx.update_progress(
+            db,
+            100.0,
+            "COMPLETED",
+            f"Batch SLA evaluation finished. Evaluated {res.get('evaluated_count', 0)} incidents.",
+        )
+        return res
+
+
+@register_handler(JobTypeEnum.INCIDENT_ESCALATION.value)
+async def handle_incident_escalation(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 51: Asynchronous incident escalation execution.
+    Executes policy-driven multi-level escalation actions idempotently.
+    """
+    from backend.services.sla_service import IncidentSLAService
+    from backend.db.models import IncidentModel
+
+    incident_id = ctx.resource_id or ctx.payload.get("incident_id")
+    if not incident_id:
+        raise PermanentJobError("Incident escalation job requires 'incident_id' or 'resource_id'.")
+
+    ctx.update_progress(db, 20.0, "LOADING_INCIDENT", f"Loading incident {incident_id} for escalation...")
+    inc = db.query(IncidentModel).filter(IncidentModel.id == incident_id, IncidentModel.workspace_id == ctx.workspace_id).first()
+    if not inc:
+        raise PermanentJobError(f"Incident '{incident_id}' not found.")
+
+    state = IncidentSLAService.evaluate_incident(db, incident_id, ctx.workspace_id)
+    reason = ctx.payload.get("reason", "Background job automated escalation.")
+    condition_type = ctx.payload.get("condition_type", "SLA_BREACH")
+    milestone = ctx.payload.get("milestone", "ANY")
+
+    ctx.update_progress(db, 60.0, "EXECUTING_ESCALATION", f"Executing escalation for {inc.incident_number}...")
+    executed = IncidentSLAService.execute_due_escalation(
+        db=db,
+        incident=inc,
+        sla_state=state,
+        condition_type=condition_type,
+        milestone=milestone,
+        reason=reason,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Escalation job completed: executed={executed}, level={state.current_escalation_level}",
+    )
+    return {
+        "incident_id": incident_id,
+        "executed": executed,
+        "escalation_level": state.current_escalation_level,
+    }
+
+
+@register_handler(JobTypeEnum.INDICATOR_ENRICHMENT.value)
+async def handle_indicator_enrichment(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 52: Asynchronous Threat Intelligence Enrichment Background Job.
+    Performs normalization, multi-provider lookups, caching, and knowledge graph projection.
+    """
+    from backend.services.threat_intelligence_service import ThreatIntelligenceService
+
+    indicator_val = ctx.payload.get("indicator_value") or ctx.resource_id
+    indicator_type = ctx.payload.get("indicator_type")
+    force_refresh = ctx.payload.get("force_refresh", False)
+
+    if not indicator_val:
+        raise PermanentJobError("Indicator enrichment job requires 'indicator_value' or 'resource_id'.")
+
+    ctx.update_progress(db, 20.0, "NORMALIZING", f"Normalizing observable '{indicator_val}'...")
+    svc = ThreatIntelligenceService()
+
+    ctx.update_progress(db, 50.0, "QUERYING_PROVIDERS", f"Querying intelligence providers for '{indicator_val}'...")
+    res = await svc.enrich_indicator(
+        db=db,
+        raw_indicator=indicator_val,
+        indicator_type=indicator_type,
+        workspace_id=ctx.workspace_id,
+        force_refresh=force_refresh,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Enrichment completed: verdict={res.overall_verdict.value}, confidence={res.consensus_confidence}, sources={res.total_sources_queried}",
+    )
+    return {
+        "indicator_type": res.indicator_type.value,
+        "normalized_value": res.normalized_value,
+        "overall_verdict": res.overall_verdict.value,
+        "consensus_confidence": res.consensus_confidence,
+        "total_sources_queried": res.total_sources_queried,
+        "is_conflicting": res.is_conflicting,
+        "threat_types": res.threat_types,
+    }
+
+
+@register_handler(JobTypeEnum.INTELLIGENCE_REFRESH.value)
+async def handle_intelligence_refresh(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 52: Force-refresh intelligence background job bypassing caches.
+    """
+    ctx.payload["force_refresh"] = True
+    return await handle_indicator_enrichment(ctx, db)
+
+
+@register_handler(JobTypeEnum.BATCH_ENRICHMENT.value)
+async def handle_batch_enrichment(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 52: Batch indicator enrichment background job.
+    """
+    from backend.services.threat_intelligence_service import ThreatIntelligenceService
+
+    indicators = ctx.payload.get("indicators", [])
+    force_refresh = ctx.payload.get("force_refresh", False)
+    if not indicators:
+        return {"total": 0, "enriched": 0, "results": []}
+
+    svc = ThreatIntelligenceService()
+    results = []
+    total = len(indicators)
+
+    for idx, ind in enumerate(indicators):
+        raw_val = ind.get("value")
+        ind_type = ind.get("type")
+        if not raw_val:
+            continue
+
+        pct = round(10.0 + (idx / total) * 80.0, 1)
+        ctx.update_progress(db, pct, "ENRICHING_BATCH", f"Enriching {idx+1}/{total}: '{raw_val}'...")
+        try:
+            res = await svc.enrich_indicator(
+                db=db,
+                raw_indicator=raw_val,
+                indicator_type=ind_type,
+                workspace_id=ctx.workspace_id,
+                force_refresh=force_refresh,
+            )
+            results.append({
+                "value": res.normalized_value,
+                "type": res.indicator_type.value,
+                "verdict": res.overall_verdict.value,
+                "confidence": res.consensus_confidence,
+            })
+        except Exception as e:
+            logger.warning(f"Error enriching {raw_val}: {e}")
+
+    ctx.update_progress(db, 100.0, "COMPLETED", f"Batch enrichment completed for {len(results)} indicators.")
+    return {"total": total, "enriched": len(results), "results": results}
+
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

@@ -159,3 +159,5 @@ export * from './response_recommendation';
 export * from './response_playbook';
 export * from './soc_copilot';
 export * from './attackPath';
+export * from './incident';
+export * from './sla';

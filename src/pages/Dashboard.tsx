@@ -421,6 +421,96 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* =========================================================================
+          2B. SECTION 51: INCIDENT SLA & ESCALATION POSTURE RIBBON
+          ========================================================================= */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div
+          onClick={() => navigate('/incidents?sla_status=BREACHED')}
+          className="p-3 rounded-card bg-surface border border-red-500/30 hover:border-red-500/60 transition-colors cursor-pointer shadow-xs flex flex-col justify-between"
+          title="Click to view all incidents with breached SLA targets"
+        >
+          <div className="flex items-center justify-between text-red-400">
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">SLA Breaches</span>
+            <AlertTriangle className="w-3.5 h-3.5" />
+          </div>
+          <div className="mt-1 flex items-baseline space-x-1.5">
+            <span className="text-xl font-bold font-mono text-red-400">
+              {posture.sla_breaches ?? 0}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-muted">overdue</span>
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/incidents?sla_status=WARNING')}
+          className="p-3 rounded-card bg-surface border border-amber-500/30 hover:border-amber-500/60 transition-colors cursor-pointer shadow-xs flex flex-col justify-between"
+          title="Click to view incidents approaching SLA warning threshold"
+        >
+          <div className="flex items-center justify-between text-amber-400">
+            <span className="text-[10px] font-mono uppercase tracking-wider font-bold">Approaching SLA</span>
+            <Clock className="w-3.5 h-3.5" />
+          </div>
+          <div className="mt-1 flex items-baseline space-x-1.5">
+            <span className="text-xl font-bold font-mono text-amber-400">
+              {posture.approaching_sla ?? 0}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-muted">at risk</span>
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/incidents?severity=CRITICAL&status=OPEN')}
+          className="p-3 rounded-card bg-surface border border-border hover:border-primary/50 transition-colors cursor-pointer shadow-xs flex flex-col justify-between"
+          title="Unacknowledged critical cases requiring immediate triage"
+        >
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[10px] font-mono uppercase tracking-wider font-semibold">Unacked Critical</span>
+            <ShieldAlert className="w-3.5 h-3.5 text-danger" />
+          </div>
+          <div className="mt-1 flex items-baseline space-x-1.5">
+            <span className="text-xl font-bold font-mono text-danger">
+              {posture.unacknowledged_critical ?? 0}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-muted">cases</span>
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/incidents')}
+          className="p-3 rounded-card bg-surface border border-border hover:border-rose-500/50 transition-colors cursor-pointer shadow-xs flex flex-col justify-between"
+          title="Active escalated incidents (Tier 2 / Lead)"
+        >
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[10px] font-mono uppercase tracking-wider font-semibold">Escalated Cases</span>
+            <Flame className="w-3.5 h-3.5 text-rose-400" />
+          </div>
+          <div className="mt-1 flex items-baseline space-x-1.5">
+            <span className="text-xl font-bold font-mono text-rose-400">
+              {posture.escalated_incidents ?? 0}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-muted">tier 2+</span>
+          </div>
+        </div>
+
+        <div
+          onClick={() => navigate('/incidents?severity=CRITICAL')}
+          className="p-3 rounded-card bg-surface border border-border hover:border-warning/50 transition-colors cursor-pointer shadow-xs flex flex-col justify-between"
+          title="Unassigned critical incidents"
+        >
+          <div className="flex items-center justify-between text-foreground-muted">
+            <span className="text-[10px] font-mono uppercase tracking-wider font-semibold">Unassigned Critical</span>
+            <Activity className="w-3.5 h-3.5 text-amber-500" />
+          </div>
+          <div className="mt-1 flex items-baseline space-x-1.5">
+            <span className="text-xl font-bold font-mono text-amber-500">
+              {posture.unassigned_critical ?? 0}
+            </span>
+            <span className="text-[10px] font-mono text-foreground-muted">urgent</span>
+          </div>
+        </div>
+      </div>
+
+      {/* =========================================================================
           3. OPERATIONAL CORE: PRIORITY QUEUE & RISK DISTRIBUTION
           ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -486,6 +576,26 @@ export const Dashboard: React.FC = () => {
                             {item.resource_type}
                           </span>
                           <SeverityIndicator severity={item.severity} size="xs" showText />
+
+                          {item.sla_status === 'BREACHED' && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-red-500/20 text-red-400 border border-red-500/40 flex items-center space-x-1">
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              <span>SLA BREACH</span>
+                            </span>
+                          )}
+
+                          {item.sla_status === 'WARNING' && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center space-x-1">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>SLA WARNING ({item.sla_remaining_minutes}m left)</span>
+                            </span>
+                          )}
+
+                          {item.escalation_level && item.escalation_level > 1 && (
+                            <span className="text-[9px] font-mono font-bold px-1 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40">
+                              L{item.escalation_level} ESCALATED
+                            </span>
+                          )}
                         </div>
                         <h3 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
                           {item.title}

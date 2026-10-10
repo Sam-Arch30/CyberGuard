@@ -144,7 +144,24 @@ class SocDashboardService:
 
             # Consider for Priority Queue if active
             if is_active:
-                if sev_upper == "CRITICAL" or score >= 80.0:
+                sla_stat = getattr(inc, "sla_status", "HEALTHY")
+                time_rem = None
+                if getattr(inc, "next_sla_deadline", None):
+                    dl = inc.next_sla_deadline
+                    if dl.tzinfo is None:
+                        dl = dl.replace(tzinfo=timezone.utc)
+                    time_rem = round(max(0.0, (dl - now).total_seconds() / 60.0), 1)
+
+                if sla_stat == "BREACHED":
+                    urgency = "P0"
+                    reason = f"CRITICAL SLA BREACH: Incident {inc.incident_number} breached target"
+                elif sla_stat == "WARNING":
+                    urgency = "P1"
+                    reason = f"SLA WARNING: Incident {inc.incident_number} approaching breach ({time_rem or 0}m left)"
+                elif sev_upper == "CRITICAL" and (not inc.assigned_to or inc.assigned_to == "Unassigned"):
+                    urgency = "P0"
+                    reason = f"UNASSIGNED CRITICAL: Immediate assignment required"
+                elif sev_upper == "CRITICAL" or score >= 80.0:
                     urgency = "P0"
                     reason = "Critical-risk active incident requiring immediate response"
                 elif sev_upper == "HIGH" or score >= 60.0:
@@ -166,11 +183,13 @@ class SocDashboardService:
                         risk_score=score,
                         severity=sev_upper,
                         status=status_upper,
-                        resource_type="INVESTIGATION",
+                        resource_type="INCIDENT",
                         reason_for_inclusion=reason,
                         urgency=urgency,
                         updated_at=iso_updated,
-                        navigation_target=f"/investigations/{inc.id}/overview",
+                        navigation_target=f"/incidents/{inc.id}",
+                        sla_status=sla_stat,
+                        time_remaining_mins=time_rem,
                     )
                 )
 
@@ -556,6 +575,27 @@ class SocDashboardService:
         )
 
         # Assemble Posture Metrics
+        sla_breaches_count = sum(
+            1 for inc in incidents
+            if getattr(inc, "sla_status", "") == "BREACHED" and (inc.status or "").upper() in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+        approaching_sla_count = sum(
+            1 for inc in incidents
+            if getattr(inc, "sla_status", "") == "WARNING" and (inc.status or "").upper() in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+        unack_critical_count = sum(
+            1 for inc in incidents
+            if (inc.severity or "").upper() == "CRITICAL" and not inc.acknowledged_at and (inc.status or "").upper() in ("NEW", "OPEN")
+        )
+        escalated_incidents_count = sum(
+            1 for inc in incidents
+            if (getattr(inc, "escalation_level", 0) or 0) > 0 and (inc.status or "").upper() in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+        unassigned_critical_count = sum(
+            1 for inc in incidents
+            if (inc.severity or "").upper() == "CRITICAL" and (not inc.assigned_to or inc.assigned_to == "Unassigned") and (inc.status or "").upper() in ("NEW", "OPEN", "ACKNOWLEDGED", "INVESTIGATING")
+        )
+
         posture = SocPostureMetrics(
             active_investigations=active_investigations_count,
             high_risk_open=high_risk_open_count,
@@ -564,6 +604,11 @@ class SocDashboardService:
             new_findings_count=new_findings_count,
             active_endpoint_agents=active_agents_count,
             total_investigations=total_investigations_count,
+            sla_breaches=sla_breaches_count,
+            approaching_sla=approaching_sla_count,
+            unacknowledged_critical=unack_critical_count,
+            escalated_incidents=escalated_incidents_count,
+            unassigned_critical=unassigned_critical_count,
         )
 
         risk_dist = SocRiskDistribution(

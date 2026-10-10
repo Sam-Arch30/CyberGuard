@@ -112,6 +112,10 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE incidents ADD COLUMN resolved_by VARCHAR(100);",
                     "ALTER TABLE incidents ADD COLUMN resolution_reason TEXT;",
                     "ALTER TABLE incidents ADD COLUMN duplicate_of_id VARCHAR(36);",
+                    "ALTER TABLE incidents ADD COLUMN sla_policy_id VARCHAR(36);",
+                    "ALTER TABLE incidents ADD COLUMN escalation_level INTEGER DEFAULT 0;",
+                    "ALTER TABLE incidents ADD COLUMN sla_status VARCHAR(30) DEFAULT 'HEALTHY';",
+                    "ALTER TABLE incidents ADD COLUMN next_sla_deadline DATETIME;",
                 ]
                 for stmt in column_migrations:
                     try:

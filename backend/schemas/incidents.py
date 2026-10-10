@@ -79,6 +79,7 @@ class IncidentCreateRequest(BaseModel):
     primary_cluster_id: Optional[str] = None
     investigation_id: Optional[str] = None
     notes: Optional[str] = None
+    auto_route: bool = False
 
 
 class IncidentPromoteAlertRequest(BaseModel):
@@ -89,6 +90,7 @@ class IncidentPromoteAlertRequest(BaseModel):
     category: Optional[str] = None
     assigned_to: Optional[str] = None
     notes: Optional[str] = None
+    auto_route: bool = False
 
 
 class IncidentPromoteClusterRequest(BaseModel):
@@ -99,6 +101,7 @@ class IncidentPromoteClusterRequest(BaseModel):
     category: Optional[str] = None
     assigned_to: Optional[str] = None
     notes: Optional[str] = None
+    auto_route: bool = False
 
 
 class IncidentUpdateRequest(BaseModel):
@@ -212,6 +215,11 @@ class IncidentItemResponse(BaseModel):
     updated_at: datetime
     alert_count: int = 0
     cluster_count: int = 0
+    escalation_level: int = 0
+    sla_status: str = "HEALTHY"
+    next_sla_deadline: Optional[datetime] = None
+    time_remaining_mins: Optional[float] = None
+    is_overdue: bool = False
 
 
 class IncidentDetailResponse(BaseModel):
@@ -247,6 +255,9 @@ class IncidentDetailResponse(BaseModel):
     closed_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
+    escalation_level: int = 0
+    sla_status: str = "HEALTHY"
+    next_sla_deadline: Optional[datetime] = None
 
     # Associated Operational Context
     alert_count: int = 0
@@ -280,6 +291,11 @@ class IncidentMetricsResponse(BaseModel):
     avg_time_to_acknowledge_sec: Optional[float] = None
     avg_time_to_contain_sec: Optional[float] = None
     avg_time_to_resolve_sec: Optional[float] = None
+    sla_breaches: int = 0
+    approaching_sla: int = 0
+    unacknowledged_critical: int = 0
+    escalated_incidents: int = 0
+    unassigned_critical: int = 0
     by_category: Dict[str, int] = Field(default_factory=dict)
     by_severity: Dict[str, int] = Field(default_factory=dict)
     by_priority: Dict[str, int] = Field(default_factory=dict)

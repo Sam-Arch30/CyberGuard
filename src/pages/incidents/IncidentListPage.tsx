@@ -70,6 +70,8 @@ export const IncidentListPage: React.FC = () => {
   const [severityFilter, setSeverityFilter] = useState<string>('ALL');
   const [priorityFilter, setPriorityFilter] = useState<string>('ALL');
   const [categoryFilter, setCategoryFilter] = useState<string>('ALL');
+  const [slaFilter, setSlaFilter] = useState<string>('ALL');
+  const [sortBy, setSortBy] = useState<string>('default');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [page, setPage] = useState<number>(1);
   const limit = 20;
@@ -109,6 +111,8 @@ export const IncidentListPage: React.FC = () => {
       if (severityFilter !== 'ALL') params.severity = severityFilter as IncidentSeverity;
       if (priorityFilter !== 'ALL') params.priority = priorityFilter as IncidentPriority;
       if (categoryFilter !== 'ALL') params.category = categoryFilter as IncidentCategory;
+      if (slaFilter !== 'ALL') params.sla_status = slaFilter as any;
+      if (sortBy !== 'default') params.sort_by = sortBy;
       if (searchQuery.trim()) params.search = searchQuery.trim();
 
       const res = await IncidentService.listIncidents(params);
@@ -120,7 +124,7 @@ export const IncidentListPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [page, statusFilter, severityFilter, priorityFilter, categoryFilter, searchQuery]);
+  }, [page, statusFilter, severityFilter, priorityFilter, categoryFilter, slaFilter, sortBy, searchQuery]);
 
   useEffect(() => {
     loadMetrics();
@@ -210,10 +214,10 @@ export const IncidentListPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Operational Metrics Ribbon */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* 2. Operational Metrics Ribbon (Section 51 SLA telemetry integrated) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
         <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
-          <span className="text-[11px] font-mono uppercase text-foreground-muted">Open Cases</span>
+          <span className="text-[10px] font-mono uppercase text-foreground-muted">Open Cases</span>
           <span className="text-xl font-bold text-foreground mt-1">
             {metricsLoading ? '—' : metrics?.open_incidents ?? 0}
           </span>
@@ -221,7 +225,7 @@ export const IncidentListPage: React.FC = () => {
         </div>
 
         <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
-          <span className="text-[11px] font-mono uppercase text-danger">Critical Cases</span>
+          <span className="text-[10px] font-mono uppercase text-danger">Critical Cases</span>
           <span className="text-xl font-bold text-danger mt-1">
             {metricsLoading ? '—' : metrics?.critical_incidents ?? 0}
           </span>
@@ -229,7 +233,31 @@ export const IncidentListPage: React.FC = () => {
         </div>
 
         <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
-          <span className="text-[11px] font-mono uppercase text-warning">Investigating</span>
+          <span className="text-[10px] font-mono uppercase text-red-400 font-bold">SLA Breaches</span>
+          <span className="text-xl font-bold text-red-400 mt-1">
+            {metricsLoading ? '—' : metrics?.sla_breaches ?? 0}
+          </span>
+          <span className="text-[10px] text-foreground-muted mt-0.5">Target overdue</span>
+        </div>
+
+        <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
+          <span className="text-[10px] font-mono uppercase text-amber-400 font-bold">Approaching SLA</span>
+          <span className="text-xl font-bold text-amber-400 mt-1">
+            {metricsLoading ? '—' : metrics?.approaching_sla ?? 0}
+          </span>
+          <span className="text-[10px] text-foreground-muted mt-0.5">Warning threshold</span>
+        </div>
+
+        <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
+          <span className="text-[10px] font-mono uppercase text-rose-400 font-bold">Escalated</span>
+          <span className="text-xl font-bold text-rose-400 mt-1">
+            {metricsLoading ? '—' : metrics?.escalated_incidents ?? 0}
+          </span>
+          <span className="text-[10px] text-foreground-muted mt-0.5">Tier 2+ Active</span>
+        </div>
+
+        <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
+          <span className="text-[10px] font-mono uppercase text-warning">Investigating</span>
           <span className="text-xl font-bold text-warning mt-1">
             {metricsLoading ? '—' : metrics?.investigating_incidents ?? 0}
           </span>
@@ -237,7 +265,7 @@ export const IncidentListPage: React.FC = () => {
         </div>
 
         <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
-          <span className="text-[11px] font-mono uppercase text-indigo-400">Contained</span>
+          <span className="text-[10px] font-mono uppercase text-indigo-400">Contained</span>
           <span className="text-xl font-bold text-indigo-400 mt-1">
             {metricsLoading ? '—' : metrics?.contained_incidents ?? 0}
           </span>
@@ -245,15 +273,7 @@ export const IncidentListPage: React.FC = () => {
         </div>
 
         <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
-          <span className="text-[11px] font-mono uppercase text-success">Resolved</span>
-          <span className="text-xl font-bold text-success mt-1">
-            {metricsLoading ? '—' : metrics?.resolved_incidents ?? 0}
-          </span>
-          <span className="text-[10px] text-foreground-muted mt-0.5">Remediated / Verified</span>
-        </div>
-
-        <div className="p-3 bg-surface border border-border rounded-control flex flex-col justify-between">
-          <span className="text-[11px] font-mono uppercase text-foreground-muted">Unassigned</span>
+          <span className="text-[10px] font-mono uppercase text-foreground-muted">Unassigned</span>
           <span className="text-xl font-bold text-foreground mt-1">
             {metricsLoading ? '—' : metrics?.unassigned_incidents ?? 0}
           </span>
@@ -351,10 +371,47 @@ export const IncidentListPage: React.FC = () => {
           <option value="OTHER">Other</option>
         </select>
 
+        {/* SLA Status Filter (Section 51) */}
+        <select
+          value={slaFilter}
+          onChange={(e) => {
+            setSlaFilter(e.target.value);
+            setPage(1);
+          }}
+          className="px-2.5 py-1.5 text-xs bg-surface-secondary border border-border rounded-control text-foreground focus:outline-hidden focus:border-primary cursor-pointer font-mono"
+        >
+          <option value="ALL">All SLA States</option>
+          <option value="BREACHED">Breached</option>
+          <option value="WARNING">Approaching (Warning)</option>
+          <option value="ON_TRACK">On Track</option>
+          <option value="PAUSED">Paused</option>
+          <option value="EXEMPT">Exempt</option>
+        </select>
+
+        {/* Sort By Dropdown (Section 51) */}
+        <select
+          value={sortBy}
+          onChange={(e) => {
+            setSortBy(e.target.value);
+            setPage(1);
+          }}
+          className="px-2.5 py-1.5 text-xs bg-surface-secondary border border-border rounded-control text-foreground focus:outline-hidden focus:border-primary cursor-pointer font-mono"
+        >
+          <option value="default">Sort: Most Urgent</option>
+          <option value="sla_breach_first">Sort: SLA Breach First</option>
+          <option value="closest_deadline">Sort: Closest Deadline</option>
+          <option value="severity">Sort: Highest Severity</option>
+          <option value="priority">Sort: Highest Priority</option>
+          <option value="newest">Sort: Newest</option>
+          <option value="oldest">Sort: Oldest</option>
+        </select>
+
         {(statusFilter !== 'ALL' ||
           severityFilter !== 'ALL' ||
           priorityFilter !== 'ALL' ||
           categoryFilter !== 'ALL' ||
+          slaFilter !== 'ALL' ||
+          sortBy !== 'default' ||
           searchQuery) && (
           <button
             type="button"
@@ -363,6 +420,8 @@ export const IncidentListPage: React.FC = () => {
               setSeverityFilter('ALL');
               setPriorityFilter('ALL');
               setCategoryFilter('ALL');
+              setSlaFilter('ALL');
+              setSortBy('default');
               setSearchQuery('');
               setPage(1);
             }}
@@ -391,6 +450,7 @@ export const IncidentListPage: React.FC = () => {
                 <th className="py-2.5 px-3">Severity</th>
                 <th className="py-2.5 px-3">Priority</th>
                 <th className="py-2.5 px-3">Status</th>
+                <th className="py-2.5 px-3">SLA &amp; Tier</th>
                 <th className="py-2.5 px-3">Assigned To</th>
                 <th className="py-2.5 px-3">Age</th>
                 <th className="py-2.5 px-3 text-right">Actions</th>
@@ -399,7 +459,7 @@ export const IncidentListPage: React.FC = () => {
             <tbody className="divide-y divide-border">
               {loading && incidents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-foreground-muted">
+                  <td colSpan={9} className="py-12 text-center text-foreground-muted">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <RefreshCw className="w-5 h-5 animate-spin text-primary" />
                       <span>Loading operational cases...</span>
@@ -408,7 +468,7 @@ export const IncidentListPage: React.FC = () => {
                 </tr>
               ) : incidents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="py-12 text-center text-foreground-muted">
+                  <td colSpan={9} className="py-12 text-center text-foreground-muted">
                     <div className="flex flex-col items-center justify-center space-y-2">
                       <ShieldCheck className="w-8 h-8 text-foreground-muted/60" />
                       <p className="font-medium text-foreground">No incidents found matching criteria</p>
@@ -490,6 +550,50 @@ export const IncidentListPage: React.FC = () => {
                         <span className={`px-2 py-0.5 rounded-xs border text-[10px] ${statusCfg.badge}`}>
                           {statusCfg.label}
                         </span>
+                      </td>
+
+                      {/* SLA Status & Escalation Tier (Section 51) */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <div className="flex items-center space-x-1.5 font-mono text-[10px]">
+                          {inc.sla_status === 'BREACHED' ? (
+                            <span className="px-1.5 py-0.5 rounded border bg-red-500/20 text-red-400 border-red-500/40 font-bold flex items-center space-x-1">
+                              <AlertTriangle className="w-2.5 h-2.5" />
+                              <span>{inc.overdue_display ? `+${inc.overdue_display}` : 'BREACHED'}</span>
+                            </span>
+                          ) : inc.sla_status === 'WARNING' ? (
+                            <span className="px-1.5 py-0.5 rounded border bg-amber-500/20 text-amber-400 border-amber-500/40 font-bold flex items-center space-x-1">
+                              <Clock className="w-2.5 h-2.5" />
+                              <span>{inc.remaining_display ? `${inc.remaining_display}` : 'WARN'}</span>
+                            </span>
+                          ) : inc.sla_status === 'MET' ? (
+                            <span className="px-1.5 py-0.5 rounded border bg-emerald-500/15 text-emerald-400 border-emerald-500/30">
+                              MET
+                            </span>
+                          ) : inc.sla_status === 'PAUSED' ? (
+                            <span className="px-1.5 py-0.5 rounded border bg-amber-500/10 text-amber-400 border-amber-500/20">
+                              PAUSED
+                            </span>
+                          ) : inc.sla_status === 'EXEMPT' ? (
+                            <span className="px-1.5 py-0.5 rounded border bg-surface-secondary text-foreground-muted border-border">
+                              EXEMPT
+                            </span>
+                          ) : inc.sla_status === 'ON_TRACK' ? (
+                            <span className="px-1.5 py-0.5 rounded border bg-blue-500/15 text-blue-400 border-blue-500/30">
+                              {inc.remaining_display ? `${inc.remaining_display}` : 'ON TRACK'}
+                            </span>
+                          ) : (
+                            <span className="text-foreground-muted text-[10px]">No SLA</span>
+                          )}
+
+                          {inc.escalation_level && inc.escalation_level > 1 && (
+                            <span
+                              className="px-1 py-0.2 rounded bg-rose-500/20 text-rose-400 border border-rose-500/40 font-bold text-[9px]"
+                              title={`Escalated to Tier ${inc.escalation_level}`}
+                            >
+                              L{inc.escalation_level}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Assigned Analyst */}
