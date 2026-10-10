@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
@@ -145,6 +145,7 @@ def _build_live_response(run: AnalysisRunModel, db: Session) -> AnalysisRunLiveR
             analysis_run_id=e.analysis_run_id,
             task_id=e.task_id,
             event_type=e.event_type,
+            sequence=getattr(e, "sequence", 1) or 1,
             timestamp=e.timestamp,
             task_status=e.task_status,
             message=e.message,
@@ -305,10 +306,19 @@ async def retry_live_analysis(run_id: str, db: Session = Depends(get_db)):
 
 @router.get(
     "/api/analysis/{run_id}/stream",
-    summary="Stream Live Analysis Events (SSE)",
-    description="Provides real-time Server-Sent Events stream for an active AnalysisRun.",
+    summary="Stream Live Analysis Events (SSE - Section 46)",
+    description="Provides real-time Server-Sent Events stream for an active AnalysisRun with tenant isolation, Last-Event-ID replay, and keepalive heartbeats.",
 )
-async def stream_live_analysis(run_id: str, db: Session = Depends(get_db)):
+async def stream_live_analysis(
+    run_id: str,
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+    last_event_query: Optional[str] = Query(None, alias="last_event_id"),
+    x_workspace_id: Optional[str] = Header("default", alias="X-Workspace-ID"),
+    workspace_id_query: Optional[str] = Query(None, alias="workspace_id"),
+    db: Session = Depends(get_db),
+):
+    workspace = (workspace_id_query or x_workspace_id or "default").strip()
+
     run = db.query(AnalysisRunModel).filter(AnalysisRunModel.id == run_id).first()
     if not run:
         raise HTTPException(
@@ -316,36 +326,89 @@ async def stream_live_analysis(run_id: str, db: Session = Depends(get_db)):
             detail=f"AnalysisRun '{run_id}' not found.",
         )
 
+    # Validate tenant isolation if artifact specifies a workspace
+    artifact = db.query(ArtifactModel).filter(ArtifactModel.id == run.artifact_id).first()
+    if artifact:
+        art_ws = getattr(artifact, "workspace_id", None)
+        if not art_ws and artifact.metadata_json:
+            try:
+                meta = json.loads(artifact.metadata_json)
+                art_ws = meta.get("workspace_id")
+            except Exception:
+                pass
+        if art_ws and art_ws not in ("default", workspace):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Access denied: AnalysisRun belongs to a different workspace.",
+            )
+
     # Initial snapshot
     initial_snapshot = _build_live_response(run, db).model_dump(mode="json")
 
+    # Determine replay cursor
+    raw_cursor = last_event_id or last_event_query
+    since_seq = 0
+    if raw_cursor:
+        try:
+            since_seq = int(raw_cursor)
+        except (ValueError, TypeError):
+            since_seq = 0
+
     async def event_generator():
-        # 1. Send initial state immediately
+        # 1. Send authoritative snapshot immediately
         yield f"event: snapshot\ndata: {json.dumps(initial_snapshot)}\n\n"
 
-        # If already terminal, close stream
+        # 2. Replay missed events from database if client reconnected with Last-Event-ID
+        if since_seq > 0:
+            from backend.services.realtime_service import global_realtime_hub
+            missed_events = global_realtime_hub.replay_analysis_events(
+                db=db,
+                run_id=run_id,
+                since_sequence=since_seq,
+            )
+            for m_evt in missed_events:
+                yield f"id: {m_evt.sequence}\nevent: {m_evt.event_type.lower()}\ndata: {json.dumps(m_evt.model_dump(mode='json'))}\n\n"
+
+        # If already terminal, emit terminal status and terminate
         if run.status in ("COMPLETED", "PARTIAL", "FAILED", "CANCELLED"):
-            yield f"event: terminal\ndata: {json.dumps({'status': run.status})}\n\n"
+            yield f"event: terminal\ndata: {json.dumps({'status': run.status, 'analysis_run_id': run.id})}\n\n"
             return
 
-        # 2. Subscribe to event hub
+        # 3. Subscribe to real-time event hub
         queue = await global_event_hub.subscribe(run_id)
         try:
             while True:
                 try:
                     # Wait for next event or 15s keepalive ping
                     msg = await asyncio.wait_for(queue.get(), timeout=15.0)
-                    yield f"event: {msg.get('type', 'message').lower()}\ndata: {json.dumps(msg)}\n\n"
 
-                    # If run reached terminal state, send terminal event and end
+                    # Extract sequence and event type
+                    seq = msg.get("sequence") or msg.get("event", {}).get("sequence") or ""
+                    evt_type = (
+                        msg.get("event_type")
+                        or msg.get("event", {}).get("event_type")
+                        or msg.get("type", "message")
+                    )
+
+                    id_line = f"id: {seq}\n" if seq else ""
+                    yield f"{id_line}event: {str(evt_type).lower()}\ndata: {json.dumps(msg)}\n\n"
+
+                    # Also emit generic 'event' for Section 37 compatibility
                     if msg.get("type") == "EVENT":
-                        evt_type = msg.get("event", {}).get("event_type")
-                        if evt_type in ("RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED"):
-                            yield f"event: terminal\ndata: {json.dumps({'event_type': evt_type})}\n\n"
-                            break
+                        yield f"event: event\ndata: {json.dumps(msg)}\n\n"
+
+                    # Check for terminal state
+                    if evt_type in (
+                        "RUN_COMPLETED", "RUN_FAILED", "RUN_CANCELLED",
+                        "ANALYSIS_COMPLETED", "ANALYSIS_PARTIAL", "ANALYSIS_FAILED", "ANALYSIS_CANCELLED"
+                    ):
+                        yield f"event: terminal\ndata: {json.dumps({'event_type': evt_type, 'status': run.status})}\n\n"
+                        break
+
                 except asyncio.TimeoutError:
-                    # Keepalive heartbeat ping
+                    # Keepalive heartbeat ping (prevents proxy / browser timeout)
                     yield ": keepalive\n\n"
+
         finally:
             await global_event_hub.unsubscribe(run_id, queue)
 
@@ -353,7 +416,7 @@ async def stream_live_analysis(run_id: str, db: Session = Depends(get_db)):
         event_generator(),
         media_type="text/event-stream",
         headers={
-            "Cache-Control": "no-cache",
+            "Cache-Control": "no-cache, no-transform",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
         },

@@ -16,10 +16,12 @@ import type {
   InvestigationWorkspaceSummary,
   InvestigationStatus,
 } from '../../types/investigationWorkspace';
+import type { RealtimeConnectionStatus } from '../../types/realtime';
 
 interface InvestigationSummaryBarProps {
   summary: InvestigationWorkspaceSummary | null;
   loading?: boolean;
+  connectionStatus?: RealtimeConnectionStatus;
   onStatusChange?: (newStatus: InvestigationStatus | string, reason?: string) => Promise<void>;
   onOpenNotes?: () => void;
   onRefresh?: () => Promise<void>;
@@ -36,6 +38,7 @@ const ALLOWED_STATUSES: { key: InvestigationStatus; label: string; color: string
 export const InvestigationSummaryBar: React.FC<InvestigationSummaryBarProps> = ({
   summary,
   loading = false,
+  connectionStatus,
   onStatusChange,
   onOpenNotes,
   onRefresh,
@@ -281,6 +284,39 @@ export const InvestigationSummaryBar: React.FC<InvestigationSummaryBarProps> = (
               </span>
             )}
           </button>
+
+          {/* Real-time SSE Connection Status */}
+          {connectionStatus && (
+            <div
+              className="flex items-center space-x-1 px-2 py-0.5 rounded text-[10px] font-mono border bg-surface border-border text-foreground-muted"
+              title="Real-time SSE event stream connection state"
+            >
+              {connectionStatus === 'CONNECTED' && (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                  <span className="text-foreground hidden sm:inline">Live</span>
+                </>
+              )}
+              {connectionStatus === 'RECONNECTING' && (
+                <>
+                  <RefreshCw className="w-2.5 h-2.5 text-warning animate-spin" />
+                  <span className="text-warning hidden sm:inline">Syncing</span>
+                </>
+              )}
+              {connectionStatus === 'FALLBACK_POLLING' && (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-info" />
+                  <span className="text-foreground-muted hidden sm:inline">Polling</span>
+                </>
+              )}
+              {connectionStatus === 'DISCONNECTED' && (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-foreground-muted/40" />
+                  <span className="text-foreground-muted hidden sm:inline">Idle</span>
+                </>
+              )}
+            </div>
+          )}
 
           {/* Refresh Revalidate Button */}
           {onRefresh && (

@@ -3,6 +3,7 @@
  */
 import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 import type { AnalysisRunLiveResponse } from '../types/analysis';
+import { RealtimeService } from './realtimeService';
 
 export const liveAnalysisService = {
   /**
@@ -76,69 +77,25 @@ export const liveAnalysisService = {
 
   /**
    * Subscribes to real-time Server-Sent Events (SSE) for an active AnalysisRun.
-   * Returns a cleanup function to close the stream.
+   * Leverages Section 46 RealtimeService with reconnection replay and gap detection.
    */
   subscribeLiveAnalysisStream(
     runId: string,
     onSnapshot: (snapshot: AnalysisRunLiveResponse) => void,
     onEvent: (eventPayload: Record<string, unknown>) => void,
     onTerminal: (status: string) => void,
-    onError?: (err: unknown) => void
+    onError?: (err: unknown) => void,
+    onStatusChange?: (status: any) => void,
+    onAuthoritativeRefetch?: () => Promise<void> | void
   ): () => void {
-    const streamUrl = apiUrl(`/api/analysis/${encodeURIComponent(runId)}/stream`);
-    let eventSource: EventSource | null = null;
-    let closed = false;
-
-    try {
-      eventSource = new EventSource(streamUrl);
-
-      eventSource.addEventListener('snapshot', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          onSnapshot(data);
-        } catch {
-          // ignore parse errors
-        }
-      });
-
-      eventSource.addEventListener('event', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          onEvent(data);
-        } catch {
-          // ignore parse errors
-        }
-      });
-
-      eventSource.addEventListener('terminal', (e: MessageEvent) => {
-        try {
-          const data = JSON.parse(e.data);
-          onTerminal(data.status || data.event_type || 'COMPLETED');
-        } catch {
-          onTerminal('COMPLETED');
-        }
-        if (eventSource) {
-          eventSource.close();
-          eventSource = null;
-        }
-      });
-
-      eventSource.onerror = (err) => {
-        if (!closed && onError) {
-          onError(err);
-        }
-        // EventSource will automatically retry per spec
-      };
-    } catch (err) {
-      if (onError) onError(err);
-    }
-
-    return () => {
-      closed = true;
-      if (eventSource) {
-        eventSource.close();
-        eventSource = null;
-      }
-    };
+    return RealtimeService.subscribe<AnalysisRunLiveResponse>({
+      url: `/api/analysis/${encodeURIComponent(runId)}/stream`,
+      onSnapshot,
+      onEvent: (evt: any) => onEvent(evt),
+      onTerminal,
+      onError,
+      onStatusChange,
+      onAuthoritativeRefetch,
+    });
   },
 };

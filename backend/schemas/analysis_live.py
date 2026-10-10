@@ -31,6 +31,20 @@ class AnalysisEventTypeEnum(str, Enum):
     RUN_COMPLETED = "RUN_COMPLETED"
     RUN_FAILED = "RUN_FAILED"
     RUN_CANCELLED = "RUN_CANCELLED"
+    # Section 46 Canonical Lifecycle Names
+    ANALYSIS_STARTED = "ANALYSIS_STARTED"
+    ANALYSIS_STAGE_STARTED = "ANALYSIS_STAGE_STARTED"
+    ANALYSIS_STAGE_COMPLETED = "ANALYSIS_STAGE_COMPLETED"
+    ANALYSIS_PROGRESS = "ANALYSIS_PROGRESS"
+    ANALYSIS_COMPLETED = "ANALYSIS_COMPLETED"
+    ANALYSIS_PARTIAL = "ANALYSIS_PARTIAL"
+    ANALYSIS_FAILED = "ANALYSIS_FAILED"
+    ANALYSIS_CANCELLED = "ANALYSIS_CANCELLED"
+    FINDING_PERSISTED = "FINDING_PERSISTED"
+    INDICATOR_DISCOVERED = "INDICATOR_DISCOVERED"
+    EVIDENCE_ADDED = "EVIDENCE_ADDED"
+    ANALYZER_WARNING = "ANALYZER_WARNING"
+    ANALYZER_DEGRADED = "ANALYZER_DEGRADED"
 
 
 class AnalysisTaskRead(BaseModel):
@@ -60,6 +74,7 @@ class AnalysisEventRead(BaseModel):
     analysis_run_id: str
     task_id: Optional[str] = None
     event_type: AnalysisEventTypeEnum
+    sequence: int = 1
     timestamp: datetime
     task_status: Optional[str] = None
     message: str

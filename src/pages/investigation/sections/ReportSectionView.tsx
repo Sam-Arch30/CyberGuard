@@ -40,6 +40,7 @@ import type {
 } from '../../../types/report';
 import { DEFAULT_CONTENT_OPTIONS } from '../../../types/report';
 import { reportService } from '../../../services/reportService';
+import { RealtimeService } from '../../../services/realtimeService';
 import { useInvestigation } from '../../../context/InvestigationContext';
 
 interface ReportSectionViewProps {
@@ -149,6 +150,36 @@ export const ReportSectionView: React.FC<ReportSectionViewProps> = ({
   useEffect(() => {
     loadReportProjection();
     fetchVersionHistory();
+  }, [effectiveId]);
+
+  // Section 46: Real-Time Report Generation Lifecycle Updates
+  useEffect(() => {
+    if (!effectiveId) return;
+
+    const unsubscribe = RealtimeService.subscribe({
+      url: `/api/investigations/${encodeURIComponent(effectiveId)}/stream`,
+      onEvent: (evt) => {
+        if (evt.event_type === 'REPORT_GENERATION_STARTED') {
+          setIsGenerating(true);
+        } else if (evt.event_type === 'REPORT_READY') {
+          setIsGenerating(false);
+          loadReportProjection();
+          fetchVersionHistory();
+          showToast(`Report ${evt.payload?.report_number || ''} ready & verified.`);
+        } else if (evt.event_type === 'REPORT_FAILED') {
+          setIsGenerating(false);
+          showToast(`Report generation failed: ${evt.payload?.error_code || evt.message || 'Compilation error'}`);
+        }
+      },
+      onAuthoritativeRefetch: () => {
+        loadReportProjection();
+        fetchVersionHistory();
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
   }, [effectiveId]);
 
   // 3. Generate New Immutable Report Version (v1, v2...)

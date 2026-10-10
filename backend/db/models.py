@@ -479,6 +479,7 @@ class AnalysisEventModel(Base):
     analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False, index=True)
     task_id = Column(String(36), ForeignKey("analysis_tasks.id", ondelete="SET NULL"), nullable=True, index=True)
     event_type = Column(String(50), nullable=False, index=True)  # RUN_STARTED, TASK_STARTED, TASK_PROGRESS, TASK_COMPLETED, TASK_FAILED, FINDING_PRODUCED, RISK_ASSESSED, RUN_COMPLETED, RUN_FAILED, RUN_CANCELLED
+    sequence = Column(Integer, nullable=False, default=1, index=True)
     timestamp = Column(DateTime, default=get_utc_now, nullable=False)
     task_status = Column(String(30), nullable=True)
     message = Column(String(255), nullable=False)
@@ -488,6 +489,10 @@ class AnalysisEventModel(Base):
 
     analysis_run = relationship("AnalysisRunModel", back_populates="events")
     task = relationship("AnalysisTaskModel", back_populates="events")
+
+    __table_args__ = (
+        Index("ix_analysis_events_run_seq", "analysis_run_id", "sequence"),
+    )
 
 
 class ModelVersionModel(Base):
@@ -3309,6 +3314,7 @@ class BackgroundJobEventModel(Base):
     job_id = Column(String(36), ForeignKey("background_jobs.id", ondelete="CASCADE"), nullable=False, index=True)
     workspace_id = Column(String(64), nullable=False, default="default", index=True)
     event_type = Column(String(64), nullable=False, index=True)
+    sequence = Column(Integer, nullable=False, default=1, index=True)
     stage = Column(String(100), nullable=True)
     progress_percent = Column(Float, nullable=True)
     message = Column(String(500), nullable=False)
@@ -3320,6 +3326,7 @@ class BackgroundJobEventModel(Base):
     __table_args__ = (
         Index("ix_bg_job_events_order", "job_id", "timestamp"),
         Index("ix_bg_job_events_ws_type", "workspace_id", "event_type"),
+        Index("ix_bg_job_events_seq", "job_id", "sequence"),
     )
 
 

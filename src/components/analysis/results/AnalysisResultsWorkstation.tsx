@@ -38,6 +38,8 @@ import {
   EvidenceCount,
 } from '../../security';
 import { analysisResultsService } from '../../../services/analysisResultsService';
+import { RealtimeService } from '../../../services/realtimeService';
+import type { RealtimeConnectionStatus } from '../../../types/realtime';
 import { EvidenceDetailDrawer } from './EvidenceDetailDrawer';
 import type {
   AnalysisResultsResponse,
@@ -66,6 +68,7 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [reassessing, setReassessing] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>('DISCONNECTED');
 
   // Progressive Disclosure Expand States
   const [expandedFindings, setExpandedFindings] = useState<Record<string, boolean>>({});
@@ -100,9 +103,11 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
 
   // Load Aggregated Results
   const loadResults = useCallback(
-    async (targetRunId?: string) => {
-      setLoading(true);
-      setError(null);
+    async (targetRunId?: string, silent: boolean = false) => {
+      if (!silent) {
+        setLoading(true);
+        setError(null);
+      }
       try {
         let res: AnalysisResultsResponse;
         if (targetRunId) {
@@ -116,9 +121,13 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
         }
         setData(res);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : 'Failed to retrieve analysis results.');
+        if (!silent) {
+          setError(err instanceof Error ? err.message : 'Failed to retrieve analysis results.');
+        }
       } finally {
-        setLoading(false);
+        if (!silent) {
+          setLoading(false);
+        }
       }
     },
     [initialRunId, investigationId]
@@ -127,6 +136,43 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
   useEffect(() => {
     loadResults();
   }, [loadResults]);
+
+  // Section 46: Real-Time Updates Subscription
+  useEffect(() => {
+    if (!data?.run_id) return;
+    const runId = data.run_id;
+
+    const unsubscribe = RealtimeService.subscribe({
+      url: `/api/analysis/${encodeURIComponent(runId)}/stream`,
+      onEvent: (evt) => {
+        // When findings persist, tasks progress, or analysis completes, silently refetch authoritative results
+        if (
+          [
+            'FINDING_PERSISTED',
+            'ANALYSIS_PROGRESS',
+            'ANALYSIS_STAGE_COMPLETED',
+            'ANALYSIS_COMPLETED',
+            'ANALYSIS_PARTIAL',
+            'ANALYZER_WARNING',
+            'ANALYZER_DEGRADED',
+          ].includes(evt.event_type)
+        ) {
+          loadResults(runId, true);
+        }
+      },
+      onStatusChange: (st) => setConnectionStatus(st),
+      onAuthoritativeRefetch: () => {
+        loadResults(runId, true);
+      },
+      onTerminal: () => {
+        loadResults(runId, true);
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [data?.run_id, loadResults]);
 
   // Handle Manual Reassessment
   const handleReassess = async () => {
@@ -212,7 +258,12 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
 
           <div className="flex items-center space-x-1.5">
             <span className="text-foreground-muted">Status:</span>
-            {isPartial ? (
+            {data.status === 'RUNNING' || data.status === 'QUEUED' ? (
+              <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-primary/10 text-primary border border-primary/30 animate-pulse">
+                <RefreshCw className="w-3 h-3 mr-1 animate-spin" />
+                ANALYSIS RUNNING ({data.completed_tasks}/{data.total_tasks} analyzers)
+              </span>
+            ) : isPartial ? (
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold bg-warning-surface text-warning border border-warning-border">
                 <AlertTriangle className="w-3 h-3 mr-1" />
                 PARTIAL RESULTS ({data.completed_tasks}/{data.total_tasks} analyzers)
@@ -232,6 +283,37 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
         </div>
 
         <div className="flex items-center space-x-2">
+          {/* Real-time Connection Status Indicator */}
+          <div
+            className="flex items-center space-x-1.5 px-2 py-0.5 rounded text-[11px] font-mono border bg-surface-secondary border-border"
+            title="Real-time SSE event stream connection state"
+          >
+            {connectionStatus === 'CONNECTED' && (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-success animate-pulse" />
+                <span className="text-foreground">● Live</span>
+              </>
+            )}
+            {connectionStatus === 'RECONNECTING' && (
+              <>
+                <RefreshCw className="w-2.5 h-2.5 text-warning animate-spin" />
+                <span className="text-warning">↻ Reconnecting</span>
+              </>
+            )}
+            {connectionStatus === 'FALLBACK_POLLING' && (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-info" />
+                <span className="text-foreground-muted">⚡ Polling</span>
+              </>
+            )}
+            {connectionStatus === 'DISCONNECTED' && (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground-muted/40" />
+                <span className="text-foreground-muted">Idle</span>
+              </>
+            )}
+          </div>
+
           {data.run_history.length > 1 && (
             <div className="flex items-center space-x-1 text-foreground-muted">
               <span>Run:</span>
@@ -268,11 +350,22 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
               onClick={onToggleViewDAG}
               leftIcon={<Activity className="w-3.5 h-3.5 text-primary" />}
             >
-              View Pipeline DAG
+              Pipeline DAG
             </Button>
           )}
         </div>
       </div>
+
+      {/* Live Processing Notice (Preserves results while pipeline executes) */}
+      {(data.status === 'RUNNING' || data.status === 'QUEUED') && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-primary/5 border border-primary/20 text-xs font-mono">
+          <div className="flex items-center space-x-2 text-primary font-medium">
+            <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            <span>Analysis pipeline is actively executing ({data.completed_tasks} of {data.total_tasks} analyzers completed). New findings and risk updates will populate seamlessly.</span>
+          </div>
+          <span className="text-[10px] text-foreground-muted uppercase tracking-wider font-semibold">Live Analysis Active</span>
+        </div>
+      )}
 
       {/* PARTIAL RESULTS WARNING BANNER */}
       {isPartial && (

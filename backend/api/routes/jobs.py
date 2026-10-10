@@ -216,3 +216,145 @@ def retry_job(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e),
         )
+
+
+@router.get(
+    "/{job_id}/stream",
+    summary="Stream Background Job Events (SSE - Section 46)",
+    description="Provides real-time Server-Sent Events stream for a specific BackgroundJob with tenant isolation, Last-Event-ID replay, and keepalive heartbeats.",
+)
+async def stream_job_events(
+    job_id: str,
+    last_event_id: Optional[str] = Header(None, alias="Last-Event-ID"),
+    last_event_query: Optional[str] = Query(None, alias="last_event_id"),
+    x_workspace_id: Optional[str] = Header("default", alias="X-Workspace-ID"),
+    workspace_id_query: Optional[str] = Query(None, alias="workspace_id"),
+    db: Session = Depends(get_db),
+):
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from backend.services.realtime_service import global_realtime_hub
+
+    workspace = (workspace_id_query or x_workspace_id or "default").strip()
+
+    job = BackgroundJobService.get_job(db=db, job_id=job_id, workspace_id=workspace)
+    if not job:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Background job '{job_id}' not found in workspace '{workspace}'.",
+        )
+
+    # Initial snapshot
+    initial_snapshot = BackgroundJobService.serialize_job(job, include_events=True).model_dump(mode="json")
+
+    # Determine replay cursor
+    raw_cursor = last_event_id or last_event_query
+    since_seq = 0
+    if raw_cursor:
+        try:
+            since_seq = int(raw_cursor)
+        except (ValueError, TypeError):
+            since_seq = 0
+
+    async def event_generator():
+        # 1. Send authoritative snapshot immediately
+        yield f"event: snapshot\ndata: {json.dumps(initial_snapshot)}\n\n"
+
+        # 2. Replay missed events from database if client reconnected with Last-Event-ID
+        if since_seq > 0:
+            missed_events = global_realtime_hub.replay_job_events(
+                db=db,
+                job_id=job_id,
+                since_sequence=since_seq,
+            )
+            for m_evt in missed_events:
+                yield f"id: {m_evt.sequence}\nevent: {m_evt.event_type.lower()}\ndata: {json.dumps(m_evt.model_dump(mode='json'))}\n\n"
+
+        # If already terminal, emit terminal status and terminate
+        if job.status in ("SUCCEEDED", "PARTIALLY_SUCCEEDED", "FAILED", "CANCELLED", "TIMED_OUT", "DEAD_LETTER"):
+            yield f"event: terminal\ndata: {json.dumps({'status': job.status, 'job_id': job.id})}\n\n"
+            return
+
+        # 3. Subscribe to real-time event hub for this job
+        queue = await global_realtime_hub.subscribe(f"job:{job_id}")
+        try:
+            while True:
+                try:
+                    # Wait for next event or 15s keepalive ping
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+
+                    seq = msg.get("sequence") or ""
+                    evt_type = msg.get("event_type") or "job_progress"
+
+                    id_line = f"id: {seq}\n" if seq else ""
+                    yield f"{id_line}event: {str(evt_type).lower()}\ndata: {json.dumps(msg)}\n\n"
+
+                    # Check for terminal state
+                    if evt_type in (
+                        "JOB_SUCCEEDED", "JOB_COMPLETED", "JOB_PARTIALLY_COMPLETED",
+                        "JOB_FAILED", "JOB_CANCELLED", "JOB_TIMED_OUT", "JOB_DEAD_LETTER"
+                    ):
+                        yield f"event: terminal\ndata: {json.dumps({'event_type': evt_type, 'status': msg.get('status')})}\n\n"
+                        break
+
+                except asyncio.TimeoutError:
+                    # Keepalive heartbeat ping
+                    yield ": keepalive\n\n"
+
+        finally:
+            await global_realtime_hub.unsubscribe(f"job:{job_id}", queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+@router.get(
+    "/stream",
+    summary="Stream Workspace Background Jobs (SSE - Section 46)",
+    description="Provides real-time Server-Sent Events stream for background jobs in a tenant workspace.",
+)
+async def stream_workspace_jobs(
+    x_workspace_id: Optional[str] = Header("default", alias="X-Workspace-ID"),
+    workspace_id_query: Optional[str] = Query(None, alias="workspace_id"),
+    db: Session = Depends(get_db),
+):
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from backend.services.realtime_service import global_realtime_hub
+
+    workspace = (workspace_id_query or x_workspace_id or "default").strip()
+    channel = f"workspace:{workspace}"
+
+    async def event_generator():
+        yield f"event: connected\ndata: {json.dumps({'workspace_id': workspace, 'channel': channel})}\n\n"
+
+        queue = await global_realtime_hub.subscribe(channel)
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    evt_type = msg.get("event_type") or "message"
+                    yield f"event: {str(evt_type).lower()}\ndata: {json.dumps(msg)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            await global_realtime_hub.unsubscribe(channel, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

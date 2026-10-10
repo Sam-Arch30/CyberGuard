@@ -35,6 +35,8 @@ import type {
   SocPriorityQueueItem,
 } from '../types/socOverview';
 import { IndicatorDetailDrawer } from '../components/search';
+import { RealtimeService } from '../services/realtimeService';
+import type { RealtimeConnectionStatus } from '../types/realtime';
 
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate();
@@ -49,9 +51,11 @@ export const Dashboard: React.FC = () => {
   const [secondsAgo, setSecondsAgo] = useState<number>(0);
   const [selectedIndicator, setSelectedIndicator] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>('DISCONNECTED');
 
   // Interval timer ref
   const timerRef = useRef<any>(null);
+  const debounceTimerRef = useRef<any>(null);
 
   // Fetch SOC Overview data from authoritative backend aggregation
   const fetchSocData = useCallback(async (isManualRefresh: boolean = false) => {
@@ -76,7 +80,30 @@ export const Dashboard: React.FC = () => {
     fetchSocData(false);
   }, [fetchSocData]);
 
-  // Periodic polling (30s) that respects document visibility
+  // Section 46: Real-time SOC dashboard stream updates
+  useEffect(() => {
+    const unsubscribe = RealtimeService.subscribe({
+      url: `/api/dashboard/stream`,
+      onEvent: () => {
+        // Debounce refresh to avoid request flooding across rapid multi-worker events
+        if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = setTimeout(() => {
+          fetchSocData(false);
+        }, 1500);
+      },
+      onStatusChange: (status) => setConnectionStatus(status),
+      onAuthoritativeRefetch: () => {
+        fetchSocData(false);
+      },
+    });
+
+    return () => {
+      unsubscribe();
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    };
+  }, [fetchSocData]);
+
+  // Periodic fallback polling (30s) that respects document visibility
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -195,13 +222,32 @@ export const Dashboard: React.FC = () => {
             ))}
           </div>
 
-          {/* Freshness Indicator */}
+          {/* Freshness & Live Transport Indicator */}
           <div
             className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-surface border border-border text-[11px] font-mono text-foreground-muted"
-            title={`Last synchronized at ${lastUpdated.toLocaleTimeString()}`}
+            title={`Real-time Stream: ${connectionStatus} · Last synchronized at ${lastUpdated.toLocaleTimeString()}`}
           >
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{secondsAgo < 5 ? 'Live' : `${secondsAgo}s ago`}</span>
+            {connectionStatus === 'CONNECTED' ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-foreground">● Live Stream</span>
+              </>
+            ) : connectionStatus === 'RECONNECTING' ? (
+              <>
+                <RefreshCw className="w-2.5 h-2.5 text-warning animate-spin" />
+                <span className="text-warning">Reconnecting</span>
+              </>
+            ) : connectionStatus === 'FALLBACK_POLLING' ? (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-info" />
+                <span>⚡ Polling ({secondsAgo}s ago)</span>
+              </>
+            ) : (
+              <>
+                <span className="w-1.5 h-1.5 rounded-full bg-foreground-muted/40" />
+                <span>{secondsAgo < 5 ? 'Sync' : `${secondsAgo}s ago`}</span>
+              </>
+            )}
             <span className="hidden sm:inline opacity-60">({lastUpdated.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})</span>
           </div>
 

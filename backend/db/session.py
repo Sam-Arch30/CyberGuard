@@ -86,6 +86,8 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE reports ADD COLUMN quality_check_json TEXT DEFAULT '{}';",
                     "ALTER TABLE reports ADD COLUMN superseded_by VARCHAR(36);",
                     "ALTER TABLE reports ADD COLUMN workspace_id VARCHAR(128) DEFAULT 'default';",
+                    "ALTER TABLE analysis_events ADD COLUMN sequence INTEGER DEFAULT 1;",
+                    "ALTER TABLE background_job_events ADD COLUMN sequence INTEGER DEFAULT 1;",
                 ]
                 for stmt in column_migrations:
                     try:

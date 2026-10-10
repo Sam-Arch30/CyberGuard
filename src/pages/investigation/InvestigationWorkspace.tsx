@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { ArrowLeft, Sparkles } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useInvestigation } from '../../context/InvestigationContext';
+import { RealtimeService } from '../../services/realtimeService';
+import type { RealtimeConnectionStatus } from '../../types/realtime';
 import { ActiveInvestigationHeader } from '../../components/layout/ActiveInvestigationHeader';
 import { InvestigationSummaryBar } from '../../components/investigation/InvestigationSummaryBar';
 import { InvestigationNav } from '../../components/investigation/InvestigationNav';
@@ -51,6 +53,40 @@ export const InvestigationWorkspace: React.FC = () => {
   const effectiveId = id || activeEmailId || workspaceSummary?.investigation.investigation_id;
   const isAnalysisRoute = section === 'analysis' || activeSection === 'analysis';
   const hasInvestigationData = Boolean(activeEmail || workspaceSummary);
+  const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>('DISCONNECTED');
+
+  // Section 46: Real-time event stream subscription for active investigation
+  useEffect(() => {
+    if (!effectiveId || effectiveId === 'analysis') return;
+
+    const unsubscribe = RealtimeService.subscribe({
+      url: `/api/investigations/${encodeURIComponent(effectiveId)}/stream`,
+      onEvent: (evt) => {
+        // When findings persist, analysis progresses/completes, or status transitions occur, refresh workspace summary
+        if (
+          [
+            'FINDING_PERSISTED',
+            'INDICATOR_DISCOVERED',
+            'EVIDENCE_ADDED',
+            'ANALYSIS_COMPLETED',
+            'ANALYSIS_PARTIAL',
+            'ANALYSIS_STAGE_COMPLETED',
+            'REPORT_READY',
+          ].includes(evt.event_type)
+        ) {
+          refreshWorkspaceSummary();
+        }
+      },
+      onStatusChange: (status) => setConnectionStatus(status),
+      onAuthoritativeRefetch: () => {
+        refreshWorkspaceSummary();
+      },
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [effectiveId, refreshWorkspaceSummary]);
 
   if (!hasInvestigationData) {
     if (isAnalysisRoute && effectiveId && effectiveId !== 'analysis') {
@@ -101,6 +137,7 @@ export const InvestigationWorkspace: React.FC = () => {
       <InvestigationSummaryBar
         summary={workspaceSummary}
         loading={loading}
+        connectionStatus={connectionStatus}
         onStatusChange={updateInvestigationStatus}
         onOpenNotes={openNotesDrawer}
         onRefresh={refreshWorkspaceSummary}

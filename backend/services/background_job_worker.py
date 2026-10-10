@@ -38,6 +38,7 @@ from backend.services.background_job_service import (
     DEFAULT_JOB_TIMEOUTS,
 )
 from backend.services.log_sanitizer import sanitize_log_text
+from backend.services.realtime_service import RealtimePublisher
 
 logger = logging.getLogger("cyberguard.services.background_worker")
 
@@ -115,18 +116,20 @@ class JobExecutionContext:
             job.heartbeat_at = now
             job.updated_at = now
 
-            event = BackgroundJobEventModel(
+            RealtimePublisher.emit_job_event(
+                db=db,
                 job_id=self.job_id,
-                workspace_id=self.workspace_id,
                 event_type="JOB_PROGRESS",
+                message=message or f"Job progressing: {stage} ({job.progress_percent}%)",
+                workspace_id=self.workspace_id,
                 stage=stage,
                 progress_percent=job.progress_percent,
-                message=message or f"Job progressing: {stage} ({job.progress_percent}%)",
-                metadata_json=json.dumps({"stage": stage}),
-                timestamp=now,
+                metadata={"stage": stage},
+                analysis_run_id=self.analysis_run_id,
+                investigation_id=self.resource_id if self.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+                report_id=self.report_id,
+                status=job.status,
             )
-            db.add(event)
-            db.commit()
 
     def heartbeat(self, db: Session) -> None:
         """Refreshes the worker's active lease on the job."""
@@ -146,19 +149,19 @@ class JobExecutionContext:
         stage: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> None:
-        """Emits an auditable event for this job."""
-        now = get_utc_now()
-        event = BackgroundJobEventModel(
+        """Emits an auditable event for this job with monotonic sequence and real-time broadcasting."""
+        RealtimePublisher.emit_job_event(
+            db=db,
             job_id=self.job_id,
-            workspace_id=self.workspace_id,
             event_type=event_type,
-            stage=stage,
             message=message,
-            metadata_json=json.dumps(metadata or {}),
-            timestamp=now,
+            workspace_id=self.workspace_id,
+            stage=stage,
+            metadata=metadata or {},
+            analysis_run_id=self.analysis_run_id,
+            investigation_id=self.resource_id if self.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+            report_id=self.report_id,
         )
-        db.add(event)
-        db.commit()
 
 
 # Handler Registry
@@ -246,6 +249,13 @@ async def handle_report_generation(ctx: JobExecutionContext, db: Session) -> Dic
     from backend.services.investigation_workspace_service import InvestigationWorkspaceService
     from backend.services.evidence_storage import evidence_storage
 
+    ctx.emit_event(
+        db=db,
+        event_type="REPORT_GENERATION_STARTED",
+        message=f"Initiated forensic report compilation for investigation {investigation_id}.",
+        stage="PROJECTION_BUILDING",
+        metadata={"investigation_id": investigation_id},
+    )
     ctx.update_progress(db, 15.0, "PROJECTION_BUILDING", "Gathering authoritative investigation evidence...")
 
     if ctx.is_cancelled(db):
@@ -306,6 +316,19 @@ async def handle_report_generation(ctx: JobExecutionContext, db: Session) -> Dic
             content_options=content_options,
         )
     except Exception as exc:
+        if report_id:
+            rep = db.query(ReportModel).filter(ReportModel.id == report_id).first()
+            if rep and rep.status == "GENERATING":
+                rep.status = "FAILED"
+                rep.summary = f"Report generation failed: {str(exc)}"
+                db.commit()
+        ctx.emit_event(
+            db=db,
+            event_type="REPORT_FAILED",
+            message=f"Report compilation failed: {str(exc)}",
+            stage="FAILED",
+            metadata={"report_id": report_id, "investigation_id": inv_key, "error": str(exc)},
+        )
         raise TransientJobError(f"PDF compilation failed: {exc}")
 
     ctx.update_progress(db, 80.0, "STORING_REPORT", "Storing report snapshot and binary artifact...")
@@ -390,6 +413,21 @@ async def handle_report_generation(ctx: JobExecutionContext, db: Session) -> Dic
     db.commit()
 
     ctx.update_progress(db, 100.0, "READY", f"Report {report_number} generated successfully.")
+    ctx.emit_event(
+        db=db,
+        event_type="REPORT_READY",
+        message=f"Report {report_number} generated successfully (v{next_version}).",
+        stage="READY",
+        metadata={
+            "report_id": report_id,
+            "report_number": report_number,
+            "report_version": next_version,
+            "investigation_id": inv_key,
+            "file_size_bytes": len(pdf_bytes),
+            "sha256": pdf_sha,
+            "download_url": f"/api/reports/{report_id}/download",
+        },
+    )
     return {
         "report_id": report_id,
         "report_number": report_number,
@@ -680,18 +718,20 @@ class BackgroundJobWorker:
                 db.commit()
                 claimed_job = db.query(BackgroundJobModel).filter(BackgroundJobModel.id == cand_id).first()
                 if claimed_job:
-                    event = BackgroundJobEventModel(
+                    RealtimePublisher.emit_job_event(
+                        db=db,
                         job_id=claimed_job.id,
-                        workspace_id=claimed_job.workspace_id,
                         event_type="JOB_STARTED",
+                        message=f"Job claimed by worker {worker_id} (attempt {claimed_job.attempt_count}/{claimed_job.max_attempts}).",
+                        workspace_id=claimed_job.workspace_id,
                         stage="CLAIMED",
                         progress_percent=0.0,
-                        message=f"Job claimed by worker {worker_id} (attempt {claimed_job.attempt_count}/{claimed_job.max_attempts}).",
-                        metadata_json=json.dumps({"worker_id": worker_id}),
-                        timestamp=now,
+                        metadata={"worker_id": worker_id, "attempt": claimed_job.attempt_count},
+                        analysis_run_id=claimed_job.analysis_run_id,
+                        investigation_id=claimed_job.resource_id if claimed_job.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+                        report_id=claimed_job.report_id,
+                        status=JobStatusEnum.RUNNING.value,
                     )
-                    db.add(event)
-                    db.commit()
                     logger.info("Worker %s claimed job %s (%s)", worker_id, claimed_job.id, claimed_job.job_type)
                     return claimed_job
 
@@ -843,16 +883,19 @@ class BackgroundJobWorker:
                         curr_job.current_stage = "RETRY_WAIT"
                         curr_job.updated_at = get_utc_now()
 
-                        event = BackgroundJobEventModel(
+                        RealtimePublisher.emit_job_event(
+                            db=retry_db,
                             job_id=curr_job.id,
-                            workspace_id=curr_job.workspace_id,
                             event_type="JOB_RETRY_SCHEDULED",
-                            stage="RETRY_WAIT",
                             message=f"Attempt {curr_job.attempt_count} failed ({sanitized_msg}). Scheduled retry in {delay}s.",
-                            metadata_json=json.dumps({"delay_seconds": delay, "next_attempt": curr_job.attempt_count + 1}),
-                            timestamp=get_utc_now(),
+                            workspace_id=curr_job.workspace_id,
+                            stage="RETRY_WAIT",
+                            metadata={"delay_seconds": delay, "next_attempt": curr_job.attempt_count + 1},
+                            analysis_run_id=curr_job.analysis_run_id,
+                            investigation_id=curr_job.resource_id if curr_job.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+                            report_id=curr_job.report_id,
+                            status=JobStatusEnum.RETRY_WAIT.value,
                         )
-                        retry_db.add(event)
                     else:
                         JobLifecycleManager.transition(
                             db=retry_db,

@@ -48,35 +48,26 @@ logger = logging.getLogger("cyberguard.orchestrator")
 # REAL-TIME PUB/SUB EVENT HUB (In-Memory SSE Broadcasting)
 # ============================================================================
 
-class AnalysisEventHub:
-    """Manages active Server-Sent Event (SSE) subscriber queues per AnalysisRun."""
+from backend.services.realtime_service import global_realtime_hub, RealtimePublisher
 
-    def __init__(self):
-        self._subscribers: Dict[str, Set[asyncio.Queue]] = {}
-        self._lock = asyncio.Lock()
+
+class AnalysisEventHub:
+    """Manages active Server-Sent Event (SSE) subscriber queues per AnalysisRun with RealtimeHub integration."""
 
     async def subscribe(self, run_id: str) -> asyncio.Queue:
-        queue: asyncio.Queue = asyncio.Queue(maxsize=100)
-        async with self._lock:
-            if run_id not in self._subscribers:
-                self._subscribers[run_id] = set()
-            self._subscribers[run_id].add(queue)
-        return queue
+        return await global_realtime_hub.subscribe(f"run:{run_id}")
 
     async def unsubscribe(self, run_id: str, queue: asyncio.Queue):
-        async with self._lock:
-            if run_id in self._subscribers:
-                self._subscribers[run_id].discard(queue)
-                if not self._subscribers[run_id]:
-                    del self._subscribers[run_id]
+        await global_realtime_hub.unsubscribe(f"run:{run_id}", queue)
 
     async def broadcast(self, run_id: str, event_payload: Dict[str, Any]):
-        subscribers = set()
-        async with self._lock:
-            if run_id in self._subscribers:
-                subscribers = set(self._subscribers[run_id])
+        channel = f"run:{run_id}"
+        target_queues = set()
+        async with global_realtime_hub._lock:
+            if channel in global_realtime_hub._subscribers:
+                target_queues = set(global_realtime_hub._subscribers[channel])
 
-        for q in subscribers:
+        for q in target_queues:
             try:
                 q.put_nowait(event_payload)
             except asyncio.QueueFull:
@@ -439,27 +430,45 @@ class AnalysisOrchestrator:
         error: Optional[str] = None,
         metadata: Optional[Dict[str, Any]] = None,
     ) -> AnalysisEventModel:
-        """Persists an AnalysisEventModel and broadcasts it to active SSE streams."""
-        evt = AnalysisEventModel(
-            id=generate_uuid("evt"),
-            analysis_run_id=run_id,
-            task_id=task_id,
+        """Persists an AnalysisEventModel with monotonic sequence and broadcasts to active real-time SSE streams."""
+        evt = RealtimePublisher.emit_analysis_event(
+            db=db,
+            run_id=run_id,
             event_type=event_type,
-            timestamp=get_utc_now(),
-            task_status=task_status,
             message=message,
+            task_id=task_id,
+            task_status=task_status,
             result_count=result_count,
             error=error,
-            metadata_json=json.dumps(metadata or {}),
+            metadata=metadata,
         )
-        db.add(evt)
-        db.commit()
+        if not evt:
+            # Resilient fallback
+            now = get_utc_now()
+            evt = AnalysisEventModel(
+                id=generate_uuid("evt"),
+                analysis_run_id=run_id,
+                task_id=task_id,
+                event_type=event_type,
+                sequence=1,
+                timestamp=now,
+                task_status=task_status,
+                message=message,
+                result_count=result_count,
+                error=error,
+                metadata_json=json.dumps(metadata or {}),
+            )
+            db.add(evt)
+            db.commit()
 
-        # Non-blocking broadcast
-        payload = {
+        # Non-blocking legacy broadcast for backward-compatible Section 37 listeners
+        legacy_payload = {
             "type": "EVENT",
+            "schema_version": 1,
+            "sequence": getattr(evt, "sequence", 1),
             "event": {
                 "id": evt.id,
+                "sequence": getattr(evt, "sequence", 1),
                 "analysis_run_id": run_id,
                 "task_id": task_id,
                 "event_type": event_type,
@@ -468,12 +477,13 @@ class AnalysisOrchestrator:
                 "message": message,
                 "result_count": result_count,
                 "error": error,
+                "metadata": metadata or {},
             },
         }
         try:
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                asyncio.create_task(global_event_hub.broadcast(run_id, payload))
+                asyncio.create_task(global_event_hub.broadcast(run_id, legacy_payload))
         except Exception:
             pass
 
@@ -654,6 +664,20 @@ class AnalysisOrchestrator:
                             )
                             db.add(f)
                             db.flush()
+                            cls.emit_event(
+                                db=db,
+                                run_id=run.id,
+                                task_id=task.id,
+                                event_type="FINDING_PERSISTED",
+                                message=f"Produced CRITICAL finding: {f.title}",
+                                result_count=1,
+                                metadata={
+                                    "finding_id": f.id,
+                                    "finding_type": f.finding_type,
+                                    "severity": f.severity,
+                                    "risk_contribution": f.risk_contribution,
+                                },
+                            )
 
                 elif task.task_type == "IOC_EXTRACTION" and art_type == "EMAIL":
                     from backend.services.email_parser import EmailParserService
@@ -694,6 +718,20 @@ class AnalysisOrchestrator:
                             )
                             db.add(f)
                             db.flush()
+                            cls.emit_event(
+                                db=db,
+                                run_id=run.id,
+                                task_id=task.id,
+                                event_type="FINDING_PERSISTED",
+                                message=f"Produced HIGH finding: {f.title}",
+                                result_count=1,
+                                metadata={
+                                    "finding_id": f.id,
+                                    "finding_type": f.finding_type,
+                                    "severity": f.severity,
+                                    "risk_contribution": f.risk_contribution,
+                                },
+                            )
 
                 elif task.task_type == "NLP_SOCIAL_ENGINEERING" and art_type == "EMAIL":
                     from backend.app.ml.classifier import global_phishing_classifier
@@ -728,6 +766,20 @@ class AnalysisOrchestrator:
                         )
                         db.add(f)
                         db.flush()
+                        cls.emit_event(
+                            db=db,
+                            run_id=run.id,
+                            task_id=task.id,
+                            event_type="FINDING_PERSISTED",
+                            message=f"Produced {f.severity} finding: {f.title}",
+                            result_count=1,
+                            metadata={
+                                "finding_id": f.id,
+                                "finding_type": f.finding_type,
+                                "severity": f.severity,
+                                "risk_contribution": f.risk_contribution,
+                            },
+                        )
 
                 elif task.task_type == "RISK_ASSESSMENT":
                     # Aggregate findings for this run
@@ -824,11 +876,26 @@ class AnalysisOrchestrator:
                 run.status = "FAILED"
             db.commit()
 
+            canonical_terminal = (
+                "ANALYSIS_COMPLETED" if run.status == "COMPLETED"
+                else ("ANALYSIS_PARTIAL" if run.status == "PARTIAL" else "ANALYSIS_FAILED")
+            )
+            legacy_terminal = (
+                "RUN_COMPLETED" if run.status == "COMPLETED"
+                else "RUN_FAILED"
+            )
             cls.emit_event(
                 db=db,
                 run_id=run.id,
-                event_type="RUN_COMPLETED" if run.status == "COMPLETED" else "RUN_FAILED",
+                event_type=canonical_terminal,
                 message=f"Analysis pipeline concluded with status {run.status}. {completed_tasks_count} completed, {failed_tasks_count} failed.",
+                result_count=completed_tasks_count,
+            )
+            cls.emit_event(
+                db=db,
+                run_id=run.id,
+                event_type=legacy_terminal,
+                message=f"Analysis run concluded with status {run.status}.",
                 result_count=completed_tasks_count,
             )
 
@@ -857,6 +924,14 @@ class AnalysisOrchestrator:
             t.message = "Cancelled by analyst"
 
         db.commit()
+
+        cls.emit_event(
+            db=db,
+            run_id=run.id,
+            event_type="ANALYSIS_CANCELLED",
+            message="Analysis pipeline execution was cancelled by user.",
+            result_count=0,
+        )
 
         cls.emit_event(
             db=db,

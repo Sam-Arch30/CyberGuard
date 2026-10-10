@@ -465,3 +465,91 @@ def list_investigation_report_versions(
         out.append(_serialize_report_item(r, is_stale=is_stale))
     return out
 
+
+@router.get(
+    "/{identifier}/stream",
+    summary="Stream Investigation Workspace Real-Time Events (SSE - Section 46)",
+    description="Provides real-time Server-Sent Events stream for an investigation, including live analysis progress, newly persisted findings, and report updates.",
+)
+async def stream_investigation_events(
+    identifier: str,
+    last_event_id: Optional[str] = Query(None),
+    workspace_id: Optional[str] = Query("default"),
+    db: Session = Depends(get_db),
+):
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from backend.services.realtime_service import global_realtime_hub
+
+    incident, run, artifact, case = InvestigationWorkspaceService.resolve_context(db, identifier)
+    if not incident and not run and not artifact:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Investigation with identifier '{identifier}' was not found.",
+        )
+
+    # Initial snapshot
+    summary = InvestigationWorkspaceService.get_workspace_summary(db, identifier)
+    summary_data = summary.model_dump(mode="json") if summary else {}
+
+    inv_key = incident.id if incident else (run.id if run else identifier)
+
+    async def event_generator():
+        yield f"event: snapshot\ndata: {json.dumps(summary_data)}\n\n"
+
+        # Subscribe to investigation channel and linked analysis run channel if present
+        queue_inv = await global_realtime_hub.subscribe(f"investigation:{inv_key}")
+        queue_run = None
+        if run:
+            queue_run = await global_realtime_hub.subscribe(f"run:{run.id}")
+
+        try:
+            while True:
+                # Merge queues
+                try:
+                    tasks = [asyncio.create_task(queue_inv.get())]
+                    if queue_run:
+                        tasks.append(asyncio.create_task(queue_run.get()))
+
+                    done, pending = await asyncio.wait(
+                        tasks,
+                        timeout=15.0,
+                        return_when=asyncio.FIRST_COMPLETED,
+                    )
+                    for p in pending:
+                        p.cancel()
+
+                    if not done:
+                        # Timeout - send keepalive
+                        yield ": keepalive\n\n"
+                        continue
+
+                    for finished_task in done:
+                        msg = finished_task.result()
+                        evt_type = msg.get("event_type") or "investigation_update"
+                        seq = msg.get("sequence") or ""
+                        id_line = f"id: {seq}\n" if seq else ""
+                        yield f"{id_line}event: {str(evt_type).lower()}\ndata: {json.dumps(msg)}\n\n"
+
+                except asyncio.CancelledError:
+                    break
+                except Exception as e:
+                    yield f": error {str(e)}\n\n"
+                    break
+
+        finally:
+            await global_realtime_hub.unsubscribe(f"investigation:{inv_key}", queue_inv)
+            if queue_run and run:
+                await global_realtime_hub.unsubscribe(f"run:{run.id}", queue_run)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
+

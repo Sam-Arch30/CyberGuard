@@ -17,6 +17,7 @@ import {
   Cpu,
   Layers,
   ShieldAlert,
+  RefreshCw,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import type {
@@ -24,6 +25,7 @@ import type {
   AnalysisTask,
   AnalysisEvent,
 } from '../../types/analysis';
+import type { RealtimeConnectionStatus } from '../../types/realtime';
 import { liveAnalysisService } from '../../services/liveAnalysisService';
 import {
   Card,
@@ -84,6 +86,8 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
   const [showTechnicalDetails, setShowTechnicalDetails] = useState<boolean>(false);
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [cancelConfirmOpen, setCancelConfirmOpen] = useState<boolean>(false);
+  const [connectionStatus, setConnectionStatus] = useState<RealtimeConnectionStatus>('DISCONNECTED');
+  const [screenReaderAnnouncement, setScreenReaderAnnouncement] = useState<string>('');
 
   const activeStreamCleanup = useRef<(() => void) | null>(null);
   const pollingTimer = useRef<number | null>(null);
@@ -167,14 +171,23 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
           (snapshot) => {
             if (isMounted) setAnalysisState(snapshot);
           },
-          (eventPayload) => {
+          (eventPayload: any) => {
             if (isMounted && eventPayload) {
+              const evtType = eventPayload.event_type || eventPayload.type;
+              if (evtType === 'ANALYSIS_STAGE_STARTED' || eventPayload.stage) {
+                setScreenReaderAnnouncement(`Live Analysis: Entered stage ${eventPayload.stage || 'new stage'}`);
+              } else if (evtType === 'FINDING_PERSISTED') {
+                setScreenReaderAnnouncement(`Security finding persisted: ${eventPayload.payload?.title || eventPayload.message || 'Finding recorded'}`);
+              } else if (evtType === 'ANALYZER_WARNING' || evtType === 'ANALYZER_DEGRADED') {
+                setScreenReaderAnnouncement(`Analyzer warning: ${eventPayload.message || 'Degraded performance'}`);
+              }
               // Refresh state on task progress/completion
               fetchState();
             }
           },
-          (_terminalStatus) => {
+          (terminalStatus) => {
             if (isMounted) {
+              setScreenReaderAnnouncement(`Analysis run reached terminal state: ${terminalStatus}`);
               fetchState();
               if (pollingTimer.current) {
                 window.clearInterval(pollingTimer.current);
@@ -195,6 +208,12 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
                 }
               }, 2000);
             }
+          },
+          (status) => {
+            if (isMounted) setConnectionStatus(status);
+          },
+          async () => {
+            if (isMounted) await fetchState();
           }
         );
       }
@@ -348,6 +367,42 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
 
         {/* Status Badge & Primary Action Controls */}
         <div className="flex items-center space-x-3 shrink-0">
+          {/* Accessible Live Region */}
+          <div className="sr-only" aria-live="polite" aria-atomic="true">
+            {screenReaderAnnouncement}
+          </div>
+
+          {/* Real-time Connection Status Indicator */}
+          <div
+            className="flex items-center space-x-1.5 px-2.5 py-1 rounded-full text-xs font-mono font-medium border bg-surface-secondary border-border"
+            title="Real-time SSE event stream connection state"
+          >
+            {connectionStatus === 'CONNECTED' && (
+              <>
+                <span className="w-2 h-2 rounded-full bg-success animate-pulse" />
+                <span className="text-foreground">● Live</span>
+              </>
+            )}
+            {connectionStatus === 'RECONNECTING' && (
+              <>
+                <RefreshCw className="w-3 h-3 text-warning animate-spin" />
+                <span className="text-warning">↻ Reconnecting</span>
+              </>
+            )}
+            {connectionStatus === 'FALLBACK_POLLING' && (
+              <>
+                <span className="w-2 h-2 rounded-full bg-info" />
+                <span className="text-foreground-muted">⚡ Polling</span>
+              </>
+            )}
+            {connectionStatus === 'DISCONNECTED' && (
+              <>
+                <span className="w-2 h-2 rounded-full bg-foreground-muted/40" />
+                <span className="text-foreground-muted">Stream Idle</span>
+              </>
+            )}
+          </div>
+
           {isRunning && (
             <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-primary/10 border border-primary/30 text-primary text-xs font-mono font-semibold animate-pulse">
               <Loader2 className="w-3.5 h-3.5 animate-spin" />

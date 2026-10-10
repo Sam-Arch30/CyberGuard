@@ -72,3 +72,45 @@ def list_dashboard_emails(
         skip=skip,
         limit=limit
     )
+
+
+@router.get(
+    "/stream",
+    summary="Stream SOC Overview Real-Time Telemetry (SSE - Section 46)",
+    description="Provides real-time Server-Sent Events stream for SOC dashboard notifications, active analysis lifecycle events, and background job metrics in a tenant workspace.",
+)
+async def stream_dashboard_telemetry(
+    workspace_id: str = Query("default", description="Workspace tenant identifier"),
+    db: Session = Depends(get_db),
+):
+    import asyncio
+    import json
+    from fastapi.responses import StreamingResponse
+    from backend.services.realtime_service import global_realtime_hub
+
+    channel = f"workspace:{workspace_id.strip()}"
+
+    async def event_generator():
+        yield f"event: connected\ndata: {json.dumps({'workspace_id': workspace_id, 'channel': channel})}\n\n"
+
+        queue = await global_realtime_hub.subscribe(channel)
+        try:
+            while True:
+                try:
+                    msg = await asyncio.wait_for(queue.get(), timeout=15.0)
+                    evt_type = msg.get("event_type") or "telemetry"
+                    yield f"event: {str(evt_type).lower()}\ndata: {json.dumps(msg)}\n\n"
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+        finally:
+            await global_realtime_hub.unsubscribe(channel, queue)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache, no-transform",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

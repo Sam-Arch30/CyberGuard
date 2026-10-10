@@ -68,6 +68,7 @@ class JobEventRead(BaseModel):
     job_id: str
     workspace_id: str
     event_type: str
+    sequence: int = 1
     stage: Optional[str] = None
     progress_percent: Optional[float] = None
     message: str

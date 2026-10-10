@@ -31,6 +31,7 @@ from backend.schemas.jobs import (
     JobMetricsSummary,
     JobActionResponse,
 )
+from backend.services.realtime_service import RealtimePublisher
 
 logger = logging.getLogger("cyberguard.services.background_job")
 
@@ -160,20 +161,37 @@ class JobLifecycleManager:
         ):
             job.completed_at = now
 
-        # Record auditable event
+        # Record auditable event and broadcast over real-time streams
         event_type = f"JOB_{target_status}"
-        event = BackgroundJobEventModel(
+        event = RealtimePublisher.emit_job_event(
+            db=db,
             job_id=job.id,
-            workspace_id=job.workspace_id,
             event_type=event_type,
+            message=message or f"Job transitioned from {previous_status} to {target_status}.",
+            workspace_id=job.workspace_id,
             stage=stage or job.current_stage,
             progress_percent=progress_percent if progress_percent is not None else job.progress_percent,
-            message=message or f"Job transitioned from {previous_status} to {target_status}.",
-            metadata_json=json.dumps(metadata or {}),
-            timestamp=now,
+            metadata=metadata or {},
+            analysis_run_id=job.analysis_run_id,
+            investigation_id=job.resource_id if job.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+            report_id=job.report_id,
+            status=target_status,
         )
-        db.add(event)
-        db.flush()
+        if not event:
+            # Fallback direct creation
+            event = BackgroundJobEventModel(
+                job_id=job.id,
+                workspace_id=job.workspace_id,
+                event_type=event_type,
+                sequence=1,
+                stage=stage or job.current_stage,
+                progress_percent=progress_percent if progress_percent is not None else job.progress_percent,
+                message=message or f"Job transitioned from {previous_status} to {target_status}.",
+                metadata_json=json.dumps(metadata or {}),
+                timestamp=now,
+            )
+            db.add(event)
+            db.flush()
         return job
 
 
@@ -278,24 +296,26 @@ class BackgroundJobService:
         db.add(job)
         db.flush()
 
-        # Emit creation event
-        event = BackgroundJobEventModel(
+        # Emit creation event and broadcast to real-time subscribers
+        RealtimePublisher.emit_job_event(
+            db=db,
             job_id=job.id,
-            workspace_id=workspace_id,
             event_type="JOB_QUEUED",
+            message=f"Job {job.id} of type {job_type} accepted and queued for execution.",
+            workspace_id=workspace_id,
             stage="QUEUED",
             progress_percent=0.0,
-            message=f"Job {job.id} of type {job_type} accepted and queued for execution.",
-            metadata_json=json.dumps({
+            metadata={
                 "job_type": job_type,
                 "priority": prio_upper,
                 "resource_type": resource_type,
                 "resource_id": resource_id,
-            }),
-            timestamp=now,
+            },
+            analysis_run_id=analysis_run_id,
+            investigation_id=resource_id if resource_type in ("INCIDENT", "INVESTIGATION") else None,
+            report_id=report_id,
+            status=JobStatusEnum.QUEUED.value,
         )
-        db.add(event)
-        db.commit()
         db.refresh(job)
 
         logger.info(
@@ -473,18 +493,21 @@ class BackgroundJobService:
         job.current_stage = "QUEUED"
         job.updated_at = now
 
-        event = BackgroundJobEventModel(
+        # Emit retry scheduled event and broadcast
+        RealtimePublisher.emit_job_event(
+            db=db,
             job_id=job.id,
-            workspace_id=job.workspace_id,
             event_type="JOB_RETRY_SCHEDULED",
+            message="Operator manually initiated retry for job.",
+            workspace_id=job.workspace_id,
             stage="QUEUED",
             progress_percent=0.0,
-            message="Operator manually initiated retry for job.",
-            metadata_json=json.dumps({"requeued_at": now.isoformat()}),
-            timestamp=now,
+            metadata={"requeued_at": now.isoformat()},
+            analysis_run_id=job.analysis_run_id,
+            investigation_id=job.resource_id if job.resource_type in ("INCIDENT", "INVESTIGATION") else None,
+            report_id=job.report_id,
+            status=JobStatusEnum.QUEUED.value,
         )
-        db.add(event)
-        db.commit()
 
         return JobActionResponse(
             success=True,
@@ -587,13 +610,14 @@ class BackgroundJobService:
                     job_id=e.job_id,
                     workspace_id=e.workspace_id,
                     event_type=e.event_type,
+                    sequence=getattr(e, "sequence", 1) or 1,
                     stage=e.stage,
                     progress_percent=e.progress_percent,
                     message=e.message,
                     metadata=json.loads(e.metadata_json or "{}"),
                     timestamp=e.timestamp,
                 )
-                for e in sorted(job.events, key=lambda x: x.timestamp)
+                for e in sorted(job.events, key=lambda x: (getattr(x, "sequence", 1) or 1, x.timestamp))
             ]
 
         res_dict = {}

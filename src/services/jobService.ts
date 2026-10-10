@@ -11,6 +11,8 @@ import type {
   JobSubmitRequest,
   JobEventRead,
 } from '../types/job';
+import { RealtimeService } from './realtimeService';
+import type { RealtimeEvent, RealtimeConnectionStatus } from '../types/realtime';
 
 export class BackgroundJobService {
   /**
@@ -157,5 +159,59 @@ export class BackgroundJobService {
       throw new Error(err || `Failed to get job metrics (${res.status})`);
     }
     return (await res.json()) as JobMetricsSummary;
+  }
+
+  /**
+   * Subscribes to real-time events for a specific background job.
+   */
+  static subscribeJob(
+    jobId: string,
+    callbacks: {
+      onEvent: (event: RealtimeEvent) => void;
+      onSnapshot?: (snapshot: JobReadResponse) => void;
+      onTerminal?: (status: string) => void;
+      onError?: (error: unknown) => void;
+      onStatusChange?: (status: RealtimeConnectionStatus) => void;
+      onAuthoritativeRefetch?: () => Promise<void> | void;
+    },
+    workspaceId: string = 'default'
+  ): () => void {
+    return RealtimeService.subscribe<JobReadResponse>({
+      url: `/api/jobs/${encodeURIComponent(jobId)}/stream`,
+      onEvent: callbacks.onEvent,
+      onSnapshot: callbacks.onSnapshot,
+      onTerminal: callbacks.onTerminal,
+      onError: callbacks.onError,
+      onStatusChange: callbacks.onStatusChange,
+      onAuthoritativeRefetch: callbacks.onAuthoritativeRefetch || (async () => {
+        try {
+          const fresh = await BackgroundJobService.getJob(jobId, workspaceId);
+          if (callbacks.onSnapshot) callbacks.onSnapshot(fresh);
+        } catch {
+          // ignore
+        }
+      }),
+    });
+  }
+
+  /**
+   * Subscribes to workspace-level job stream for all background jobs.
+   */
+  static subscribeWorkspaceJobs(
+    workspaceId: string = 'default',
+    callbacks: {
+      onEvent: (event: RealtimeEvent) => void;
+      onError?: (error: unknown) => void;
+      onStatusChange?: (status: RealtimeConnectionStatus) => void;
+      onAuthoritativeRefetch?: () => Promise<void> | void;
+    }
+  ): () => void {
+    return RealtimeService.subscribe<JobListResponse>({
+      url: `/api/jobs/stream`,
+      onEvent: callbacks.onEvent,
+      onError: callbacks.onError,
+      onStatusChange: callbacks.onStatusChange,
+      onAuthoritativeRefetch: callbacks.onAuthoritativeRefetch,
+    });
   }
 }
