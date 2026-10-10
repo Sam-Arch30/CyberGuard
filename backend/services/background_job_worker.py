@@ -790,6 +790,93 @@ async def handle_batch_enrichment(ctx: JobExecutionContext, db: Session) -> Dict
     return {"total": total, "enriched": len(results), "results": results}
 
 
+@register_handler(JobTypeEnum.WATCHLIST_MONITORING_CYCLE.value)
+async def handle_watchlist_monitoring_cycle(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 53: Continuous Threat Monitoring Cycle for due watchlists.
+    """
+    from backend.services.watchlist_monitoring_service import WatchlistMonitoringService
+
+    watchlist_id = ctx.payload.get("watchlist_id") or ctx.resource_id
+    trigger_type = ctx.payload.get("trigger_type", "SCHEDULED")
+
+    ctx.update_progress(db, 20.0, "RUNNING_CYCLE", "Evaluating due indicators for continuous monitoring...")
+    runs = await WatchlistMonitoringService.execute_monitoring_cycle(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        watchlist_id=watchlist_id,
+        job_id=ctx.job_id,
+        trigger_type=trigger_type,
+    )
+
+    total_checked = sum(r.items_checked for r in runs)
+    total_changed = sum(r.items_changed for r in runs)
+    total_alerts = sum(r.alerts_created for r in runs)
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Monitoring cycle completed: checked={total_checked}, changed={total_changed}, alerts={total_alerts}",
+    )
+    return {
+        "watchlists_processed": len(runs),
+        "total_items_checked": total_checked,
+        "total_items_changed": total_changed,
+        "total_alerts_created": total_alerts,
+        "runs": [r.model_dump() for r in runs],
+    }
+
+
+@register_handler(JobTypeEnum.WATCHLIST_REFRESH.value)
+async def handle_watchlist_refresh(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 53: Force manual refresh on an entire watchlist.
+    """
+    ctx.payload["trigger_type"] = "MANUAL"
+    return await handle_watchlist_monitoring_cycle(ctx, db)
+
+
+@register_handler(JobTypeEnum.WATCHED_INDICATOR_CHECK.value)
+async def handle_watched_indicator_check(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 53: Targeted refresh check for a single watched indicator.
+    """
+    from backend.db.models import WatchedIndicatorModel
+    from backend.services.watchlist_monitoring_service import WatchlistMonitoringService
+
+    item_id = ctx.payload.get("item_id") or ctx.resource_id
+    if not item_id:
+        raise PermanentJobError("Watched indicator check requires 'item_id' or 'resource_id'.")
+
+    item = (
+        db.query(WatchedIndicatorModel)
+        .filter(WatchedIndicatorModel.id == item_id, WatchedIndicatorModel.workspace_id == ctx.workspace_id)
+        .first()
+    )
+    if not item:
+        raise PermanentJobError(f"Watched indicator '{item_id}' not found.")
+
+    ctx.update_progress(db, 30.0, "CHECKING", f"Querying intelligence for '{item.normalized_value}'...")
+    change = await WatchlistMonitoringService.execute_single_indicator_check(db, item, force=True)
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Check completed: verdict={item.last_verdict}, changed={change is not None}",
+    )
+    return {
+        "item_id": item.id,
+        "normalized_value": item.normalized_value,
+        "verdict": item.last_verdict,
+        "confidence": item.last_confidence,
+        "change_detected": change is not None,
+        "change_type": change.change_type if change else None,
+        "alert_id": change.alert_id if change else None,
+    }
+
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

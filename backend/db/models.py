@@ -3896,6 +3896,199 @@ class ThreatIntelProviderConfigModel(Base):
     )
 
 
+# ============================================================================
+# Section 53: IOC Watchlists & Continuous Threat Monitoring
+# ============================================================================
+
+class WatchlistModel(Base):
+    """
+    Section 53: Persistent Analyst Watchlist.
+    Logical collection of high-value indicators & entities monitored continuously.
+    """
+    __tablename__ = "watchlists"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(150), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, PAUSED, ARCHIVED
+    priority = Column(String(20), nullable=False, default="MEDIUM", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    owner_user_id = Column(String(100), nullable=True)
+    team_id = Column(String(64), nullable=True)
+    check_interval_minutes = Column(Integer, nullable=False, default=60)  # 15, 60, 360, 720, 1440, 10080
+    change_sensitivity = Column(String(20), nullable=False, default="MEDIUM")  # LOW, MEDIUM, HIGH
+    alert_threshold = Column(String(20), nullable=False, default="HIGH")  # LOW, MEDIUM, HIGH, CRITICAL, NONE
+    notify_on_change = Column(Boolean, nullable=False, default=True)
+    cooldown_minutes = Column(Integer, nullable=False, default=360)
+    last_monitored_at = Column(DateTime, nullable=True)
+    next_monitoring_cycle_at = Column(DateTime, nullable=True, index=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_by = Column(String(100), nullable=False, default="system")
+    updated_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    items = relationship("WatchedIndicatorModel", back_populates="watchlist", cascade="all, delete-orphan")
+    runs = relationship("WatchlistMonitoringRunModel", back_populates="watchlist", cascade="all, delete-orphan")
+    changes = relationship("IntelligenceChangeModel", back_populates="watchlist", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_wl_ws_status", "workspace_id", "status"),
+        Index("ix_wl_ws_next_cycle", "workspace_id", "next_monitoring_cycle_at"),
+        Index("ix_wl_ws_priority", "workspace_id", "priority"),
+    )
+
+
+class WatchedIndicatorModel(Base):
+    """
+    Section 53: Monitored Indicator item within a Watchlist.
+    Maintains check schedules, execution history, and pointers to intelligence snapshots.
+    """
+    __tablename__ = "watched_indicators"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    watchlist_id = Column(String(36), ForeignKey("watchlists.id", ondelete="CASCADE"), nullable=False, index=True)
+    indicator_id = Column(String(36), ForeignKey("indicators.id", ondelete="SET NULL"), nullable=True, index=True)
+    indicator_type = Column(String(50), nullable=False, index=True)  # IP, DOMAIN, URL, SHA256, SHA1, MD5, EMAIL, CERTIFICATE, ASN, HOSTNAME
+    raw_value = Column(Text, nullable=False)
+    normalized_value = Column(String(500), nullable=False, index=True)
+    display_value = Column(String(500), nullable=False)
+    monitoring_status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, PAUSED, CHECKING, HEALTHY, STALE, DEGRADED, ERROR
+    priority = Column(String(20), nullable=False, default="MEDIUM", index=True)
+    first_watched_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_checked_at = Column(DateTime, nullable=True)
+    next_check_at = Column(DateTime, nullable=True, index=True)
+    last_successful_check_at = Column(DateTime, nullable=True)
+    last_failed_check_at = Column(DateTime, nullable=True)
+    last_change_detected_at = Column(DateTime, nullable=True)
+    last_snapshot_id = Column(String(36), nullable=True)
+    last_verdict = Column(String(50), nullable=False, default="UNKNOWN")  # UNKNOWN, CLEAN, SUSPICIOUS, MALICIOUS
+    last_confidence = Column(Float, nullable=False, default=0.0)
+    last_severity = Column(String(20), nullable=False, default="NONE")
+    failure_count = Column(Integer, nullable=False, default=0)
+    consecutive_failure_count = Column(Integer, nullable=False, default=0)
+    last_error_message = Column(Text, nullable=True)
+    source_incident_id = Column(String(36), nullable=True, index=True)
+    source_investigation_id = Column(String(128), nullable=True, index=True)
+    created_by = Column(String(100), nullable=False, default="system")
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    watchlist = relationship("WatchlistModel", back_populates="items")
+    snapshots = relationship("IntelligenceSnapshotModel", back_populates="watched_indicator", cascade="all, delete-orphan")
+    changes = relationship("IntelligenceChangeModel", back_populates="watched_indicator", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_wi_ws_wl_norm", "workspace_id", "watchlist_id", "normalized_value", unique=True),
+        Index("ix_wi_ws_status_next", "workspace_id", "monitoring_status", "next_check_at"),
+    )
+
+
+class IntelligenceSnapshotModel(Base):
+    """
+    Section 53: Point-in-time normalized threat intelligence snapshot.
+    Stores deterministic fingerprint for material change comparison.
+    """
+    __tablename__ = "intelligence_snapshots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    watched_indicator_id = Column(String(36), ForeignKey("watched_indicators.id", ondelete="CASCADE"), nullable=False, index=True)
+    indicator_type = Column(String(50), nullable=False)
+    normalized_value = Column(String(500), nullable=False, index=True)
+    provider_consensus_verdict = Column(String(50), nullable=False, default="UNKNOWN")
+    consensus_confidence = Column(Float, nullable=False, default=0.0)
+    severity = Column(String(20), nullable=False, default="NONE")
+    sources_count = Column(Integer, nullable=False, default=1)
+    has_conflicts = Column(Boolean, nullable=False, default=False)
+    threat_types_json = Column(Text, nullable=False, default="[]")
+    normalized_data_json = Column(Text, nullable=False, default="{}")
+    fingerprint = Column(String(64), nullable=False, index=True)  # SHA256 of material attributes
+    retrieved_at = Column(DateTime, default=get_utc_now, nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    watched_indicator = relationship("WatchedIndicatorModel", back_populates="snapshots")
+
+    __table_args__ = (
+        Index("ix_snap_wi_time", "watched_indicator_id", "created_at"),
+        Index("ix_snap_norm_fp", "normalized_value", "fingerprint"),
+    )
+
+
+class IntelligenceChangeModel(Base):
+    """
+    Section 53: Record of detected material change between snapshots.
+    Tracks previous vs current state, severity, explanation, and created alerts.
+    """
+    __tablename__ = "intelligence_changes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    watchlist_id = Column(String(36), ForeignKey("watchlists.id", ondelete="CASCADE"), nullable=False, index=True)
+    watched_indicator_id = Column(String(36), ForeignKey("watched_indicators.id", ondelete="CASCADE"), nullable=False, index=True)
+    indicator_type = Column(String(50), nullable=False)
+    normalized_value = Column(String(500), nullable=False, index=True)
+    change_type = Column(String(50), nullable=False, index=True)  # NEWLY_MALICIOUS, NEWLY_SUSPICIOUS, BECAME_CLEAN, VERDICT_CHANGED, CONFIDENCE_CHANGED, SEVERITY_CHANGED, PROVIDER_CONFLICT_CHANGED, ASN_CHANGED, HOSTING_CHANGED, CAMPAIGN_ASSOCIATION_CHANGED
+    change_severity = Column(String(20), nullable=False, default="MEDIUM", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    previous_snapshot_id = Column(String(36), nullable=True)
+    current_snapshot_id = Column(String(36), nullable=True)
+    previous_verdict = Column(String(50), nullable=True)
+    current_verdict = Column(String(50), nullable=True)
+    previous_confidence = Column(Float, nullable=True)
+    current_confidence = Column(Float, nullable=True)
+    previous_severity = Column(String(20), nullable=True)
+    current_severity = Column(String(20), nullable=True)
+    change_summary = Column(Text, nullable=False)
+    change_details_json = Column(Text, default="{}", nullable=False)
+    alert_id = Column(String(36), nullable=True, index=True)
+    notification_id = Column(String(36), nullable=True, index=True)
+    acknowledged = Column(Boolean, nullable=False, default=False)
+    acknowledged_at = Column(DateTime, nullable=True)
+    acknowledged_by = Column(String(100), nullable=True)
+    detected_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    watchlist = relationship("WatchlistModel", back_populates="changes")
+    watched_indicator = relationship("WatchedIndicatorModel", back_populates="changes")
+
+    __table_args__ = (
+        Index("ix_ic_ws_wl_time", "workspace_id", "watchlist_id", "detected_at"),
+        Index("ix_ic_wi_time", "watched_indicator_id", "detected_at"),
+    )
+
+
+class WatchlistMonitoringRunModel(Base):
+    """
+    Section 53: Audit log of watchlist monitoring execution cycles.
+    """
+    __tablename__ = "watchlist_monitoring_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    watchlist_id = Column(String(36), ForeignKey("watchlists.id", ondelete="CASCADE"), nullable=False, index=True)
+    job_id = Column(String(36), nullable=True, index=True)
+    trigger_type = Column(String(30), nullable=False, default="SCHEDULED")  # SCHEDULED, MANUAL, EVENT_DRIVEN
+    status = Column(String(30), nullable=False, default="RUNNING")  # QUEUED, RUNNING, SUCCEEDED, PARTIALLY_SUCCEEDED, FAILED, CANCELLED
+    items_due = Column(Integer, nullable=False, default=0)
+    items_checked = Column(Integer, nullable=False, default=0)
+    items_changed = Column(Integer, nullable=False, default=0)
+    items_failed = Column(Integer, nullable=False, default=0)
+    alerts_created = Column(Integer, nullable=False, default=0)
+    notifications_created = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, default=get_utc_now, nullable=False)
+    completed_at = Column(DateTime, nullable=True)
+    duration_ms = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
+    run_summary_json = Column(Text, default="{}", nullable=False)
+
+    watchlist = relationship("WatchlistModel", back_populates="runs")
+
+    __table_args__ = (
+        Index("ix_wmr_ws_wl_time", "workspace_id", "watchlist_id", "started_at"),
+    )
+
+
 
 
 

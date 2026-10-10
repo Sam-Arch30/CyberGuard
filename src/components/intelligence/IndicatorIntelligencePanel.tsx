@@ -12,12 +12,14 @@ import {
   Copy,
   Check,
   Sparkles,
+  Eye,
 } from 'lucide-react';
 import type {
   AggregatedIndicatorIntelligence,
   IndicatorHistoryResponse,
 } from '../../types/threatIntelligence';
 import { threatIntelligenceService } from '../../services/threatIntelligenceService';
+import { QuickWatchModal } from '../watchlists/QuickWatchModal';
 
 interface IndicatorIntelligencePanelProps {
   intelligence: AggregatedIndicatorIntelligence;
@@ -39,6 +41,7 @@ export const IndicatorIntelligencePanel: React.FC<IndicatorIntelligencePanelProp
   const [showHistory, setShowHistory] = useState(false);
   const [historyData, setHistoryData] = useState<IndicatorHistoryResponse | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [showWatchModal, setShowWatchModal] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(data.normalized_value);
@@ -161,6 +164,13 @@ export const IndicatorIntelligencePanel: React.FC<IndicatorIntelligencePanelProp
 
         <div className="flex items-center space-x-2">
           {getVerdictBadge(data.overall_verdict)}
+          <button
+            onClick={() => setShowWatchModal(true)}
+            className="p-1.5 rounded-md bg-surface-secondary hover:bg-surface-secondary/80 text-foreground-muted hover:text-foreground border border-border transition-colors cursor-pointer"
+            title="Continuously monitor in a Watchlist"
+          >
+            <Eye className="w-3.5 h-3.5 text-primary" />
+          </button>
           <button
             onClick={handleRefresh}
             disabled={isRefreshing || data.privacy_scope === 'INTERNAL'}
@@ -375,6 +385,14 @@ export const IndicatorIntelligencePanel: React.FC<IndicatorIntelligencePanelProp
           </div>
         </div>
       )}
+
+      {/* Quick Watch Modal */}
+      <QuickWatchModal
+        isOpen={showWatchModal}
+        onClose={() => setShowWatchModal(false)}
+        indicatorValue={data.normalized_value}
+        indicatorType={data.indicator_type}
+      />
     </div>
   );
 };

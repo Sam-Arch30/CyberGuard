@@ -19,6 +19,8 @@ Incident (Operational Case Lifecycle: Section 50 & Section 51)
   ↓
 Threat Intelligence Enrichment (Section 52: Multi-provider evidence layer)
   ↓
+Watchlist Monitoring (Section 53: Continuous temporal change detection)
+  ↓
 Investigation (Forensic Workspace, Attack Path, Timeline)
   ↓
 Risk / Explainability (Unified Risk Engine: Section 35 & Explainable AI: Section 36)

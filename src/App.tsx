@@ -33,6 +33,7 @@ import { DesignSystemPreview } from './pages/DesignSystemPreview';
 import { AlertWorkspace } from './pages/AlertWorkspace';
 import { IncidentListPage } from './pages/incidents/IncidentListPage';
 import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage';
+import { Watchlists } from './pages/Watchlists';
 
 function AppContent() {
   return (
@@ -93,6 +94,8 @@ function AppContent() {
         <Route path="/campaigns" element={<CampaignIntelligence />} />
         <Route path="/campaigns/:id" element={<CampaignIntelligence />} />
         <Route path="/osint" element={<ThreatIntelligence />} />
+        <Route path="/watchlists" element={<Watchlists />} />
+        <Route path="/watchlists/:id" element={<Watchlists />} />
         <Route path="/benchmarks" element={<BenchmarkEvaluation />} />
         <Route path="/design-system" element={<DesignSystemPreview />} />
 

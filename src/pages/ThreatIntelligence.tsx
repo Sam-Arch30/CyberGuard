@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import {
   Globe2,
   Search,
@@ -6,6 +7,7 @@ import {
   Radio,
   ShieldAlert,
   AlertTriangle,
+  Eye,
 } from 'lucide-react';
 import type {
   AggregatedIndicatorIntelligence,
@@ -131,6 +133,13 @@ export const ThreatIntelligence: React.FC = () => {
               {p.display_name}
             </span>
           ))}
+          <Link
+            to="/watchlists"
+            className="ml-2 px-2 py-1 bg-primary text-primary-foreground font-semibold rounded text-[11px] inline-flex items-center space-x-1 hover:bg-primary-hover transition-colors"
+          >
+            <Eye className="w-3 h-3" />
+            <span>Watchlists</span>
+          </Link>
         </div>
       </div>
 
