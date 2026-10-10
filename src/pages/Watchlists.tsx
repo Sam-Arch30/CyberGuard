@@ -42,6 +42,12 @@ export const Watchlists: React.FC = () => {
             Section 53: Continuous threat intelligence polling, material change detection, and automated security alerting.
           </p>
         </div>
+        <button
+          onClick={() => navigate('/hunting')}
+          className="px-3 py-1.5 bg-primary text-primary-foreground font-semibold rounded-control text-xs flex items-center space-x-1.5 hover:bg-primary-hover transition-colors cursor-pointer shrink-0"
+        >
+          <span>Open Threat Hunting</span>
+        </button>
       </div>
 
       {/* Main Content Area */}

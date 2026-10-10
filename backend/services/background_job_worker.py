@@ -877,6 +877,53 @@ async def handle_watched_indicator_check(ctx: JobExecutionContext, db: Session) 
     }
 
 
+@register_handler(JobTypeEnum.THREAT_HUNT_EXECUTION.value)
+async def handle_threat_hunt_execution(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 54: Asynchronous background threat hunt execution.
+    """
+    from backend.schemas.hunting import HuntQueryDefinition, HuntExecutionRequest, HuntExecutionModeEnum
+    from backend.services.threat_hunting_service import ThreatHuntingService
+
+    raw_qdef = ctx.payload.get("query_definition")
+    if not raw_qdef:
+        raise PermanentJobError("Threat hunt execution requires 'query_definition' in job payload.")
+
+    try:
+        qdef = HuntQueryDefinition.model_validate(raw_qdef)
+    except Exception as exc:
+        raise PermanentJobError(f"Malformed query definition: {exc}")
+
+    saved_hunt_id = ctx.payload.get("saved_hunt_id")
+
+    ctx.update_progress(db, 20.0, "RUNNING", f"Executing threat hunt across '{qdef.data_source.value}'...")
+
+    res = ThreatHuntingService.execute_hunt(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        req=HuntExecutionRequest(
+            query_definition=qdef,
+            saved_hunt_id=saved_hunt_id,
+            execution_mode=HuntExecutionModeEnum.BACKGROUND,
+        ),
+        actor=ctx.user_id or "system",
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Threat hunt completed: {res.total_matches} record(s) matched in {res.duration_ms}ms.",
+    )
+
+    return {
+        "execution_id": res.execution_id,
+        "data_source": res.data_source,
+        "total_matches": res.total_matches,
+        "duration_ms": res.duration_ms,
+    }
+
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

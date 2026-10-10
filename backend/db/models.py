@@ -4089,6 +4089,81 @@ class WatchlistMonitoringRunModel(Base):
     )
 
 
+# ============================================================================
+# Section 54: Threat Hunting Workspace & Query Engine Models
+# ============================================================================
+
+class SavedHuntModel(Base):
+    """
+    Section 54: Persistent Saved Threat Hunt Query Definition.
+    Preserves analytical hypotheses, structured filter expressions, data source scope,
+    and team visibility controls.
+    """
+    __tablename__ = "saved_hunts"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(200), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    data_source = Column(String(64), nullable=False, default="indicators", index=True)
+    query_definition_json = Column(Text, nullable=False, default="{}")
+    hypothesis = Column(Text, nullable=True)
+    tags_json = Column(Text, nullable=False, default="[]")
+    owner_user_id = Column(String(100), nullable=True, index=True)
+    team_id = Column(String(64), nullable=True)
+    visibility = Column(String(30), nullable=False, default="TEAM", index=True)  # PRIVATE, TEAM, TENANT
+    is_template = Column(Boolean, nullable=False, default=False, index=True)
+    last_executed_at = Column(DateTime, nullable=True)
+    last_result_count = Column(Integer, nullable=True)
+    created_by = Column(String(100), nullable=False, default="system")
+    updated_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    executions = relationship("HuntExecutionModel", back_populates="saved_hunt", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_sh_ws_source", "workspace_id", "data_source"),
+        Index("ix_sh_ws_vis", "workspace_id", "visibility"),
+        Index("ix_sh_ws_owner", "workspace_id", "owner_user_id"),
+    )
+
+
+class HuntExecutionModel(Base):
+    """
+    Section 54: Audit Log and Execution History for Threat Hunts.
+    Captures exact query definition, result count, matched record IDs, performance duration,
+    and links to Section 45 Background Jobs.
+    """
+    __tablename__ = "hunt_executions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    saved_hunt_id = Column(String(36), ForeignKey("saved_hunts.id", ondelete="SET NULL"), nullable=True, index=True)
+    data_source = Column(String(64), nullable=False, default="indicators", index=True)
+    query_definition_json = Column(Text, nullable=False, default="{}")
+    execution_mode = Column(String(30), nullable=False, default="FAST")  # FAST, BACKGROUND
+    status = Column(String(30), nullable=False, default="RUNNING", index=True)  # QUEUED, RUNNING, SUCCEEDED, PARTIALLY_SUCCEEDED, FAILED, CANCELLED
+    result_count = Column(Integer, nullable=False, default=0)
+    matched_record_ids_json = Column(Text, nullable=False, default="[]")
+    results_summary_json = Column(Text, nullable=False, default="{}")
+    duration_ms = Column(Integer, nullable=True)
+    error_message = Column(Text, nullable=True)
+    executed_by = Column(String(100), nullable=False, default="system")
+    job_id = Column(String(36), nullable=True, index=True)
+    started_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    saved_hunt = relationship("SavedHuntModel", back_populates="executions")
+
+    __table_args__ = (
+        Index("ix_he_ws_source_time", "workspace_id", "data_source", "started_at"),
+        Index("ix_he_ws_status", "workspace_id", "status"),
+        Index("ix_he_ws_saved", "workspace_id", "saved_hunt_id"),
+    )
+
+
+
 
 
 

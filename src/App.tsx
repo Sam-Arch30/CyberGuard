@@ -34,6 +34,7 @@ import { AlertWorkspace } from './pages/AlertWorkspace';
 import { IncidentListPage } from './pages/incidents/IncidentListPage';
 import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage';
 import { Watchlists } from './pages/Watchlists';
+import { ThreatHunting } from './pages/ThreatHunting';
 
 function AppContent() {
   return (
@@ -96,6 +97,8 @@ function AppContent() {
         <Route path="/osint" element={<ThreatIntelligence />} />
         <Route path="/watchlists" element={<Watchlists />} />
         <Route path="/watchlists/:id" element={<Watchlists />} />
+        <Route path="/hunting" element={<ThreatHunting />} />
+        <Route path="/threat-hunting" element={<ThreatHunting />} />
         <Route path="/benchmarks" element={<BenchmarkEvaluation />} />
         <Route path="/design-system" element={<DesignSystemPreview />} />
 

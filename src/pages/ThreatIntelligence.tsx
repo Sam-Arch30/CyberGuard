@@ -8,6 +8,7 @@ import {
   ShieldAlert,
   AlertTriangle,
   Eye,
+  Compass,
 } from 'lucide-react';
 import type {
   AggregatedIndicatorIntelligence,
@@ -135,10 +136,17 @@ export const ThreatIntelligence: React.FC = () => {
           ))}
           <Link
             to="/watchlists"
-            className="ml-2 px-2 py-1 bg-primary text-primary-foreground font-semibold rounded text-[11px] inline-flex items-center space-x-1 hover:bg-primary-hover transition-colors"
+            className="ml-2 px-2 py-1 bg-surface border border-border text-foreground font-semibold rounded text-[11px] inline-flex items-center space-x-1 hover:bg-surface-secondary transition-colors"
           >
-            <Eye className="w-3 h-3" />
+            <Eye className="w-3 h-3 text-primary" />
             <span>Watchlists</span>
+          </Link>
+          <Link
+            to="/hunting"
+            className="px-2 py-1 bg-primary text-primary-foreground font-semibold rounded text-[11px] inline-flex items-center space-x-1 hover:bg-primary-hover transition-colors"
+          >
+            <Compass className="w-3 h-3" />
+            <span>Threat Hunting</span>
           </Link>
         </div>
       </div>
