@@ -31,6 +31,8 @@ import { UrlSecurityView } from './pages/UrlSecurityView';
 import { EndpointAgentView } from './pages/EndpointAgentView';
 import { DesignSystemPreview } from './pages/DesignSystemPreview';
 import { AlertWorkspace } from './pages/AlertWorkspace';
+import { IncidentListPage } from './pages/incidents/IncidentListPage';
+import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage';
 
 function AppContent() {
   return (
@@ -44,6 +46,10 @@ function AppContent() {
         <Route path="/reports/:id" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/:tab" element={<Settings />} />
+
+        {/* Section 50: Incident Management & Case Lifecycle */}
+        <Route path="/incidents" element={<IncidentListPage />} />
+        <Route path="/incidents/:id" element={<IncidentDetailPage />} />
 
         {/* Section 48: Alert Management & Triage Workspace */}
         <Route path="/alerts" element={<AlertWorkspace />} />

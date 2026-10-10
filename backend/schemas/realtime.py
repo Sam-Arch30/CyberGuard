@@ -67,6 +67,16 @@ class RealtimeEventTypeEnum(str, Enum):
     ALERT_CLUSTER_MERGED = "ALERT_CLUSTER_MERGED"
     ALERT_CLUSTER_INVESTIGATION_LINKED = "ALERT_CLUSTER_INVESTIGATION_LINKED"
 
+    # Section 50: Incident Management & Case Lifecycle
+    INCIDENT_CREATED = "INCIDENT_CREATED"
+    INCIDENT_UPDATED = "INCIDENT_UPDATED"
+    INCIDENT_ASSIGNED = "INCIDENT_ASSIGNED"
+    INCIDENT_STATUS_CHANGED = "INCIDENT_STATUS_CHANGED"
+    INCIDENT_SEVERITY_CHANGED = "INCIDENT_SEVERITY_CHANGED"
+    INCIDENT_RESOLVED = "INCIDENT_RESOLVED"
+    INCIDENT_CLOSED = "INCIDENT_CLOSED"
+    INCIDENT_REOPENED = "INCIDENT_REOPENED"
+
 
 class RealtimeResourceScopeEnum(str, Enum):
     ANALYSIS_RUN = "ANALYSIS_RUN"
@@ -77,6 +87,7 @@ class RealtimeResourceScopeEnum(str, Enum):
     NOTIFICATION = "NOTIFICATION"
     ALERT = "ALERT"
     ALERT_CLUSTER = "ALERT_CLUSTER"
+    INCIDENT = "INCIDENT"
 
 
 
@@ -104,6 +115,9 @@ class RealtimeEventPayload(BaseModel):
     report_version: Optional[int] = None
     report_number: Optional[str] = None
     error_code: Optional[str] = None
+    incident_id: Optional[str] = None
+    incident_number: Optional[str] = None
+    priority: Optional[str] = None
     extra: Dict[str, Any] = Field(default_factory=dict)
 
     model_config = ConfigDict(from_attributes=True)
@@ -118,11 +132,12 @@ class RealtimeEvent(BaseModel):
     event_id: str
     sequence: int
     event_type: str
-    resource_type: str  # ANALYSIS_RUN, JOB, INVESTIGATION, REPORT, WORKSPACE
+    resource_type: str  # ANALYSIS_RUN, JOB, INVESTIGATION, REPORT, WORKSPACE, INCIDENT
     resource_id: str
     job_id: Optional[str] = None
     analysis_run_id: Optional[str] = None
     investigation_id: Optional[str] = None
+    incident_id: Optional[str] = None
     report_id: Optional[str] = None
     workspace_id: str = "default"
     stage: Optional[str] = None

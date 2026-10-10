@@ -17,6 +17,7 @@ import {
 import { cn } from '../../utils/cn';
 import { AlertService } from '../../services/alertService';
 import { AlertClusterService } from '../../services/alertClusterService';
+import { IncidentService } from '../../services/incidentService';
 import type { AlertDetail, AlertItem, AlertSeverity, AlertStatus } from '../../types/alert';
 import type { AlertClusterDetail } from '../../types/alertCluster';
 import { AlertClusterDetailModal } from './AlertClusterDetailModal';
@@ -172,6 +173,23 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
       if (onAlertUpdated) onAlertUpdated(updated);
     } catch (err: unknown) {
       alert(err instanceof Error ? err.message : 'Failed to start investigation');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePromoteToIncident = async () => {
+    if (!detail) return;
+    setActionLoading(true);
+    try {
+      const inc = await IncidentService.promoteAlert({
+        alert_id: detail.id,
+        title: `Incident: ${detail.title}`,
+      });
+      navigate(`/incidents/${inc.id}`);
+      onClose();
+    } catch (err: unknown) {
+      alert(err instanceof Error ? err.message : 'Failed to promote alert to incident');
     } finally {
       setActionLoading(false);
     }
@@ -877,6 +895,16 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
                     className="px-3 py-1.5 bg-surface border border-border text-foreground-muted rounded-md text-xs font-mono font-bold hover:bg-surface-secondary cursor-pointer transition-colors"
                   >
                     Suppress
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handlePromoteToIncident}
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 bg-danger-surface hover:bg-danger/20 border border-danger-border text-danger rounded-md text-xs font-mono font-bold flex items-center space-x-1 cursor-pointer transition-colors"
+                    title="Promote this security alert to an operational Incident case"
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>Promote to Incident</span>
                   </button>
                 </>
               )}

@@ -7,7 +7,9 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  BellRing,
+  Layers,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -110,13 +112,28 @@ export const Sidebar: React.FC<SidebarProps> = ({
       description: 'Security overview, universal ingestion & active threats',
     },
     {
+      id: 'alerts',
+      name: 'Alerts',
+      path: '/alerts',
+      matchPrefixes: ['/alerts', '/security-alerts'],
+      icon: BellRing,
+      description: 'Alert triage, correlation clusters & noise suppression',
+    },
+    {
+      id: 'incidents',
+      name: 'Incidents',
+      path: '/incidents',
+      matchPrefixes: ['/incidents', '/cases'],
+      icon: Layers,
+      description: 'Operational security cases, lifecycle & ownership',
+    },
+    {
       id: 'investigations',
       name: 'Investigations',
       path: '/investigations',
       matchPrefixes: [
         '/investigations',
         '/investigate',
-        '/cases',
         '/overview',
         '/email',
         '/analysis',
@@ -124,7 +141,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         '/investigation',
       ],
       icon: ShieldAlert,
-      description: 'Triage, deep-dive forensic analysis & response workflows',
+      description: 'Deep-dive forensic analysis, attack graphs & response workflows',
     },
     {
       id: 'reports',

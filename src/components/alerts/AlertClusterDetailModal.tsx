@@ -14,9 +14,11 @@ import {
   RefreshCw,
   GitMerge,
   ArrowRight,
+  ShieldAlert,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { AlertClusterService } from '../../services/alertClusterService';
+import { IncidentService } from '../../services/incidentService';
 import type { AlertClusterDetail, ClusterStatus } from '../../types/alertCluster';
 
 interface AlertClusterDetailModalProps {
@@ -127,6 +129,23 @@ export const AlertClusterDetailModal: React.FC<AlertClusterDetailModalProps> = (
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to link investigation');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handlePromoteToIncident = async () => {
+    if (!clusterId) return;
+    setActionLoading(true);
+    try {
+      const inc = await IncidentService.promoteCluster({
+        cluster_id: clusterId,
+        title: detail?.title,
+      });
+      navigate(`/incidents/${inc.id}`);
+      onClose();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to promote cluster to incident');
     } finally {
       setActionLoading(false);
     }
@@ -269,6 +288,16 @@ export const AlertClusterDetailModal: React.FC<AlertClusterDetailModalProps> = (
                       className="px-3 py-1.5 bg-surface-secondary hover:bg-surface-secondary/80 border border-border text-xs font-mono text-foreground rounded-md cursor-pointer transition-colors"
                     >
                       Change Status
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handlePromoteToIncident}
+                      disabled={actionLoading}
+                      className="px-3 py-1.5 bg-danger-surface hover:bg-danger/20 border border-danger-border text-xs font-mono text-danger font-semibold rounded-md flex items-center space-x-1 cursor-pointer transition-colors"
+                      title="Promote this alert cluster to an operational Incident case"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" />
+                      <span>Promote to Incident</span>
                     </button>
                     <button
                       type="button"

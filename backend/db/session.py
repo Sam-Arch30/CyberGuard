@@ -96,6 +96,22 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE notifications ADD COLUMN suppression_reason TEXT;",
                     "ALTER TABLE notifications ADD COLUMN suppression_scope VARCHAR(50);",
                     "ALTER TABLE notifications ADD COLUMN updated_at DATETIME;",
+                    "ALTER TABLE incidents ADD COLUMN priority VARCHAR(20) DEFAULT 'P3_MEDIUM';",
+                    "ALTER TABLE incidents ADD COLUMN category VARCHAR(50) DEFAULT 'OTHER';",
+                    "ALTER TABLE incidents ADD COLUMN first_seen_at DATETIME;",
+                    "ALTER TABLE incidents ADD COLUMN last_seen_at DATETIME;",
+                    "ALTER TABLE incidents ADD COLUMN acknowledged_at DATETIME;",
+                    "ALTER TABLE incidents ADD COLUMN contained_at DATETIME;",
+                    "ALTER TABLE incidents ADD COLUMN resolved_at DATETIME;",
+                    "ALTER TABLE incidents ADD COLUMN team_id VARCHAR(64);",
+                    "ALTER TABLE incidents ADD COLUMN primary_alert_id VARCHAR(36);",
+                    "ALTER TABLE incidents ADD COLUMN primary_cluster_id VARCHAR(36);",
+                    "ALTER TABLE incidents ADD COLUMN investigation_id VARCHAR(128);",
+                    "ALTER TABLE incidents ADD COLUMN report_id VARCHAR(36);",
+                    "ALTER TABLE incidents ADD COLUMN created_by VARCHAR(100);",
+                    "ALTER TABLE incidents ADD COLUMN resolved_by VARCHAR(100);",
+                    "ALTER TABLE incidents ADD COLUMN resolution_reason TEXT;",
+                    "ALTER TABLE incidents ADD COLUMN duplicate_of_id VARCHAR(36);",
                 ]
                 for stmt in column_migrations:
                     try:

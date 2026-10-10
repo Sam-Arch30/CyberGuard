@@ -51,6 +51,7 @@ from backend.api.routes.jobs import router as jobs_router
 from backend.api.routes.notifications import router as notifications_router
 from backend.api.routes.alerts import router as alerts_router
 from backend.api.routes.alert_clusters import router as alert_clusters_router, alert_correlate_router
+from backend.api.routes.incidents import router as incidents_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -120,6 +121,7 @@ app.add_middleware(
 # Include API Routers
 app.include_router(email_router)
 app.include_router(cases_router)
+app.include_router(incidents_router)
 app.include_router(correlation_router)
 app.include_router(reports_router)
 app.include_router(audit_router)

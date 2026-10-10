@@ -29,6 +29,10 @@ def generate_cluster_number() -> str:
     return f"CLU-{uuid.uuid4().hex[:8].upper()}"
 
 
+def generate_incident_number() -> str:
+    return f"INC-{datetime.now(timezone.utc).year}-{uuid.uuid4().hex[:6].upper()}"
+
+
 class CaseModel(Base):
     __tablename__ = "cases"
 
@@ -707,18 +711,34 @@ class IncidentModel(Base):
     __tablename__ = "incidents"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    incident_number = Column(String(32), unique=True, nullable=False, index=True)
+    incident_number = Column(String(32), unique=True, nullable=False, default=generate_incident_number, index=True)
     workspace_id = Column(String(64), nullable=False, default="default", index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    status = Column(String(30), nullable=False, default="OPEN", index=True)  # OPEN, INVESTIGATING, CONTAINED, RESOLVED, CLOSED, FALSE_POSITIVE
+    status = Column(String(30), nullable=False, default="OPEN", index=True)  # NEW, OPEN, ACKNOWLEDGED, INVESTIGATING, CONTAINED, RESOLVED, CLOSED, FALSE_POSITIVE, DUPLICATE
     severity = Column(String(20), nullable=False, default="MEDIUM", index=True)  # SAFE, LOW, MEDIUM, HIGH, CRITICAL
+    priority = Column(String(20), nullable=False, default="P3_MEDIUM", index=True)  # P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW
+    category = Column(String(50), nullable=False, default="OTHER", index=True)  # PHISHING, CREDENTIAL_COMPROMISE, MALWARE, etc.
     risk_score = Column(Float, nullable=False, default=0.0)  # 0.0 - 100.0
     confidence = Column(Float, nullable=False, default=1.0)  # 0.0 - 1.0
     opened_at = Column(DateTime, default=get_utc_now, nullable=False)
+    first_seen_at = Column(DateTime, nullable=True)
+    last_seen_at = Column(DateTime, nullable=True)
+    acknowledged_at = Column(DateTime, nullable=True)
+    contained_at = Column(DateTime, nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
     closed_at = Column(DateTime, nullable=True)
     assigned_to = Column(String(100), nullable=True)
+    team_id = Column(String(64), nullable=True)
     legacy_case_id = Column(String(36), nullable=True, index=True)  # Pointer to legacy cases.id
+    primary_alert_id = Column(String(36), nullable=True, index=True)
+    primary_cluster_id = Column(String(36), nullable=True, index=True)
+    investigation_id = Column(String(128), nullable=True, index=True)
+    report_id = Column(String(36), nullable=True, index=True)
+    created_by = Column(String(100), nullable=True, default="SYSTEM")
+    resolved_by = Column(String(100), nullable=True)
+    resolution_reason = Column(Text, nullable=True)
+    duplicate_of_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
@@ -738,6 +758,45 @@ class IncidentModel(Base):
     threat_memory_observations = relationship("ThreatMemoryObservationModel", back_populates="incident", lazy="selectin")
     risk_assessments = relationship("RiskAssessmentModel", back_populates="incident", foreign_keys="RiskAssessmentModel.incident_id", cascade="all, delete-orphan", lazy="selectin")
     device_correlations = relationship("DeviceIncidentCorrelationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+
+    timeline_events = relationship("IncidentTimelineEventModel", back_populates="incident", cascade="all, delete-orphan", order_by="asc(IncidentTimelineEventModel.timestamp)", lazy="selectin")
+    notes = relationship("IncidentNoteModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentNoteModel.created_at)", lazy="selectin")
+    duplicate_of = relationship("IncidentModel", remote_side=[id], foreign_keys=[duplicate_of_id], lazy="selectin")
+
+
+class IncidentTimelineEventModel(Base):
+    """
+    Chronological factual events linked to an incident case lifecycle.
+    """
+    __tablename__ = "incident_timeline_events"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False, index=True)
+    timestamp = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    actor = Column(String(100), nullable=False, default="SYSTEM")
+    source_type = Column(String(50), nullable=False, default="SYSTEM")
+    source_id = Column(String(128), nullable=True)
+    summary = Column(Text, nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="timeline_events")
+
+
+class IncidentNoteModel(Base):
+    """
+    Analyst case notes linked to an operational incident.
+    """
+    __tablename__ = "incident_notes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="CASCADE"), nullable=False, index=True)
+    author = Column(String(100), nullable=False, default="SOC Analyst")
+    note_text = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    incident = relationship("IncidentModel", back_populates="notes")
 
 
 class IncidentCorrelationModel(Base):

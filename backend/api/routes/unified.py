@@ -155,7 +155,6 @@ def get_analysis_findings_endpoint(id: str, db: Session = Depends(get_db)):
     summary="Get Incident by ID or Incident Number",
     description="Returns incident details, related threat events, and proposed response actions."
 )
-@router.get("/api/incidents/{id}", include_in_schema=False)
 def get_incident_endpoint(id: str, db: Session = Depends(get_db)):
     incident = IncidentService.get_incident(db, id)
     if not incident:
