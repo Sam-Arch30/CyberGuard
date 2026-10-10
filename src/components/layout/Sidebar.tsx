@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   BellRing,
   Layers,
+  Binary,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -150,6 +151,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       matchPrefixes: ['/reports'],
       icon: FileText,
       description: 'Forensic dossiers, executive summaries & export logs',
+    },
+    {
+      id: 'detections',
+      name: 'Detection Rules',
+      path: '/detections',
+      matchPrefixes: ['/detections', '/rules'],
+      icon: Binary,
+      description: 'Detection engineering, versioned rule lifecycles & backtesting',
     },
   ];
 

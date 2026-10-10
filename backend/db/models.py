@@ -13,7 +13,7 @@ from sqlalchemy import (
     Index,
     Boolean
 )
-from sqlalchemy.orm import relationship, relationship as orm_relationship
+from sqlalchemy.orm import relationship, relationship as orm_relationship, synonym
 from backend.db.session import Base
 
 
@@ -207,7 +207,14 @@ class EmailAnalysisModel(Base):
     domains_json = Column(Text, nullable=True, default="[]")
     countries_json = Column(Text, nullable=True, default="[]")
     indicators_json = Column(Text, nullable=True, default="{}")
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    sender_domain = Column(String(255), nullable=True, index=True)
+    contains_login_url = Column(Boolean, default=False)
+    url_count = Column(Integer, default=0)
+    attachment_count = Column(Integer, default=0)
+    threat_level = Column(String(30), nullable=True, default="UNKNOWN")
     analyzed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
 
 
 class CampaignModel(Base):
@@ -536,15 +543,17 @@ class FindingModel(Base):
     __tablename__ = "findings"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
-    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=False, index=True)
-    analyzer = Column(String(100), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="CASCADE"), nullable=True, index=True)
+    analyzer = Column(String(100), nullable=False, default="detection_rules", index=True)
+    source_type = Column(String(50), nullable=True, default="DETECTION_RULE", index=True)
     finding_type = Column(String(100), nullable=False, index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=False)
     severity = Column(String(20), nullable=False, default="LOW", index=True)  # SAFE, LOW, MEDIUM, HIGH, CRITICAL
     confidence = Column(Float, nullable=False, default=1.0)  # 0.0 - 1.0
     risk_contribution = Column(Float, nullable=False, default=0.0)  # 0.0 - 100.0
-    method = Column(String(50), nullable=False, index=True)  # RULE, HEURISTIC, ML, LLM, EXTERNAL_INTELLIGENCE, STATISTICAL, GRAPH, MANUAL, HYBRID
+    method = Column(String(50), nullable=False, default="RULE", index=True)  # RULE, HEURISTIC, ML, LLM, EXTERNAL_INTELLIGENCE, STATISTICAL, GRAPH, MANUAL, HYBRID
     model_version_id = Column(String(36), ForeignKey("model_versions.id", ondelete="SET NULL"), nullable=True, index=True)
     rule_id = Column(String(100), nullable=True, index=True)
     metadata_json = Column(Text, default="{}", nullable=False)
@@ -553,6 +562,24 @@ class FindingModel(Base):
     analysis_run = relationship("AnalysisRunModel", back_populates="findings")
     model_version = relationship("ModelVersionModel", back_populates="findings")
     evidence_items = relationship("FindingEvidenceModel", back_populates="finding", cascade="all, delete-orphan", lazy="selectin")
+
+    @property
+    def details(self) -> Dict[str, Any]:
+        if not self.metadata_json:
+            return {}
+        try:
+            return json.loads(self.metadata_json)
+        except Exception:
+            return {}
+
+    @details.setter
+    def details(self, val: Any) -> None:
+        if isinstance(val, dict):
+            self.metadata_json = json.dumps(val)
+        elif isinstance(val, str):
+            self.metadata_json = val
+        else:
+            self.metadata_json = json.dumps(val)
 
 
 class FindingEvidenceModel(Base):
@@ -1860,20 +1887,30 @@ class RegisteredModelModel(Base):
 class CandidateRuleModel(Base):
     """
     Candidate detection rule synthesized from validated emerging patterns,
-    correlations, and Threat Memory (Section 25).
+    correlations, Threat Memory, and proactive threat hunts (Section 25 & Section 56).
     """
     __tablename__ = "candidate_rules"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    rule_identifier = Column(String(64), nullable=True, index=True)  # e.g. RULE-101, PHISH-001
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=False, default="")
     rule_type = Column(String(50), nullable=False, default="STRUCTURAL", index=True)  # INDICATOR, STRUCTURAL, BEHAVIORAL, etc.
-    status = Column(String(30), nullable=False, default="DISCOVERED", index=True)  # DISCOVERED, DRAFT, VALIDATING, TESTED, REVIEW_REQUIRED, APPROVED, STAGED, ACTIVE, REJECTED, DISABLED, RETIRED, SUPERSEDED
+    category = Column(String(50), nullable=False, default="PHISHING", index=True)  # EMAIL, PHISHING, URL, DOMAIN, ATTACHMENT, IDENTITY, AUTHENTICATION, ENDPOINT, NETWORK, API, BEHAVIORAL, INFRASTRUCTURE, CAMPAIGN, CORRELATION, ANOMALY
+    status = Column(String(30), nullable=False, default="DRAFT", index=True)  # DRAFT, CANDIDATE, VALIDATING, PENDING_REVIEW, APPROVED, STAGED, ACTIVE, DISABLED, DEPRECATED, ARCHIVED, REJECTED, DISCOVERED, TESTED, RETIRED, SUPERSEDED
     pattern_candidate_id = Column(String(36), ForeignKey("emerging_pattern_candidates.id", ondelete="SET NULL"), nullable=True, index=True)
+    
+    # Provenance tracking (Section 26 & Section 56)
+    provenance_type = Column(String(50), nullable=False, default="ANALYST_CREATED", index=True)  # HUNT, INVESTIGATION, FINDING, THREAT_INTELLIGENCE, ANALYST_CREATED, SYSTEM_PROPOSED, CAMPAIGN, WATCHLIST
+    provenance_id = Column(String(128), nullable=True, index=True)
+    provenance_details_json = Column(Text, default="{}", nullable=False)
     source_memory_ids_json = Column(Text, default="[]", nullable=False)
     source_incident_ids_json = Column(Text, default="[]", nullable=False)
+
+    # Rule definition & data dependencies
     definition_json = Column(Text, default="{}", nullable=False)
+    data_sources_json = Column(Text, default="[]", nullable=False)
     thresholds_json = Column(Text, default="{}", nullable=False)
     time_window_seconds = Column(Integer, nullable=True)
     scope = Column(String(30), nullable=False, default="GLOBAL", index=True)  # EMAIL, URL, AUTH, NETWORK, API, FILE, MEDIA, GLOBAL
@@ -1881,11 +1918,18 @@ class CandidateRuleModel(Base):
     confidence = Column(Float, nullable=False, default=0.8)
     generalization_level = Column(String(30), nullable=False, default="STRUCTURAL")  # EXACT, STRUCTURAL, BEHAVIORAL, etc.
     complexity_score = Column(Float, nullable=False, default=1.0)
+    cost_class = Column(String(20), nullable=False, default="LOW", index=True)  # LOW, MEDIUM, HIGH, UNSUPPORTED
     normalized_fingerprint = Column(String(64), nullable=False, index=True)
     version = Column(String(20), nullable=False, default="v1", index=True)
+    tags_json = Column(Text, default="[]", nullable=False)
+    attack_techniques_json = Column(Text, default="[]", nullable=False)  # MITRE ATT&CK techniques e.g. ["T1566.002"]
+    is_system_rule = Column(Boolean, nullable=False, default=False, index=True)
+
+    # Lifecycle timestamps & audit
     evaluation_summary_json = Column(Text, default="{}", nullable=False)
     staged_at = Column(DateTime, nullable=True)
     activated_at = Column(DateTime, nullable=True)
+    disabled_at = Column(DateTime, nullable=True)
     retired_at = Column(DateTime, nullable=True)
     created_by = Column(String(100), nullable=False, default="analyst")
     reviewed_by = Column(String(100), nullable=True)
@@ -1900,7 +1944,9 @@ class CandidateRuleModel(Base):
     __table_args__ = (
         Index("ix_cr_ws_status", "workspace_id", "status"),
         Index("ix_cr_ws_scope", "workspace_id", "scope"),
+        Index("ix_cr_ws_cat", "workspace_id", "category"),
         Index("ix_cr_ws_fp", "workspace_id", "normalized_fingerprint"),
+        Index("ix_cr_ws_ident", "workspace_id", "rule_identifier"),
     )
 
     @property
@@ -1923,19 +1969,39 @@ class CandidateRuleModel(Base):
     def evaluation_summary(self) -> Dict[str, Any]:
         return json.loads(self.evaluation_summary_json or "{}")
 
+    @property
+    def data_sources(self) -> List[str]:
+        return json.loads(self.data_sources_json or "[]")
+
+    @property
+    def tags(self) -> List[str]:
+        return json.loads(self.tags_json or "[]")
+
+    @property
+    def attack_techniques(self) -> List[str]:
+        return json.loads(self.attack_techniques_json or "[]")
+
+    @property
+    def provenance_details(self) -> Dict[str, Any]:
+        return json.loads(self.provenance_details_json or "{}")
+
 
 class CandidateRuleVersionModel(Base):
     """
-    Immutable version history for candidate and production rules (Section 25).
+    Immutable version history for candidate and production detection rules (Section 25 & 56).
     """
     __tablename__ = "candidate_rule_versions"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_rule_id = synonym("rule_id")
     version = Column(String(20), nullable=False, index=True)
     workspace_id = Column(String(64), nullable=False, default="default", index=True)
     definition_json = Column(Text, default="{}", nullable=False)
+    data_sources_json = Column(Text, default="[]", nullable=False)
     thresholds_json = Column(Text, default="{}", nullable=False)
+    diff_summary_json = Column(Text, default="{}", nullable=False)
+    cost_class = Column(String(20), nullable=False, default="LOW")
     evaluation_summary_json = Column(Text, default="{}", nullable=False)
     status = Column(String(30), nullable=False, default="DRAFT")
     created_by = Column(String(100), nullable=False, default="analyst")
@@ -1961,20 +2027,32 @@ class CandidateRuleVersionModel(Base):
     def evaluation_summary(self) -> Dict[str, Any]:
         return json.loads(self.evaluation_summary_json or "{}")
 
+    @property
+    def data_sources(self) -> List[str]:
+        return json.loads(self.data_sources_json or "[]")
+
+    @property
+    def diff_summary(self) -> Dict[str, Any]:
+        return json.loads(self.diff_summary_json or "{}")
+
 
 class CandidateRuleExecutionModel(Base):
     """
-    Telemetry log for candidate and active rule executions, including shadow mode (Section 25).
+    Telemetry log for candidate and active rule executions, backtests, and shadow evaluations (Section 25 & 56).
     """
     __tablename__ = "candidate_rule_executions"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    candidate_rule_id = synonym("rule_id")
     rule_version = Column(String(20), nullable=False)
     workspace_id = Column(String(64), nullable=False, default="default", index=True)
     mode = Column(String(20), nullable=False, default="SHADOW", index=True)  # SHADOW, PRODUCTION, BACKTEST
     matched = Column(Boolean, nullable=False, default=False, index=True)
     matched_conditions_json = Column(Text, default="[]", nullable=False)
+    match_explanation_json = Column(Text, default="{}", nullable=False)
+    detection_id = Column(String(64), nullable=True, index=True)
+    finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
     event_id = Column(String(36), nullable=True, index=True)
     incident_id = Column(String(36), nullable=True, index=True)
     execution_time_ms = Column(Float, nullable=False, default=0.0)
@@ -1987,11 +2065,16 @@ class CandidateRuleExecutionModel(Base):
     __table_args__ = (
         Index("ix_cre_ws_mode_matched", "workspace_id", "mode", "matched"),
         Index("ix_cre_executed_at", "executed_at"),
+        Index("ix_cre_detection_id", "detection_id"),
     )
 
     @property
     def matched_conditions(self) -> List[Dict[str, Any]]:
         return json.loads(self.matched_conditions_json or "[]")
+
+    @property
+    def match_explanation(self) -> Dict[str, Any]:
+        return json.loads(self.match_explanation_json or "{}")
 
 
 # ============================================================================

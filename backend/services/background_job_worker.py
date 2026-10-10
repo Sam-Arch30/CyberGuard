@@ -966,6 +966,47 @@ async def handle_advanced_pivot_execution(ctx: JobExecutionContext, db: Session)
     }
 
 
+@register_handler(JobTypeEnum.DETECTION_RULE_BACKTEST.value)
+async def handle_detection_rule_backtest(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 56: Asynchronous background historical backtesting for detection rules.
+    """
+    from backend.schemas.detection_rules import DetectionRuleBacktestRequest
+    from backend.services.detection_rule_lifecycle_service import DetectionRuleLifecycleService
+
+    rule_id = ctx.resource_id or ctx.payload.get("rule_id")
+    if not rule_id:
+        raise PermanentJobError("Missing 'rule_id' in backtest job payload.")
+
+    raw_req = ctx.payload.get("backtest_request", {})
+    try:
+        backtest_req = DetectionRuleBacktestRequest.model_validate(raw_req)
+    except Exception as exc:
+        raise PermanentJobError(f"Malformed backtest request: {exc}")
+
+    ctx.update_progress(db, 20.0, "RUNNING", f"Executing backtest for rule {rule_id} across {backtest_req.time_range_preset.value}...")
+
+    user_id = ctx.payload.get("user_id") or getattr(ctx, "user_id", None) or "system"
+
+    res = DetectionRuleLifecycleService.backtest_rule(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        rule_id=rule_id,
+        req=backtest_req,
+        actor_id=user_id,
+        job_id=ctx.job_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Backtest completed: {res.matches_count} matches evaluated in {res.duration_ms}ms.",
+    )
+
+    return res.model_dump()
+
+
 
 
 # ---------------------------------------------------------------------------

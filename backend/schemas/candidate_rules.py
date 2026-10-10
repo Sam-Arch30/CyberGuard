@@ -32,18 +32,22 @@ class RuleType(str, Enum):
 
 
 class RuleLifecycleStatus(str, Enum):
-    """Formal lifecycle state machine for candidate rules."""
+    """Formal lifecycle state machine for candidate and detection rules."""
     DISCOVERED = "DISCOVERED"        # Proposed from EmergingPatternCandidate or Threat Memory
     DRAFT = "DRAFT"                  # Under human or automated formulation
+    CANDIDATE = "CANDIDATE"          # Formulated candidate rule
     VALIDATING = "VALIDATING"        # Under syntax and complexity budget validation
     TESTED = "TESTED"                # Historical backtesting and FP analysis complete
-    REVIEW_REQUIRED = "REVIEW_REQUIRED" # Awaiting security engineer review
+    PENDING_REVIEW = "PENDING_REVIEW" # Awaiting security engineer review
+    REVIEW_REQUIRED = "REVIEW_REQUIRED" # Awaiting security engineer review (alias)
     APPROVED = "APPROVED"            # Approved by authorized reviewer (not yet active)
     STAGED = "STAGED"                # Operating in shadow mode (monitoring without alerting)
     ACTIVE = "ACTIVE"                # Deployed in production detection pipeline
     REJECTED = "REJECTED"            # Rejected during review or failed backtesting
     DISABLED = "DISABLED"            # Temporarily disabled due to noise or drift
+    DEPRECATED = "DEPRECATED"        # Deprecated rule
     RETIRED = "RETIRED"              # Permanently retired due to obsolescence
+    ARCHIVED = "ARCHIVED"            # Preserved inactive archive
     SUPERSEDED = "SUPERSEDED"        # Replaced by a newer version (e.g. v1 -> v2)
 
 
@@ -81,24 +85,45 @@ class GeneralizationLevel(str, Enum):
 
 class DslOperator(str, Enum):
     """Safe, validated operators supported by CyberGuard Rule DSL."""
-    # Equality & comparison
-    EQUALS = "eq"
-    NOT_EQUALS = "neq"
-    GREATER_THAN = "gt"
-    GREATER_THAN_OR_EQUAL = "gte"
-    LESS_THAN = "lt"
-    LESS_THAN_OR_EQUAL = "lte"
+    # Equality & comparison (Section 56 Standard)
+    EQUALS = "EQUALS"
+    NOT_EQUALS = "NOT_EQUALS"
+    GREATER_THAN = "GREATER_THAN"
+    GREATER_THAN_OR_EQUAL = "GREATER_THAN_OR_EQUAL"
+    LESS_THAN = "LESS_THAN"
+    LESS_THAN_OR_EQUAL = "LESS_THAN_OR_EQUAL"
 
     # String & collection operators
-    CONTAINS = "contains"
-    NOT_CONTAINS = "not_contains"
-    STARTS_WITH = "starts_with"
-    ENDS_WITH = "ends_with"
-    REGEX = "regex"
-    IN = "in"
-    NOT_IN = "not_in"
-    EXISTS = "exists"
-    NOT_EXISTS = "not_exists"
+    CONTAINS = "CONTAINS"
+    NOT_CONTAINS = "NOT_CONTAINS"
+    STARTS_WITH = "STARTS_WITH"
+    ENDS_WITH = "ENDS_WITH"
+    REGEX = "REGEX"
+    IN = "IN"
+    NOT_IN = "NOT_IN"
+    EXISTS = "EXISTS"
+    NOT_EXISTS = "NOT_EXISTS"
+    LOOKALIKE = "LOOKALIKE"
+    MATCHES_ENUM = "MATCHES_ENUM"
+    IS_PRIVATE = "IS_PRIVATE"
+    IS_EXTERNAL = "IS_EXTERNAL"
+
+    # Backward-compatible Section 25 lowercase forms
+    EQ_SHORT = "eq"
+    NEQ_SHORT = "neq"
+    GT_SHORT = "gt"
+    GTE_SHORT = "gte"
+    LT_SHORT = "lt"
+    LTE_SHORT = "lte"
+    CONTAINS_SHORT = "contains"
+    NOT_CONTAINS_SHORT = "not_contains"
+    STARTS_WITH_SHORT = "starts_with"
+    ENDS_WITH_SHORT = "ends_with"
+    REGEX_SHORT = "regex"
+    IN_SHORT = "in"
+    NOT_IN_SHORT = "not_in"
+    EXISTS_SHORT = "exists"
+    NOT_EXISTS_SHORT = "not_exists"
 
     # Semantic & statistical
     SIMILARITY_GTE = "similarity_gte"

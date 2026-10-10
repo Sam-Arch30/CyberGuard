@@ -35,6 +35,7 @@ import { IncidentListPage } from './pages/incidents/IncidentListPage';
 import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage';
 import { Watchlists } from './pages/Watchlists';
 import { ThreatHunting } from './pages/ThreatHunting';
+import { DetectionRules } from './pages/DetectionRules';
 
 function AppContent() {
   return (
@@ -99,6 +100,10 @@ function AppContent() {
         <Route path="/watchlists/:id" element={<Watchlists />} />
         <Route path="/hunting" element={<ThreatHunting />} />
         <Route path="/threat-hunting" element={<ThreatHunting />} />
+        <Route path="/detections" element={<DetectionRules />} />
+        <Route path="/detections/:id" element={<DetectionRules />} />
+        <Route path="/rules" element={<Navigate to="/detections" replace />} />
+        <Route path="/detection-rules" element={<Navigate to="/detections" replace />} />
         <Route path="/benchmarks" element={<BenchmarkEvaluation />} />
         <Route path="/design-system" element={<DesignSystemPreview />} />
 
