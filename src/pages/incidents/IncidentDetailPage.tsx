@@ -19,8 +19,15 @@ import {
   CheckCircle,
   ExternalLink,
   ChevronDown,
+  History,
+  Globe2,
 } from 'lucide-react';
 import { IncidentService } from '../../services/incidentService';
+import { IncidentSLABanner } from '../../components/incidents/IncidentSLABanner';
+import { IncidentWorkflowHistoryModal } from '../../components/incidents/IncidentWorkflowHistoryModal';
+import { IndicatorIntelligencePanel } from '../../components/intelligence/IndicatorIntelligencePanel';
+import { threatIntelligenceService } from '../../services/threatIntelligenceService';
+import type { AggregatedIndicatorIntelligence } from '../../types/threatIntelligence';
 import type {
   IncidentDetail,
   IncidentStatus,
@@ -67,7 +74,13 @@ export const IncidentDetailPage: React.FC = () => {
   const [copied, setCopied] = useState<boolean>(false);
 
   // Active Tab
-  const [activeTab, setActiveTab] = useState<'facts' | 'alerts' | 'timeline' | 'notes' | 'handoff'>('facts');
+  const [activeTab, setActiveTab] = useState<'facts' | 'alerts' | 'timeline' | 'notes' | 'handoff' | 'threat_intel'>('facts');
+
+  // Section 52: Threat Intelligence state
+  const [selectedObservable, setSelectedObservable] = useState<{ type: string; value: string } | null>(null);
+  const [enrichedIntel, setEnrichedIntel] = useState<AggregatedIndicatorIntelligence | null>(null);
+  const [intelLoading, setIntelLoading] = useState<boolean>(false);
+  const [intelError, setIntelError] = useState<string | null>(null);
 
   // Modals / Inputs
   const [showResolveModal, setShowResolveModal] = useState<boolean>(false);
@@ -82,6 +95,8 @@ export const IncidentDetailPage: React.FC = () => {
 
   const [showAssignModal, setShowAssignModal] = useState<boolean>(false);
   const [assigneeName, setAssigneeName] = useState<string>('');
+
+  const [showWorkflowModal, setShowWorkflowModal] = useState<boolean>(false);
 
   // Note submission
   const [newNoteText, setNewNoteText] = useState<string>('');
@@ -256,6 +271,21 @@ export const IncidentDetailPage: React.FC = () => {
     }
   };
 
+  const handleEnrichObservable = async (type: string, value: string) => {
+    setSelectedObservable({ type, value });
+    setEnrichedIntel(null);
+    setIntelError(null);
+    try {
+      setIntelLoading(true);
+      const res = await threatIntelligenceService.getIndicatorIntelligence(type, value);
+      setEnrichedIntel(res);
+    } catch (err: unknown) {
+      setIntelError(err instanceof Error ? err.message : 'Failed to query threat intelligence.');
+    } finally {
+      setIntelLoading(false);
+    }
+  };
+
   if (loading && !incident) {
     return (
       <div className="py-24 text-center text-foreground-muted flex flex-col items-center justify-center space-y-3">
@@ -320,7 +350,16 @@ export const IncidentDetailPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 2. Main Incident Header Card */}
+      {/* 2. Operational SLA & Escalation Telemetry Banner (Section 51) */}
+      <IncidentSLABanner
+        incidentId={incident.id}
+        incidentStatus={incident.status}
+        assignedTo={incident.assigned_to}
+        onUpdated={loadIncident}
+        onOpenWorkflowHistory={() => setShowWorkflowModal(true)}
+      />
+
+      {/* 3. Main Incident Header Card */}
       <div className="p-5 bg-surface border border-border rounded-control shadow-xs space-y-4">
         <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
           <div className="space-y-1">
@@ -372,6 +411,17 @@ export const IncidentDetailPage: React.FC = () => {
               <User className="w-3.5 h-3.5 text-foreground-muted" />
               <span>{incident.assigned_to ? incident.assigned_to : 'Assign Analyst'}</span>
               <ChevronDown className="w-3 h-3 text-foreground-muted" />
+            </button>
+
+            {/* Workflow History Audit Trigger */}
+            <button
+              type="button"
+              onClick={() => setShowWorkflowModal(true)}
+              className="px-2.5 py-1.5 text-xs bg-surface-secondary border border-border rounded-control text-foreground hover:bg-surface flex items-center space-x-1.5 cursor-pointer"
+              title="View automated workflow execution logs"
+            >
+              <History className="w-3.5 h-3.5 text-primary" />
+              <span>Workflow Logs</span>
             </button>
 
             {/* Acknowledge Button */}
@@ -614,6 +664,30 @@ export const IncidentDetailPage: React.FC = () => {
           }`}
         >
           Investigation & Response
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            setActiveTab('threat_intel');
+            const firstDomain = incident.affected_entities.domains[0];
+            const firstIp = incident.affected_entities.ips[0];
+            if (!selectedObservable && (firstDomain || firstIp)) {
+              if (firstDomain) handleEnrichObservable('DOMAIN', firstDomain);
+              else if (firstIp) handleEnrichObservable('IP', firstIp);
+            }
+          }}
+          className={`pb-2.5 cursor-pointer transition-colors border-b-2 flex items-center space-x-1.5 ${
+            activeTab === 'threat_intel'
+              ? 'border-primary text-primary font-semibold'
+              : 'border-transparent text-foreground-muted hover:text-foreground'
+          }`}
+        >
+          <Globe2 className="w-3.5 h-3.5" />
+          <span>Threat Intelligence</span>
+          <span className="px-1.5 py-0.2 rounded-full bg-surface-secondary text-[10px]">
+            {incident.affected_entities.domains.length + incident.affected_entities.ips.length}
+          </span>
         </button>
       </div>
 
@@ -1014,6 +1088,90 @@ export const IncidentDetailPage: React.FC = () => {
         </div>
       )}
 
+      {/* Tab: Threat Intelligence (Section 52) */}
+      {activeTab === 'threat_intel' && (
+        <div className="space-y-4">
+          <div className="p-4 bg-surface border border-border rounded-control space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border pb-3">
+              <div>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground flex items-center space-x-2">
+                  <Globe2 className="w-4 h-4 text-primary" />
+                  <span>External Threat Intelligence & Observable Profiling</span>
+                </h3>
+                <p className="text-[11px] text-foreground-muted mt-0.5">
+                  Inspect multi-provider intelligence, reputation verdicts, confidence, and provenance for observables related to this case.
+                </p>
+              </div>
+            </div>
+
+            {/* Observable Selector Chips */}
+            <div className="space-y-2">
+              <span className="text-[11px] font-mono text-foreground-muted block">
+                Select an observable from this incident to enrich:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {incident.affected_entities.domains.map((dom) => (
+                  <button
+                    key={dom}
+                    type="button"
+                    onClick={() => handleEnrichObservable('DOMAIN', dom)}
+                    className={`px-2.5 py-1 rounded text-xs font-mono transition-all cursor-pointer border ${
+                      selectedObservable?.value === dom
+                        ? 'bg-primary text-primary-foreground border-primary font-bold'
+                        : 'bg-surface-secondary text-foreground hover:bg-surface border-border'
+                    }`}
+                  >
+                    DOMAIN: {dom}
+                  </button>
+                ))}
+                {incident.affected_entities.ips.map((ip) => (
+                  <button
+                    key={ip}
+                    type="button"
+                    onClick={() => handleEnrichObservable('IP', ip)}
+                    className={`px-2.5 py-1 rounded text-xs font-mono transition-all cursor-pointer border ${
+                      selectedObservable?.value === ip
+                        ? 'bg-primary text-primary-foreground border-primary font-bold'
+                        : 'bg-surface-secondary text-foreground hover:bg-surface border-border'
+                    }`}
+                  >
+                    IP: {ip}
+                  </button>
+                ))}
+                {incident.affected_entities.domains.length === 0 && incident.affected_entities.ips.length === 0 && (
+                  <div className="text-xs text-foreground-muted italic py-1">
+                    No domains or IP addresses currently linked to this incident.
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Enriched Intelligence Display */}
+          {intelLoading && (
+            <div className="p-8 bg-surface rounded-control border border-border text-center text-xs font-mono text-foreground-muted flex flex-col items-center justify-center space-y-2">
+              <RefreshCw className="w-5 h-5 animate-spin text-primary" />
+              <span>Querying threat intelligence providers for '{selectedObservable?.value}'...</span>
+            </div>
+          )}
+
+          {intelError && (
+            <div className="p-3.5 bg-danger-surface border border-danger-border rounded-control text-xs font-mono text-danger flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 shrink-0" />
+              <span>{intelError}</span>
+            </div>
+          )}
+
+          {enrichedIntel && !intelLoading && (
+            <IndicatorIntelligencePanel
+              intelligence={enrichedIntel}
+              onRefresh={(updated) => setEnrichedIntel(updated)}
+              defaultExpanded={true}
+            />
+          )}
+        </div>
+      )}
+
       {/* 6. Modals */}
 
       {/* Contain Modal */}
@@ -1198,6 +1356,13 @@ export const IncidentDetailPage: React.FC = () => {
           </div>
         </div>
       )}
+      {/* Section 51 Workflow History Modal */}
+      <IncidentWorkflowHistoryModal
+        incidentId={incident.id}
+        incidentNumber={incident.incident_number}
+        isOpen={showWorkflowModal}
+        onClose={() => setShowWorkflowModal(false)}
+      />
     </div>
   );
 };

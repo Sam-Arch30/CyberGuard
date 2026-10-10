@@ -6,9 +6,13 @@ import {
   Radio,
   ShieldAlert,
   AlertTriangle,
-  Info
 } from 'lucide-react';
-import { RiskBadge } from '../components/common/RiskBadge';
+import type {
+  AggregatedIndicatorIntelligence,
+  ThreatIntelProviderConfig,
+} from '../types/threatIntelligence';
+import { threatIntelligenceService } from '../services/threatIntelligenceService';
+import { IndicatorIntelligencePanel } from '../components/intelligence/IndicatorIntelligencePanel';
 
 interface CampaignCluster {
   campaign_id: string;
@@ -29,29 +33,28 @@ interface CampaignCluster {
 
 export const ThreatIntelligence: React.FC = () => {
   const [lookupQuery, setLookupQuery] = useState('');
+  const [selectedType, setSelectedType] = useState('AUTO');
   const [isSearching, setIsSearching] = useState(false);
-  const [lookupResult, setLookupResult] = useState<any>(null);
+  const [intelligenceResult, setIntelligenceResult] = useState<AggregatedIndicatorIntelligence | null>(null);
   const [lookupError, setLookupError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
 
   const [clusters, setClusters] = useState<CampaignCluster[]>([]);
   const [activeCluster, setActiveCluster] = useState<CampaignCluster | null>(null);
   const [loadingClusters, setLoadingClusters] = useState(true);
-  const [providerStatus, setProviderStatus] = useState<{ configured: boolean; provider: string; error?: string } | null>(null);
+  const [providers, setProviders] = useState<ThreatIntelProviderConfig[]>([]);
 
   useEffect(() => {
-    // Fetch provider status
-    fetch('/api/intelligence/geolocation/status')
-      .then(res => res.ok ? res.json() : null)
-      .then(data => {
-        if (data) setProviderStatus(data);
-      })
+    // Fetch provider configurations
+    threatIntelligenceService
+      .listProviders()
+      .then((data) => setProviders(data || []))
       .catch(() => {});
 
     // Fetch actual tracked campaigns
     setLoadingClusters(true);
     fetch('/api/campaigns')
-      .then(res => res.ok ? res.json() : [])
+      .then((res) => (res.ok ? res.json() : []))
       .then((data: CampaignCluster[]) => {
         setClusters(data || []);
         if (data && data.length > 0) {
@@ -66,38 +69,32 @@ export const ThreatIntelligence: React.FC = () => {
       });
   }, []);
 
-  const handleLookup = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const query = lookupQuery.trim();
+  const handleLookup = async (e?: React.FormEvent, customQuery?: string, customType?: string) => {
+    if (e) e.preventDefault();
+    const query = (customQuery || lookupQuery).trim();
     if (!query) return;
 
+    const indType = customType || selectedType;
     setIsSearching(true);
     setLookupError(null);
-    setLookupResult(null);
+    setIntelligenceResult(null);
     setHasSearched(true);
 
-    const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(query) || query.includes(':');
-    const endpoint = isIp
-      ? `/api/emails/lookup/${encodeURIComponent(query)}`
-      : `/api/emails/lookup-domain/${encodeURIComponent(query)}`;
-
     try {
-      const res = await fetch(endpoint);
-      if (!res.ok) {
-        if (res.status === 404) {
-          setLookupError(`No threat intelligence record found for '${query}'.`);
-        } else {
-          setLookupError(`Lookup request failed with status ${res.status}.`);
-        }
-      } else {
-        const data = await res.json();
-        setLookupResult(data);
-      }
+      const typeParam = indType === 'AUTO' ? 'HOSTNAME' : indType;
+      const res = await threatIntelligenceService.getIndicatorIntelligence(typeParam, query);
+      setIntelligenceResult(res);
     } catch (err: any) {
-      setLookupError('Unable to contact threat intelligence service.');
+      setLookupError(err.message || 'Unable to contact threat intelligence service.');
     } finally {
       setIsSearching(false);
     }
+  };
+
+  const handleQuickSample = (val: string, type: string) => {
+    setLookupQuery(val);
+    setSelectedType(type);
+    handleLookup(undefined, val, type);
   };
 
   return (
@@ -107,40 +104,67 @@ export const ThreatIntelligence: React.FC = () => {
         <div>
           <div className="flex items-center space-x-2 text-primary font-mono text-xs mb-1 font-semibold uppercase tracking-wider">
             <Globe2 className="w-3.5 h-3.5 text-primary" />
-            <span>GLOBAL THREAT INTELLIGENCE & INFRASTRUCTURE MATRIX</span>
+            <span>SECTION 52 — THREAT INTELLIGENCE & EXTERNAL ENRICHMENT</span>
           </div>
           <h1 className="text-xl font-bold text-foreground font-sans tracking-tight">
-            Threat Intelligence & Domain Profiling
+            Threat Intelligence & Indicator Profiling
           </h1>
           <p className="text-xs text-foreground-muted font-mono mt-1">
-            Correlate domain registration WHOIS, IP subnet reputation, BGP routing anomalies, and threat actor campaign clusters.
+            Query multi-provider intelligence for IPs, domains, URLs, and hashes with privacy safeguards and provenance tracking.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 px-3 py-1.5 rounded-lg bg-surface-secondary border border-border text-xs font-mono text-foreground">
-          <Radio className={`w-3.5 h-3.5 ${providerStatus?.configured ? 'text-success animate-pulse' : 'text-foreground-muted'}`} />
-          <span>
-            {providerStatus?.configured
-              ? <>Provider: <strong className="text-primary font-medium">{providerStatus.provider}</strong> (Active)</>
-              : <span className="text-foreground-muted">Threat intelligence provider not configured</span>
-            }
-          </span>
+        {/* Provider Operational Status Ribbon */}
+        <div className="flex flex-wrap items-center gap-1.5 p-2 bg-surface-secondary border border-border rounded-lg text-xs font-mono">
+          <Radio className="w-3.5 h-3.5 text-success animate-pulse mr-1" />
+          <span className="text-foreground-muted text-[11px] mr-1">Active Providers:</span>
+          {providers.map((p) => (
+            <span
+              key={p.id}
+              className={`px-1.5 py-0.5 rounded text-[10px] font-semibold border ${
+                p.enabled
+                  ? 'bg-surface text-primary border-border'
+                  : 'bg-surface/50 text-foreground-muted border-border/50 line-through'
+              }`}
+              title={`${p.display_name} (Priority: #${p.priority})`}
+            >
+              {p.display_name}
+            </span>
+          ))}
         </div>
       </div>
 
-      {/* Domain / IP WHOIS & Reputation Search */}
-      <div className="bg-surface border border-border rounded-xl p-5 space-y-3">
+      {/* Multi-Indicator Intelligence Search Form */}
+      <div className="bg-surface border border-border rounded-xl p-5 space-y-4">
         <form onSubmit={handleLookup} className="flex flex-col sm:flex-row items-center gap-2.5">
+          {/* Indicator Type Select */}
+          <select
+            value={selectedType}
+            onChange={(e) => setSelectedType(e.target.value)}
+            className="w-full sm:w-36 px-2.5 py-2 bg-surface-secondary border border-border rounded-lg text-xs font-mono text-foreground focus:outline-none focus:border-primary"
+          >
+            <option value="AUTO">Auto-Detect</option>
+            <option value="IP">IP Address</option>
+            <option value="DOMAIN">Domain</option>
+            <option value="URL">URL</option>
+            <option value="SHA256">SHA-256 Hash</option>
+            <option value="MD5">MD5 Hash</option>
+            <option value="EMAIL">Email</option>
+            <option value="ASN">ASN</option>
+          </select>
+
+          {/* Input field */}
           <div className="relative flex-grow w-full">
             <Search className="w-4 h-4 text-foreground-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={lookupQuery}
               onChange={(e) => setLookupQuery(e.target.value)}
-              placeholder="Enter Domain Name (e.g. evil-corp.com) or IP Address (e.g. 198.51.100.25)..."
+              placeholder="Enter IP (e.g. 185.220.101.42), domain (bank-corp-update.com), URL, or file hash..."
               className="w-full pl-9 pr-4 py-2 bg-surface-secondary border border-border rounded-lg text-xs font-mono text-foreground placeholder:text-foreground-muted focus:outline-none focus:border-primary"
             />
           </div>
+
           <button
             type="submit"
             disabled={isSearching || !lookupQuery.trim()}
@@ -151,56 +175,63 @@ export const ThreatIntelligence: React.FC = () => {
             ) : (
               <Database className="w-3.5 h-3.5" />
             )}
-            <span>QUERY INTELLIGENCE</span>
+            <span>ENRICH INDICATOR</span>
           </button>
         </form>
 
+        {/* Quick Sample Observables */}
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-mono">
+          <span className="text-[10px] text-foreground-muted">Quick Presets:</span>
+          <button
+            type="button"
+            onClick={() => handleQuickSample('bank-corp-update.com', 'DOMAIN')}
+            className="px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface-secondary/80 text-foreground border border-border text-[10px] transition-colors cursor-pointer"
+          >
+            bank-corp-update.com (Phish Domain)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickSample('185.220.101.42', 'IP')}
+            className="px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface-secondary/80 text-foreground border border-border text-[10px] transition-colors cursor-pointer"
+          >
+            185.220.101.42 (C2 IP)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickSample('192.168.1.1', 'IP')}
+            className="px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface-secondary/80 text-warning border border-border text-[10px] transition-colors cursor-pointer"
+          >
+            192.168.1.1 (Internal Blocked Test)
+          </button>
+          <button
+            type="button"
+            onClick={() => handleQuickSample('4a7d1ed414474e4033ac29ccb8653d9b', 'MD5')}
+            className="px-2 py-0.5 rounded bg-surface-secondary hover:bg-surface-secondary/80 text-foreground border border-border text-[10px] transition-colors cursor-pointer"
+          >
+            4a7d1ed... (Malware Hash)
+          </button>
+        </div>
+
         {/* Search Result View */}
-        {hasSearched ? (
-          lookupError ? (
-            <div className="p-3.5 rounded-lg bg-danger-surface border border-danger-border flex items-center space-x-2 text-xs font-mono text-danger">
-              <AlertTriangle className="w-4 h-4 shrink-0" />
-              <span>{lookupError}</span>
-            </div>
-          ) : lookupResult ? (
-            <div className="p-3.5 rounded-lg bg-surface-secondary border border-border grid grid-cols-1 md:grid-cols-4 gap-3 text-xs font-mono">
-              <div>
-                <span className="text-foreground-muted block text-[10px]">Queried Artifact:</span>
-                <span className="text-primary font-semibold">{lookupQuery}</span>
+        {hasSearched && (
+          <div className="pt-2">
+            {lookupError ? (
+              <div className="p-3.5 rounded-lg bg-danger-surface border border-danger-border flex items-center space-x-2 text-xs font-mono text-danger">
+                <AlertTriangle className="w-4 h-4 shrink-0" />
+                <span>{lookupError}</span>
               </div>
-              <div>
-                <span className="text-foreground-muted block text-[10px]">Classification / ASN:</span>
-                <span className="text-foreground font-semibold">
-                  {lookupResult.asn || lookupResult.autonomous_system || 'Unclassified / None'}
-                </span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block text-[10px]">Country / Geolocation:</span>
-                <span className="text-foreground">
-                  {lookupResult.country ? `${lookupResult.city ? lookupResult.city + ', ' : ''}${lookupResult.country}` : 'Not available'}
-                </span>
-              </div>
-              <div>
-                <span className="text-foreground-muted block text-[10px]">Enrichment Status:</span>
-                <span className={`font-bold px-2 py-0.5 rounded border inline-block mt-0.5 ${
-                  lookupResult.enrichment_available || lookupResult.available
-                    ? 'bg-success-surface border-success-border text-success'
-                    : 'bg-surface border-border text-foreground-muted'
-                }`}>
-                  {lookupResult.enrichment_available || lookupResult.available ? 'Enriched' : 'Provider unconfigured'}
-                </span>
-              </div>
-            </div>
-          ) : null
-        ) : (
-          <div className="p-3.5 rounded-lg bg-surface-secondary/40 border border-border/60 text-xs font-mono text-foreground-muted flex items-center space-x-2">
-            <Info className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span>Enter an IP address or domain name above to perform live threat intelligence lookup.</span>
+            ) : intelligenceResult ? (
+              <IndicatorIntelligencePanel
+                intelligence={intelligenceResult}
+                onRefresh={(updated) => setIntelligenceResult(updated)}
+                defaultExpanded={true}
+              />
+            ) : null}
           </div>
         )}
       </div>
 
-      {/* Threat Actor Campaign Clusters */}
+      {/* Tracked Threat Campaign Clusters */}
       <div className="space-y-3">
         <h3 className="text-xs font-mono font-semibold text-foreground-muted uppercase tracking-wider">
           TRACKED THREAT CAMPAIGN CLUSTERS ({clusters.length})
@@ -218,108 +249,38 @@ export const ThreatIntelligence: React.FC = () => {
             <h4 className="text-sm font-bold text-foreground font-sans">
               No Tracked Threat Campaigns Detected
             </h4>
-            <p className="text-xs text-foreground-muted font-mono max-w-md mx-auto">
-              Real campaigns are established automatically when multi-signal correlation across analyzed emails exceeds detection thresholds.
+            <p className="text-xs text-foreground-muted max-w-sm mx-auto font-mono">
+              Campaigns are automatically created when multiple indicators share common infrastructure, subject patterns, and ASN associations.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column: Cluster Selection List */}
-            <div className="space-y-2.5">
-              {clusters.map((cluster) => {
-                const isSelected = activeCluster?.campaign_id === cluster.campaign_id;
-                return (
-                  <div
-                    key={cluster.campaign_id}
-                    onClick={() => setActiveCluster(cluster)}
-                    className={`p-3.5 rounded-xl border text-xs font-mono cursor-pointer transition-all ${
-                      isSelected
-                        ? 'bg-primary-subtle border-primary/40 shadow-xs'
-                        : 'bg-surface border-border hover:bg-surface-secondary/50'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <span className={`font-semibold ${isSelected ? 'text-primary' : 'text-foreground'}`}>
-                        {cluster.name}
-                      </span>
-                      <RiskBadge severity={cluster.overall_confidence > 75 ? 'CRITICAL' : 'HIGH'} size="sm" />
-                    </div>
-                    <div className="text-foreground font-sans font-medium mt-1">
-                      {cluster.dominant_attack_type}
-                    </div>
-                    <div className="text-[11px] text-foreground-muted mt-2 flex justify-between">
-                      <span>First Seen: {cluster.first_seen}</span>
-                      <span className="text-warning font-semibold">{cluster.email_count} Emails</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Right Column: Cluster Detail Inspector */}
-            {activeCluster && (
-              <div className="lg:col-span-2 bg-surface border border-border rounded-xl p-5 space-y-4">
-                <div className="flex items-center justify-between border-b border-border pb-3">
-                  <div>
-                    <span className="text-xs font-mono text-primary font-semibold">
-                      CLUSTER ID: {activeCluster.campaign_id}
-                    </span>
-                    <h2 className="text-lg font-bold text-foreground font-sans mt-0.5">
-                      {activeCluster.name}
-                    </h2>
-                  </div>
-                  <RiskBadge severity={activeCluster.overall_confidence > 75 ? 'CRITICAL' : 'HIGH'} size="md" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {clusters.map((c) => (
+              <div
+                key={c.campaign_id}
+                onClick={() => setActiveCluster(c)}
+                className={`p-4 bg-surface border rounded-xl space-y-2 cursor-pointer transition-all hover:border-primary ${
+                  activeCluster?.campaign_id === c.campaign_id
+                    ? 'border-primary ring-1 ring-primary'
+                    : 'border-border'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-xs text-foreground font-sans">{c.name}</span>
+                  <span className="text-[10px] font-mono font-bold text-primary px-1.5 py-0.5 rounded bg-surface-secondary border border-border">
+                    {Math.round(c.overall_confidence * 100)}% Conf
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-mono">
-                  <div className="p-3 rounded-lg bg-surface-secondary border border-border space-y-1">
-                    <span className="text-foreground-muted text-[10px] block">Attack Classification:</span>
-                    <span className="text-foreground font-bold text-sm">{activeCluster.dominant_attack_type}</span>
-                  </div>
-
-                  <div className="p-3 rounded-lg bg-surface-secondary border border-border space-y-1">
-                    <span className="text-foreground-muted text-[10px] block">Confidence Rating:</span>
-                    <span className="text-primary font-semibold">{activeCluster.overall_confidence.toFixed(1)}%</span>
-                  </div>
+                <div className="text-[11px] font-mono text-foreground-muted">
+                  Attack Type: <strong className="text-foreground">{c.dominant_attack_type}</strong>
                 </div>
-
-                {activeCluster.targeted_brands.length > 0 && (
-                  <div className="space-y-1.5">
-                    <h4 className="text-xs font-mono font-semibold text-foreground-muted uppercase">
-                      TARGETED BRANDS
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeCluster.targeted_brands.map((brand) => (
-                        <span
-                          key={brand}
-                          className="px-2 py-0.5 rounded bg-surface-secondary border border-border text-foreground text-xs font-mono"
-                        >
-                          {brand}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {activeCluster.targeted_organizations.length > 0 && (
-                  <div className="space-y-1.5">
-                    <h4 className="text-xs font-mono font-semibold text-foreground-muted uppercase">
-                      TARGETED ORGANIZATIONS
-                    </h4>
-                    <div className="flex flex-wrap gap-1.5">
-                      {activeCluster.targeted_organizations.map((org) => (
-                        <span
-                          key={org}
-                          className="px-2 py-0.5 rounded bg-danger-surface border border-danger-border text-danger text-xs font-mono"
-                        >
-                          {org}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                <div className="flex items-center justify-between text-[10px] font-mono text-foreground-muted/80 pt-1 border-t border-border/50">
+                  <span>Emails: {c.email_count}</span>
+                  <span>Domains: {c.domain_count}</span>
+                  <span>IPs: {c.ip_count}</span>
+                </div>
               </div>
-            )}
+            ))}
           </div>
         )}
       </div>

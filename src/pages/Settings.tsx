@@ -10,12 +10,16 @@ import {
   Check,
   Share2,
   ExternalLink,
-  Laptop
+  Laptop,
+  Clock,
+  Globe2,
 } from 'lucide-react';
 import { INITIAL_SETTINGS } from '../config/systemSettings';
 import type { SystemSettings } from '../types';
 import { useTheme, THEME_OPTIONS, type AppTheme } from '../context/ThemeContext';
 import { cn } from '../utils/cn';
+import { IncidentOperationsSettings } from '../components/settings/IncidentOperationsSettings';
+import { ThreatIntelligenceSettings } from '../components/settings/ThreatIntelligenceSettings';
 
 export const Settings: React.FC = () => {
   const { tab } = useParams<{ tab?: string }>();
@@ -30,6 +34,8 @@ export const Settings: React.FC = () => {
   const SETTINGS_TABS = [
     { id: 'appearance', label: 'Appearance', icon: Palette },
     { id: 'detection', label: 'Detection', icon: Cpu },
+    { id: 'threat-intel', label: 'Threat Intelligence', icon: Globe2 },
+    { id: 'incident-operations', label: 'Incident Operations', icon: Clock },
     { id: 'integrations', label: 'Integrations', icon: Share2 },
     { id: 'agents', label: 'Agents', icon: Laptop },
     { id: 'security', label: 'Security', icon: Shield },
@@ -372,6 +378,12 @@ export const Settings: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Section 51: Incident Operations Settings */}
+      {activeTab === 'incident-operations' && <IncidentOperationsSettings />}
+
+      {/* Section 52: Threat Intelligence Settings */}
+      {activeTab === 'threat-intel' && <ThreatIntelligenceSettings />}
     </div>
   );
 };
