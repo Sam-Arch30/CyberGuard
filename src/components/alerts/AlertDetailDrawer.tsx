@@ -12,10 +12,14 @@ import {
   Send,
   Loader2,
   RefreshCw,
+  GitBranch,
 } from 'lucide-react';
 import { cn } from '../../utils/cn';
 import { AlertService } from '../../services/alertService';
+import { AlertClusterService } from '../../services/alertClusterService';
 import type { AlertDetail, AlertItem, AlertSeverity, AlertStatus } from '../../types/alert';
+import type { AlertClusterDetail } from '../../types/alertCluster';
+import { AlertClusterDetailModal } from './AlertClusterDetailModal';
 import { useRealtimeSubscription } from '../../hooks/useRealtimeSubscription';
 import type { RealtimeEvent } from '../../types/realtime';
 
@@ -52,7 +56,13 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
   const [noteInput, setNoteInput] = useState<string>('');
   const [noteSubmitting, setNoteSubmitting] = useState<boolean>(false);
 
-  // Load alert details
+  // Section 49: Alert Correlation & Incident Clustering state
+  const [cluster, setCluster] = useState<AlertClusterDetail | null>(null);
+  const [clusterLoading, setClusterLoading] = useState<boolean>(false);
+  const [correlating, setCorrelating] = useState<boolean>(false);
+  const [selectedClusterId, setSelectedClusterId] = useState<string | null>(null);
+
+  // Load alert details & cluster association
   const loadDetail = useCallback(async () => {
     if (!alertId) return;
     setLoading(true);
@@ -66,16 +76,42 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
     } finally {
       setLoading(false);
     }
+
+    // Load Section 49 alert cluster association
+    setClusterLoading(true);
+    try {
+      const clu = await AlertClusterService.getAlertCluster(alertId);
+      setCluster(clu);
+    } catch (err: unknown) {
+      console.warn('Failed to check alert cluster association:', err);
+    } finally {
+      setClusterLoading(false);
+    }
   }, [alertId]);
+
+  const handleRunCorrelation = async () => {
+    if (!alertId) return;
+    setCorrelating(true);
+    try {
+      await AlertClusterService.triggerAlertCorrelation(alertId);
+      await loadDetail();
+    } catch (err: unknown) {
+      console.error('Failed to trigger correlation:', err);
+    } finally {
+      setCorrelating(false);
+    }
+  };
 
   useEffect(() => {
     if (isOpen && alertId) {
       loadDetail();
     } else {
       setDetail(null);
+      setCluster(null);
       setError(null);
       setActiveModal('NONE');
       setModalInput('');
+      setSelectedClusterId(null);
     }
   }, [isOpen, alertId, loadDetail]);
 
@@ -517,6 +553,161 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
                 </div>
               </div>
 
+              {/* SECTION 49: RELATED ACTIVITY & ALERT CLUSTER */}
+              <div className="p-4 rounded-lg bg-surface border border-border space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="p-1 rounded bg-primary/10 text-primary">
+                      <GitBranch className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-xs font-mono font-bold text-foreground uppercase tracking-wider">
+                      Related Activity & Correlation
+                    </span>
+                  </div>
+                  {cluster && (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-bold">
+                      {Math.round(cluster.confidence * 100)}% Correlated
+                    </span>
+                  )}
+                </div>
+
+                {clusterLoading ? (
+                  <div className="py-4 flex items-center justify-center space-x-2 text-xs font-mono text-foreground-muted">
+                    <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                    <span>Evaluating correlation signals...</span>
+                  </div>
+                ) : cluster ? (
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <div className="flex items-center space-x-2">
+                          <span className="text-xs font-mono font-bold text-foreground">
+                            {cluster.title}
+                          </span>
+                          <span className="text-[10px] font-mono text-foreground-muted">
+                            ({cluster.cluster_number})
+                          </span>
+                        </div>
+                        <p className="text-[11px] font-mono text-foreground-muted mt-0.5">
+                          {cluster.alert_count} related alert{cluster.alert_count > 1 ? 's' : ''} • First seen {new Date(cluster.first_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} • Last seen {new Date(cluster.last_seen).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClusterId(cluster.id)}
+                        className="text-xs font-mono text-primary hover:underline flex items-center space-x-1 cursor-pointer"
+                      >
+                        <span>Cluster Context</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </button>
+                    </div>
+
+                    {/* Sibling Alerts */}
+                    <div className="space-y-1 divide-y divide-border/60 border border-border/60 rounded-md overflow-hidden bg-surface-secondary/20">
+                      {cluster.members.map((mem) => {
+                        const isCurrent = mem.alert_id === detail.id;
+                        const signalsText = mem.signals.map(s => s.type.replace(/_/g, ' ').toLowerCase()).slice(0, 3).join(' · ');
+                        return (
+                          <div
+                            key={mem.id}
+                            className={cn(
+                              "p-2.5 flex items-center justify-between text-xs font-mono transition-colors",
+                              isCurrent ? "bg-primary/5 border-l-2 border-primary" : "hover:bg-surface-secondary/50 cursor-pointer"
+                            )}
+                            onClick={() => {
+                              if (!isCurrent) {
+                                onAlertUpdated?.({ id: mem.alert_id } as any);
+                              }
+                            }}
+                          >
+                            <div className="space-y-0.5 pr-2">
+                              <div className="flex items-center space-x-2">
+                                <span className={cn(
+                                  "w-1.5 h-1.5 rounded-full",
+                                  mem.alert_summary?.severity === 'CRITICAL' ? 'bg-threat-critical' :
+                                  mem.alert_summary?.severity === 'HIGH' ? 'bg-threat-high' :
+                                  mem.alert_summary?.severity === 'MEDIUM' ? 'bg-threat-medium' : 'bg-primary'
+                                )} />
+                                <span className={cn("font-semibold", isCurrent ? "text-primary" : "text-foreground")}>
+                                  {mem.alert_summary?.title || `Alert #${mem.alert_id.slice(0, 8)}`}
+                                </span>
+                                {isCurrent && (
+                                  <span className="text-[10px] text-primary bg-primary/10 px-1 rounded">Current</span>
+                                )}
+                              </div>
+                              {signalsText && (
+                                <p className="text-[10px] text-foreground-muted pl-3.5">
+                                  {signalsText}
+                                </p>
+                              )}
+                            </div>
+                            <span className={cn(
+                              "px-1.5 py-0.5 rounded text-[10px] font-bold uppercase",
+                              getSeverityBadgeClass((mem.alert_summary?.severity as AlertSeverity) || 'HIGH')
+                            )}>
+                              {mem.alert_summary?.severity || 'HIGH'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    <div className="pt-1 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedClusterId(cluster.id)}
+                        className="px-2.5 py-1 text-xs font-mono bg-surface-secondary hover:bg-surface-secondary/80 border border-border rounded text-foreground cursor-pointer flex items-center space-x-1"
+                      >
+                        <Layers className="w-3 h-3 text-primary" />
+                        <span>View All Cluster Evidence</span>
+                      </button>
+
+                      {cluster.investigation_id ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigate(`/investigations/${cluster.investigation_id}`);
+                            onClose();
+                          }}
+                          className="px-2.5 py-1 text-xs font-mono bg-primary text-primary-foreground font-bold rounded hover:bg-primary-hover cursor-pointer flex items-center space-x-1"
+                        >
+                          <span>Open Investigation</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const res = await AlertClusterService.linkInvestigation(cluster.id, { create_if_missing: true });
+                            if (res.investigation_id) {
+                              navigate(`/investigations/${res.investigation_id}`);
+                              onClose();
+                            }
+                          }}
+                          className="px-2.5 py-1 text-xs font-mono bg-primary text-primary-foreground font-bold rounded hover:bg-primary-hover cursor-pointer flex items-center space-x-1"
+                        >
+                          <span>Escalate Cluster</span>
+                          <ArrowRight className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="py-2 flex items-center justify-between text-xs font-mono text-foreground-muted">
+                    <span>This alert is currently not associated with another alert cluster.</span>
+                    <button
+                      type="button"
+                      onClick={handleRunCorrelation}
+                      disabled={correlating}
+                      className="px-2.5 py-1 bg-surface-secondary hover:bg-surface-secondary/80 border border-border rounded text-foreground text-xs font-mono cursor-pointer flex items-center space-x-1"
+                    >
+                      {correlating ? <Loader2 className="w-3 h-3 animate-spin" /> : <GitBranch className="w-3 h-3 text-primary" />}
+                      <span>Run Correlation</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
               {/* EVIDENCE ITEMS */}
               {detail.evidence_items && detail.evidence_items.length > 0 && (
                 <div className="space-y-2">
@@ -793,6 +984,18 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
             </div>
           </div>
         )}
+
+        {/* Section 49: Alert Cluster Deep Inspection Modal */}
+        <AlertClusterDetailModal
+          clusterId={selectedClusterId}
+          isOpen={Boolean(selectedClusterId)}
+          onClose={() => setSelectedClusterId(null)}
+          onClusterUpdated={loadDetail}
+          onSelectAlert={(targetAlertId) => {
+            setSelectedClusterId(null);
+            onAlertUpdated?.({ id: targetAlertId } as any);
+          }}
+        />
       </div>
     </div>
   );

@@ -25,6 +25,10 @@ def get_utc_now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def generate_cluster_number() -> str:
+    return f"CLU-{uuid.uuid4().hex[:8].upper()}"
+
+
 class CaseModel(Base):
     __tablename__ = "cases"
 
@@ -3352,8 +3356,8 @@ class NotificationModel(Base):
     message = Column(Text, nullable=False)
 
     # Authoritative Provenance & Navigation
-    source_type = Column(String(50), nullable=False, index=True)  # FINDING, ANALYSIS_RUN, REPORT, JOB, INVESTIGATION, INCIDENT
-    source_id = Column(String(128), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False, default="FINDING", index=True)  # FINDING, ANALYSIS_RUN, REPORT, JOB, INVESTIGATION, INCIDENT
+    source_id = Column(String(128), nullable=False, default=generate_uuid, index=True)
     investigation_id = Column(String(128), nullable=True, index=True)
     analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
@@ -3362,7 +3366,7 @@ class NotificationModel(Base):
     navigation_target = Column(String(255), nullable=True)
 
     # Deduplication & Suppression
-    deduplication_key = Column(String(190), nullable=False, index=True)
+    deduplication_key = Column(String(190), nullable=False, default=generate_uuid, index=True)
 
     # Metadata & Explanations (sanitized JSON)
     metadata_json = Column(Text, default="{}", nullable=False)
@@ -3402,6 +3406,79 @@ class NotificationModel(Base):
 
 # Section 48: Unified Domain Model alias for Security Alerts
 AlertModel = NotificationModel
+
+
+# ============================================================================
+# SECTION 49: ALERT CORRELATION & INCIDENT CLUSTERING MODELS
+# ============================================================================
+
+class AlertClusterModel(Base):
+    """
+    Section 49: Persisted Alert Cluster abstraction.
+    Groups correlated security alerts that share infrastructure, identities,
+    indicators, temporal proximity, campaigns, or attack-path graph relationships.
+    """
+    __tablename__ = "alert_clusters"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    cluster_number = Column(String(32), unique=True, nullable=False, default=generate_cluster_number, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    title = Column(String(255), nullable=False)
+    summary = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="OPEN", index=True)  # OPEN, INVESTIGATING, CONTAINED, RESOLVED, FALSE_POSITIVE, SUPPRESSED
+    severity = Column(String(20), nullable=False, default="HIGH", index=True)  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    risk_score = Column(Float, nullable=False, default=0.0)  # 0.0 - 100.0
+    confidence = Column(Float, nullable=False, default=1.0)  # 0.0 - 1.0 (correlation confidence)
+    alert_count = Column(Integer, nullable=False, default=1)
+    primary_alert_id = Column(String(36), ForeignKey("notifications.id", ondelete="SET NULL"), nullable=True, index=True)
+    investigation_id = Column(String(128), nullable=True, index=True)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True)
+    merged_into_cluster_id = Column(String(36), ForeignKey("alert_clusters.id", ondelete="SET NULL"), nullable=True, index=True)
+    correlation_version = Column(String(32), nullable=False, default="1.0.0")
+    first_seen = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_seen = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    members = relationship("AlertClusterMemberModel", back_populates="cluster", cascade="all, delete-orphan", lazy="selectin")
+    primary_alert = relationship("NotificationModel", foreign_keys=[primary_alert_id])
+    campaign = relationship("CampaignModel", foreign_keys=[campaign_id])
+    merged_into = relationship("AlertClusterModel", remote_side=[id], foreign_keys=[merged_into_cluster_id])
+
+    __table_args__ = (
+        Index("ix_clu_ws_status", "workspace_id", "status"),
+        Index("ix_clu_ws_sev", "workspace_id", "severity"),
+        Index("ix_clu_ws_inv", "workspace_id", "investigation_id"),
+        Index("ix_clu_ws_camp", "workspace_id", "campaign_id"),
+        Index("ix_clu_ws_updated", "workspace_id", "updated_at"),
+    )
+
+
+class AlertClusterMemberModel(Base):
+    """
+    Section 49: Explicit association between an Alert and an Alert Cluster.
+    Contains membership confidence, structured correlation reasons, and versioning.
+    """
+    __tablename__ = "alert_cluster_members"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    cluster_id = Column(String(36), ForeignKey("alert_clusters.id", ondelete="CASCADE"), nullable=False, index=True)
+    alert_id = Column(String(36), ForeignKey("notifications.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    membership_confidence = Column(Float, nullable=False, default=1.0)
+    correlation_reasons_json = Column(Text, default="[]", nullable=False)  # JSON array of structured SignalDetail dicts
+    correlation_version = Column(String(32), nullable=False, default="1.0.0")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    cluster = relationship("AlertClusterModel", back_populates="members")
+    alert = relationship("NotificationModel", foreign_keys=[alert_id])
+
+    __table_args__ = (
+        Index("ix_clu_mem_clu_alert", "cluster_id", "alert_id", unique=True),
+        Index("ix_clu_mem_ws_alert", "workspace_id", "alert_id"),
+    )
+
 
 
 

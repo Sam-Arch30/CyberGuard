@@ -148,6 +148,19 @@ class NotificationService:
             )
             RealtimePublisher._async_broadcast(realtime_event)
 
+            # 4. Trigger Section 49 Alert Correlation for Security Alerts
+            if notif.category == NotificationCategoryEnum.SECURITY_ALERT.value:
+                try:
+                    from backend.services.alert_correlation_service import AlertCorrelationService
+                    AlertCorrelationService.correlate_alert(
+                        db=db,
+                        alert_id=notif.id,
+                        workspace_id=notif.workspace_id,
+                        triggered_by="system:notification_lifecycle",
+                    )
+                except Exception as corr_err:
+                    logger.warning("Automatic alert correlation failed for alert %s (alert preserved): %s", notif.id, corr_err)
+
             return notif
 
         except Exception as e:

@@ -50,6 +50,7 @@ from backend.api.routes.search import router as search_router
 from backend.api.routes.jobs import router as jobs_router
 from backend.api.routes.notifications import router as notifications_router
 from backend.api.routes.alerts import router as alerts_router
+from backend.api.routes.alert_clusters import router as alert_clusters_router, alert_correlate_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -163,6 +164,8 @@ app.include_router(investigations_router)
 app.include_router(search_router)
 app.include_router(jobs_router)
 app.include_router(notifications_router)
+app.include_router(alert_clusters_router)
+app.include_router(alert_correlate_router)
 app.include_router(alerts_router)
 
 from backend.api.routes.benchmark import reset_workspace_state

@@ -555,6 +555,48 @@ async def handle_evidence_export(ctx: JobExecutionContext, db: Session) -> Dict[
     return {"export_status": "READY", "manifest_id": str(uuid.uuid4())}
 
 
+@register_handler(JobTypeEnum.ALERT_CORRELATION.value)
+async def handle_alert_correlation(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 49: Asynchronous Alert Correlation & Incident Clustering.
+    Correlates an incoming or re-triaged alert against candidate alerts in the same workspace.
+    """
+    ctx.update_progress(db, 15.0, "INITIALIZING", "Extracting alert correlation attributes...")
+    job = db.query(BackgroundJobModel).filter(BackgroundJobModel.id == ctx.job_id).first()
+    payload = (job.payload_json or {}) if job else {}
+    alert_id = payload.get("alert_id") or ctx.resource_id
+    workspace_id = (job.workspace_id if job else None) or payload.get("workspace_id")
+
+    if not alert_id:
+        raise PermanentJobError("Alert correlation job requires valid 'alert_id' or 'resource_id'.")
+
+    ctx.update_progress(db, 40.0, "CANDIDATE_SEARCH", f"Retrieving candidate alerts for alert {alert_id}...")
+    from backend.services.alert_correlation_service import AlertCorrelationService
+
+    cluster = AlertCorrelationService.correlate_alert(
+        db=db,
+        alert_id=alert_id,
+        workspace_id=workspace_id,
+        triggered_by=f"job:{ctx.job_id}",
+    )
+
+    cluster_id = cluster.id if cluster else None
+    cluster_title = cluster.title if cluster else None
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Alert correlation completed. Result: {cluster_title or 'Unclustered single alert'}",
+    )
+    return {
+        "alert_id": alert_id,
+        "cluster_id": cluster_id,
+        "cluster_title": cluster_title,
+        "clustered": cluster is not None,
+    }
+
+
 @register_handler(JobTypeEnum.MAINTENANCE.value)
 async def handle_maintenance(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
     """Runs background maintenance, temporary storage cleanup, and stale lease recovery."""

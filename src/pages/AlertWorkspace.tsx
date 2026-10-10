@@ -11,11 +11,17 @@ import {
   ExternalLink,
   Radio,
   X,
+  Layers,
+  GitBranch,
+  ArrowRight,
 } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { AlertService } from '../services/alertService';
+import { AlertClusterService } from '../services/alertClusterService';
 import type { AlertItem, AlertMetrics, AlertSeverity, AlertStatus } from '../types/alert';
+import type { AlertClusterItem } from '../types/alertCluster';
 import { AlertDetailDrawer } from '../components/alerts/AlertDetailDrawer';
+import { AlertClusterDetailModal } from '../components/alerts/AlertClusterDetailModal';
 import { useRealtimeSubscription } from '../hooks/useRealtimeSubscription';
 import type { RealtimeEvent } from '../types/realtime';
 
@@ -23,6 +29,9 @@ export const AlertWorkspace: React.FC = () => {
   const { id: paramAlertId } = useParams<{ id?: string }>();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+
+  // Mode: Alerts Queue vs Incident Clusters
+  const [viewMode, setViewMode] = useState<'ALERTS' | 'CLUSTERS'>('ALERTS');
 
   // Filters & Pagination State
   const [statusFilter, setStatusFilter] = useState<string>(
@@ -43,6 +52,13 @@ export const AlertWorkspace: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(true);
   const [bulkSelected, setBulkSelected] = useState<string[]>([]);
   const [bulkActionLoading, setBulkActionLoading] = useState<boolean>(false);
+
+  // Section 49: Clusters Data State
+  const [clusters, setClusters] = useState<AlertClusterItem[]>([]);
+  const [clusterTotal, setClusterTotal] = useState<number>(0);
+  const [clusterLoading, setClusterLoading] = useState<boolean>(false);
+  const [activeClusterId, setActiveClusterId] = useState<string | null>(null);
+  const [isClusterModalOpen, setIsClusterModalOpen] = useState<boolean>(false);
 
   // Detail Drawer State
   const [selectedAlertId, setSelectedAlertId] = useState<string | null>(paramAlertId || null);
@@ -86,13 +102,37 @@ export const AlertWorkspace: React.FC = () => {
     }
   }, [statusFilter, severityFilter, searchQuery, sortBy, page]);
 
+  const loadClusters = useCallback(async () => {
+    setClusterLoading(true);
+    try {
+      const res = await AlertClusterService.listClusters({
+        status: statusFilter === 'ALL' ? undefined : statusFilter,
+        severity: severityFilter === 'ALL' ? undefined : severityFilter,
+        q: searchQuery.trim() ? searchQuery.trim() : undefined,
+        limit: pageSize,
+        offset: page * pageSize,
+        sort_by: sortBy as any,
+      });
+      setClusters(res.items);
+      setClusterTotal(res.total);
+    } catch (e) {
+      console.error('Failed to load alert clusters:', e);
+    } finally {
+      setClusterLoading(false);
+    }
+  }, [statusFilter, severityFilter, searchQuery, sortBy, page]);
+
   useEffect(() => {
     loadMetrics();
   }, [loadMetrics]);
 
   useEffect(() => {
-    loadAlerts();
-  }, [loadAlerts]);
+    if (viewMode === 'ALERTS') {
+      loadAlerts();
+    } else {
+      loadClusters();
+    }
+  }, [viewMode, loadAlerts, loadClusters]);
 
   // Section 46 real-time update subscription
   const { status: connectionStatus } = useRealtimeSubscription({
@@ -110,6 +150,18 @@ export const AlertWorkspace: React.FC = () => {
       ) {
         loadAlerts();
         loadMetrics();
+      }
+
+      if (
+        [
+          'ALERT_CLUSTER_CREATED',
+          'ALERT_CLUSTER_UPDATED',
+          'ALERT_ADDED_TO_CLUSTER',
+          'ALERT_CLUSTER_MERGED',
+          'ALERT_CLUSTER_INVESTIGATION_LINKED',
+        ].includes(event.event_type)
+      ) {
+        loadClusters();
       }
     },
   });
@@ -212,7 +264,25 @@ export const AlertWorkspace: React.FC = () => {
     }
   };
 
-  const totalPages = Math.ceil(total / pageSize) || 1;
+  const getClusterStatusBadge = (status: string) => {
+    switch (status) {
+      case 'OPEN':
+        return 'bg-threat-critical/15 text-threat-critical border-threat-critical/30';
+      case 'INVESTIGATING':
+        return 'bg-primary/15 text-primary border-primary/30';
+      case 'CONTAINED':
+        return 'bg-threat-medium/15 text-threat-medium border-threat-medium/30';
+      case 'RESOLVED':
+        return 'bg-threat-low/15 text-threat-low border-threat-low/30';
+      case 'MERGED':
+        return 'bg-surface-secondary text-foreground-muted border-border line-through';
+      default:
+        return 'bg-surface-secondary text-foreground-muted border-border';
+    }
+  };
+
+  const currentTotal = viewMode === 'ALERTS' ? total : clusterTotal;
+  const totalPages = Math.ceil(currentTotal / pageSize) || 1;
 
   return (
     <div className="flex-1 flex flex-col min-h-screen bg-background text-foreground select-none">
@@ -252,17 +322,62 @@ export const AlertWorkspace: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-3">
+          {/* Section 49: Segmented View Switcher */}
+          <div className="p-0.5 rounded-lg bg-surface border border-border flex items-center">
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('ALERTS');
+                setPage(0);
+              }}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-xs font-mono font-semibold transition-colors cursor-pointer flex items-center space-x-1.5',
+                viewMode === 'ALERTS'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Alerts Queue</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setViewMode('CLUSTERS');
+                setPage(0);
+              }}
+              className={cn(
+                'px-3 py-1.5 rounded-md text-xs font-mono font-semibold transition-colors cursor-pointer flex items-center space-x-1.5',
+                viewMode === 'CLUSTERS'
+                  ? 'bg-primary text-primary-foreground shadow-xs'
+                  : 'text-foreground-muted hover:text-foreground'
+              )}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Incident Clusters</span>
+              {clusterTotal > 0 && (
+                <span className="px-1.5 py-0.2 text-[10px] rounded bg-white/20 text-white font-mono font-bold">
+                  {clusterTotal}
+                </span>
+              )}
+            </button>
+          </div>
+
           <button
             type="button"
             onClick={() => {
-              loadAlerts();
+              if (viewMode === 'ALERTS') {
+                loadAlerts();
+              } else {
+                loadClusters();
+              }
               loadMetrics();
             }}
-            disabled={loading}
+            disabled={loading || clusterLoading}
             className="px-3 py-1.5 bg-surface border border-border hover:bg-surface-secondary text-foreground-muted hover:text-foreground rounded-md text-xs font-mono flex items-center space-x-1.5 cursor-pointer transition-colors"
           >
-            <RefreshCw className={cn('w-3.5 h-3.5', loading && 'animate-spin')} />
+            <RefreshCw className={cn('w-3.5 h-3.5', (loading || clusterLoading) && 'animate-spin')} />
             <span>Refresh</span>
           </button>
         </div>
@@ -434,150 +549,301 @@ export const AlertWorkspace: React.FC = () => {
         </div>
       )}
 
-      {/* 5. Main Alert Queue */}
+      {/* 5. Main Alert Queue / Incident Clusters View */}
       <div className="flex-1 overflow-x-auto p-6">
-        {loading && alerts.length === 0 ? (
-          <div className="py-20 flex flex-col items-center justify-center space-y-3">
-            <RefreshCw className="w-6 h-6 text-primary animate-spin" />
-            <p className="text-xs font-mono text-foreground-muted">Loading authoritative alerts queue...</p>
-          </div>
-        ) : alerts.length === 0 ? (
-          <div className="py-20 border border-dashed border-border rounded-lg flex flex-col items-center justify-center space-y-2 text-center">
-            <CheckCircle2 className="w-8 h-8 text-threat-low" />
-            <h3 className="text-sm font-bold font-mono text-foreground">No alerts matching filter</h3>
-            <p className="text-xs font-mono text-foreground-muted max-w-sm">
-              CyberGuard has no unresolved security alerts within the selected status and severity scope.
-            </p>
-          </div>
-        ) : (
-          <div className="border border-border rounded-lg overflow-hidden bg-surface shadow-xs">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="border-b border-border bg-surface-secondary/60 text-[11px] font-mono text-foreground-muted uppercase tracking-wider">
-                  <th className="py-3 px-4 w-10">
-                    <input
-                      type="checkbox"
-                      checked={bulkSelected.length === alerts.length && alerts.length > 0}
-                      onChange={handleSelectAll}
-                      className="cursor-pointer"
-                      title="Select all"
-                    />
-                  </th>
-                  <th className="py-3 px-4 w-28">Severity</th>
-                  <th className="py-3 px-4">Alert Title & Evidence Snippet</th>
-                  <th className="py-3 px-4 w-24">Risk</th>
-                  <th className="py-3 px-4 w-32">Status</th>
-                  <th className="py-3 px-4 w-36">Investigation</th>
-                  <th className="py-3 px-4 w-28">Created</th>
-                  <th className="py-3 px-4 w-24 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border text-xs font-mono">
-                {alerts.map((item) => {
-                  const isSelected = bulkSelected.includes(item.id);
-                  const isCurrent = selectedAlertId === item.id;
-                  return (
-                    <tr
-                      key={item.id}
-                      onClick={() => handleRowClick(item)}
-                      className={cn(
-                        'hover:bg-surface-secondary/70 cursor-pointer transition-colors group',
-                        isSelected && 'bg-primary/5',
-                        isCurrent && 'bg-primary/10'
-                      )}
-                    >
-                      <td className="py-3 px-4" onClick={(e) => handleToggleSelect(item.id, e)}>
+        {viewMode === 'ALERTS' ? (
+          <>
+            {loading && alerts.length === 0 ? (
+              <div className="py-20 flex flex-col items-center justify-center space-y-3">
+                <RefreshCw className="w-6 h-6 text-primary animate-spin" />
+                <p className="text-xs font-mono text-foreground-muted">Loading authoritative alerts queue...</p>
+              </div>
+            ) : alerts.length === 0 ? (
+              <div className="py-20 border border-dashed border-border rounded-lg flex flex-col items-center justify-center space-y-2 text-center">
+                <CheckCircle2 className="w-8 h-8 text-threat-low" />
+                <h3 className="text-sm font-bold font-mono text-foreground">No alerts matching filter</h3>
+                <p className="text-xs font-mono text-foreground-muted max-w-sm">
+                  CyberGuard has no unresolved security alerts within the selected status and severity scope.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-border rounded-lg overflow-hidden bg-surface shadow-xs">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-secondary/60 text-[11px] font-mono text-foreground-muted uppercase tracking-wider">
+                      <th className="py-3 px-4 w-10">
                         <input
                           type="checkbox"
-                          checked={isSelected}
-                          onChange={() => {}}
+                          checked={bulkSelected.length === alerts.length && alerts.length > 0}
+                          onChange={handleSelectAll}
                           className="cursor-pointer"
+                          title="Select all"
                         />
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <span
-                          className={cn(
-                            'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
-                            getSeverityBadge(item.severity)
-                          )}
-                        >
-                          {item.severity}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <div className="space-y-0.5">
-                          <p className="font-bold text-foreground group-hover:text-primary transition-colors">
-                            {item.title}
-                          </p>
-                          <p className="text-[11px] text-foreground-muted line-clamp-1">
-                            {item.message}
-                          </p>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <span className="font-bold text-threat-critical">
-                          {item.risk_score.toFixed(0)} / 100
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        <span
-                          className={cn(
-                            'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
-                            getStatusBadge(item.status)
-                          )}
-                        >
-                          {item.status}
-                        </span>
-                      </td>
-
-                      <td className="py-3 px-4">
-                        {item.investigation_id ? (
-                          <span className="text-primary font-bold hover:underline flex items-center space-x-1">
-                            <span className="truncate max-w-[120px]">{item.investigation_id}</span>
-                            <ExternalLink className="w-2.5 h-2.5" />
-                          </span>
-                        ) : (
-                          <span className="text-foreground-subtle text-[11px]">—</span>
-                        )}
-                      </td>
-
-                      <td className="py-3 px-4 text-foreground-muted">
-                        <div className="flex items-center space-x-1" title={item.created_at}>
-                          <Clock className="w-3 h-3" />
-                          <span>{formatTimeAgo(item.created_at)}</span>
-                        </div>
-                      </td>
-
-                      <td className="py-3 px-4 text-right">
-                        {item.status === 'OPEN' ? (
-                          <button
-                            type="button"
-                            onClick={(e) => handleQuickAcknowledge(item, e)}
-                            className="px-2.5 py-1 bg-surface border border-border hover:border-primary text-foreground-muted hover:text-foreground rounded text-[10px] font-bold cursor-pointer transition-colors"
-                          >
-                            Ack
-                          </button>
-                        ) : (
-                          <span className="text-[10px] text-foreground-subtle uppercase">View</span>
-                        )}
-                      </td>
+                      </th>
+                      <th className="py-3 px-4 w-28">Severity</th>
+                      <th className="py-3 px-4">Alert Title & Evidence Snippet</th>
+                      <th className="py-3 px-4 w-24">Risk</th>
+                      <th className="py-3 px-4 w-32">Status</th>
+                      <th className="py-3 px-4 w-36">Investigation</th>
+                      <th className="py-3 px-4 w-28">Created</th>
+                      <th className="py-3 px-4 w-24 text-right">Action</th>
                     </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-border text-xs font-mono">
+                    {alerts.map((item) => {
+                      const isSelected = bulkSelected.includes(item.id);
+                      const isCurrent = selectedAlertId === item.id;
+                      return (
+                        <tr
+                          key={item.id}
+                          onClick={() => handleRowClick(item)}
+                          className={cn(
+                            'hover:bg-surface-secondary/70 cursor-pointer transition-colors group',
+                            isSelected && 'bg-primary/5',
+                            isCurrent && 'bg-primary/10'
+                          )}
+                        >
+                          <td className="py-3 px-4" onClick={(e) => handleToggleSelect(item.id, e)}>
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => {}}
+                              className="cursor-pointer"
+                            />
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+                                getSeverityBadge(item.severity)
+                              )}
+                            >
+                              {item.severity}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-foreground group-hover:text-primary transition-colors">
+                                {item.title}
+                              </p>
+                              <p className="text-[11px] text-foreground-muted line-clamp-1">
+                                {item.message}
+                              </p>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-threat-critical">
+                              {item.risk_score.toFixed(0)} / 100
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+                                getStatusBadge(item.status)
+                              )}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {item.investigation_id ? (
+                              <span className="text-primary font-bold hover:underline flex items-center space-x-1">
+                                <span className="truncate max-w-[120px]">{item.investigation_id}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </span>
+                            ) : (
+                              <span className="text-foreground-subtle text-[11px]">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-foreground-muted">
+                            <div className="flex items-center space-x-1" title={item.created_at}>
+                              <Clock className="w-3 h-3" />
+                              <span>{formatTimeAgo(item.created_at)}</span>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            {item.status === 'OPEN' ? (
+                              <button
+                                type="button"
+                                onClick={(e) => handleQuickAcknowledge(item, e)}
+                                className="px-2.5 py-1 bg-surface border border-border hover:border-primary text-foreground-muted hover:text-foreground rounded text-[10px] font-bold cursor-pointer transition-colors"
+                              >
+                                Ack
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-foreground-subtle uppercase">View</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        ) : (
+          /* SECTION 49: INCIDENT CLUSTERS VIEW */
+          <>
+            {clusterLoading && clusters.length === 0 ? (
+              <div className="py-20 flex flex-col items-center justify-center space-y-3">
+                <RefreshCw className="w-6 h-6 text-primary animate-spin" />
+                <p className="text-xs font-mono text-foreground-muted">Correlating multi-alert incident clusters...</p>
+              </div>
+            ) : clusters.length === 0 ? (
+              <div className="py-20 border border-dashed border-border rounded-lg flex flex-col items-center justify-center space-y-2 text-center">
+                <Layers className="w-8 h-8 text-foreground-muted" />
+                <h3 className="text-sm font-bold font-mono text-foreground">No incident clusters matching filter</h3>
+                <p className="text-xs font-mono text-foreground-muted max-w-sm">
+                  CyberGuard has found no multi-alert correlated security incidents matching the current criteria.
+                </p>
+              </div>
+            ) : (
+              <div className="border border-border rounded-lg overflow-hidden bg-surface shadow-xs">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b border-border bg-surface-secondary/60 text-[11px] font-mono text-foreground-muted uppercase tracking-wider">
+                      <th className="py-3 px-4 w-32">Cluster ID</th>
+                      <th className="py-3 px-4 w-28">Severity</th>
+                      <th className="py-3 px-4">Correlated Incident Title & Summary</th>
+                      <th className="py-3 px-4 w-24">Risk</th>
+                      <th className="py-3 px-4 w-28">Confidence</th>
+                      <th className="py-3 px-4 w-28 text-center">Alerts</th>
+                      <th className="py-3 px-4 w-32">Status</th>
+                      <th className="py-3 px-4 w-36">Investigation</th>
+                      <th className="py-3 px-4 w-32">Timespan</th>
+                      <th className="py-3 px-4 w-28 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border text-xs font-mono">
+                    {clusters.map((clu) => {
+                      const isCurrent = activeClusterId === clu.id;
+                      return (
+                        <tr
+                          key={clu.id}
+                          onClick={() => {
+                            setActiveClusterId(clu.id);
+                            setIsClusterModalOpen(true);
+                          }}
+                          className={cn(
+                            'hover:bg-surface-secondary/70 cursor-pointer transition-colors group',
+                            isCurrent && 'bg-primary/10'
+                          )}
+                        >
+                          <td className="py-3 px-4 font-bold text-foreground group-hover:text-primary transition-colors flex items-center space-x-1.5">
+                            <Layers className="w-3.5 h-3.5 text-primary shrink-0" />
+                            <span>{clu.cluster_number}</span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+                                getSeverityBadge(clu.severity as AlertSeverity)
+                              )}
+                            >
+                              {clu.severity}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <div className="space-y-0.5">
+                              <p className="font-bold text-foreground group-hover:text-primary transition-colors">
+                                {clu.title}
+                              </p>
+                              {clu.summary && (
+                                <p className="text-[11px] text-foreground-muted line-clamp-1">
+                                  {clu.summary}
+                                </p>
+                              )}
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-threat-critical">
+                              {clu.risk_score.toFixed(0)} / 100
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span className="font-bold text-primary">
+                              {Math.round(clu.confidence * 100)}%
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4 text-center">
+                            <span className="inline-flex items-center space-x-1 px-2 py-0.5 rounded bg-surface-secondary border border-border text-[11px] font-bold text-foreground">
+                              <GitBranch className="w-3 h-3 text-primary" />
+                              <span>{clu.alert_count}</span>
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            <span
+                              className={cn(
+                                'px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border',
+                                getClusterStatusBadge(clu.status)
+                              )}
+                            >
+                              {clu.status}
+                            </span>
+                          </td>
+
+                          <td className="py-3 px-4">
+                            {clu.investigation_id ? (
+                              <span className="text-primary font-bold hover:underline flex items-center space-x-1">
+                                <span className="truncate max-w-[120px]">{clu.investigation_id}</span>
+                                <ExternalLink className="w-2.5 h-2.5" />
+                              </span>
+                            ) : (
+                              <span className="text-foreground-subtle text-[11px]">—</span>
+                            )}
+                          </td>
+
+                          <td className="py-3 px-4 text-foreground-muted">
+                            <div className="flex items-center space-x-1" title={clu.last_seen}>
+                              <Clock className="w-3 h-3" />
+                              <span>{formatTimeAgo(clu.last_seen)}</span>
+                            </div>
+                          </td>
+
+                          <td className="py-3 px-4 text-right">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveClusterId(clu.id);
+                                setIsClusterModalOpen(true);
+                              }}
+                              className="px-2.5 py-1 bg-surface border border-border hover:border-primary text-foreground-muted hover:text-foreground rounded text-[10px] font-bold cursor-pointer transition-colors flex items-center space-x-1 ml-auto"
+                            >
+                              <span>Inspect</span>
+                              <ArrowRight className="w-3 h-3 text-primary" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
 
         {/* 6. Pagination Footer */}
-        {total > pageSize && (
+        {currentTotal > pageSize && (
           <div className="mt-4 flex items-center justify-between text-xs font-mono text-foreground-muted">
             <span>
-              Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, total)} of {total} alerts
+              Showing {page * pageSize + 1}–{Math.min((page + 1) * pageSize, currentTotal)} of {currentTotal} {viewMode === 'ALERTS' ? 'alerts' : 'clusters'}
             </span>
             <div className="flex items-center space-x-2">
               <button
@@ -618,6 +884,25 @@ export const AlertWorkspace: React.FC = () => {
         onAlertUpdated={(updated) => {
           setAlerts((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
           loadMetrics();
+        }}
+      />
+
+      {/* 8. Section 49: Alert Cluster Forensic Modal */}
+      <AlertClusterDetailModal
+        clusterId={activeClusterId}
+        isOpen={isClusterModalOpen}
+        onClose={() => {
+          setIsClusterModalOpen(false);
+          setActiveClusterId(null);
+        }}
+        onClusterUpdated={() => {
+          loadClusters();
+          loadAlerts();
+        }}
+        onSelectAlert={(alertId) => {
+          setIsClusterModalOpen(false);
+          setSelectedAlertId(alertId);
+          setIsDrawerOpen(true);
         }}
       />
     </div>
