@@ -4163,6 +4163,68 @@ class HuntExecutionModel(Base):
     )
 
 
+class PivotExecutionModel(Base):
+    """
+    Section 55: Persistent Execution Log for Advanced Threat Hunting Pivots.
+    Records provenance, source observable, target relationship, multi-hop traversal depth,
+    duration, and background job linkage.
+    """
+    __tablename__ = "pivot_executions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_type = Column(String(50), nullable=False, index=True)
+    source_value = Column(String(500), nullable=False, index=True)
+    pivot_type = Column(String(64), nullable=False, index=True)
+    execution_mode = Column(String(30), nullable=False, default="FAST")  # FAST, BACKGROUND
+    status = Column(String(30), nullable=False, default="SUCCEEDED", index=True)  # QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED
+    depth = Column(Integer, nullable=False, default=1)
+    result_count = Column(Integer, nullable=False, default=0)
+    results_summary_json = Column(Text, nullable=False, default="{}")
+    duration_ms = Column(Float, nullable=False, default=0.0)
+    job_id = Column(String(36), nullable=True, index=True)
+    executed_by = Column(String(100), nullable=False, default="analyst")
+    investigation_id = Column(String(36), nullable=True, index=True)
+    error_message = Column(Text, nullable=True)
+    started_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    completed_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index("ix_pe_ws_src_type_val", "workspace_id", "source_type", "source_value"),
+        Index("ix_pe_ws_pivot_status", "workspace_id", "pivot_type", "status"),
+    )
+
+
+class HuntHypothesisModel(Base):
+    """
+    Section 55: Structured Analyst Investigation Hypothesis & Evidence Classification.
+    Allows analysts to test propositions across pivoted entities (e.g., shared C2 infrastructure)
+    and categorize discovered relationships into supporting, contradicting, or neutral evidence.
+    """
+    __tablename__ = "hunt_hypotheses"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    investigation_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    title = Column(String(255), nullable=False)
+    hypothesis_text = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="PROPOSED", index=True)  # PROPOSED, INVESTIGATING, CONFIRMED, DISPROVED, ABANDONED
+    source_observable = Column(String(500), nullable=True)
+    supporting_items_json = Column(Text, nullable=False, default="[]")
+    contradicting_items_json = Column(Text, nullable=False, default="[]")
+    neutral_items_json = Column(Text, nullable=False, default="[]")
+    analyst_notes = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False, default="analyst")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_hh_ws_status", "workspace_id", "status"),
+        Index("ix_hh_ws_inv", "workspace_id", "investigation_id"),
+    )
+
+
+
 
 
 

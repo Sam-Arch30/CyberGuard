@@ -108,6 +108,14 @@ class RealtimeEventTypeEnum(str, Enum):
     HUNT_FAILED = "HUNT_FAILED"
     HUNT_CANCELLED = "HUNT_CANCELLED"
 
+    # Section 55: Advanced Threat Hunting & Investigation Pivots
+    PIVOT_STARTED = "PIVOT_STARTED"
+    PIVOT_PROGRESS = "PIVOT_PROGRESS"
+    PIVOT_COMPLETED = "PIVOT_COMPLETED"
+    PIVOT_PARTIALLY_COMPLETED = "PIVOT_PARTIALLY_COMPLETED"
+    PIVOT_FAILED = "PIVOT_FAILED"
+    PIVOT_CANCELLED = "PIVOT_CANCELLED"
+
 
 class RealtimeResourceScopeEnum(str, Enum):
     ANALYSIS_RUN = "ANALYSIS_RUN"
@@ -121,6 +129,7 @@ class RealtimeResourceScopeEnum(str, Enum):
     INCIDENT = "INCIDENT"
     WATCHLIST = "WATCHLIST"
     HUNT = "HUNT"
+    PIVOT = "PIVOT"
 
 
 

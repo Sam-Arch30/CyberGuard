@@ -924,6 +924,49 @@ async def handle_threat_hunt_execution(ctx: JobExecutionContext, db: Session) ->
     }
 
 
+@register_handler(JobTypeEnum.ADVANCED_PIVOT_EXECUTION.value)
+async def handle_advanced_pivot_execution(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 55: Asynchronous background threat hunting investigation pivot execution.
+    """
+    from backend.schemas.pivots import PivotRequest, PivotSourceTypeEnum, PivotTypeEnum
+    from backend.services.investigation_pivot_service import InvestigationPivotService
+
+    raw_req = ctx.payload.get("pivot_request")
+    if not raw_req:
+        raise PermanentJobError("Advanced pivot execution requires 'pivot_request' in job payload.")
+
+    try:
+        pivot_req = PivotRequest.model_validate(raw_req)
+    except Exception as exc:
+        raise PermanentJobError(f"Malformed pivot request: {exc}")
+
+    ctx.update_progress(db, 25.0, "RUNNING", f"Executing pivot '{pivot_req.pivot_type.value}' on {pivot_req.source_value}...")
+
+    res = InvestigationPivotService.execute_pivot(
+        db=db,
+        req=pivot_req,
+        workspace_id=ctx.workspace_id,
+        user_id=ctx.user_id or "system",
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Pivot completed: {res.total_results} entity targets discovered in {res.execution_time_ms}ms.",
+    )
+
+    return {
+        "execution_id": res.execution_id,
+        "pivot_type": res.pivot_type,
+        "source_value": res.source_value,
+        "total_results": res.total_results,
+        "execution_time_ms": res.execution_time_ms,
+    }
+
+
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

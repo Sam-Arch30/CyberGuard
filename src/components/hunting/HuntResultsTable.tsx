@@ -11,19 +11,21 @@ import {
   Compass,
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import type { HuntQueryResultResponse } from '../../types/hunting';
+import type { HuntQueryResultResponse, HuntResultItem } from '../../types/hunting';
 import { huntingService } from '../../services/huntingService';
 
 interface HuntResultsTableProps {
   results: HuntQueryResultResponse;
   onOpenInvestigationModal: (selectedIds: string[]) => void;
   onOpenWatchlistModal: (selectedIds: string[]) => void;
+  onOpenPivotModal?: (item: HuntResultItem) => void;
 }
 
 export const HuntResultsTable: React.FC<HuntResultsTableProps> = ({
   results,
   onOpenInvestigationModal,
   onOpenWatchlistModal,
+  onOpenPivotModal,
 }) => {
   const navigate = useNavigate();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -204,6 +206,19 @@ export const HuntResultsTable: React.FC<HuntResultsTableProps> = ({
           </div>
 
           <div className="flex items-center space-x-2">
+            {onOpenPivotModal && selectedIds.length > 0 && (
+              <button
+                onClick={() => {
+                  const first = results.items.find((it) => selectedIds.includes(it.id));
+                  if (first) onOpenPivotModal(first);
+                }}
+                className="px-3 py-1.5 text-xs font-mono text-foreground bg-surface hover:bg-surface-secondary border border-border rounded-control flex items-center space-x-1.5 cursor-pointer shadow-xs"
+                title="Open Advanced Pivot Explorer on selected item"
+              >
+                <Compass className="w-3.5 h-3.5 text-primary" />
+                <span>Pivot on Selected</span>
+              </button>
+            )}
             <button
               onClick={() => onOpenWatchlistModal(selectedIds)}
               className="px-3 py-1.5 text-xs font-mono text-foreground bg-surface hover:bg-surface-secondary border border-border rounded-control flex items-center space-x-1.5 cursor-pointer shadow-xs"
@@ -298,6 +313,16 @@ export const HuntResultsTable: React.FC<HuntResultsTableProps> = ({
 
                     <td className="py-2.5 px-3 text-right whitespace-nowrap">
                       <div className="flex items-center justify-end space-x-1.5">
+                        {onOpenPivotModal && (
+                          <button
+                            onClick={() => onOpenPivotModal(row)}
+                            className="px-2 py-1 text-xs font-mono font-medium text-primary bg-primary/10 hover:bg-primary/20 rounded-control border border-primary/30 flex items-center space-x-1 transition-colors cursor-pointer"
+                            title="Open Advanced Threat Hunting & Investigation Pivots Explorer"
+                          >
+                            <Compass className="w-3.5 h-3.5 text-primary" />
+                            <span>Pivot</span>
+                          </button>
+                        )}
                         {row.pivot_links.osint_url && (
                           <button
                             onClick={() => navigate(row.pivot_links.osint_url)}

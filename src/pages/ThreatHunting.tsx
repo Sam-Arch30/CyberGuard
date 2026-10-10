@@ -14,6 +14,7 @@ import type {
   HuntQueryResultResponse,
   SavedHuntResponse,
   SavedHuntCreateRequest,
+  HuntResultItem,
 } from '../types/hunting';
 import { huntingService } from '../services/huntingService';
 import { QueryBuilder } from '../components/hunting/QueryBuilder';
@@ -21,6 +22,7 @@ import { HuntResultsTable } from '../components/hunting/HuntResultsTable';
 import { SavedHuntsLibrary } from '../components/hunting/SavedHuntsLibrary';
 import { InvestigationHandoffModal } from '../components/hunting/InvestigationHandoffModal';
 import { WatchlistHandoffModal } from '../components/hunting/WatchlistHandoffModal';
+import { PivotPanel } from '../components/hunting/pivots/PivotPanel';
 
 export const ThreatHunting: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'workspace' | 'library'>('workspace');
@@ -59,6 +61,35 @@ export const ThreatHunting: React.FC = () => {
   const [handoffInvOpen, setHandoffInvOpen] = useState(false);
   const [handoffWlOpen, setHandoffWlOpen] = useState(false);
   const [selectedHandoffIds, setSelectedHandoffIds] = useState<string[]>([]);
+
+  // Section 55: Advanced Pivots State
+  const [pivotPanelOpen, setPivotPanelOpen] = useState(false);
+  const [pivotSourceType, setPivotSourceType] = useState('DOMAIN');
+  const [pivotSourceValue, setPivotSourceValue] = useState('');
+
+  const inferSourceType = (item: HuntResultItem): string => {
+    if (item.properties?.indicator_type) return String(item.properties.indicator_type).toUpperCase();
+    if (item.properties?.type) return String(item.properties.type).toUpperCase();
+    const val = item.primary_value.trim();
+    if (val.includes('@')) return 'EMAIL';
+    if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(val)) return 'IP';
+    if (/^[a-fA-F0-9]{32,64}$/.test(val)) return 'HASH';
+    if (val.startsWith('http://') || val.startsWith('https://')) return 'URL';
+    if (/^AS\d+$/i.test(val)) return 'ASN';
+    return 'DOMAIN';
+  };
+
+  const handleOpenPivot = (item: HuntResultItem) => {
+    setPivotSourceType(inferSourceType(item));
+    setPivotSourceValue(item.primary_value);
+    setPivotPanelOpen(true);
+  };
+
+  const handleHandoffToHunt = (queryDef: HuntQueryDefinition) => {
+    setQuery(queryDef);
+    setActiveTab('workspace');
+    showToast('Applied iterative hunt query from pivot targets. Ready to execute.');
+  };
 
   // Banner Feedback
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -284,6 +315,7 @@ export const ThreatHunting: React.FC = () => {
                 setSelectedHandoffIds(ids);
                 setHandoffWlOpen(true);
               }}
+              onOpenPivotModal={handleOpenPivot}
             />
           )}
         </div>
@@ -417,6 +449,15 @@ export const ThreatHunting: React.FC = () => {
           />
         </>
       )}
+
+      {/* 7. Section 55: Advanced Threat Hunting & Investigation Pivots Workspace */}
+      <PivotPanel
+        isOpen={pivotPanelOpen}
+        onClose={() => setPivotPanelOpen(false)}
+        initialSourceType={pivotSourceType}
+        initialSourceValue={pivotSourceValue}
+        onHandoffToHunt={handleHandoffToHunt}
+      />
     </div>
   );
 };
