@@ -207,7 +207,7 @@ export class BackgroundJobService {
     }
   ): () => void {
     return RealtimeService.subscribe<JobListResponse>({
-      url: `/api/jobs/stream`,
+      url: `/api/jobs/stream?workspace_id=${encodeURIComponent(workspaceId)}`,
       onEvent: callbacks.onEvent,
       onError: callbacks.onError,
       onStatusChange: callbacks.onStatusChange,

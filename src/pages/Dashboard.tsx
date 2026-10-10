@@ -437,9 +437,19 @@ export const Dashboard: React.FC = () => {
                 </span>
               )}
             </div>
-            <span className="text-[11px] font-mono text-foreground-muted">
-              Ranked by Urgency &amp; Risk
-            </span>
+            <div className="flex items-center space-x-3">
+              <button
+                type="button"
+                onClick={() => navigate('/alerts')}
+                className="text-primary hover:underline text-[11px] font-mono font-bold flex items-center space-x-1 cursor-pointer"
+              >
+                <span>Alert Triage</span>
+                <ChevronRight className="w-3 h-3" />
+              </button>
+              <span className="text-[11px] font-mono text-foreground-muted">
+                Ranked by Urgency &amp; Risk
+              </span>
+            </div>
           </div>
 
           {priorityQueue.length === 0 ? (

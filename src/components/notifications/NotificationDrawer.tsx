@@ -5,11 +5,8 @@ import {
   ShieldCheck,
   CheckCircle2,
   Clock,
-  ExternalLink,
   X,
   Check,
-  Filter,
-  AlertTriangle,
   Info,
   RefreshCw,
   ChevronRight,
@@ -484,7 +481,17 @@ export const NotificationDrawer: React.FC<NotificationDrawerProps> = ({
 
           {/* Footer */}
           <div className="px-5 py-3 border-t border-border bg-surface/60 flex items-center justify-between text-[11px] font-mono text-foreground-muted">
-            <span>Real-time transport: Section 46 SSE</span>
+            <button
+              type="button"
+              onClick={() => {
+                navigate('/alerts');
+                onClose();
+              }}
+              className="px-2.5 py-1 rounded bg-primary/10 text-primary border border-primary/20 hover:bg-primary/20 text-[11px] font-mono font-bold flex items-center space-x-1 cursor-pointer transition-colors"
+            >
+              <span>Alert Triage Workspace</span>
+              <ChevronRight className="w-3 h-3" />
+            </button>
             <button
               type="button"
               onClick={onClose}

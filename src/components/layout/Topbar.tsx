@@ -1,8 +1,7 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
 import {
   Bell,
   ShieldAlert,
-  ShieldCheck,
   Palette,
   Check,
   Sparkles,
@@ -27,7 +26,6 @@ export interface TopbarProps {
 }
 
 export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className }) => {
-  const [showNotifications, setShowNotifications] = useState(false);
   const [showThemeMenu, setShowThemeMenu] = useState(false);
   const [isSearchModalOpen, setIsSearchModalOpen] = useState(false);
   const [drawerIndicator, setDrawerIndicator] = useState<string | null>(null);
@@ -43,7 +41,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
   const [isResettingWorkspace, setIsResettingWorkspace] = useState(false);
 
   const themeMenuRef = useRef<HTMLDivElement>(null);
-  const notifRef = useRef<HTMLDivElement>(null);
 
   // Section 47: Fetch unread counts from authoritative API
   const fetchUnreadCounts = useCallback(async () => {
@@ -100,9 +97,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
       if (themeMenuRef.current && !themeMenuRef.current.contains(event.target as Node)) {
         setShowThemeMenu(false);
       }
-      if (notifRef.current && !notifRef.current.contains(event.target as Node)) {
-        setShowNotifications(false);
-      }
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
@@ -117,44 +111,6 @@ export const Topbar: React.FC<TopbarProps> = ({ onToggleMobileSidebar, className
       setIsResettingWorkspace(false);
     }
   };
-
-  // Derive alerts from current active email telemetry
-  const alerts = useMemo(() => {
-    if (!activeEmail) return [];
-    const list = [];
-    if (activeEmail.threat_score && activeEmail.threat_score.score >= 50) {
-      list.push({
-        id: 'ALT-SCORE',
-        title: `Threat Score: ${activeEmail.threat_score.score}/100 (${activeEmail.threat_score.severity?.toUpperCase() || 'HIGH'})`,
-        time: 'Active Investigation',
-        level: activeEmail.threat_score.score >= 80 ? 'CRITICAL' : 'HIGH',
-        sender: activeEmail.from || activeEmail.subject || 'Threat detected',
-      });
-    }
-    const spfResult = activeEmail.authentication?.spf?.result?.toLowerCase();
-    const dkimResult = activeEmail.authentication?.dkim?.result?.toLowerCase();
-    const dmarcResult = activeEmail.authentication?.dmarc?.result?.toLowerCase();
-    if (spfResult === 'fail' || dkimResult === 'fail' || dmarcResult === 'fail') {
-      list.push({
-        id: 'ALT-AUTH',
-        title: 'Cryptographic Authentication Verification Failure',
-        time: 'Envelope Parsed',
-        level: 'CRITICAL',
-        sender: `SPF: ${spfResult || 'none'}, DKIM: ${dkimResult || 'none'}, DMARC: ${dmarcResult || 'none'}`,
-      });
-    }
-    const urls = activeEmail.indicators?.urls || [];
-    if (urls.length > 0 && activeEmail.threat_score && activeEmail.threat_score.score >= 50) {
-      list.push({
-        id: 'ALT-URL',
-        title: `${urls.length} URL Indicator(s) Extracted from Email`,
-        time: 'Payload Analysis',
-        level: 'HIGH',
-        sender: urls[0]?.value || 'Observed URL',
-      });
-    }
-    return list;
-  }, [activeEmail]);
 
   // Derive heading hierarchy based on current route (Section 13)
   const pageHeading = useMemo(() => {

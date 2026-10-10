@@ -88,6 +88,14 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE reports ADD COLUMN workspace_id VARCHAR(128) DEFAULT 'default';",
                     "ALTER TABLE analysis_events ADD COLUMN sequence INTEGER DEFAULT 1;",
                     "ALTER TABLE background_job_events ADD COLUMN sequence INTEGER DEFAULT 1;",
+                    "ALTER TABLE notifications ADD COLUMN assigned_to VARCHAR(100);",
+                    "ALTER TABLE notifications ADD COLUMN resolved_at DATETIME;",
+                    "ALTER TABLE notifications ADD COLUMN resolved_by VARCHAR(100);",
+                    "ALTER TABLE notifications ADD COLUMN resolution_reason TEXT;",
+                    "ALTER TABLE notifications ADD COLUMN false_positive_reason TEXT;",
+                    "ALTER TABLE notifications ADD COLUMN suppression_reason TEXT;",
+                    "ALTER TABLE notifications ADD COLUMN suppression_scope VARCHAR(50);",
+                    "ALTER TABLE notifications ADD COLUMN updated_at DATETIME;",
                 ]
                 for stmt in column_migrations:
                     try:

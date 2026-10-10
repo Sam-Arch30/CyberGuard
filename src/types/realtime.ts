@@ -43,10 +43,15 @@ export type RealtimeEventType =
   | 'REPORT_GENERATION_STARTED'
   | 'REPORT_READY'
   | 'REPORT_FAILED'
-  // Section 47: Notifications & Alerts
+  // Section 47 & 48: Notifications & Security Alerts
   | 'NOTIFICATION_CREATED'
   | 'NOTIFICATION_READ'
-  | 'ALERT_ACKNOWLEDGED';
+  | 'ALERT_ACKNOWLEDGED'
+  | 'ALERT_STATUS_CHANGED'
+  | 'ALERT_ASSIGNED'
+  | 'ALERT_RESOLVED'
+  | 'ALERT_NOTE_ADDED'
+  | 'ALERT_SUPPRESSED';
 
 export interface RealtimeEventPayload {
   finding_id?: string;

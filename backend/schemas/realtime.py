@@ -50,10 +50,15 @@ class RealtimeEventTypeEnum(str, Enum):
     REPORT_READY = "REPORT_READY"
     REPORT_FAILED = "REPORT_FAILED"
 
-    # Section 47: Notifications & Security Alerts
+    # Section 47 & 48: Notifications & Security Alerts Triage
     NOTIFICATION_CREATED = "NOTIFICATION_CREATED"
     NOTIFICATION_READ = "NOTIFICATION_READ"
     ALERT_ACKNOWLEDGED = "ALERT_ACKNOWLEDGED"
+    ALERT_STATUS_CHANGED = "ALERT_STATUS_CHANGED"
+    ALERT_ASSIGNED = "ALERT_ASSIGNED"
+    ALERT_RESOLVED = "ALERT_RESOLVED"
+    ALERT_NOTE_ADDED = "ALERT_NOTE_ADDED"
+    ALERT_SUPPRESSED = "ALERT_SUPPRESSED"
 
 
 class RealtimeResourceScopeEnum(str, Enum):
@@ -63,6 +68,8 @@ class RealtimeResourceScopeEnum(str, Enum):
     REPORT = "REPORT"
     WORKSPACE = "WORKSPACE"
     NOTIFICATION = "NOTIFICATION"
+    ALERT = "ALERT"
+
 
 
 

@@ -8,7 +8,6 @@ import { RealtimeService } from '../services/realtimeService';
 import type {
   RealtimeConnectionStatus,
   RealtimeEvent,
-  RealtimeSubscriptionOptions,
 } from '../types/realtime';
 
 export interface UseRealtimeSubscriptionProps<T = unknown> {

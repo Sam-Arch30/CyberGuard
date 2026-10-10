@@ -30,6 +30,7 @@ import { FileSecurityView } from './pages/FileSecurityView';
 import { UrlSecurityView } from './pages/UrlSecurityView';
 import { EndpointAgentView } from './pages/EndpointAgentView';
 import { DesignSystemPreview } from './pages/DesignSystemPreview';
+import { AlertWorkspace } from './pages/AlertWorkspace';
 
 function AppContent() {
   return (
@@ -43,6 +44,11 @@ function AppContent() {
         <Route path="/reports/:id" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/:tab" element={<Settings />} />
+
+        {/* Section 48: Alert Management & Triage Workspace */}
+        <Route path="/alerts" element={<AlertWorkspace />} />
+        <Route path="/alerts/:id" element={<AlertWorkspace />} />
+        <Route path="/security-alerts" element={<Navigate to="/alerts" replace />} />
 
         {/* Canonical Investigation Workspace Routes */}
         <Route path="/investigations/:id" element={<InvestigationWorkspace />} />

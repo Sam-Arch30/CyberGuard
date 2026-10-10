@@ -3373,6 +3373,16 @@ class NotificationModel(Base):
     acknowledged_at = Column(DateTime, nullable=True)
     acknowledged_by = Column(String(100), nullable=True)
 
+    # Section 48: Alert Triage & Disposition Lifecycle
+    assigned_to = Column(String(100), nullable=True, index=True)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(String(100), nullable=True)
+    resolution_reason = Column(Text, nullable=True)
+    false_positive_reason = Column(Text, nullable=True)
+    suppression_reason = Column(Text, nullable=True)
+    suppression_scope = Column(String(50), nullable=True)  # THIS_ALERT, INDICATOR, PATTERN
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False, index=True)
+
     # Relationships
     analysis_run = relationship("AnalysisRunModel", foreign_keys=[analysis_run_id])
     finding = relationship("FindingModel", foreign_keys=[finding_id])
@@ -3385,7 +3395,14 @@ class NotificationModel(Base):
         Index("ix_notif_ws_dedup", "workspace_id", "deduplication_key"),
         Index("ix_notif_ws_created", "workspace_id", "created_at"),
         Index("ix_notif_ws_inv", "workspace_id", "investigation_id"),
+        Index("ix_notif_ws_assign", "workspace_id", "assigned_to"),
+        Index("ix_notif_ws_sev_status", "workspace_id", "severity", "status"),
     )
+
+
+# Section 48: Unified Domain Model alias for Security Alerts
+AlertModel = NotificationModel
+
 
 
 
