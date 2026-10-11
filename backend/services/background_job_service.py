@@ -57,6 +57,9 @@ DEFAULT_JOB_TIMEOUTS: Dict[str, int] = {
     JobTypeEnum.DETECTION_PIPELINE_REPLAY.value: 600,
     JobTypeEnum.ATTACK_SURFACE_REFRESH.value: 300,
     JobTypeEnum.ATTACK_SURFACE_DISCOVERY.value: 300,
+    JobTypeEnum.INVENTORY_SYNC.value: 300,
+    JobTypeEnum.INVENTORY_RECONCILIATION.value: 300,
+    JobTypeEnum.INVENTORY_STALE_CHECK.value: 180,
 }
 
 # Legal lifecycle state transition matrix

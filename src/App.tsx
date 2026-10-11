@@ -38,6 +38,7 @@ import { ThreatHunting } from './pages/ThreatHunting';
 import { DetectionRules } from './pages/DetectionRules';
 import { CrossSourceCorrelationPage } from './pages/CrossSourceCorrelationPage';
 import { AttackSurfacePage } from './pages/AttackSurfacePage';
+import { InventoryPage } from './pages/InventoryPage';
 
 function AppContent() {
   return (
@@ -69,7 +70,14 @@ function AppContent() {
         {/* Section 62: Attack Surface Intelligence */}
         <Route path="/attack-surface" element={<AttackSurfacePage />} />
         <Route path="/attack-surface/:id" element={<AttackSurfacePage />} />
-        <Route path="/assets" element={<Navigate to="/attack-surface" replace />} />
+
+        {/* Section 63: Asset & Identity Inventory */}
+        <Route path="/inventory" element={<InventoryPage />} />
+        <Route path="/inventory/:id" element={<InventoryPage />} />
+        <Route path="/assets" element={<InventoryPage />} />
+        <Route path="/assets/:id" element={<InventoryPage />} />
+        <Route path="/identities" element={<InventoryPage />} />
+        <Route path="/identities/:id" element={<InventoryPage />} />
 
         {/* Canonical Investigation Workspace Routes */}
         <Route path="/investigations/:id" element={<InvestigationWorkspace />} />

@@ -61,6 +61,7 @@ from backend.api.routes.detection_pipeline import router as detection_pipeline_r
 from backend.api.routes.behavioral_detection import router as behavioral_detection_router
 from backend.api.routes.cross_source_correlation import router as cross_source_correlation_router
 from backend.api.routes.attack_surface import router as attack_surface_router
+from backend.api.routes.inventory import router as inventory_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -149,6 +150,7 @@ app.include_router(behavioral_detection_router, prefix="/api/behavioral")
 app.include_router(cross_source_correlation_router)
 app.include_router(cross_source_correlation_router, prefix="/api/cross-source-correlation")
 app.include_router(attack_surface_router)
+app.include_router(inventory_router)
 app.include_router(correlation_router)
 app.include_router(reports_router)
 app.include_router(audit_router)

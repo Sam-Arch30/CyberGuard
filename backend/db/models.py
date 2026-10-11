@@ -4910,6 +4910,14 @@ class AssetModel(Base):
     active_exposure_count = Column(Integer, nullable=False, default=0)
     first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
     last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    department = Column(String(100), nullable=True)
+    ownership_status = Column(String(32), nullable=False, default="UNASSIGNED", index=True)  # ASSIGNED, UNASSIGNED, UNKNOWN, CONFLICTED, INFERRED
+    classification = Column(String(50), nullable=True, index=True)  # SERVER, WORKSTATION, LAPTOP, MOBILE, DATABASE, APPLICATION, API, NETWORK_DEVICE, CLOUD_RESOURCE
+    tags_json = Column(Text, default="[]", nullable=False)
+    last_observed_at = Column(DateTime, nullable=True)
+    last_sync_at = Column(DateTime, nullable=True)
+    is_managed = Column(Boolean, default=True, nullable=False, index=True)
+    is_stale = Column(Boolean, default=False, nullable=False, index=True)
     last_scanned_at = Column(DateTime, nullable=True)
     last_analyzed_at = Column(DateTime, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
@@ -4924,6 +4932,7 @@ class AssetModel(Base):
         Index("ix_assets_ws_status_exp", "workspace_id", "status", "exposure_state"),
         Index("ix_assets_ws_crit_risk", "workspace_id", "criticality", "risk_score"),
         Index("ix_assets_ws_last_seen", "workspace_id", "last_seen_at"),
+        Index("ix_assets_ws_own_stale", "workspace_id", "ownership_status", "is_stale"),
     )
 
     @property
@@ -4932,6 +4941,13 @@ class AssetModel(Base):
             return json.loads(self.metadata_json or "{}")
         except Exception:
             return {}
+
+    @property
+    def tags_list(self) -> List[str]:
+        try:
+            return json.loads(self.tags_json or "[]")
+        except Exception:
+            return []
 
 
 class ExposureModel(Base):
@@ -5089,6 +5105,168 @@ class AttackSurfaceSnapshotModel(Base):
             return json.loads(self.diff_summary_json or "{}")
         except Exception:
             return {}
+
+
+# ============================================================================
+# SECTION 63: ASSET & IDENTITY INVENTORY MODELS
+# ============================================================================
+
+class IdentityModel(Base):
+    """
+    Section 63: Authoritative Enterprise Identity & Account Representation.
+    Tracks human users, accounts, service accounts, and API identities, their privileges,
+    associated assets, manager/team lineage, and authentication freshness.
+    """
+    __tablename__ = "identities"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    identity_type = Column(String(32), nullable=False, default="USER", index=True)  # USER, ACCOUNT, SERVICE_ACCOUNT, APPLICATION_IDENTITY, API_CLIENT
+    canonical_identifier = Column(String(255), nullable=False, index=True)  # Lowercased email, UPN, directory username
+    display_name = Column(String(255), nullable=False, index=True)
+    email = Column(String(255), nullable=True, index=True)
+    username = Column(String(100), nullable=True, index=True)
+    department = Column(String(100), nullable=True)
+    team = Column(String(100), nullable=True)
+    business_unit = Column(String(100), nullable=True)
+    manager = Column(String(255), nullable=True)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # ACTIVE, INACTIVE, DORMANT, SUSPENDED, RETIRED, UNKNOWN
+    criticality = Column(String(20), nullable=False, default="MEDIUM", index=True)  # CRITICAL, HIGH, MEDIUM, LOW
+    is_privileged = Column(Boolean, default=False, nullable=False, index=True)  # Administrator, high-privilege account
+    is_service_account = Column(Boolean, default=False, nullable=False, index=True)
+    is_orphaned = Column(Boolean, default=False, nullable=False, index=True)  # Missing known owner or application
+    is_dormant = Column(Boolean, default=False, nullable=False, index=True)  # Inactive authentication > threshold
+    source = Column(String(50), nullable=False, default="DIRECTORY", index=True)  # DIRECTORY, IDP, HR_SYSTEM, ENDPOINT_AGENT, CLOUD_IAM, MANUAL_ANALYST
+    external_id = Column(String(255), nullable=True, index=True)  # Directory GUID, IdP object ID
+    canonical_entity_id = Column(String(128), nullable=True, index=True)  # Link to Knowledge Graph EntityModel.id
+    risk_score = Column(Float, nullable=False, default=0.0)
+    risk_level = Column(String(20), nullable=False, default="LOW")
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_authenticated_at = Column(DateTime, nullable=True)
+    last_sync_at = Column(DateTime, nullable=True)
+    tags_json = Column(Text, default="[]", nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_identities_ws_canon", "workspace_id", "canonical_identifier", unique=True),
+        Index("ix_identities_ws_status_type", "workspace_id", "status", "identity_type"),
+        Index("ix_identities_ws_priv_orph", "workspace_id", "is_privileged", "is_orphaned"),
+    )
+
+    @property
+    def metadata_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.metadata_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def tags_list(self) -> List[str]:
+        try:
+            return json.loads(self.tags_json or "[]")
+        except Exception:
+            return []
+
+
+class InventorySourceModel(Base):
+    """
+    Section 63: Controlled Inventory Source Registry.
+    Tracks authoritative systems (CMDB, IdP, Agent, Cloud) and their deterministic precedence weights.
+    """
+    __tablename__ = "inventory_sources"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_type = Column(String(32), nullable=False, index=True)  # DIRECTORY, CMDB, ENDPOINT_AGENT, CLOUD_PROVIDER, APPLICATION_REGISTRY, NETWORK_TELEMETRY, MANUAL
+    name = Column(String(128), nullable=False)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # ACTIVE, DEGRADED, OFFLINE, PAUSED
+    authority_weight = Column(Integer, nullable=False, default=50)  # e.g., CMDB=100, Directory=80, Agent=60, Cloud=50, Network=40, Inferred=20
+    sync_interval_seconds = Column(Integer, nullable=False, default=3600)
+    last_sync_at = Column(DateTime, nullable=True)
+    last_sync_status = Column(String(32), nullable=True)  # SUCCESS, PARTIAL, FAILED
+    last_sync_record_count = Column(Integer, nullable=False, default=0)
+    health_status = Column(String(32), nullable=False, default="HEALTHY")  # HEALTHY, DEGRADED, UNHEALTHY
+    capabilities_json = Column(Text, default="[]", nullable=False)
+    config_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_inv_sources_ws_type", "workspace_id", "source_type"),
+    )
+
+    @property
+    def capabilities_list(self) -> List[str]:
+        try:
+            return json.loads(self.capabilities_json or "[]")
+        except Exception:
+            return []
+
+
+class InventoryConflictModel(Base):
+    """
+    Section 63: Source Conflict Registry & Review Workspace.
+    Tracks discrepancies between authoritative sources (e.g., CMDB owner vs Directory owner)
+    with source authority justification and audit resolution state.
+    """
+    __tablename__ = "inventory_conflicts"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    target_type = Column(String(32), nullable=False, index=True)  # ASSET, IDENTITY
+    target_id = Column(String(36), nullable=False, index=True)
+    target_canonical_name = Column(String(255), nullable=False, index=True)
+    field_name = Column(String(64), nullable=False, index=True)  # owner, team, environment, criticality, status
+    conflicting_values_json = Column(Text, default="[]", nullable=False)  # Array of {source, source_id, value, authority_weight, observed_at}
+    resolved_value = Column(String(255), nullable=True)
+    resolved_source = Column(String(64), nullable=True)
+    resolution_reason = Column(Text, nullable=True)
+    status = Column(String(32), nullable=False, default="PENDING_REVIEW", index=True)  # AUTO_RESOLVED, PENDING_REVIEW, MANUALLY_RESOLVED, IGNORED
+    resolved_by = Column(String(100), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_inv_conflicts_ws_status", "workspace_id", "status"),
+        Index("ix_inv_conflicts_target", "target_type", "target_id"),
+    )
+
+    @property
+    def conflicting_values_list(self) -> List[Dict[str, Any]]:
+        try:
+            return json.loads(self.conflicting_values_json or "[]")
+        except Exception:
+            return []
+
+
+class InventoryOverrideModel(Base):
+    """
+    Section 63: Manual Analyst Metadata Overrides.
+    Captures manual edits with full audit trail, preserving original source values.
+    """
+    __tablename__ = "inventory_overrides"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    target_type = Column(String(32), nullable=False, index=True)  # ASSET, IDENTITY
+    target_id = Column(String(36), nullable=False, index=True)
+    field_name = Column(String(64), nullable=False, index=True)
+    previous_value = Column(String(255), nullable=True)
+    new_value = Column(String(255), nullable=False)
+    reason = Column(Text, nullable=True)
+    actor = Column(String(100), nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_inv_overrides_ws_target", "workspace_id", "target_type", "target_id"),
+    )
+
 
 
 

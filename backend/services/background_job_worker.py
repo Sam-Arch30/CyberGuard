@@ -1374,6 +1374,69 @@ async def handle_attack_surface_discovery_job(ctx: JobExecutionContext, db: Sess
     return res.model_dump()
 
 
+@register_handler(JobTypeEnum.INVENTORY_SYNC.value)
+async def handle_inventory_sync_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 63: Full or source-specific inventory synchronization.
+    """
+    from backend.services.inventory_service import InventoryService
+    from backend.schemas.inventory import InventorySyncRequest
+
+    ctx.update_progress(db, 10.0, "SYNCING", "Starting inventory synchronization sweep...")
+    req = InventorySyncRequest(
+        source_ids=ctx.payload.get("source_ids"),
+        sync_endpoints=ctx.payload.get("sync_endpoints", True),
+        sync_identities=ctx.payload.get("sync_identities", True),
+        sync_telemetry=ctx.payload.get("sync_telemetry", True),
+    )
+    res = InventoryService.run_inventory_sync(db, ctx.workspace_id, req)
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Inventory sync completed: {res.assets_synced} assets, {res.identities_synced} identities."
+    )
+    return res.model_dump()
+
+
+@register_handler(JobTypeEnum.INVENTORY_RECONCILIATION.value)
+async def handle_inventory_reconciliation_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 63: Asynchronous full inventory reconciliation sweep.
+    Detects stale assets, unmanaged endpoints, dormant accounts, and unassigned owners.
+    """
+    from backend.services.inventory_service import InventoryService
+
+    ctx.update_progress(db, 10.0, "RECONCILING", "Executing full inventory reconciliation...")
+    report = InventoryService.run_reconciliation(db, ctx.workspace_id)
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Reconciliation completed: {report.stale_assets_flagged} stale assets, {report.dormant_identities_flagged} dormant identities."
+    )
+    return report.model_dump()
+
+
+@register_handler(JobTypeEnum.INVENTORY_STALE_CHECK.value)
+async def handle_inventory_stale_check_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 63: Stale asset and dormant identity check.
+    """
+    from backend.services.inventory_service import InventoryService
+
+    ctx.update_progress(db, 15.0, "CHECKING", "Checking inventory telemetry freshness...")
+    report = InventoryService.run_reconciliation(db, ctx.workspace_id)
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Freshness check completed: {report.stale_assets_flagged} stale assets flagged."
+    )
+    return report.model_dump()
+
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

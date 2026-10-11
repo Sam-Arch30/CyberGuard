@@ -13,6 +13,7 @@ import {
   Binary,
   GitMerge,
   Globe,
+  Boxes,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -134,9 +135,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'attack-surface',
       name: 'Attack Surface',
       path: '/attack-surface',
-      matchPrefixes: ['/attack-surface', '/assets'],
+      matchPrefixes: ['/attack-surface'],
       icon: Globe,
       description: 'Asset discovery, external/internal exposure mapping & risk prioritization',
+    },
+    {
+      id: 'inventory',
+      name: 'Inventory',
+      path: '/inventory',
+      matchPrefixes: ['/inventory', '/assets', '/identities'],
+      icon: Boxes,
+      description: 'Authoritative asset & identity inventory, ownership & source precedence',
     },
     {
       id: 'incidents',
