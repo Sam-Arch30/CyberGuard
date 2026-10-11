@@ -17,7 +17,8 @@ export type InvestigationWorkspaceSection =
   | 'evidence'
   | 'intelligence'
   | 'response'
-  | 'report';
+  | 'report'
+  | 'automation';
 
 export type InvestigationStatus =
   | 'NEW'

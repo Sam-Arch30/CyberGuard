@@ -24,6 +24,7 @@ import {
   GitBranch,
   Network,
   Clock,
+  Bot,
 } from 'lucide-react';
 import { useInvestigation, INVESTIGATION_SECTIONS, type InvestigationSection } from '../../context/InvestigationContext';
 import { AddToCaseModal } from '../case/AddToCaseModal';
@@ -40,6 +41,7 @@ const SECTION_ICONS: Record<InvestigationSection, React.FC<{ className?: string 
   intelligence: Globe2,
   response: ShieldAlert,
   report: FileCheck,
+  automation: Bot,
   email: FileText,
   investigation: FolderLock,
 };

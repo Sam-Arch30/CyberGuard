@@ -547,6 +547,14 @@ class RealtimePublisher:
             logger.warning("Failure isolated in publish_to_workspace: %s", e)
 
     @classmethod
+    def publish(cls, event: RealtimeEvent) -> None:
+        """Broadcasts a realtime event safely without blocking or throwing."""
+        try:
+            cls._async_broadcast(event)
+        except Exception as e:
+            logger.warning("Failure isolated in publish: %s", e)
+
+    @classmethod
     def _async_broadcast(cls, event: RealtimeEvent) -> None:
         """Schedules broadcast in running event loop safely."""
         try:

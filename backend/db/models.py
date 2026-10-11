@@ -5538,6 +5538,134 @@ class ThreatActorRelationshipModel(Base):
     )
 
 
+# =============================================================================
+# Section 66: Advanced Investigation Automation Models
+# =============================================================================
+
+class InvestigationAutomationRunModel(Base):
+    """
+    Section 66: Persistent record of an investigation automation execution.
+    Represents an authorized, bounded execution of planned investigation steps
+    for an authoritative investigation/incident.
+    """
+    __tablename__ = "investigation_automation_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    investigation_id = Column(String(64), nullable=False, index=True)
+    trigger_type = Column(String(64), nullable=False, default="MANUAL_ANALYST", index=True)
+    mode = Column(String(32), nullable=False, default="ASSISTED")  # MANUAL, ASSISTED, POLICY_AUTOMATIC
+    template_name = Column(String(64), nullable=False, default="GENERAL_INCIDENT_INVESTIGATION")
+    plan_version = Column(String(32), nullable=False, default="v1.0")
+    status = Column(String(32), nullable=False, default="QUEUED", index=True)  # QUEUED, PLANNING, RUNNING, PARTIALLY_COMPLETED, WAITING_FOR_ANALYST, COMPLETED, FAILED, CANCELLED, TIMED_OUT
+    budget_json = Column(Text, nullable=False, default="{}")  # max_steps, max_time_seconds, max_depth, max_entities, max_hunts
+    visited_entities_json = Column(Text, nullable=False, default="[]")  # loop prevention tracking
+    total_steps = Column(Integer, nullable=False, default=0)
+    completed_steps = Column(Integer, nullable=False, default=0)
+    failed_steps = Column(Integer, nullable=False, default=0)
+    coverage_summary_json = Column(Text, nullable=False, default="{}")
+    investigation_summary_json = Column(Text, nullable=False, default="{}")  # knowns, unknowns, assessment, next steps
+    error_message = Column(Text, nullable=True)
+    created_by = Column(String(100), nullable=False, default="SOC Analyst")
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    steps = relationship("InvestigationAutomationStepModel", back_populates="run", cascade="all, delete-orphan", order_by="InvestigationAutomationStepModel.step_index")
+    gaps = relationship("InvestigationGapModel", back_populates="run")
+
+    __table_args__ = (
+        Index("ix_iar_ws_inv", "workspace_id", "investigation_id"),
+        Index("ix_iar_status", "status"),
+    )
+
+
+class InvestigationAutomationStepModel(Base):
+    """
+    Section 66: Discrete, bounded investigation step within an automation run.
+    Contains explicit typed action, parameters, execution state, and output summary.
+    """
+    __tablename__ = "investigation_automation_steps"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    run_id = Column(String(36), ForeignKey("investigation_automation_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_index = Column(Integer, nullable=False)
+    action_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    cost_class = Column(String(32), nullable=False, default="NORMAL")  # FAST, NORMAL, EXPENSIVE, BACKGROUND
+    approval_level = Column(String(32), nullable=False, default="READ_ONLY_AUTOMATIC")  # READ_ONLY_AUTOMATIC, READ_ONLY_APPROVAL_OPTIONAL, ANALYST_APPROVAL_REQUIRED, ADMIN_APPROVAL_REQUIRED, FORBIDDEN
+    status = Column(String(32), nullable=False, default="QUEUED", index=True)  # QUEUED, WAITING_APPROVAL, RUNNING, COMPLETED, PARTIALLY_COMPLETED, FAILED, CANCELLED, SKIPPED
+    input_params_json = Column(Text, nullable=False, default="{}")
+    result_summary_json = Column(Text, nullable=False, default="{}")
+    result_count = Column(Integer, nullable=False, default=0)
+    warnings_json = Column(Text, nullable=False, default="[]")
+    error_message = Column(Text, nullable=True)
+    approved_by = Column(String(100), nullable=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    duration_ms = Column(Integer, nullable=False, default=0)
+
+    run = relationship("InvestigationAutomationRunModel", back_populates="steps")
+
+    __table_args__ = (
+        Index("ix_ias_run_idx", "run_id", "step_index"),
+        Index("ix_ias_action", "action_id"),
+    )
+
+
+class InvestigationAutomationPolicyModel(Base):
+    """
+    Section 66: Controlled policy governing automated investigation triggers and allowed steps.
+    """
+    __tablename__ = "investigation_automation_policies"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # DRAFT, ACTIVE, DISABLED, ARCHIVED
+    template_name = Column(String(64), nullable=False, default="GENERAL_INCIDENT_INVESTIGATION")
+    trigger_conditions_json = Column(Text, nullable=False, default="{}")
+    allowed_steps_json = Column(Text, nullable=False, default="[]")
+    limits_json = Column(Text, nullable=False, default="{}")
+    version = Column(String(32), nullable=False, default="1.0")
+    created_by = Column(String(100), nullable=False, default="Security Admin")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_iap_ws_status", "workspace_id", "status"),
+    )
+
+
+class InvestigationGapModel(Base):
+    """
+    Section 66: Identified missing information or telemetry blindspot in an investigation.
+    Represents an investigation gap (e.g. stale auth logs, missing endpoint data), not a malicious finding.
+    """
+    __tablename__ = "investigation_gaps"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    investigation_id = Column(String(64), nullable=False, index=True)
+    run_id = Column(String(36), ForeignKey("investigation_automation_runs.id", ondelete="SET NULL"), nullable=True, index=True)
+    category = Column(String(64), nullable=False, index=True)  # TELEMETRY_MISSING, AUTHENTICATION_STALE, INTELLIGENCE_UNAVAILABLE, TEMPORAL_BLINDSPOT, UNRESOLVED_IDENTITY, ENDPOINT_OFFLINE
+    severity = Column(String(32), nullable=False, default="MEDIUM")  # LOW, MEDIUM, HIGH, CRITICAL
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    remediation_recommendation = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    run = relationship("InvestigationAutomationRunModel", back_populates="gaps")
+
+    __table_args__ = (
+        Index("ix_ig_ws_inv", "workspace_id", "investigation_id"),
+        Index("ix_ig_cat_sev", "category", "severity"),
+    )
+
+
+
 
 
 

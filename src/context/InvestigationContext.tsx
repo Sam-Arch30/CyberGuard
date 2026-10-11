@@ -22,6 +22,7 @@ export type InvestigationSection =
   | 'intelligence'
   | 'response'
   | 'report'
+  | 'automation'
   | 'email'
   | 'investigation';
 
@@ -108,8 +109,16 @@ export const INVESTIGATION_SECTIONS: SectionMetadata[] = [
     defaultSubTab: 'generate'
   },
   {
-    id: 'email',
+    id: 'automation',
     number: '10',
+    label: 'Automation',
+    shortLabel: 'Automation',
+    description: 'Automated workflow execution, gated approvals, telemetry audit & gaps',
+    defaultSubTab: 'runs'
+  },
+  {
+    id: 'email',
+    number: '11',
     label: 'Email',
     shortLabel: 'Email',
     description: 'Email identity, authentication, relay path, headers & evidence',
@@ -224,6 +233,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     intelligence: 'all',
     response: 'recommendations',
     report: 'generate',
+    automation: 'runs',
     email: 'body',
     investigation: 'graph',
   });

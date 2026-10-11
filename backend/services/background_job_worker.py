@@ -1498,6 +1498,37 @@ async def handle_campaign_workspace_jobs(ctx: JobExecutionContext, db: Session) 
     }
 
 
+@register_handler(JobTypeEnum.INVESTIGATION_AUTOMATION_RUN.value)
+async def handle_investigation_automation_run(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 66: Asynchronous execution of an investigation automation run.
+    """
+    from backend.services.investigation_automation_service import InvestigationAutomationService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    run_id = params.get("run_id") or getattr(ctx, "resource_id", None)
+    if not run_id:
+        raise PermanentJobError("Missing required 'run_id' for INVESTIGATION_AUTOMATION_RUN job.")
+
+    ctx.update_progress(db, 10.0, "RUNNING", f"Executing investigation automation run {run_id}...")
+    run = InvestigationAutomationService.execute_automation_run(db, run_id)
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Investigation automation finished with status {run.status} ({run.completed_steps}/{run.total_steps} steps completed).",
+    )
+    return {
+        "run_id": run.id,
+        "status": run.status,
+        "completed_steps": run.completed_steps,
+        "total_steps": run.total_steps,
+        "failed_steps": run.failed_steps,
+    }
+
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

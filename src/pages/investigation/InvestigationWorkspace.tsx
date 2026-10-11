@@ -21,6 +21,7 @@ import { EvidenceSectionView } from './sections/EvidenceSectionView';
 import { IntelligenceSectionView } from './sections/IntelligenceSectionView';
 import { ResponseSectionView } from './sections/ResponseSectionView';
 import { ReportSectionView } from './sections/ReportSectionView';
+import { AutomationSectionView } from './sections/AutomationSectionView';
 
 // Backward-compatible sections
 import { EmailSectionView } from './sections/EmailSectionView';
@@ -188,6 +189,9 @@ export const InvestigationWorkspace: React.FC = () => {
         )}
         {activeSection === 'report' && (
           <ReportSectionView investigationId={effectiveId || ''} email={activeEmail || undefined} />
+        )}
+        {activeSection === 'automation' && (
+          <AutomationSectionView />
         )}
 
         {/* Backward-compatible legacy aliases */}

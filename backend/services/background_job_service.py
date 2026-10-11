@@ -63,6 +63,7 @@ DEFAULT_JOB_TIMEOUTS: Dict[str, int] = {
     JobTypeEnum.ASSET_PRIORITY_RECALCULATION.value: 300,
     JobTypeEnum.ASSET_PRIORITY_BATCH_EVALUATION.value: 300,
     JobTypeEnum.ASSET_PRIORITY_POLICY_SWEEP.value: 300,
+    JobTypeEnum.INVESTIGATION_AUTOMATION_RUN.value: 300,
 }
 
 # Legal lifecycle state transition matrix

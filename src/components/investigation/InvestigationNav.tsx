@@ -10,6 +10,7 @@ import {
   Globe2,
   ShieldAlert,
   FileCheck,
+  Bot,
 } from 'lucide-react';
 import type {
   InvestigationWorkspaceSection,
@@ -84,6 +85,12 @@ export const WORKSPACE_TABS: WorkspaceTabConfig[] = [
     label: 'Report',
     icon: FileCheck,
     description: 'Forensic case dossier, findings summary and executive export',
+  },
+  {
+    id: 'automation',
+    label: 'Automation',
+    icon: Bot,
+    description: 'Automated workflow execution, gated approvals, telemetry audit & gaps',
   },
 ];
 
