@@ -81,6 +81,10 @@ class NotificationTypeEnum(str, Enum):
     PIPELINE_ERROR_ALERT = "PIPELINE_ERROR_ALERT"
     PIPELINE_BATCH_COMPLETED = "PIPELINE_BATCH_COMPLETED"
 
+    # Section 60: Behavioral Detection & Anomaly Analytics Notifications
+    BEHAVIORAL_ANOMALY_ALERT = "BEHAVIORAL_ANOMALY_ALERT"
+    BEHAVIORAL_BASELINE_DEGRADED = "BEHAVIORAL_BASELINE_DEGRADED"
+
 
 class NotificationRead(BaseModel):
     id: str

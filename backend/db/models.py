@@ -1421,6 +1421,8 @@ class BehavioralDeviationModel(Base):
     evidence_ids_json = Column(Text, default="[]", nullable=False)
     explanation = Column(Text, nullable=False)
     limitations_json = Column(Text, default="[]", nullable=False)
+    finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
+    alert_id = Column(String(36), nullable=True, index=True)
     created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
 
     incident = relationship("IncidentModel", back_populates="behavioral_deviations")
@@ -1430,6 +1432,7 @@ class BehavioralDeviationModel(Base):
         Index("ix_bd_entity_time", "entity_type", "entity_id", "created_at"),
         Index("ix_bd_inc_metric", "incident_id", "metric_type"),
         Index("ix_bd_ws_dev", "workspace_id", "deviation_score"),
+        Index("ix_bd_finding", "finding_id"),
     )
 
 
@@ -1451,6 +1454,71 @@ class BaselineAuditModel(Base):
 
     __table_args__ = (
         Index("ix_bal_base_action", "baseline_id", "action"),
+    )
+
+
+class BehaviorProfileModel(Base):
+    """
+    Section 60: Entity-level behavioral profile managing long-term observation state,
+    baseline versioning, active quality status, and anomaly summaries.
+    """
+    __tablename__ = "behavior_profiles"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    entity_type = Column(String(50), nullable=False, index=True)  # USER, DEVICE, ENDPOINT, API_CLIENT, IP, DOMAIN, ACCOUNT, SERVICE
+    entity_id = Column(String(128), nullable=False, index=True)
+    entity_category = Column(String(50), nullable=False, default="HUMAN_USER", index=True)  # HUMAN_USER, SERVICE_ACCOUNT, ADMINISTRATOR, DEVICE, APPLICATION
+    profile_status = Column(String(30), nullable=False, default="INSUFFICIENT_DATA", index=True)  # INSUFFICIENT_DATA, LEARNING, ACTIVE, STALE, DEGRADED, SUSPENDED
+    sample_count = Column(Integer, nullable=False, default=0)
+    first_observed_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_observed_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_anomaly_at = Column(DateTime, nullable=True)
+    anomaly_count = Column(Integer, nullable=False, default=0)
+    quality_status = Column(String(30), nullable=False, default="INSUFFICIENT_HISTORY", index=True)
+    confidence_score = Column(Float, nullable=False, default=0.5)
+    baseline_version = Column(String(32), nullable=False, default="1.0.0")
+    feature_schema_version = Column(String(32), nullable=False, default="1.0.0")
+    active_metrics_json = Column(Text, default="[]", nullable=False)
+    top_deviations_json = Column(Text, default="[]", nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_bp_ws_entity", "workspace_id", "entity_type", "entity_id", unique=True),
+        Index("ix_bp_ws_status", "workspace_id", "profile_status"),
+        Index("ix_bp_ws_quality", "workspace_id", "quality_status"),
+        Index("ix_bp_ws_updated", "workspace_id", "updated_at"),
+    )
+
+
+class BehaviorLearningQuarantineModel(Base):
+    """
+    Section 60: Learning quarantine protecting baselines against poisoning from suspicious
+    or unverified observations before they are admitted into normal training sets.
+    """
+    __tablename__ = "behavior_learning_quarantines"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    entity_type = Column(String(50), nullable=False, index=True)
+    entity_id = Column(String(128), nullable=False, index=True)
+    metric_type = Column(String(64), nullable=False, index=True)
+    observed_value = Column(String(255), nullable=False)
+    event_id = Column(String(128), nullable=True, index=True)
+    quarantine_reason = Column(String(255), nullable=False)  # HIGH_ANOMALY, UNVERIFIED_TELEMETRY, SUSPECTED_POISONING, SUSPICIOUS_BURST
+    disposition = Column(String(30), nullable=False, default="PENDING", index=True)  # PENDING, APPROVED, REJECTED, EXPIRED
+    reviewed_by = Column(String(100), nullable=True)
+    reviewed_at = Column(DateTime, nullable=True)
+    review_notes = Column(Text, nullable=True)
+    payload_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_blq_ws_entity", "workspace_id", "entity_type", "entity_id"),
+        Index("ix_blq_ws_disp", "workspace_id", "disposition"),
+        Index("ix_blq_ws_created", "workspace_id", "created_at"),
     )
 
 

@@ -156,6 +156,8 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE candidate_rules ADD COLUMN last_validation_run_id VARCHAR(36);",
                     "ALTER TABLE candidate_rules ADD COLUMN validation_status VARCHAR(30) DEFAULT 'NOT_RUN';",
                     "ALTER TABLE candidate_rules ADD COLUMN validation_updated_at DATETIME;",
+                    "ALTER TABLE behavioral_deviations ADD COLUMN finding_id VARCHAR(36);",
+                    "ALTER TABLE behavioral_deviations ADD COLUMN alert_id VARCHAR(36);",
                 ]
                 for stmt in column_migrations:
                     try:

@@ -299,8 +299,9 @@ class AuthSourceAdapter:
     @staticmethod
     def normalize(raw: Dict[str, Any]) -> Tuple[Dict[str, Any], List[Dict[str, Any]], List[Dict[str, Any]]]:
         auth_result = str(raw.get("auth_result") or raw.get("status") or raw.get("auth.status") or "SUCCESS").upper()
-        user_id = str(raw.get("user_id") or raw.get("user") or raw.get("username") or "").strip()
-        username = str(raw.get("username") or raw.get("user") or raw.get("user_id") or "").strip()
+        user_id = str(raw.get("user_id") or raw.get("user") or raw.get("username") or raw.get("account_id") or "").strip()
+        username = str(raw.get("username") or raw.get("user") or raw.get("user_id") or raw.get("account_id") or "").strip()
+        account_id = str(raw.get("account_id") or user_id or username).strip()
         ip_address = str(raw.get("ip_address") or raw.get("client_ip") or raw.get("auth.client_ip") or "").strip()
         auth_method = str(raw.get("auth_method") or "PASSWORD").upper()
         user_agent = str(raw.get("user_agent") or "").strip()
@@ -312,6 +313,7 @@ class AuthSourceAdapter:
             "auth_result": auth_result,
             "user_id": user_id,
             "username": username,
+            "account_id": account_id,
             "ip_address": ip_address,
             "auth_method": auth_method,
             "user_agent": user_agent,
@@ -322,6 +324,7 @@ class AuthSourceAdapter:
             "auth.result": auth_result,
             "auth.user_id": user_id,
             "auth.username": username,
+            "auth.account_id": account_id,
             "auth.client_ip": ip_address,
             "auth.method": auth_method,
             "auth.failed_attempts": failed_attempts,
@@ -990,6 +993,25 @@ class UnifiedThreatDetectionPipelineService:
                         "alert_id": a_id,
                     })
 
+        # Section 60: Behavioral Detection & Anomaly Evaluation
+        behavioral_anomalies_count = 0
+        try:
+            from backend.services.behavioral_anomaly_service import BehavioralAnomalyService
+            beh_responses = BehavioralAnomalyService.evaluate_event(
+                db=db,
+                norm_event=norm_event,
+                mode=req.mode,
+            )
+            for br in beh_responses:
+                if br.is_anomaly:
+                    behavioral_anomalies_count += 1
+                    if br.finding_id:
+                        findings_count += 1
+                    if br.alert_id:
+                        alerts_count += 1
+        except Exception as exc:
+            logger.warning("Behavioral anomaly evaluation failed gracefully (non-fatal): %s", exc)
+
         db.commit()
 
         duration_ms = round((time.perf_counter() - pipeline_start) * 1000.0, 3)
@@ -1003,6 +1025,7 @@ class UnifiedThreatDetectionPipelineService:
                 {"stage": "EXECUTE", "status": "COMPLETED", "evaluations_count": len(evaluations)},
                 {"stage": "PERSIST_MATCH", "status": "COMPLETED", "matches_count": matches_count},
                 {"stage": "DOWNSTREAM_HANDOFF", "status": "COMPLETED", "findings": findings_count, "alerts": alerts_count},
+                {"stage": "BEHAVIORAL_EVALUATION", "status": "COMPLETED", "anomalies": behavioral_anomalies_count},
             ],
             "mode": req.mode.value,
         }

@@ -104,6 +104,9 @@ function AppContent() {
         <Route path="/detections/:id" element={<DetectionRules />} />
         <Route path="/pipeline" element={<DetectionRules defaultTab="pipeline" />} />
         <Route path="/detection-pipeline" element={<DetectionRules defaultTab="pipeline" />} />
+        <Route path="/behavioral" element={<DetectionRules defaultTab="behavioral" />} />
+        <Route path="/behavioral-analytics" element={<DetectionRules defaultTab="behavioral" />} />
+        <Route path="/anomalies" element={<DetectionRules defaultTab="behavioral" />} />
         <Route path="/rules" element={<Navigate to="/detections" replace />} />
         <Route path="/detection-rules" element={<Navigate to="/detections" replace />} />
         <Route path="/benchmarks" element={<BenchmarkEvaluation />} />

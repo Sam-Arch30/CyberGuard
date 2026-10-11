@@ -1225,6 +1225,48 @@ async def handle_detection_pipeline_replay(ctx: JobExecutionContext, db: Session
     return res.model_dump()
 
 
+@register_handler(JobTypeEnum.BEHAVIORAL_BASELINE_REFRESH.value)
+async def handle_behavioral_baseline_refresh(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 60: Controlled baseline recalculation excluding quarantined observations.
+    """
+    from backend.services.behavioral_anomaly_service import BehavioralAnomalyService
+
+    ctx.update_progress(db, 10.0, "REFRESHING", "Starting behavioral baseline refresh...")
+    res = BehavioralAnomalyService.refresh_entity_baselines(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        entity_type=ctx.payload.get("entity_type"),
+        entity_id=ctx.payload.get("entity_id"),
+        user_id=ctx.payload.get("user_id", "system"),
+    )
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Baseline refresh completed for workspace {ctx.workspace_id}: {res.get('refreshed_baselines', 0)} baselines updated."
+    )
+    return res
+
+
+@register_handler(JobTypeEnum.BEHAVIORAL_BATCH_ANOMALY_RUN.value)
+async def handle_behavioral_batch_anomaly_run(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 60: Batch anomaly scan over pending telemetry or entity profiles.
+    """
+    from backend.services.behavioral_anomaly_service import BehavioralAnomalyService
+
+    ctx.update_progress(db, 20.0, "SCANNING", "Running batch behavioral anomaly scan...")
+    stats = BehavioralAnomalyService.get_overview_stats(db, workspace_id=ctx.workspace_id)
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Batch anomaly scan completed: {stats.total_profiles} profiles checked, {stats.anomalies_today} anomalies today."
+    )
+    return stats.model_dump()
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

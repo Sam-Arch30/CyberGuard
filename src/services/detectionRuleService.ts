@@ -24,6 +24,11 @@ import type {
   DeadLetterItem,
   EventIngestPayload,
   PipelineReplayRequestPayload,
+  BehaviorProfile,
+  BehaviorProfileDetail,
+  BehavioralAnomalyDetail,
+  LearningQuarantineItem,
+  BehavioralOverviewStats,
 } from '../types/detectionRules';
 
 const getHeaders = (): Record<string, string> => {
@@ -730,6 +735,130 @@ export const detectionRuleService = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `Dead letter retry failed: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  // Section 60: Behavioral Detection & Anomaly Analytics
+  async getBehavioralOverview(): Promise<BehavioralOverviewStats> {
+    const res = await fetch('/api/v1/behavioral/overview', {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to load behavioral overview: ${res.statusText}`);
+    return res.json();
+  },
+
+  async listBehaviorProfiles(params?: {
+    status?: string;
+    quality?: string;
+    entity_type?: string;
+    search?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: BehaviorProfile[]; total: number }> {
+    const query = new URLSearchParams();
+    if (params?.status && params.status !== 'ALL') query.set('status', params.status);
+    if (params?.quality && params.quality !== 'ALL') query.set('quality', params.quality);
+    if (params?.entity_type && params.entity_type !== 'ALL') query.set('entity_type', params.entity_type);
+    if (params?.search) query.set('search', params.search);
+    if (params?.limit) query.set('limit', params.limit.toString());
+    if (params?.offset) query.set('offset', params.offset.toString());
+
+    const res = await fetch(`/api/v1/behavioral/profiles?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to load behavior profiles: ${res.statusText}`);
+    return res.json();
+  },
+
+  async getBehaviorProfileDetail(profileId: string): Promise<BehaviorProfileDetail> {
+    const res = await fetch(`/api/v1/behavioral/profiles/${profileId}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to load behavior profile detail: ${res.statusText}`);
+    return res.json();
+  },
+
+  async listBehavioralDeviations(params?: {
+    entity_type?: string;
+    entity_id?: string;
+    severity?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: BehavioralAnomalyDetail[]; total: number }> {
+    const query = new URLSearchParams();
+    if (params?.entity_type && params.entity_type !== 'ALL') query.set('entity_type', params.entity_type);
+    if (params?.entity_id) query.set('entity_id', params.entity_id);
+    if (params?.severity && params.severity !== 'ALL') query.set('severity', params.severity);
+    if (params?.limit) query.set('limit', params.limit.toString());
+    if (params?.offset) query.set('offset', params.offset.toString());
+
+    const res = await fetch(`/api/v1/behavioral/deviations?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to load behavioral deviations: ${res.statusText}`);
+    return res.json();
+  },
+
+  async listLearningQuarantine(params?: {
+    disposition?: string;
+    limit?: number;
+    offset?: number;
+  }): Promise<{ items: LearningQuarantineItem[]; total: number }> {
+    const query = new URLSearchParams();
+    if (params?.disposition && params.disposition !== 'ALL') query.set('disposition', params.disposition);
+    if (params?.limit) query.set('limit', params.limit.toString());
+    if (params?.offset) query.set('offset', params.offset.toString());
+
+    const res = await fetch(`/api/v1/behavioral/quarantine?${query.toString()}`, {
+      headers: getHeaders(),
+    });
+    if (!res.ok) throw new Error(`Failed to load learning quarantine: ${res.statusText}`);
+    return res.json();
+  },
+
+  async reviewQuarantineItem(
+    quarantineId: string,
+    disposition: string,
+    reviewNotes?: string
+  ): Promise<LearningQuarantineItem> {
+    const res = await fetch(`/api/v1/behavioral/quarantine/${quarantineId}/review`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ disposition, review_notes: reviewNotes }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Quarantine review failed: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async refreshBaselines(params?: { entity_type?: string; entity_id?: string }): Promise<any> {
+    const res = await fetch('/api/v1/behavioral/baselines/refresh', {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({
+        entity_type: params?.entity_type,
+        entity_id: params?.entity_id,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Baseline refresh failed: ${res.statusText}`);
+    }
+    return res.json();
+  },
+
+  async rollbackBaseline(baselineId: string, reason: string): Promise<any> {
+    const res = await fetch(`/api/v1/behavioral/baselines/${baselineId}/rollback`, {
+      method: 'POST',
+      headers: getHeaders(),
+      body: JSON.stringify({ reason }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || `Baseline rollback failed: ${res.statusText}`);
     }
     return res.json();
   },

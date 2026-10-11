@@ -30,8 +30,10 @@ import {
   Lock,
   History,
   Cpu,
+  TrendingUp,
 } from 'lucide-react';
 import { UnifiedDetectionPipelineView } from '../components/detection/UnifiedDetectionPipelineView';
+import { BehavioralAnomalyView } from '../components/detection/BehavioralAnomalyView';
 import type {
   DetectionRule,
   DetectionRuleValidationResult,
@@ -55,11 +57,11 @@ import type {
 import { detectionRuleService } from '../services/detectionRuleService';
 
 interface DetectionRulesProps {
-  defaultTab?: 'catalog' | 'builder' | 'detail' | 'pipeline';
+  defaultTab?: 'catalog' | 'builder' | 'detail' | 'pipeline' | 'behavioral';
 }
 
 export const DetectionRules: React.FC<DetectionRulesProps> = ({ defaultTab = 'catalog' }) => {
-  const [activeTab, setActiveTab] = useState<'catalog' | 'builder' | 'detail' | 'pipeline'>(defaultTab);
+  const [activeTab, setActiveTab] = useState<'catalog' | 'builder' | 'detail' | 'pipeline' | 'behavioral'>(defaultTab);
   const [detailSubTab, setDetailSubTab] = useState<
     'overview' | 'health' | 'validation' | 'deployment' | 'exceptions' | 'quality' | 'testing'
   >('overview');
@@ -1126,6 +1128,17 @@ export const DetectionRules: React.FC<DetectionRulesProps> = ({ defaultTab = 'ca
           >
             <Cpu className="w-3.5 h-3.5" />
             <span>Unified Detection Pipeline</span>
+          </button>
+          <button
+            onClick={() => setActiveTab('behavioral')}
+            className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors flex items-center space-x-1.5 ${
+              activeTab === 'behavioral'
+                ? 'bg-primary/10 text-primary border border-primary/20'
+                : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Behavioral Analytics</span>
           </button>
           {selectedRule && (
             <button
@@ -2723,6 +2736,13 @@ export const DetectionRules: React.FC<DetectionRulesProps> = ({ defaultTab = 'ca
         {/* ================================================================== */}
         {activeTab === 'pipeline' && (
           <UnifiedDetectionPipelineView />
+        )}
+
+        {/* ================================================================== */}
+        {/* TAB 5: BEHAVIORAL DETECTION & ANOMALY ANALYTICS (SECTION 60)       */}
+        {/* ================================================================== */}
+        {activeTab === 'behavioral' && (
+          <BehavioralAnomalyView />
         )}
       </main>
 

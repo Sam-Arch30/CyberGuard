@@ -626,4 +626,121 @@ export interface PipelineReplayRequestPayload {
   max_events?: number;
 }
 
+/**
+ * Section 60: Behavioral Detection & Anomaly Analytics Types
+ */
+
+export type ProfileStatus = 'INSUFFICIENT_DATA' | 'LEARNING' | 'ACTIVE' | 'STALE' | 'DEGRADED' | 'SUSPENDED';
+
+export type BaselineQualityStatus = 'NO_DATA' | 'INSUFFICIENT_HISTORY' | 'DEVELOPING' | 'STABLE' | 'STALE' | 'DEGRADED';
+
+export type QuarantineDisposition = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED';
+
+export interface BehaviorProfile {
+  id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  entity_category: string;
+  profile_status: ProfileStatus;
+  sample_count: number;
+  first_observed_at: string;
+  last_observed_at: string;
+  last_anomaly_at?: string | null;
+  anomaly_count: number;
+  quality_status: BaselineQualityStatus;
+  confidence_score: number;
+  baseline_version: string;
+  feature_schema_version: string;
+  active_metrics: string[];
+  top_deviations: Array<{
+    metric_type: string;
+    observed_value: string;
+    expected_range: string;
+    deviation_score: number;
+    severity: string;
+    occurred_at: string;
+  }>;
+  metadata: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface BehaviorProfileDetail extends BehaviorProfile {
+  recent_deviations: Array<{
+    id: string;
+    metric_type: string;
+    observed_value: string;
+    expected_range: string;
+    deviation_score: number;
+    severity_hint: string;
+    explanation: string;
+    finding_id?: string;
+    alert_id?: string;
+    created_at: string;
+  }>;
+  active_baselines: Array<{
+    id: string;
+    metric_type: string;
+    sample_count: number;
+    quality_status: string;
+    confidence_score: number;
+    learning_mode: string;
+    expected_range_summary: string;
+    metric_version: string;
+    updated_at: string;
+  }>;
+  pending_quarantine_count: number;
+}
+
+export interface BehavioralAnomalyDetail {
+  id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  metric_type: string;
+  observed_value: string;
+  baseline_expected_range: string;
+  deviation_score: number;
+  severity_hint: string;
+  direction: string;
+  explanation: string;
+  evidence_ids: string[];
+  limitations: string[];
+  finding_id?: string;
+  alert_id?: string;
+  incident_id?: string;
+  created_at: string;
+}
+
+export interface LearningQuarantineItem {
+  id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  metric_type: string;
+  observed_value: string;
+  event_id?: string;
+  quarantine_reason: string;
+  disposition: QuarantineDisposition;
+  reviewed_by?: string;
+  reviewed_at?: string;
+  review_notes?: string;
+  payload: Record<string, any>;
+  created_at: string;
+}
+
+export interface BehavioralOverviewStats {
+  total_profiles: number;
+  active_profiles: number;
+  learning_profiles: number;
+  insufficient_profiles: number;
+  degraded_profiles: number;
+  anomalies_today: number;
+  high_severity_anomalies_today: number;
+  pending_quarantines: number;
+  recent_deviations: BehavioralAnomalyDetail[];
+}
+
+
 

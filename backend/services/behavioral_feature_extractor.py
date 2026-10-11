@@ -417,4 +417,206 @@ class BehavioralFeatureExtractor:
             }
             return cls.extract_from_api_event(api_dict)
 
+        elif "ENDPOINT" in event_type or "PROCESS" in event_type:
+            endpoint_dict = {
+                "id": event_id,
+                "timestamp": ts,
+                "endpoint_id": attributes.get("endpoint_id") or attributes.get("host_id") or attributes.get("hostname"),
+                "process_name": attributes.get("process_name") or attributes.get("image"),
+                "command_line": attributes.get("command_line") or attributes.get("cmdline"),
+                "parent_process_name": attributes.get("parent_process_name") or attributes.get("parent_process"),
+                "user": attributes.get("user") or attributes.get("username"),
+            }
+            return cls.extract_from_endpoint_event(endpoint_dict)
+
         return []
+
+    @classmethod
+    def extract_from_endpoint_event(cls, event: Any) -> List[ExtractedFeatureObservation]:
+        """
+        Extracts observations from endpoint telemetry (process execution, command lines).
+        Strictly sanitizes command lines to avoid secret leakage.
+        """
+        obs: List[ExtractedFeatureObservation] = []
+
+        endpoint_id = (
+            getattr(event, "endpoint_id", None)
+            or getattr(event, "host_id", None)
+            or getattr(event, "hostname", None)
+            or (event.get("endpoint_id") if isinstance(event, dict) else None)
+            or (event.get("hostname") if isinstance(event, dict) else None)
+        )
+        if not endpoint_id:
+            return obs
+
+        endpoint_id = str(endpoint_id).strip()
+        ts = getattr(event, "timestamp", None) or (event.get("timestamp") if isinstance(event, dict) else None)
+        if isinstance(ts, str):
+            try:
+                ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except Exception:
+                ts = datetime.now(timezone.utc)
+        elif not isinstance(ts, datetime):
+            ts = datetime.now(timezone.utc)
+
+        event_id = getattr(event, "id", None) or (event.get("id", "ep-ev") if isinstance(event, dict) else "ep-ev")
+        process_name = getattr(event, "process_name", None) or (event.get("process_name") if isinstance(event, dict) else None)
+        command_line = getattr(event, "command_line", None) or (event.get("command_line") if isinstance(event, dict) else None)
+        parent_process = getattr(event, "parent_process_name", None) or (event.get("parent_process_name") if isinstance(event, dict) else None)
+        user_name = getattr(event, "user", None) or (event.get("user") if isinstance(event, dict) else None)
+
+        # 1. PROCESS_EXECUTION_FREQUENCY (Numeric rate)
+        obs.append(ExtractedFeatureObservation(
+            entity_type=BaselineEntityType.ENDPOINT,
+            entity_id=endpoint_id,
+            entity_category=EntityProfileCategory.DEVICE,
+            metric_type=BaselineMetricType.PROCESS_EXECUTION_FREQUENCY,
+            numeric_value=1.0,
+            event_time=ts,
+            event_id=event_id,
+        ))
+
+        # 2. PROCESS_NAME_FREQUENCY (Categorical)
+        if process_name:
+            clean_proc = sanitize_log_text(str(process_name).strip().lower())
+            obs.append(ExtractedFeatureObservation(
+                entity_type=BaselineEntityType.ENDPOINT,
+                entity_id=endpoint_id,
+                entity_category=EntityProfileCategory.DEVICE,
+                metric_type=BaselineMetricType.PROCESS_NAME_FREQUENCY,
+                categorical_value=clean_proc,
+                event_time=ts,
+                event_id=event_id,
+            ))
+
+        # 3. COMMAND_LINE_LENGTH (Numeric)
+        if command_line is not None:
+            cmd_len = float(len(str(command_line).strip()))
+            obs.append(ExtractedFeatureObservation(
+                entity_type=BaselineEntityType.ENDPOINT,
+                entity_id=endpoint_id,
+                entity_category=EntityProfileCategory.DEVICE,
+                metric_type=BaselineMetricType.COMMAND_LINE_LENGTH,
+                numeric_value=cmd_len,
+                event_time=ts,
+                event_id=event_id,
+            ))
+
+        # 4. PARENT_PROCESS_FREQUENCY (Categorical)
+        if parent_process:
+            clean_parent = sanitize_log_text(str(parent_process).strip().lower())
+            obs.append(ExtractedFeatureObservation(
+                entity_type=BaselineEntityType.ENDPOINT,
+                entity_id=endpoint_id,
+                entity_category=EntityProfileCategory.DEVICE,
+                metric_type=BaselineMetricType.PARENT_PROCESS_FREQUENCY,
+                categorical_value=clean_parent,
+                event_time=ts,
+                event_id=event_id,
+            ))
+
+        # 5. User association if present
+        if user_name:
+            clean_user = str(user_name).strip().lower()
+            user_cat = cls.infer_entity_category(clean_user)
+            if process_name:
+                obs.append(ExtractedFeatureObservation(
+                    entity_type=BaselineEntityType.ACCOUNT,
+                    entity_id=clean_user,
+                    entity_category=user_cat,
+                    metric_type=BaselineMetricType.PROCESS_NAME_FREQUENCY,
+                    categorical_value=clean_proc,
+                    event_time=ts,
+                    event_id=event_id,
+                ))
+
+        return obs
+
+    @classmethod
+    def extract_from_normalized_detection_event(cls, norm_event: Any) -> List[ExtractedFeatureObservation]:
+        """
+        Section 60: Direct extraction from Section 59 NormalizedDetectionEvent.
+        Preserves provenance and maps payload attributes deterministically.
+        """
+        payload = getattr(norm_event, "payload", {}) or {}
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                payload = {}
+
+        source_type = (getattr(norm_event, "source_type", "") or "").upper()
+        event_type = (getattr(norm_event, "event_type", "") or "").upper()
+        ts = getattr(norm_event, "occurred_at", datetime.now(timezone.utc))
+        event_id = getattr(norm_event, "event_id", "norm-ev")
+
+        if source_type == "ENDPOINT" or "ENDPOINT" in event_type or "PROCESS" in event_type:
+            ep_dict = {
+                "id": event_id,
+                "timestamp": ts,
+                "endpoint_id": payload.get("endpoint_id") or payload.get("hostname") or payload.get("host_id") or getattr(norm_event, "source_id", None),
+                "process_name": payload.get("process_name") or payload.get("process") or payload.get("image"),
+                "command_line": payload.get("command_line") or payload.get("cmdline"),
+                "parent_process_name": payload.get("parent_process_name") or payload.get("parent_process"),
+                "user": payload.get("user") or payload.get("username") or payload.get("account_id"),
+            }
+            return cls.extract_from_endpoint_event(ep_dict)
+
+        elif source_type == "AUTH" or "AUTH" in event_type or "LOGIN" in event_type:
+            auth_dict = {
+                "id": event_id,
+                "timestamp": ts,
+                "account_id": payload.get("account_id") or payload.get("username") or payload.get("user") or payload.get("email"),
+                "source_ip": payload.get("source_ip") or payload.get("ip") or payload.get("client_ip"),
+                "device_id": payload.get("device_id") or payload.get("device") or getattr(norm_event, "source_id", None),
+                "location_country": payload.get("country") or payload.get("location_country"),
+                "authentication_method": payload.get("auth_method") or payload.get("authentication_method"),
+                "result": "SUCCESS" if "SUCCESS" in event_type or payload.get("success", True) else "FAILURE",
+            }
+            return cls.extract_from_auth_event(auth_dict)
+
+        elif source_type == "NETWORK" or "NETWORK" in event_type or "DNS" in event_type:
+            net_dict = {
+                "id": event_id,
+                "timestamp": ts,
+                "source_ip": payload.get("source_ip") or payload.get("client_ip") or payload.get("src_ip"),
+                "destination_ip": payload.get("destination_ip") or payload.get("dest_ip"),
+                "domain": payload.get("domain") or payload.get("query"),
+                "destination_port": payload.get("destination_port") or payload.get("dest_port") or payload.get("port"),
+                "bytes_sent": payload.get("bytes_sent") or payload.get("bytes_out"),
+                "dns_query": payload.get("dns_query") or payload.get("query"),
+            }
+            return cls.extract_from_network_event(net_dict)
+
+        elif source_type == "API" or "API" in event_type:
+            api_dict = {
+                "id": event_id,
+                "timestamp": ts,
+                "account_id": payload.get("account_id") or payload.get("user_id") or payload.get("client_id"),
+                "service": payload.get("service", "api_service"),
+                "route_template": payload.get("route_template") or payload.get("endpoint") or payload.get("path"),
+                "method": payload.get("method", "GET"),
+                "response_bytes": payload.get("response_bytes") or payload.get("bytes"),
+                "is_service_account": payload.get("is_service_account", False),
+            }
+            return cls.extract_from_api_event(api_dict)
+
+        elif source_type == "EMAIL" or "EMAIL" in event_type:
+            sender = payload.get("sender") or payload.get("from") or payload.get("sender_email")
+            if sender:
+                clean_sender = str(sender).strip().lower()
+                cat = cls.infer_entity_category(clean_sender)
+                return [
+                    ExtractedFeatureObservation(
+                        entity_type=BaselineEntityType.ACCOUNT,
+                        entity_id=clean_sender,
+                        entity_category=cat,
+                        metric_type=BaselineMetricType.EMAIL_VOLUME,
+                        numeric_value=1.0,
+                        event_time=ts,
+                        event_id=event_id,
+                    )
+                ]
+
+        return []
+
