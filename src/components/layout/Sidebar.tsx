@@ -16,6 +16,7 @@ import {
   Boxes,
   Scale,
   Cpu,
+  Sliders,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -204,6 +205,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       matchPrefixes: ['/detections', '/rules', '/pipeline', '/detection-pipeline'],
       icon: Binary,
       description: 'Detection engineering, versioned rule lifecycles & backtesting',
+    },
+    {
+      id: 'admin',
+      name: 'Administration',
+      path: '/admin',
+      matchPrefixes: ['/admin', '/administration'],
+      icon: Sliders,
+      description: 'Platform governance, users, RBAC, tenants, policies & system health',
     },
   ];
 

@@ -1699,6 +1699,77 @@ async def handle_automation_workflow_jobs(ctx: JobExecutionContext, db: Session)
         return {"expired_count": expired_count, "status": "SWEEP_COMPLETED"}
 
 
+@register_handler(JobTypeEnum.ADMIN_BULK_USER_OPERATION.value)
+@register_handler(JobTypeEnum.ADMIN_INTEGRATION_HEALTH_SWEEP.value)
+async def handle_admin_governance_jobs(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 71: Platform Administration & Governance background job handler.
+    Executes asynchronous bulk administrative operations and integration health sweeps.
+    """
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    job_type = getattr(ctx, "job_type", "")
+    tenant_id = getattr(ctx, "workspace_id", "default") or "default"
+
+    if job_type == JobTypeEnum.ADMIN_BULK_USER_OPERATION.value:
+        action = params.get("action", "STATUS_UPDATE")
+        user_ids = params.get("user_ids", [])
+        new_status = params.get("status", "DISABLED")
+        reason = params.get("reason", "Bulk administrative operation")
+
+        from backend.db.models import AdminUserModel
+        from backend.services.audit_service import AuditService
+
+        ctx.update_progress(db, 20.0, "RUNNING", f"Processing bulk user operation on {len(user_ids)} users...")
+        updated_count = 0
+        users = db.query(AdminUserModel).filter(
+            AdminUserModel.tenant_id == tenant_id,
+            AdminUserModel.id.in_(user_ids)
+        ).all()
+        for u in users:
+            # Prevent disabling last platform admin
+            if u.is_platform_admin and new_status == "DISABLED":
+                active_admins = db.query(AdminUserModel).filter(
+                    AdminUserModel.is_platform_admin == True,
+                    AdminUserModel.status == "ACTIVE"
+                ).count()
+                if active_admins <= 1:
+                    continue
+            u.status = new_status
+            updated_count += 1
+            AuditService.record_audit_event(
+                db,
+                actor="Platform Admin (Worker)",
+                action="USER_STATUS_UPDATED",
+                resource_type="admin_user",
+                resource_id=u.id,
+                metadata={"new_status": new_status, "reason": reason, "bulk": True}
+            )
+        db.commit()
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Updated {updated_count} users successfully.")
+        return {"action": action, "updated_count": updated_count, "status": "COMPLETED"}
+
+    else:
+        # Integration health sweep
+        from backend.db.models import AdminIntegrationConfigModel
+        ctx.update_progress(db, 20.0, "RUNNING", "Sweeping integration health statuses...")
+        integrations = db.query(AdminIntegrationConfigModel).filter(
+            AdminIntegrationConfigModel.tenant_id == tenant_id
+        ).all()
+        checked_count = 0
+        for integ in integrations:
+            if not integ.enabled:
+                integ.health_status = "UNCONFIGURED"
+            elif integ.credential_configured:
+                integ.health_status = "HEALTHY"
+            else:
+                integ.health_status = "DEGRADED"
+            integ.last_health_check_at = datetime.now(timezone.utc)
+            checked_count += 1
+        db.commit()
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Verified {checked_count} integrations.")
+        return {"checked_count": checked_count, "status": "SWEEP_COMPLETED"}
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

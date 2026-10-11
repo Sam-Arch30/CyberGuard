@@ -42,6 +42,7 @@ import { InventoryPage } from './pages/InventoryPage';
 import { ThreatActorWorkspace } from './pages/ThreatActorWorkspace';
 import { EvidenceWorkspace } from './pages/EvidenceWorkspace';
 import { AutomationPage } from './pages/AutomationPage';
+import { AdminPage } from './pages/AdminPage';
 
 function AppContent() {
   return (
@@ -55,6 +56,10 @@ function AppContent() {
         <Route path="/reports/:id" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/settings/:tab" element={<Settings />} />
+
+        {/* Section 71: Platform Administration & Governance */}
+        <Route path="/admin" element={<AdminPage />} />
+        <Route path="/admin/:tab" element={<AdminPage />} />
 
         {/* Section 50: Incident Management & Case Lifecycle */}
         <Route path="/incidents" element={<IncidentListPage />} />

@@ -6145,6 +6145,179 @@ class AutomationApprovalRequestModel(Base):
     )
 
 
+# =============================================================================
+# SECTION 71: PLATFORM ADMINISTRATION & GOVERNANCE MODELS
+# =============================================================================
+
+class AdminUserModel(Base):
+    """
+    Section 71: Authoritative administrative user and account model.
+    Maintains user identity, role, team affiliation, status, and permission scope.
+    """
+    __tablename__ = "admin_users"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    username = Column(String(100), nullable=False, unique=True, index=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    full_name = Column(String(255), nullable=False)
+    role = Column(String(50), nullable=False, default="SOC_ANALYST", index=True)
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, DISABLED, INVITED, LOCKED, PENDING_VERIFICATION
+    team_id = Column(String(36), nullable=True, index=True)
+    is_platform_admin = Column(Boolean, nullable=False, default=False)
+    custom_permissions_json = Column(Text, nullable=False, default="[]")
+    last_login_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_au_tenant_role", "tenant_id", "role"),
+        Index("ix_au_tenant_status", "tenant_id", "status"),
+    )
+
+
+class AdminTeamModel(Base):
+    """
+    Section 71: Operational team and organizational structure model.
+    Groups users into operational units (e.g. Tier 1 SOC, Threat Hunting Unit).
+    """
+    __tablename__ = "admin_teams"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(100), nullable=False, index=True)
+    description = Column(Text, nullable=True)
+    team_lead_id = Column(String(36), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_at_tenant_name", "tenant_id", "name"),
+    )
+
+
+class AdminTenantModel(Base):
+    """
+    Section 71: Multi-tenant boundary and organizational entity model.
+    Defines tenant status, retention schedules, plan tier, and operational parameters.
+    """
+    __tablename__ = "admin_tenants"
+
+    id = Column(String(64), primary_key=True)  # Unique tenant identifier/slug (e.g. 'default', 'acme-corp')
+    name = Column(String(150), nullable=False)
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, SUSPENDED, PROVISIONING, DISABLED
+    plan_tier = Column(String(50), nullable=False, default="ENTERPRISE")  # COMMUNITY, STANDARD, ENTERPRISE
+    retention_days = Column(Integer, nullable=False, default=90)
+    configuration_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+
+class AdminSecurityPolicyModel(Base):
+    """
+    Section 71: Versioned security governance policy model.
+    Controls authentication, session management, retention, role delegation, and external sharing.
+    """
+    __tablename__ = "admin_security_policies"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    policy_type = Column(String(50), nullable=False, index=True)  # AUTHENTICATION, SESSION_MANAGEMENT, DATA_RETENTION, ROLE_DELEGATION, EXTERNAL_SHARING, API_ACCESS
+    name = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="DRAFT", index=True)  # DRAFT, VALIDATING, ACTIVE, DISABLED, ARCHIVED
+    version = Column(Integer, nullable=False, default=1)
+    rules_json = Column(Text, nullable=False, default="{}")
+    created_by = Column(String(100), nullable=False, default="Security Admin")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_asp_tenant_type_status", "tenant_id", "policy_type", "status"),
+    )
+
+
+class AdminSystemSettingModel(Base):
+    """
+    Section 71: Persistent system setting with optimistic concurrency and scope precedence.
+    Enforces server-side typing, validation, and optimistic version checks.
+    """
+    __tablename__ = "admin_system_settings"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="GLOBAL", index=True)  # 'GLOBAL' or specific tenant_id
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    key = Column(String(100), nullable=False, index=True)
+    value_json = Column(Text, nullable=False, default="{}")
+    category = Column(String(50), nullable=False, default="GENERAL", index=True)
+    scope = Column(String(20), nullable=False, default="GLOBAL")  # GLOBAL, TENANT
+    is_secret = Column(Boolean, nullable=False, default=False)
+    version = Column(Integer, nullable=False, default=1)
+    updated_by = Column(String(100), nullable=False, default="Platform Admin")
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ass_tenant_key", "tenant_id", "key", unique=True),
+    )
+
+
+class AdminIntegrationConfigModel(Base):
+    """
+    Section 71: Controlled external integration registry and provider configuration model.
+    Guarantees secrets are never returned in plaintext and provides health diagnostics.
+    """
+    __tablename__ = "admin_integration_configs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    provider_name = Column(String(100), nullable=False, index=True)
+    display_name = Column(String(150), nullable=False)
+    category = Column(String(50), nullable=False, default="THREAT_INTEL", index=True)
+    enabled = Column(Boolean, nullable=False, default=False, index=True)
+    health_status = Column(String(30), nullable=False, default="UNCONFIGURED", index=True)  # HEALTHY, DEGRADED, UNCONFIGURED, ERROR
+    endpoint_url = Column(String(500), nullable=True)
+    credential_configured = Column(Boolean, nullable=False, default=False)
+    credential_vault_key = Column(String(100), nullable=True)
+    settings_json = Column(Text, nullable=False, default="{}")
+    last_health_check_at = Column(DateTime, nullable=True)
+    last_error_message = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_aic_tenant_provider", "tenant_id", "provider_name", unique=True),
+    )
+
+
+class AdminFeatureControlModel(Base):
+    """
+    Section 71: Role-gated feature flags and capability controls.
+    Enforces authorization requirements and multi-scope feature availability.
+    """
+    __tablename__ = "admin_feature_controls"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="GLOBAL", index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    feature_key = Column(String(100), nullable=False, index=True)
+    display_name = Column(String(150), nullable=False)
+    description = Column(Text, nullable=True)
+    enabled = Column(Boolean, nullable=False, default=True, index=True)
+    scope = Column(String(30), nullable=False, default="GLOBAL")  # GLOBAL, TENANT, ENVIRONMENT
+    requires_role = Column(String(50), nullable=False, default="SOC_ANALYST")
+    updated_by = Column(String(100), nullable=False, default="Platform Admin")
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_afc_tenant_feature", "tenant_id", "feature_key", unique=True),
+    )
+
+
+
 
 
 

@@ -168,6 +168,30 @@ class AuditService:
         return audit_entry
 
     @classmethod
+    def record_audit_event(
+        cls,
+        db: Session,
+        actor: Optional[str] = "SOC Analyst",
+        action: str = "AUDIT_EVENT",
+        resource_type: str = "general",
+        resource_id: str = "",
+        metadata: Optional[Dict[str, Any]] = None,
+        case_id: Optional[str] = None,
+        details: Optional[str] = None,
+    ) -> AuditLogModel:
+        return cls.log_audit(
+            db=db,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            user=actor,
+            metadata=metadata,
+            case_id=case_id,
+            details=details,
+        )
+
+
+    @classmethod
     def _ensure_sample_seed(cls, db: Session):
         """
         Seeds baseline forensic evidence record and immutable chain-of-custody audit logs for sample-001.
