@@ -330,12 +330,16 @@ def test_smoke_test_runner_logic():
             return 200, {"categories": {}}
         elif url.endswith("/api/admin/performance/circuits"):
             return 200, {"circuits": []}
+        elif url.endswith("/api/demo/scenarios"):
+            return 200, {"status": "SUCCESS", "count": 4}
+        elif url.endswith("/api/demo/status"):
+            return 200, {"environment_mode": "DEMO_READY"}
         return 404, {"error": "Not Found"}
 
     with patch("scripts.smoke_test.make_request", side_effect=mock_make_request):
         report = run_smoke_tests("http://mock-cyberguard:8000")
         assert report["overall_status"] == "PASS"
-        assert report["total_checks"] == 7
-        assert report["passed_checks"] == 7
+        assert report["total_checks"] == 9
+        assert report["passed_checks"] == 9
         assert report["failed_checks"] == 0
 

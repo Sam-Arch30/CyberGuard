@@ -70,6 +70,7 @@ from backend.api.routes.executive_reports import router as executive_reports_rou
 from backend.api.routes.automation import router as automation_router
 from backend.api.routes.platform_admin import router as platform_admin_router
 from backend.api.routes.health import router as health_router
+from backend.api.routes.demo import router as demo_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -215,6 +216,7 @@ app.include_router(alert_clusters_router)
 app.include_router(alert_correlate_router)
 app.include_router(alerts_router)
 app.include_router(health_router)
+app.include_router(demo_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])

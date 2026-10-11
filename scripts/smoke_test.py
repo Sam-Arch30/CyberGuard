@@ -168,6 +168,38 @@ def run_smoke_tests(base_url: str) -> dict:
     if not passed:
         overall_pass = False
 
+    # Check 8: Demo Scenarios Catalog (Section 75)
+    t0 = time.time()
+    code, data = make_request(f"{base_clean}/api/demo/scenarios")
+    duration = round((time.time() - t0) * 1000.0, 1)
+    passed = (code == 200 and data.get("status") == "SUCCESS" and data.get("count", 0) >= 4)
+    results.append({
+        "check": "CHECK_08_DEMO_SCENARIOS_CATALOG",
+        "endpoint": "/api/demo/scenarios",
+        "status_code": code,
+        "latency_ms": duration,
+        "passed": passed,
+        "details": {"scenarios_count": data.get("count", 0)}
+    })
+    if not passed:
+        overall_pass = False
+
+    # Check 9: Demo Environment & Isolation Status (Section 75)
+    t0 = time.time()
+    code, data = make_request(f"{base_clean}/api/demo/status")
+    duration = round((time.time() - t0) * 1000.0, 1)
+    passed = (code == 200 and data.get("environment_mode") == "DEMO_READY")
+    results.append({
+        "check": "CHECK_09_DEMO_ENVIRONMENT_STATUS",
+        "endpoint": "/api/demo/status",
+        "status_code": code,
+        "latency_ms": duration,
+        "passed": passed,
+        "details": {"environment_mode": data.get("environment_mode")}
+    })
+    if not passed:
+        overall_pass = False
+
     report = {
         "service": "cyberguard",
         "target_url": base_clean,
