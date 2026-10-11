@@ -1465,6 +1465,38 @@ async def handle_asset_priority_recalculation_job(ctx: JobExecutionContext, db: 
     return summary
 
 
+@register_handler(JobTypeEnum.CAMPAIGN_CORRELATION_SWEEP.value)
+@register_handler(JobTypeEnum.CAMPAIGN_ENRICHMENT_SYNC.value)
+@register_handler(JobTypeEnum.THREAT_ACTOR_SYNC.value)
+async def handle_campaign_workspace_jobs(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 65: Asynchronous Campaign & Threat Actor Workspace enrichment and correlation sweep.
+    """
+    from backend.services.campaign_service import CampaignService
+    from backend.services.threat_workspace_service import ThreatWorkspaceService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    ctx.update_progress(db, 30.0, "RUNNING", "Running campaign clustering and candidate generation sweep...")
+
+    # 1. Trigger campaign candidate clustering
+    CampaignService.ensure_campaigns_initialized(db)
+
+    ctx.update_progress(db, 70.0, "RUNNING", "Enumerating active campaigns and threat actor relationships...")
+    campaigns = ThreatWorkspaceService.list_campaigns(db, ctx.workspace_id, page=1, page_size=100)
+    actors = ThreatWorkspaceService.list_actors(db, ctx.workspace_id, page=1, page_size=100)
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Workspace synchronization complete: {campaigns.total} campaigns and {actors.total} threat actors active.",
+    )
+    return {
+        "campaigns_total": campaigns.total,
+        "actors_total": actors.total,
+        "workspace_id": ctx.workspace_id,
+    }
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

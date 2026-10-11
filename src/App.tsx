@@ -39,6 +39,7 @@ import { DetectionRules } from './pages/DetectionRules';
 import { CrossSourceCorrelationPage } from './pages/CrossSourceCorrelationPage';
 import { AttackSurfacePage } from './pages/AttackSurfacePage';
 import { InventoryPage } from './pages/InventoryPage';
+import { ThreatActorWorkspace } from './pages/ThreatActorWorkspace';
 
 function AppContent() {
   return (
@@ -115,6 +116,10 @@ function AppContent() {
         <Route path="/cross-investigation/:id" element={<CrossInvestigationWorkspacePage />} />
         <Route path="/campaigns" element={<CampaignIntelligence />} />
         <Route path="/campaigns/:id" element={<CampaignIntelligence />} />
+        <Route path="/actors" element={<ThreatActorWorkspace />} />
+        <Route path="/actors/:id" element={<ThreatActorWorkspace />} />
+        <Route path="/threat-actors" element={<ThreatActorWorkspace />} />
+        <Route path="/threat-actors/:id" element={<ThreatActorWorkspace />} />
         <Route path="/osint" element={<ThreatIntelligence />} />
         <Route path="/watchlists" element={<Watchlists />} />
         <Route path="/watchlists/:id" element={<Watchlists />} />

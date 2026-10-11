@@ -161,6 +161,21 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     "ALTER TABLE findings ADD COLUMN is_composite BOOLEAN DEFAULT 0;",
                     "ALTER TABLE findings ADD COLUMN parent_finding_id VARCHAR(36);",
                     "ALTER TABLE findings ADD COLUMN correlation_id VARCHAR(36);",
+                    "ALTER TABLE campaigns ADD COLUMN threat_actor_id VARCHAR(36);",
+                    "ALTER TABLE campaigns ADD COLUMN attribution_state VARCHAR(30) DEFAULT 'UNKNOWN';",
+                    "ALTER TABLE campaigns ADD COLUMN attribution_confidence FLOAT DEFAULT 0.0;",
+                    "ALTER TABLE campaigns ADD COLUMN lifecycle_status VARCHAR(30) DEFAULT 'CANDIDATE';",
+                    "ALTER TABLE campaigns ADD COLUMN activity_state VARCHAR(30) DEFAULT 'ACTIVE';",
+                    "ALTER TABLE campaigns ADD COLUMN watch_state VARCHAR(30) DEFAULT 'NOT_MONITORED';",
+                    "ALTER TABLE campaigns ADD COLUMN description TEXT;",
+                    "ALTER TABLE campaigns ADD COLUMN mitre_techniques_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN affected_assets_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN affected_identities_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN related_alerts_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN related_incidents_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN analyst_notes_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN source_conflicts_json TEXT DEFAULT '[]';",
+                    "ALTER TABLE campaigns ADD COLUMN provenance_history_json TEXT DEFAULT '[]';",
                 ]
                 for stmt in column_migrations:
                     try:

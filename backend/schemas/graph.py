@@ -15,6 +15,10 @@ class NodeType(str, Enum):
     CAMPAIGN = "Campaign"
     COUNTRY = "Country"
     HASH = "Hash"
+    THREAT_ACTOR = "Threat Actor"
+    TECHNIQUE = "Technique"
+    ASSET = "Asset"
+    IDENTITY = "Identity"
 
 
 class GraphNode(BaseModel):

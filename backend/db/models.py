@@ -244,12 +244,28 @@ class CampaignModel(Base):
     supporting_evidence_json = Column(Text, default="[]", nullable=False)
     contradicting_evidence_json = Column(Text, default="[]", nullable=False)
     correlation_summary = Column(Text, nullable=True)
+    threat_actor_id = Column(String(36), ForeignKey("threat_actors.id", ondelete="SET NULL"), nullable=True, index=True)
+    attribution_state = Column(String(30), default="UNKNOWN", nullable=False, index=True)  # UNKNOWN, SUSPECTED, POSSIBLE, PROBABLE, ASSESSED, CONFIRMED, DISPUTED, REJECTED
+    attribution_confidence = Column(Float, default=0.0, nullable=False)  # 0.0 - 1.0 distinct from risk
+    lifecycle_status = Column(String(30), default="CANDIDATE", nullable=False, index=True)  # CANDIDATE, OPEN, ACTIVE, MONITORING, CONTAINED, INACTIVE, CLOSED, ARCHIVED
+    activity_state = Column(String(30), default="ACTIVE", nullable=False)  # ACTIVE, QUIET, STALE, UNKNOWN
+    watch_state = Column(String(30), default="NOT_MONITORED", nullable=False)  # MONITORED, NOT_MONITORED
+    description = Column(Text, nullable=True)
+    mitre_techniques_json = Column(Text, default="[]", nullable=False)  # e.g. ["T1566.001", "T1566.002"]
+    affected_assets_json = Column(Text, default="[]", nullable=False)
+    affected_identities_json = Column(Text, default="[]", nullable=False)
+    related_alerts_json = Column(Text, default="[]", nullable=False)
+    related_incidents_json = Column(Text, default="[]", nullable=False)
+    analyst_notes_json = Column(Text, default="[]", nullable=False)
+    source_conflicts_json = Column(Text, default="[]", nullable=False)
+    provenance_history_json = Column(Text, default="[]", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
     # Relationships
     emails = relationship("CampaignEmailModel", back_populates="campaign", cascade="all, delete-orphan", lazy="selectin")
     incidents = relationship("CampaignIncidentModel", back_populates="campaign", cascade="all, delete-orphan", lazy="selectin")
+    threat_actor = relationship("ThreatActorModel", back_populates="campaigns", lazy="selectin")
 
 
 class CampaignIncidentModel(Base):
@@ -5379,6 +5395,147 @@ class AssetPrioritySnapshotModel(Base):
             return json.loads(self.explanation_json or "{}")
         except Exception:
             return {}
+
+
+# =============================================================================
+# Section 65: Threat Actor & Campaign Workspace Models
+# =============================================================================
+
+class ThreatActorModel(Base):
+    """
+    Section 65: Threat Actor Profile & Intelligence Entity.
+    Represents suspected or known adversarial groups, clusters, or threat operators.
+    Maintains aliases with provider provenance, explicit attribution states,
+    confidence levels, motivation, sophistication, and observed technique mappings.
+    """
+    __tablename__ = "threat_actors"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    actor_id = Column(String(32), unique=True, nullable=False, index=True)  # e.g., TA-001, ACTOR-042
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(255), nullable=False, index=True)
+    canonical_name = Column(String(255), nullable=False, index=True)
+    actor_type = Column(String(50), nullable=False, default="UNKNOWN", index=True)  # NATION_STATE, CYBERCRIME, HACKTIVIST, INSIDER, OPPORTUNISTIC, UNKNOWN
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, MONITORING, DORMANT, RETIRED, UNKNOWN
+    attribution_state = Column(String(30), nullable=False, default="SUSPECTED", index=True)  # UNKNOWN, SUSPECTED, POSSIBLE, PROBABLE, ASSESSED, CONFIRMED, DISPUTED, REJECTED
+    attribution_confidence = Column(Float, nullable=False, default=0.5)  # 0.0 - 1.0 (strictly separate from risk/severity)
+    motivation = Column(String(100), nullable=True)  # FINANCIAL, ESPIONAGE, SABOTAGE, CREDENTIAL_HARVESTING
+    sophistication = Column(String(50), nullable=False, default="UNKNOWN")  # ADVANCED, INTERMEDIATE, COMMODITY, UNKNOWN
+    description = Column(Text, nullable=True)
+    first_observed_at = Column(DateTime, nullable=True, index=True)
+    last_observed_at = Column(DateTime, nullable=True, index=True)
+    aliases_json = Column(Text, nullable=False, default="[]")  # Array of {alias, source, source_record_id, observed_at, confidence}
+    primary_targets_json = Column(Text, nullable=False, default="[]")  # Target sectors, regions, orgs
+    observed_techniques_json = Column(Text, nullable=False, default="[]")  # MITRE ATT&CK technique IDs
+    observed_infrastructure_json = Column(Text, nullable=False, default="[]")  # Known IPs, domains, ASNs
+    supporting_evidence_json = Column(Text, nullable=False, default="[]")
+    contradicting_evidence_json = Column(Text, nullable=False, default="[]")
+    analyst_notes_json = Column(Text, nullable=False, default="[]")
+    created_by = Column(String(100), nullable=False, default="ANALYST")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    campaigns = relationship("CampaignModel", back_populates="threat_actor", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_ta_ws_name", "workspace_id", "name"),
+        Index("ix_ta_ws_status", "workspace_id", "status"),
+        Index("ix_ta_ws_attr", "workspace_id", "attribution_state"),
+    )
+
+
+class ThreatHypothesisModel(Base):
+    """
+    Section 65: Analyst-Authored Threat Hypothesis.
+    Explicitly tracks hypotheses separate from observed facts.
+    Maintains hypothesis lifecycle (OPEN, SUPPORTED, WEAKENED, REJECTED, CONFIRMED)
+    with supporting and contradicting evidence.
+    """
+    __tablename__ = "threat_hypotheses"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    subject_type = Column(String(30), nullable=False, index=True)  # CAMPAIGN, THREAT_ACTOR, INFRASTRUCTURE
+    subject_id = Column(String(64), nullable=False, index=True)
+    title = Column(String(255), nullable=False)
+    hypothesis_text = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="OPEN", index=True)  # OPEN, SUPPORTED, WEAKENED, REJECTED, CONFIRMED
+    confidence = Column(Float, nullable=False, default=0.5)  # 0.0 - 1.0
+    supporting_evidence_json = Column(Text, nullable=False, default="[]")
+    contradicting_evidence_json = Column(Text, nullable=False, default="[]")
+    created_by = Column(String(100), nullable=False, default="ANALYST")
+    updated_by = Column(String(100), nullable=False, default="ANALYST")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_th_ws_subj", "workspace_id", "subject_type", "subject_id"),
+        Index("ix_th_status", "status"),
+    )
+
+
+class ThreatAttributionAssessmentModel(Base):
+    """
+    Section 65: Attribution Assessment Audit Record.
+    Immutable log capturing every state transition in threat actor or campaign attribution.
+    Stores prior state, new state, analyst justification, supporting/contradicting evidence,
+    and external intelligence conflicts.
+    """
+    __tablename__ = "threat_attribution_assessments"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    subject_type = Column(String(30), nullable=False, index=True)  # CAMPAIGN, THREAT_ACTOR
+    subject_id = Column(String(64), nullable=False, index=True)
+    target_type = Column(String(30), nullable=False)  # THREAT_ACTOR, UNKNOWN
+    target_id = Column(String(64), nullable=True, index=True)
+    prior_attribution_state = Column(String(30), nullable=False)
+    new_attribution_state = Column(String(30), nullable=False)  # UNKNOWN, SUSPECTED, POSSIBLE, PROBABLE, ASSESSED, CONFIRMED, DISPUTED, REJECTED
+    confidence = Column(Float, nullable=False, default=0.5)
+    justification = Column(Text, nullable=False)
+    supporting_evidence_json = Column(Text, nullable=False, default="[]")
+    contradicting_evidence_json = Column(Text, nullable=False, default="[]")
+    external_conflicts_json = Column(Text, nullable=False, default="[]")
+    assessed_by = Column(String(100), nullable=False, default="ANALYST")
+    assessed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_taa_ws_subj", "workspace_id", "subject_type", "subject_id"),
+        Index("ix_taa_time", "assessed_at"),
+    )
+
+
+class ThreatActorRelationshipModel(Base):
+    """
+    Section 65: Threat Workspace Relationship with Semantic Classification.
+    Enforces clear semantic classification (OBSERVED vs CORRELATED vs HYPOTHESIZED vs ASSESSED).
+    Connects actors/campaigns to indicators, infrastructure, assets, identities, or techniques.
+    """
+    __tablename__ = "threat_actor_relationships"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    source_type = Column(String(30), nullable=False, index=True)  # THREAT_ACTOR, CAMPAIGN
+    source_id = Column(String(64), nullable=False, index=True)
+    target_type = Column(String(30), nullable=False, index=True)  # INDICATOR, INFRASTRUCTURE, TECHNIQUE, ASSET, IDENTITY, ALERT, INCIDENT
+    target_id = Column(String(255), nullable=False, index=True)
+    target_value = Column(String(500), nullable=False)
+    relationship_type = Column(String(64), nullable=False)  # OPERATES_INFRASTRUCTURE, USES_TECHNIQUE, TARGETS_ASSET, TARGETS_IDENTITY, ASSOCIATED_IOC
+    semantic_class = Column(String(30), nullable=False, default="OBSERVED", index=True)  # OBSERVED, CORRELATED, INFERRED, HYPOTHESIZED, ASSESSED, EXTERNAL_INTELLIGENCE, ANALYST_ASSERTED
+    confidence = Column(Float, nullable=False, default=1.0)
+    is_contradicting = Column(Boolean, nullable=False, default=False)
+    evidence_summary = Column(Text, nullable=True)
+    provenance_source = Column(String(100), nullable=False, default="INTERNAL_TELEMETRY")
+    first_observed_at = Column(DateTime, nullable=True)
+    last_observed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_tar_src", "workspace_id", "source_type", "source_id"),
+        Index("ix_tar_tgt", "workspace_id", "target_type", "target_id"),
+        Index("ix_tar_sem", "semantic_class"),
+    )
 
 
 
