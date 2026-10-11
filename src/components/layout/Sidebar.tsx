@@ -11,6 +11,7 @@ import {
   BellRing,
   Layers,
   Binary,
+  GitMerge,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -119,6 +120,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       matchPrefixes: ['/alerts', '/security-alerts'],
       icon: BellRing,
       description: 'Alert triage, correlation clusters & noise suppression',
+    },
+    {
+      id: 'correlations',
+      name: 'Correlations',
+      path: '/correlations',
+      matchPrefixes: ['/correlations', '/cross-source-correlation'],
+      icon: GitMerge,
+      description: 'Cross-source correlation, unified entity resolution & composite signals',
     },
     {
       id: 'incidents',

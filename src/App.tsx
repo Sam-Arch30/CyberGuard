@@ -36,6 +36,7 @@ import { IncidentDetailPage } from './pages/incidents/IncidentDetailPage';
 import { Watchlists } from './pages/Watchlists';
 import { ThreatHunting } from './pages/ThreatHunting';
 import { DetectionRules } from './pages/DetectionRules';
+import { CrossSourceCorrelationPage } from './pages/CrossSourceCorrelationPage';
 
 function AppContent() {
   return (
@@ -58,6 +59,11 @@ function AppContent() {
         <Route path="/alerts" element={<AlertWorkspace />} />
         <Route path="/alerts/:id" element={<AlertWorkspace />} />
         <Route path="/security-alerts" element={<Navigate to="/alerts" replace />} />
+
+        {/* Section 61: Cross-Source Correlation & Unified Entity Correlation */}
+        <Route path="/correlations" element={<CrossSourceCorrelationPage />} />
+        <Route path="/correlations/:id" element={<CrossSourceCorrelationPage />} />
+        <Route path="/cross-source-correlation" element={<Navigate to="/correlations" replace />} />
 
         {/* Canonical Investigation Workspace Routes */}
         <Route path="/investigations/:id" element={<InvestigationWorkspace />} />

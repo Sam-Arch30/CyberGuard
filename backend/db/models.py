@@ -556,12 +556,16 @@ class FindingModel(Base):
     method = Column(String(50), nullable=False, default="RULE", index=True)  # RULE, HEURISTIC, ML, LLM, EXTERNAL_INTELLIGENCE, STATISTICAL, GRAPH, MANUAL, HYBRID
     model_version_id = Column(String(36), ForeignKey("model_versions.id", ondelete="SET NULL"), nullable=True, index=True)
     rule_id = Column(String(100), nullable=True, index=True)
+    is_composite = Column(Boolean, default=False, nullable=False, index=True)
+    parent_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
+    correlation_id = Column(String(36), nullable=True, index=True)
     metadata_json = Column(Text, default="{}", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
 
     analysis_run = relationship("AnalysisRunModel", back_populates="findings")
     model_version = relationship("ModelVersionModel", back_populates="findings")
     evidence_items = relationship("FindingEvidenceModel", back_populates="finding", cascade="all, delete-orphan", lazy="selectin")
+    parent_finding = relationship("FindingModel", remote_side=[id], foreign_keys=[parent_finding_id], backref="child_findings")
 
     @property
     def details(self) -> Dict[str, Any]:
@@ -4708,6 +4712,169 @@ class DetectionDeadLetterModel(Base):
             return json.loads(self.provenance_json or "{}")
         except Exception:
             return {}
+
+
+# ============================================================================
+# SECTION 61: CROSS-SOURCE CORRELATION & UNIFIED ENTITY CORRELATION MODELS
+# ============================================================================
+
+def generate_correlation_number() -> str:
+    return f"CORR-{datetime.now(timezone.utc).year}-{uuid.uuid4().hex[:6].upper()}"
+
+
+class CrossSourceCorrelationModel(Base):
+    """
+    Persisted Cross-Source Correlation instance connecting signals, entities, findings,
+    and threat intelligence from disparate CyberGuard data sources (Section 61).
+    """
+    __tablename__ = "cross_source_correlations"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    correlation_number = Column(String(32), unique=True, nullable=False, index=True, default=generate_correlation_number)
+    correlation_type = Column(String(64), nullable=False, index=True)  # SAME_ENTITY, SHARED_INFRASTRUCTURE, TEMPORAL_ATTACK_SEQUENCE, etc.
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(String(32), nullable=False, default="CORRELATED", index=True)  # CANDIDATE, CORRELATED, PARTIALLY_CORRELATED, STALE, INVALIDATED, ARCHIVED
+    confidence_score = Column(Float, nullable=False, default=0.85)  # 0.0 - 1.0 (Distinct from risk!)
+    confidence_level = Column(String(20), nullable=False, default="HIGH", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    risk_score = Column(Float, nullable=False, default=0.0)  # 0.0 - 100.0 (Calculated by Unified Risk Engine)
+    risk_level = Column(String(20), nullable=False, default="LOW", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    severity = Column(String(20), nullable=False, default="MEDIUM", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    first_observed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_observed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    time_window_seconds = Column(Float, nullable=False, default=1800.0)  # e.g. 30 minutes
+    idempotency_hash = Column(String(64), nullable=False, index=True)  # sha256 to prevent duplicate creation
+    parent_finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
+    alert_id = Column(String(36), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True)
+    explanation_summary = Column(Text, nullable=False)
+    supporting_reasons_json = Column(Text, default="[]", nullable=False)
+    contradictions_json = Column(Text, default="[]", nullable=False)
+    missing_context_json = Column(Text, default="[]", nullable=False)
+    quality_metrics_json = Column(Text, default="{}", nullable=False)
+    rule_version = Column(String(32), nullable=False, default="1.0.0")
+    schema_version = Column(String(32), nullable=False, default="1.0.0")
+    analyst_disposition = Column(String(32), nullable=True, index=True)  # CONFIRMED, REJECTED, UNCERTAIN
+    analyst_notes = Column(Text, nullable=True)
+    dispositioned_by = Column(String(100), nullable=True)
+    dispositioned_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    members = relationship("CorrelationMemberModel", back_populates="correlation", cascade="all, delete-orphan", lazy="selectin")
+    parent_finding = relationship("FindingModel", foreign_keys=[parent_finding_id])
+    incident = relationship("IncidentModel", foreign_keys=[incident_id])
+    campaign = relationship("CampaignModel", foreign_keys=[campaign_id])
+
+    __table_args__ = (
+        Index("ix_csc_ws_type_status", "workspace_id", "correlation_type", "status"),
+        Index("ix_csc_ws_idempotency", "workspace_id", "idempotency_hash", unique=True),
+        Index("ix_csc_ws_created", "workspace_id", "created_at"),
+    )
+
+    @property
+    def supporting_reasons(self) -> List[str]:
+        try:
+            return json.loads(self.supporting_reasons_json or "[]")
+        except Exception:
+            return []
+
+    @property
+    def contradictions(self) -> List[str]:
+        try:
+            return json.loads(self.contradictions_json or "[]")
+        except Exception:
+            return []
+
+    @property
+    def missing_context(self) -> List[str]:
+        try:
+            return json.loads(self.missing_context_json or "[]")
+        except Exception:
+            return []
+
+    @property
+    def quality_metrics(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.quality_metrics_json or "{}")
+        except Exception:
+            return {}
+
+
+class CorrelationMemberModel(Base):
+    """
+    Normalized association between a Cross-Source Correlation and its constituent members
+    (Entities, Findings, Alerts, Incidents, Indicators, Evidence items, Relationships, Signals) (Section 61).
+    """
+    __tablename__ = "correlation_members"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    correlation_id = Column(String(36), ForeignKey("cross_source_correlations.id", ondelete="CASCADE"), nullable=False, index=True)
+    member_type = Column(String(32), nullable=False, index=True)  # ENTITY, FINDING, ALERT, INCIDENT, INDICATOR, EVIDENCE, RELATIONSHIP, SIGNAL
+    member_id = Column(String(128), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False, default="GENERIC", index=True)  # EMAIL, ENDPOINT, NETWORK, AUTH, API, BEHAVIORAL, DETECTION_RULE, THREAT_INTEL, WATCHLIST
+    role = Column(String(32), nullable=False, default="SUPPORTING", index=True)  # PRIMARY, SUPPORTING, PIVOT, OBSERVED
+    occurred_at = Column(DateTime, nullable=True, index=True)
+    confidence = Column(Float, nullable=False, default=1.0)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    correlation = relationship("CrossSourceCorrelationModel", back_populates="members")
+
+    __table_args__ = (
+        Index("ix_cm_corr_member", "correlation_id", "member_type", "member_id"),
+        Index("ix_cm_member_type_id", "member_type", "member_id"),
+    )
+
+    @property
+    def metadata_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.metadata_json or "{}")
+        except Exception:
+            return {}
+
+
+class EntityResolutionRecordModel(Base):
+    """
+    Immutable audit record of a deterministic entity resolution decision
+    mapping raw/external identifiers to canonical knowledge graph entities (Section 61).
+    """
+    __tablename__ = "entity_resolution_records"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    entity_type = Column(String(50), nullable=False, index=True)  # USER, ACCOUNT, DEVICE, ENDPOINT, IP, DOMAIN, URL, EMAIL, HASH, PROCESS, API_CLIENT
+    canonical_entity_id = Column(String(128), nullable=False, index=True)
+    raw_identifier = Column(Text, nullable=False)
+    normalized_identifier = Column(String(500), nullable=False, index=True)
+    resolution_method = Column(String(50), nullable=False, index=True)  # EXACT_ID, CANONICAL_NORMALIZATION, COMPOSITE_KEY, GRAPH_LINK, FUZZY_MATCH, UNRESOLVED
+    resolution_confidence = Column(Float, nullable=False, default=1.0)
+    status = Column(String(32), nullable=False, default="RESOLVED", index=True)  # RESOLVED, AMBIGUOUS, UNRESOLVED
+    matched_attributes_json = Column(Text, default="{}", nullable=False)
+    provenance_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_err_ws_type_norm", "workspace_id", "entity_type", "normalized_identifier"),
+        Index("ix_err_ws_canonical", "workspace_id", "canonical_entity_id"),
+    )
+
+    @property
+    def matched_attributes(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.matched_attributes_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def provenance(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.provenance_json or "{}")
+        except Exception:
+            return {}
+
 
 
 

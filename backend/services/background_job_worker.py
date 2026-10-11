@@ -1267,6 +1267,62 @@ async def handle_behavioral_batch_anomaly_run(ctx: JobExecutionContext, db: Sess
     return stats.model_dump()
 
 
+@register_handler(JobTypeEnum.CROSS_SOURCE_CORRELATION.value)
+async def handle_cross_source_correlation_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 61: On-demand cross-source correlation evaluation job.
+    """
+    from backend.services.cross_source_correlation_engine import CrossSourceCorrelationEngine
+
+    ctx.update_progress(db, 20.0, "CORRELATING", "Executing cross-source correlation evaluation...")
+    corrs = CrossSourceCorrelationEngine.evaluate_cross_source_correlation(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        entity_id=ctx.payload.get("entity_id"),
+        finding_id=ctx.payload.get("finding_id"),
+        incident_id=ctx.payload.get("incident_id"),
+        window_seconds=float(ctx.payload.get("window_seconds", 1800.0)),
+    )
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Cross-source correlation completed: {len(corrs)} correlations identified."
+    )
+    return {
+        "correlations_identified": len(corrs),
+        "correlation_ids": [c.id for c in corrs],
+        "workspace_id": ctx.workspace_id,
+    }
+
+
+@register_handler(JobTypeEnum.HISTORICAL_CORRELATION_SWEEP.value)
+async def handle_historical_correlation_sweep_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 61: Batch sweep across historical telemetry windows.
+    """
+    from backend.services.cross_source_correlation_engine import CrossSourceCorrelationEngine
+
+    ctx.update_progress(db, 15.0, "SWEEPING", "Starting historical correlation sweep...")
+    window_s = float(ctx.payload.get("window_seconds", 86400.0))  # 24h default for historical sweep
+    corrs = CrossSourceCorrelationEngine.evaluate_cross_source_correlation(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        window_seconds=window_s,
+    )
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Historical correlation sweep completed: {len(corrs)} correlations analyzed."
+    )
+    return {
+        "sweep_correlations_found": len(corrs),
+        "correlation_ids": [c.id for c in corrs],
+        "workspace_id": ctx.workspace_id,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

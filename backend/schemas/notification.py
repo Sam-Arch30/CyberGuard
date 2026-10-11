@@ -85,6 +85,10 @@ class NotificationTypeEnum(str, Enum):
     BEHAVIORAL_ANOMALY_ALERT = "BEHAVIORAL_ANOMALY_ALERT"
     BEHAVIORAL_BASELINE_DEGRADED = "BEHAVIORAL_BASELINE_DEGRADED"
 
+    # Section 61: Cross-Source Correlation & Unified Entity Correlation Notifications
+    CROSS_SOURCE_THREAT_CORRELATED = "CROSS_SOURCE_THREAT_CORRELATED"
+    COMPOSITE_ATTACK_PATTERN_DETECTED = "COMPOSITE_ATTACK_PATTERN_DETECTED"
+
 
 class NotificationRead(BaseModel):
     id: str
