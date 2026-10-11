@@ -620,6 +620,14 @@ class SocDashboardService:
             total=crit_count + high_count + med_count + low_count + safe_count,
         )
 
+        # Section 64: Top Operational Prioritized Assets
+        try:
+            from backend.services.asset_prioritization_service import AssetPrioritizationService
+            highest_priority_assets = AssetPrioritizationService.get_top_prioritized_assets(db, workspace_id, limit=5)
+        except Exception as e:
+            logger.warning("Failed to fetch highest priority assets for SOC overview: %s", e)
+            highest_priority_assets = []
+
         return SocOverviewResponse(
             generated_at=now.isoformat(),
             time_window=time_window,
@@ -630,5 +638,6 @@ class SocDashboardService:
             threat_intel=threat_intel_items,
             active_campaigns=campaign_items,
             system_health=system_health,
+            highest_priority_assets=highest_priority_assets,
             partial_failures=partial_failures,
         )

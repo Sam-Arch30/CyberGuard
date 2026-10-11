@@ -125,4 +125,5 @@ class SocOverviewResponse(BaseModel):
     threat_intel: List[SocThreatIntelItem] = Field(default_factory=list)
     active_campaigns: List[SocCampaignSummaryItem] = Field(default_factory=list)
     system_health: SocSystemHealth
+    highest_priority_assets: List[Dict[str, Any]] = Field(default_factory=list, description="Section 64: Top operational assets requiring analyst attention")
     partial_failures: List[str] = Field(default_factory=list, description="List of any degraded or unavailable subsystems")

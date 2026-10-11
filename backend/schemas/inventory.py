@@ -172,6 +172,17 @@ class AssetRead(AssetBase):
     canonical_entity_id: Optional[str] = None
     risk_score: float = 0.0
     risk_level: str = "LOW"
+    priority_band: Optional[str] = "P4"
+    priority_score: Optional[float] = 0.0
+    effective_priority: Optional[str] = "P4"
+    priority_override: Optional[str] = None
+    priority_override_reason: Optional[str] = None
+    priority_override_by: Optional[str] = None
+    priority_override_at: Optional[datetime] = None
+    priority_override_expires_at: Optional[datetime] = None
+    priority_data_quality: Optional[str] = "UNKNOWN"
+    priority_calculated_at: Optional[datetime] = None
+    priority_explanation_dict: Optional[Dict[str, Any]] = None
     active_finding_count: int = 0
     active_exposure_count: int = 0
     first_seen_at: datetime

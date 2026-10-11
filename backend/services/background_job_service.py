@@ -60,6 +60,9 @@ DEFAULT_JOB_TIMEOUTS: Dict[str, int] = {
     JobTypeEnum.INVENTORY_SYNC.value: 300,
     JobTypeEnum.INVENTORY_RECONCILIATION.value: 300,
     JobTypeEnum.INVENTORY_STALE_CHECK.value: 180,
+    JobTypeEnum.ASSET_PRIORITY_RECALCULATION.value: 300,
+    JobTypeEnum.ASSET_PRIORITY_BATCH_EVALUATION.value: 300,
+    JobTypeEnum.ASSET_PRIORITY_POLICY_SWEEP.value: 300,
 }
 
 # Legal lifecycle state transition matrix

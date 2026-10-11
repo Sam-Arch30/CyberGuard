@@ -73,6 +73,16 @@ export interface InventoryAsset {
   active_exposure_count: number;
   is_managed: boolean;
   is_stale: boolean;
+  priority_band?: 'P1' | 'P2' | 'P3' | 'P4' | 'UNPRIORITIZED';
+  priority_score?: number;
+  effective_priority?: 'P1' | 'P2' | 'P3' | 'P4' | 'UNPRIORITIZED';
+  is_overridden?: boolean;
+  priority_override?: string | null;
+  priority_override_reason?: string | null;
+  priority_override_by?: string | null;
+  priority_override_expires_at?: string | null;
+  priority_data_quality?: 'GOOD' | 'DEGRADED' | 'STALE' | 'UNKNOWN';
+  priority_calculated_at?: string | null;
   tags: string[];
   first_seen_at: string;
   last_seen_at: string;

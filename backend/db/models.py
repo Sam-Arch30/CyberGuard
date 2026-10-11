@@ -4921,6 +4921,21 @@ class AssetModel(Base):
     last_scanned_at = Column(DateTime, nullable=True)
     last_analyzed_at = Column(DateTime, nullable=True)
     metadata_json = Column(Text, default="{}", nullable=False)
+
+    # Section 64: Risk-Based Asset Prioritization
+    priority_band = Column(String(16), nullable=False, default="UNPRIORITIZED", index=True)  # P1, P2, P3, P4, UNPRIORITIZED
+    priority_score = Column(Float, nullable=False, default=0.0, index=True)  # Bounded operational priority score (0.0 - 100.0)
+    priority_calculated_at = Column(DateTime, nullable=True)
+    priority_policy_id = Column(String(36), nullable=True)
+    priority_policy_version = Column(Integer, nullable=True, default=1)
+    priority_override = Column(String(16), nullable=True)  # P1, P2, P3, P4
+    priority_override_reason = Column(Text, nullable=True)
+    priority_override_by = Column(String(100), nullable=True)
+    priority_override_at = Column(DateTime, nullable=True)
+    priority_override_expires_at = Column(DateTime, nullable=True)
+    priority_explanation_json = Column(Text, default="{}", nullable=False)
+    priority_data_quality = Column(String(20), nullable=False, default="UNKNOWN", index=True)  # GOOD, DEGRADED, STALE, UNKNOWN
+
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
@@ -4933,6 +4948,7 @@ class AssetModel(Base):
         Index("ix_assets_ws_crit_risk", "workspace_id", "criticality", "risk_score"),
         Index("ix_assets_ws_last_seen", "workspace_id", "last_seen_at"),
         Index("ix_assets_ws_own_stale", "workspace_id", "ownership_status", "is_stale"),
+        Index("ix_assets_ws_prio", "workspace_id", "priority_band", "priority_score"),
     )
 
     @property
@@ -4948,6 +4964,26 @@ class AssetModel(Base):
             return json.loads(self.tags_json or "[]")
         except Exception:
             return []
+
+    @property
+    def priority_explanation_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.priority_explanation_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def effective_priority(self) -> str:
+        if self.priority_override:
+            if self.priority_override_expires_at:
+                now = datetime.now(timezone.utc)
+                exp = self.priority_override_expires_at
+                if exp.tzinfo is None:
+                    exp = exp.replace(tzinfo=timezone.utc)
+                if now > exp:
+                    return self.priority_band
+            return self.priority_override
+        return self.priority_band
 
 
 class ExposureModel(Base):
@@ -5266,6 +5302,83 @@ class InventoryOverrideModel(Base):
     __table_args__ = (
         Index("ix_inv_overrides_ws_target", "workspace_id", "target_type", "target_id"),
     )
+
+
+# ============================================================================
+# SECTION 64: RISK-BASED ASSET PRIORITIZATION MODELS
+# ============================================================================
+
+class AssetPrioritizationPolicyModel(Base):
+    """
+    Section 64: Versioned Operational Asset Prioritization Policy.
+    Defines configurable, deterministic factor weights and thresholds for ranking assets.
+    """
+    __tablename__ = "asset_prioritization_policies"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(100), nullable=False)
+    description = Column(Text, nullable=True)
+    version = Column(Integer, nullable=False, default=1)
+    status = Column(String(20), nullable=False, default="ACTIVE", index=True)  # ACTIVE, DRAFT, DISABLED, ARCHIVED
+    configuration_json = Column(Text, nullable=False)
+    created_by = Column(String(100), nullable=False, default="SYSTEM")
+    activated_at = Column(DateTime, nullable=True)
+    deactivated_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_prio_pol_ws_status_ver", "workspace_id", "status", "version"),
+    )
+
+    @property
+    def configuration_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.configuration_json or "{}")
+        except Exception:
+            return {}
+
+
+class AssetPrioritySnapshotModel(Base):
+    """
+    Section 64: Immutable historical snapshot of an asset priority evaluation.
+    Provides complete auditability of priority transitions and factor contributions.
+    """
+    __tablename__ = "asset_priority_snapshots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    asset_id = Column(String(36), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    priority_band = Column(String(16), nullable=False, index=True)  # P1, P2, P3, P4, UNPRIORITIZED
+    priority_score = Column(Float, nullable=False, default=0.0)
+    policy_id = Column(String(36), nullable=False, index=True)
+    policy_version = Column(Integer, nullable=False, default=1)
+    risk_score = Column(Float, nullable=False, default=0.0)
+    business_criticality = Column(String(20), nullable=False, default="UNKNOWN")
+    exposure_state = Column(String(32), nullable=False, default="UNKNOWN")
+    active_incident_count = Column(Integer, nullable=False, default=0)
+    data_quality = Column(String(20), nullable=False, default="UNKNOWN")  # GOOD, DEGRADED, STALE, UNKNOWN
+    explanation_json = Column(Text, nullable=False, default="{}")
+    is_override = Column(Boolean, default=False, nullable=False)
+    override_priority = Column(String(16), nullable=True)
+    override_reason = Column(Text, nullable=True)
+    override_by = Column(String(100), nullable=True)
+    previous_priority_band = Column(String(16), nullable=True)
+    transition_type = Column(String(32), nullable=False, default="INITIAL")  # INITIAL, ESCALATED, DEESCALATED, UNCHANGED, OVERRIDDEN, EXPIRED
+    calculated_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_prio_snap_ws_asset_time", "workspace_id", "asset_id", "calculated_at"),
+    )
+
+    @property
+    def explanation_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.explanation_json or "{}")
+        except Exception:
+            return {}
 
 
 

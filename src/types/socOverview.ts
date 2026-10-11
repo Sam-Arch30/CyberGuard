@@ -104,5 +104,19 @@ export interface SocOverviewResponse {
   threat_intel: SocThreatIntelItem[];
   active_campaigns: SocCampaignSummaryItem[];
   system_health: SocSystemHealth;
+  highest_priority_assets?: Array<{
+    id: string;
+    canonical_name: string;
+    display_name: string;
+    asset_type: string;
+    effective_priority: string;
+    priority_score: number;
+    risk_score: number;
+    criticality: string;
+    exposure_state: string;
+    primary_reason: string;
+    owner?: string | null;
+    active_incidents: number;
+  }>;
   partial_failures: string[];
 }

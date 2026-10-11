@@ -1436,6 +1436,35 @@ async def handle_inventory_stale_check_job(ctx: JobExecutionContext, db: Session
     return report.model_dump()
 
 
+@register_handler(JobTypeEnum.ASSET_PRIORITY_RECALCULATION.value)
+@register_handler(JobTypeEnum.ASSET_PRIORITY_BATCH_EVALUATION.value)
+@register_handler(JobTypeEnum.ASSET_PRIORITY_POLICY_SWEEP.value)
+async def handle_asset_priority_recalculation_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 64: Asynchronous Risk-Based Asset Prioritization recalculation.
+    """
+    from backend.services.asset_prioritization_service import AssetPrioritizationService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    asset_ids = params.get("asset_ids")
+
+    ctx.update_progress(db, 40.0, "RECALCULATING", "Computing deterministic risk-based asset priorities...")
+    summary = AssetPrioritizationService.recalculate_workspace_priorities(
+        db=db,
+        workspace_id=ctx.workspace_id,
+        asset_ids=asset_ids,
+        actor=params.get("actor", "BACKGROUND_JOB"),
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Recalculation complete: {summary['processed']} assets evaluated (P1: {summary['p1_count']}, P2: {summary['p2_count']}, P3: {summary['p3_count']}, P4: {summary['p4_count']}).",
+    )
+    return summary
+
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

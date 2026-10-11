@@ -777,6 +777,86 @@ export const Dashboard: React.FC = () => {
       </div>
 
       {/* =========================================================================
+          3B. SECTION 64: RISK-BASED ASSET PRIORITIZATION — HIGHEST PRIORITY ASSETS
+          ========================================================================= */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <h2 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center gap-1.5">
+              <Flame className="w-3.5 h-3.5 text-amber-500" />
+              <span>Highest Priority Assets (Section 64)</span>
+            </h2>
+            {data?.highest_priority_assets && data.highest_priority_assets.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-400 font-mono font-bold">
+                {data.highest_priority_assets.length} ASSETS REQUIRE ATTENTION
+              </span>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={() => navigate('/assets')}
+            className="text-primary hover:underline text-[11px] font-mono font-bold flex items-center space-x-1 cursor-pointer"
+          >
+            <span>Asset Inventory</span>
+            <ChevronRight className="w-3 h-3" />
+          </button>
+        </div>
+
+        {(!data?.highest_priority_assets || data.highest_priority_assets.length === 0) ? (
+          <div className="p-4 rounded-card bg-surface border border-border text-center text-xs font-mono text-foreground-muted">
+            No critical or high priority assets currently require immediate operational intervention.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+            {data.highest_priority_assets.slice(0, 4).map((asset) => {
+              const pBand = asset.effective_priority || 'P4';
+              const pBg =
+                pBand === 'P1'
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
+                  : pBand === 'P2'
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                  : pBand === 'P3'
+                  ? 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
+                  : 'bg-blue-500/15 text-blue-400 border-blue-500/30';
+
+              return (
+                <div
+                  key={asset.id}
+                  onClick={() => navigate(`/assets?id=${asset.id}`)}
+                  className="p-3.5 rounded-card bg-surface border border-border hover:border-primary/50 transition-all cursor-pointer group flex flex-col justify-between space-y-2.5 shadow-xs"
+                >
+                  <div className="space-y-1.5 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <span className={`text-[10px] font-mono font-bold px-1.5 py-0.2 rounded border ${pBg}`}>
+                        {pBand} • {asset.priority_score?.toFixed(1) || '0.0'}
+                      </span>
+                      <span className="text-[10px] font-mono text-foreground-muted uppercase">
+                        {asset.asset_type}
+                      </span>
+                    </div>
+                    <h4 className="text-xs font-mono font-bold text-foreground group-hover:text-primary transition-colors truncate">
+                      {asset.canonical_name}
+                    </h4>
+                    <p className="text-[11px] text-foreground-muted line-clamp-2">
+                      {asset.primary_reason || `Criticality: ${asset.criticality} • Risk: ${asset.risk_score.toFixed(1)}`}
+                    </p>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1 border-t border-border/50 text-[10px] font-mono text-foreground-muted">
+                    <span>Risk: {asset.risk_score.toFixed(1)}</span>
+                    <span className="text-primary flex items-center space-x-0.5 group-hover:translate-x-0.5 transition-transform font-bold">
+                      <span>Inspect</span>
+                      <ChevronRight className="w-2.5 h-2.5" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </section>
+
+      {/* =========================================================================
           4. THREAT INTELLIGENCE & CORRELATION SUMMARY
           ========================================================================= */}
       <section className="space-y-3">

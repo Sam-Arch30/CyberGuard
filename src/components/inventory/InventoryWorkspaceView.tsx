@@ -20,6 +20,11 @@ import {
   Users,
   KeyRound,
   FileCheck2,
+  Flame,
+  Sliders,
+  History,
+  Sparkles,
+  Info,
 } from 'lucide-react';
 import type {
   InventoryAsset,
@@ -32,7 +37,13 @@ import type {
   AssetType,
   IdentityType,
 } from '../../types/inventory';
+import type {
+  PriorityBand,
+  PriorityExplanation,
+  PriorityHistoryItem,
+} from '../../types/assetPrioritization';
 import { InventoryService } from '../../services/inventoryService';
+import { AssetPrioritizationService } from '../../services/assetPrioritizationService';
 import {
   Button,
   Badge,
@@ -70,6 +81,7 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
   const [filterAssetStatus, setFilterAssetStatus] = useState('ALL');
   const [filterEnvironment, setFilterEnvironment] = useState('ALL');
   const [filterCriticality, setFilterCriticality] = useState('ALL');
+  const [filterPriority, setFilterPriority] = useState('ALL');
   const [filterOwnershipStatus, setFilterOwnershipStatus] = useState('ALL');
   const [filterManagedOnly, setFilterManagedOnly] = useState<boolean | undefined>(undefined);
   const [filterStaleOnly, setFilterStaleOnly] = useState<boolean | undefined>(undefined);
@@ -94,11 +106,22 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
   const [loadingConflicts, setLoadingConflicts] = useState(false);
   const [filterConflictStatus, setFilterConflictStatus] = useState('ALL');
 
-  // Detail Drawers
+  // Detail Drawers & Section 64 Priority State
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(initialAssetId || null);
   const [selectedAssetDetail, setSelectedAssetDetail] = useState<InventoryAssetDetail | null>(null);
   const [loadingAssetDetail, setLoadingAssetDetail] = useState(false);
-  const [assetDetailTab, setAssetDetailTab] = useState<'overview' | 'exposures' | 'services' | 'neighbors' | 'timeline'>('overview');
+  const [assetDetailTab, setAssetDetailTab] = useState<'overview' | 'priority' | 'exposures' | 'services' | 'neighbors' | 'timeline'>('overview');
+  const [priorityExplanation, setPriorityExplanation] = useState<PriorityExplanation | null>(null);
+  const [priorityHistory, setPriorityHistory] = useState<PriorityHistoryItem[]>([]);
+  const [loadingPriority, setLoadingPriority] = useState(false);
+  const [isRecalculatingPriority, setIsRecalculatingPriority] = useState(false);
+
+  // Section 64 Manual Override Modal State
+  const [isOverrideModalOpen, setIsOverrideModalOpen] = useState(false);
+  const [overrideBand, setOverrideBand] = useState<PriorityBand>('P1');
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideDurationHours, setOverrideDurationHours] = useState<number | undefined>(24);
+  const [isSubmittingOverride, setIsSubmittingOverride] = useState(false);
 
   const [selectedIdentityId, setSelectedIdentityId] = useState<string | null>(null);
   const [selectedIdentityDetail, setSelectedIdentityDetail] = useState<InventoryIdentityDetail | null>(null);
@@ -238,6 +261,22 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
     }
   }, []);
 
+  const fetchAssetPriorityData = useCallback(async (id: string) => {
+    setLoadingPriority(true);
+    try {
+      const [explanation, historyRes] = await Promise.all([
+        AssetPrioritizationService.getPriorityExplanation(id).catch(() => null),
+        AssetPrioritizationService.getPriorityHistory(id, 20).catch(() => ({ items: [], total: 0 })),
+      ]);
+      setPriorityExplanation(explanation);
+      setPriorityHistory(historyRes.items || []);
+    } catch (err) {
+      console.error('Failed to get priority data:', err);
+    } finally {
+      setLoadingPriority(false);
+    }
+  }, []);
+
   const fetchIdentityDetail = useCallback(async (id: string) => {
     setLoadingIdentityDetail(true);
     try {
@@ -261,10 +300,13 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
   useEffect(() => {
     if (selectedAssetId) {
       fetchAssetDetail(selectedAssetId);
+      fetchAssetPriorityData(selectedAssetId);
     } else {
       setSelectedAssetDetail(null);
+      setPriorityExplanation(null);
+      setPriorityHistory([]);
     }
-  }, [selectedAssetId, fetchAssetDetail]);
+  }, [selectedAssetId, fetchAssetDetail, fetchAssetPriorityData]);
 
   useEffect(() => {
     if (selectedIdentityId) {
@@ -273,6 +315,64 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
       setSelectedIdentityDetail(null);
     }
   }, [selectedIdentityId, fetchIdentityDetail]);
+
+  const handleRecalculatePriority = async () => {
+    if (!selectedAssetId) return;
+    setIsRecalculatingPriority(true);
+    try {
+      await AssetPrioritizationService.recalculate([selectedAssetId], true);
+      await Promise.all([
+        fetchAssetDetail(selectedAssetId),
+        fetchAssetPriorityData(selectedAssetId),
+        fetchAssets(),
+        fetchOverview(),
+      ]);
+    } catch (err) {
+      console.error('Failed to recalculate priority:', err);
+    } finally {
+      setIsRecalculatingPriority(false);
+    }
+  };
+
+  const handleApplyOverrideSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAssetId || !overrideReason.trim()) return;
+    setIsSubmittingOverride(true);
+    try {
+      await AssetPrioritizationService.applyOverride(
+        selectedAssetId,
+        overrideBand,
+        overrideReason.trim(),
+        overrideDurationHours
+      );
+      setIsOverrideModalOpen(false);
+      setOverrideReason('');
+      await Promise.all([
+        fetchAssetDetail(selectedAssetId),
+        fetchAssetPriorityData(selectedAssetId),
+        fetchAssets(),
+      ]);
+    } catch (err) {
+      console.error('Failed to apply override:', err);
+    } finally {
+      setIsSubmittingOverride(false);
+    }
+  };
+
+  const handleRemoveOverride = async () => {
+    if (!selectedAssetId) return;
+    if (!window.confirm('Remove manual priority override and revert to calculated priority?')) return;
+    try {
+      await AssetPrioritizationService.removeOverride(selectedAssetId);
+      await Promise.all([
+        fetchAssetDetail(selectedAssetId),
+        fetchAssetPriorityData(selectedAssetId),
+        fetchAssets(),
+      ]);
+    } catch (err) {
+      console.error('Failed to remove override:', err);
+    }
+  };
 
   // ---------------------------------------------------------------------------
   // Action Handlers
@@ -389,6 +489,21 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
         return 'bg-amber-950/80 text-amber-300 border-amber-800/60';
       default:
         return 'bg-slate-800 text-slate-300 border-slate-700';
+    }
+  };
+
+  const getPriorityBadgeClass = (priority?: string) => {
+    switch (priority?.toUpperCase()) {
+      case 'P1':
+        return 'bg-rose-950/80 text-rose-300 border-rose-700/80 font-bold';
+      case 'P2':
+        return 'bg-orange-950/80 text-orange-300 border-orange-700/80 font-bold';
+      case 'P3':
+        return 'bg-amber-950/80 text-amber-300 border-amber-700/80 font-medium';
+      case 'P4':
+        return 'bg-blue-950/80 text-blue-300 border-blue-700/80 font-medium';
+      default:
+        return 'bg-slate-800 text-slate-400 border-slate-700';
     }
   };
 
@@ -680,6 +795,19 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
               </select>
 
               <select
+                value={filterPriority}
+                onChange={(e) => setFilterPriority(e.target.value)}
+                className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-slate-300 focus:outline-none"
+              >
+                <option value="ALL">All Priorities</option>
+                <option value="P1">P1 — Critical Attention</option>
+                <option value="P2">P2 — High Attention</option>
+                <option value="P3">P3 — Medium Attention</option>
+                <option value="P4">P4 — Low Attention</option>
+                <option value="OVERRIDDEN">Manual Override Only</option>
+              </select>
+
+              <select
                 value={filterEnvironment}
                 onChange={(e) => setFilterEnvironment(e.target.value)}
                 className="bg-slate-950 border border-slate-800 rounded px-2.5 py-1.5 text-slate-300 focus:outline-none"
@@ -748,6 +876,7 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
                   <th className="py-3 px-4">Owner &amp; Team</th>
                   <th className="py-3 px-4">Environment</th>
                   <th className="py-3 px-4">Criticality</th>
+                  <th className="py-3 px-4">Priority (SOC)</th>
                   <th className="py-3 px-4">Status &amp; Management</th>
                   <th className="py-3 px-4">Risk</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -756,19 +885,31 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
               <tbody className="divide-y divide-slate-800/60 font-normal">
                 {loadingAssets ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-cyan-500" />
                       Loading asset inventory...
                     </td>
                   </tr>
-                ) : assets.length === 0 ? (
+                ) : assets.filter((asset) => {
+                    if (filterPriority === 'ALL') return true;
+                    if (filterPriority === 'OVERRIDDEN') return Boolean(asset.priority_override);
+                    const eff = asset.effective_priority || asset.priority_band || 'P4';
+                    return eff === filterPriority;
+                  }).length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-500">
+                    <td colSpan={9} className="py-12 text-center text-slate-500">
                       No assets found matching selected filters.
                     </td>
                   </tr>
                 ) : (
-                  assets.map((asset) => (
+                  assets
+                    .filter((asset) => {
+                      if (filterPriority === 'ALL') return true;
+                      if (filterPriority === 'OVERRIDDEN') return Boolean(asset.priority_override);
+                      const eff = asset.effective_priority || asset.priority_band || 'P4';
+                      return eff === filterPriority;
+                    })
+                    .map((asset) => (
                     <tr
                       key={asset.id}
                       className="hover:bg-slate-800/40 transition-colors cursor-pointer"
@@ -804,6 +945,24 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
                         <Badge className={cn('text-xs', getCriticalityBadgeClass(asset.criticality))}>
                           {asset.criticality}
                         </Badge>
+                      </td>
+
+                      <td className="py-3 px-4">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <Badge className={cn('text-xs font-mono font-bold', getPriorityBadgeClass(asset.effective_priority || asset.priority_band))}>
+                            {asset.effective_priority || asset.priority_band || 'P4'}
+                          </Badge>
+                          {asset.priority_score !== undefined && (
+                            <span className="text-[11px] font-mono text-slate-400">
+                              {asset.priority_score.toFixed(1)}
+                            </span>
+                          )}
+                          {asset.priority_override && (
+                            <Badge className="bg-purple-950/80 text-purple-300 border-purple-800 text-[9px] px-1 py-0">
+                              OVERRIDE
+                            </Badge>
+                          )}
+                        </div>
                       </td>
 
                       <td className="py-3 px-4">
@@ -1226,12 +1385,20 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
           ) : (
             <>
               <ModalHeader>
-                <ModalTitle className="flex items-center gap-2">
+                <ModalTitle className="flex items-center gap-2 flex-wrap">
                   {getAssetTypeIcon(selectedAssetDetail.asset_type)}
                   <span className="font-mono text-base">{selectedAssetDetail.canonical_name}</span>
                   <Badge className={cn('text-xs ml-2', getCriticalityBadgeClass(selectedAssetDetail.criticality))}>
                     {selectedAssetDetail.criticality} Criticality
                   </Badge>
+                  <Badge className={cn('text-xs ml-1 font-bold', getPriorityBadgeClass(selectedAssetDetail.effective_priority || selectedAssetDetail.priority_band))}>
+                    {selectedAssetDetail.effective_priority || selectedAssetDetail.priority_band || 'P4'} Priority
+                  </Badge>
+                  {selectedAssetDetail.priority_override && (
+                    <Badge className="bg-purple-950/80 text-purple-300 border-purple-800 text-[10px]">
+                      OVERRIDE: {selectedAssetDetail.priority_override}
+                    </Badge>
+                  )}
                 </ModalTitle>
               </ModalHeader>
               <ModalBody className="max-h-[70vh] overflow-y-auto">
@@ -1241,6 +1408,16 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
                     className={cn('pb-2 border-b-2', assetDetailTab === 'overview' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400')}
                   >
                     Overview
+                  </button>
+                  <button
+                    onClick={() => setAssetDetailTab('priority')}
+                    className={cn(
+                      'pb-2 border-b-2 flex items-center gap-1.5',
+                      assetDetailTab === 'priority' ? 'border-cyan-500 text-cyan-400 font-semibold' : 'border-transparent text-slate-400 hover:text-slate-200'
+                    )}
+                  >
+                    <Flame className="w-3.5 h-3.5 text-amber-400" />
+                    Priority &amp; Attention (S64)
                   </button>
                   <button
                     onClick={() => setAssetDetailTab('exposures')}
@@ -1293,6 +1470,240 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
                           <Badge className="bg-amber-950 text-amber-300 border-amber-800 text-xs">Unmanaged</Badge>
                         )}
                       </div>
+                    </div>
+                  </div>
+                )}
+
+                {assetDetailTab === 'priority' && (
+                  <div className="flex flex-col gap-5 text-sm">
+                    {/* Top Status Cards */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+                        <div className="text-xs text-slate-400 flex items-center justify-between">
+                          <span>Effective Priority</span>
+                          <Flame className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <Badge className={cn('text-sm font-mono font-bold px-2 py-0.5', getPriorityBadgeClass(selectedAssetDetail.effective_priority || selectedAssetDetail.priority_band))}>
+                            {selectedAssetDetail.effective_priority || selectedAssetDetail.priority_band || 'P4'}
+                          </Badge>
+                          <span className="text-xs font-mono text-slate-400">
+                            Score: {(selectedAssetDetail.priority_score ?? 0).toFixed(1)} / 100
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          {selectedAssetDetail.priority_override ? 'Driven by manual analyst override' : 'Calculated by operational policy'}
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+                        <div className="text-xs text-slate-400 flex items-center justify-between">
+                          <span>Baseline Engine Calculation</span>
+                          <Sliders className="w-4 h-4 text-cyan-400" />
+                        </div>
+                        <div className="mt-2 flex items-baseline gap-2">
+                          <span className="font-mono font-bold text-slate-200">
+                            {selectedAssetDetail.priority_band || 'P4'}
+                          </span>
+                          <span className="text-xs font-mono text-slate-400">
+                            ({(selectedAssetDetail.priority_score ?? 0).toFixed(1)} pts)
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1 truncate">
+                          Policy: {priorityExplanation?.policy_id || 'production-prioritization-v1'} (v{priorityExplanation?.policy_version || 1})
+                        </div>
+                      </div>
+
+                      <div className="p-3.5 rounded-xl bg-slate-950 border border-slate-800 flex flex-col justify-between">
+                        <div className="text-xs text-slate-400 flex items-center justify-between">
+                          <span>Telemetry Quality &amp; Freshness</span>
+                          <Info className="w-4 h-4 text-indigo-400" />
+                        </div>
+                        <div className="mt-2 flex items-center gap-2">
+                          {priorityExplanation?.data_quality?.status === 'GOOD' || selectedAssetDetail.priority_data_quality === 'GOOD' ? (
+                            <Badge className="bg-emerald-950 text-emerald-300 border-emerald-800 text-xs">
+                              GOOD (Fresh)
+                            </Badge>
+                          ) : priorityExplanation?.data_quality?.status === 'DEGRADED' || selectedAssetDetail.priority_data_quality === 'DEGRADED' ? (
+                            <Badge className="bg-amber-950 text-amber-300 border-amber-800 text-xs">
+                              DEGRADED
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-orange-950 text-orange-300 border-orange-800 text-xs">
+                              {priorityExplanation?.data_quality?.status || selectedAssetDetail.priority_data_quality || 'STALE'}
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-slate-500 mt-1">
+                          Evaluated: {selectedAssetDetail.priority_calculated_at ? new Date(selectedAssetDetail.priority_calculated_at).toLocaleTimeString() : 'Recent'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Manual Override Banner if Active */}
+                    {selectedAssetDetail.priority_override && (
+                      <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-800/60 flex items-start justify-between gap-3">
+                        <div>
+                          <div className="flex items-center gap-2 text-xs font-bold text-purple-300">
+                            <Badge className="bg-purple-900 text-purple-200 border-purple-700 text-[10px]">
+                              ACTIVE OVERRIDE: {selectedAssetDetail.priority_override}
+                            </Badge>
+                            <span>Overridden by {selectedAssetDetail.priority_override_by || 'analyst'}</span>
+                          </div>
+                          <p className="text-xs text-purple-200/90 mt-1">
+                            <strong>Reason:</strong> {selectedAssetDetail.priority_override_reason}
+                          </p>
+                          {selectedAssetDetail.priority_override_expires_at && (
+                            <div className="text-[11px] text-purple-300/70 font-mono mt-0.5">
+                              Expires: {new Date(selectedAssetDetail.priority_override_expires_at).toLocaleString()}
+                            </div>
+                          )}
+                        </div>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleRemoveOverride}
+                          className="border-purple-700 text-purple-300 hover:bg-purple-900/50 text-xs shrink-0"
+                        >
+                          Revert to Calculated
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Analyst Operational Action Bar */}
+                    <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900/60 border border-slate-800">
+                      <span className="text-xs text-slate-300 font-medium">
+                        Analyst Prioritization Controls:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsOverrideModalOpen(true)}
+                          className="text-xs border-slate-700 hover:border-cyan-500 text-slate-300"
+                        >
+                          <Sliders className="w-3.5 h-3.5 mr-1 text-cyan-400" />
+                          Set Manual Override
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleRecalculatePriority}
+                          disabled={isRecalculatingPriority}
+                          className="text-xs bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold"
+                        >
+                          <RefreshCw className={cn('w-3.5 h-3.5 mr-1', isRecalculatingPriority && 'animate-spin')} />
+                          Recalculate Priority Now
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* "Why Prioritized?" Explainable Breakdown */}
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+                          <span>Why is this asset prioritized at {selectedAssetDetail.effective_priority || selectedAssetDetail.priority_band || 'P4'}?</span>
+                        </h4>
+                        <span className="text-[11px] text-slate-500">
+                          Non-arbitrary deterministic attribution
+                        </span>
+                      </div>
+
+                      {/* Contributors Breakdown Cards */}
+                      {loadingPriority ? (
+                        <div className="p-6 text-center text-slate-500">
+                          <RefreshCw className="w-5 h-5 animate-spin mx-auto mb-2 text-cyan-500" />
+                          Loading priority contributors...
+                        </div>
+                      ) : !priorityExplanation || priorityExplanation.contributors.length === 0 ? (
+                        <div className="p-4 rounded bg-slate-900/30 border border-slate-800 text-xs text-slate-500 text-center">
+                          Prioritization engine details pending first evaluation pass.
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                          {priorityExplanation.contributors.map((c, i) => (
+                            <div key={i} className="p-3 rounded-lg bg-slate-950 border border-slate-800 space-y-1.5">
+                              <div className="flex items-center justify-between">
+                                <span className="font-semibold text-slate-200 text-xs">
+                                  {c.label || c.factor.replace(/_/g, ' ')}
+                                </span>
+                                <Badge className="bg-slate-800 text-slate-300 text-[10px] font-mono">
+                                  +{c.weighted_points.toFixed(1)} pts ({Math.round(c.weight * 100)}%)
+                                </Badge>
+                              </div>
+                              <p className="text-xs text-slate-400">
+                                {c.description}
+                              </p>
+                              <div className="flex items-center justify-between pt-1 border-t border-slate-900 text-[10px] text-slate-500 font-mono">
+                                <span>Source: {c.source}</span>
+                                <span className="text-slate-400">Value: {String(c.value)}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Uncertainty & Freshness Penalties Note */}
+                      {priorityExplanation?.data_quality && ((priorityExplanation.data_quality.issues && priorityExplanation.data_quality.issues.length > 0) || (priorityExplanation.data_quality.stale_sources && priorityExplanation.data_quality.stale_sources.length > 0)) && (
+                        <div className="p-3 rounded-lg bg-amber-950/30 border border-amber-800/50 space-y-1">
+                          <div className="text-xs font-semibold text-amber-300 flex items-center gap-1.5">
+                            <AlertTriangle className="w-3.5 h-3.5" />
+                            <span>Uncertainty &amp; Stale Data Safeguards (Missing Telemetry ≠ Safe)</span>
+                          </div>
+                          {priorityExplanation.data_quality.issues.map((pen, i) => (
+                            <p key={i} className="text-xs text-amber-200/80">
+                              • {pen}
+                            </p>
+                          ))}
+                          {priorityExplanation.data_quality.stale_sources.length > 0 && (
+                            <p className="text-xs text-amber-200/80">
+                              • Stale telemetry sources detected: {priorityExplanation.data_quality.stale_sources.join(', ')}
+                            </p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Historical Timeline */}
+                    <div className="space-y-3 pt-2">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
+                        <History className="w-3.5 h-3.5 text-cyan-400" />
+                        <span>Priority Transition History</span>
+                      </h4>
+                      {priorityHistory.length === 0 ? (
+                        <div className="p-4 rounded bg-slate-950 border border-slate-800 text-xs text-slate-500 text-center">
+                          No historical priority transitions recorded yet.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {priorityHistory.map((snap) => (
+                            <div key={snap.id} className="p-2.5 rounded-lg bg-slate-950 border border-slate-800 flex items-start justify-between gap-3 text-xs">
+                              <div className="space-y-0.5">
+                                <div className="flex items-center gap-2">
+                                  <Badge className={cn('text-[10px] font-mono font-bold', getPriorityBadgeClass(snap.priority_band))}>
+                                    {snap.priority_band}
+                                  </Badge>
+                                  <span className="font-semibold text-slate-200">
+                                    {snap.transition_type}
+                                  </span>
+                                  {snap.previous_priority_band && (
+                                    <span className="text-[11px] text-slate-500 font-mono">
+                                      ({snap.previous_priority_band} → {snap.priority_band})
+                                    </span>
+                                  )}
+                                </div>
+                                <p className="text-slate-400 text-xs">
+                                  {snap.transition_reason || 'Evaluated against policy configuration'}
+                                </p>
+                              </div>
+                              <div className="text-[10px] font-mono text-slate-500 shrink-0 text-right">
+                                <div>{new Date(snap.calculated_at).toLocaleTimeString()}</div>
+                                <div>{new Date(snap.calculated_at).toLocaleDateString()}</div>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1651,6 +2062,101 @@ export const InventoryWorkspaceView: React.FC<InventoryWorkspaceViewProps> = ({
           <ModalFooter>
             <Button variant="outline" type="button" onClick={() => setIsAddSourceOpen(false)}>Cancel</Button>
             <Button type="submit" className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold">Add Source</Button>
+          </ModalFooter>
+        </form>
+      </Modal>
+
+      {/* SECTION 64 MANUAL PRIORITY OVERRIDE MODAL */}
+      <Modal isOpen={isOverrideModalOpen} onClose={() => setIsOverrideModalOpen(false)}>
+        <form onSubmit={handleApplyOverrideSubmit}>
+          <ModalHeader>
+            <ModalTitle className="flex items-center gap-2">
+              <Sliders className="w-5 h-5 text-cyan-400" />
+              <span>Apply Manual Priority Override</span>
+            </ModalTitle>
+          </ModalHeader>
+          <ModalBody className="flex flex-col gap-4 text-sm">
+            <div className="p-3 rounded-lg bg-slate-950 border border-slate-800 text-xs text-slate-300">
+              <span className="text-slate-400 block mb-0.5">Target Asset:</span>
+              <span className="font-mono font-bold text-slate-100">{selectedAssetDetail?.canonical_name}</span>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1.5">
+                Override Priority Level
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {(['P1', 'P2', 'P3', 'P4'] as PriorityBand[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setOverrideBand(p)}
+                    className={cn(
+                      'py-2 px-3 rounded-lg border font-mono font-bold text-xs transition-all text-center',
+                      overrideBand === p
+                        ? 'border-cyan-500 bg-cyan-950 text-cyan-300 ring-1 ring-cyan-500'
+                        : 'border-slate-800 bg-slate-950 text-slate-400 hover:border-slate-700'
+                    )}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1.5">
+                Justification &amp; Operational Rationale <span className="text-red-400">*</span>
+              </label>
+              <textarea
+                required
+                rows={3}
+                placeholder="Explain why this asset requires urgent manual escalation or de-escalation (e.g., Active incident INC-8492, payment gateway downtime impact)..."
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-cyan-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-xs font-medium text-slate-300 block mb-1.5">
+                Override Expiration Window
+              </label>
+              <select
+                value={overrideDurationHours === undefined ? 'PERMANENT' : String(overrideDurationHours)}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setOverrideDurationHours(val === 'PERMANENT' ? undefined : Number(val));
+                }}
+                className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-xs text-slate-100 focus:outline-none"
+              >
+                <option value="1">1 Hour (Immediate investigation)</option>
+                <option value="4">4 Hours (Shift window)</option>
+                <option value="24">24 Hours (Next business day review)</option>
+                <option value="72">72 Hours (Weekend maintenance window)</option>
+                <option value="168">7 Days (Weekly review)</option>
+                <option value="PERMANENT">Indefinite / Until manually removed</option>
+              </select>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button
+              variant="outline"
+              type="button"
+              onClick={() => setIsOverrideModalOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              disabled={isSubmittingOverride || !overrideReason.trim()}
+              className="bg-cyan-600 hover:bg-cyan-500 text-slate-950 font-semibold"
+            >
+              {isSubmittingOverride ? (
+                <RefreshCw className="w-4 h-4 animate-spin mr-1" />
+              ) : null}
+              Confirm Override
+            </Button>
           </ModalFooter>
         </form>
       </Modal>
