@@ -91,6 +91,10 @@ class SocCopilotToolRegistry:
         ).first()
 
         if evt:
+            if evt.incident and evt.incident.workspace_id != workspace_id:
+                evt = None
+
+        if evt:
             return {
                 "type": "THREAT_EVENT",
                 "id": evt.id,
@@ -189,10 +193,11 @@ class SocCopilotToolRegistry:
         query: str,
         limit: int = 10
     ) -> List[Dict[str, Any]]:
-        """Bounded search of persistent Evidence records with limit ceiling."""
+        """Bounded search of persistent Evidence records with limit ceiling and tenant scope."""
         limit = min(limit, 20)
         q = f"%{query.strip()}%"
         evidences = db.query(EvidenceModel).filter(
+            EvidenceModel.tenant_id == workspace_id,
             or_(
                 EvidenceModel.evidence_id.ilike(q),
                 EvidenceModel.original_filename.ilike(q),
@@ -221,9 +226,9 @@ class SocCopilotToolRegistry:
         category: Optional[str] = None,
         limit: int = 10
     ) -> List[Dict[str, Any]]:
-        """Bounded search of structured Finding records with limit ceiling."""
+        """Bounded search of structured Finding records with limit ceiling and tenant scope."""
         limit = min(limit, 20)
-        query = db.query(FindingModel)
+        query = db.query(FindingModel).filter(FindingModel.workspace_id == workspace_id)
         if category:
             query = query.filter(FindingModel.category == category.upper())
         findings = query.order_by(desc(FindingModel.created_at)).limit(limit).all()

@@ -5,13 +5,18 @@ from typing import Any
 
 # Sensitive regex patterns to redact in server logs
 SENSITIVE_PATTERNS = [
-    (re.compile(r'Authorization\s*:\s*Bearer\s+[^\r\n\s]+', re.IGNORECASE), 'Authorization: Bearer [REDACTED]'),
-    (re.compile(r'Authorization\s*:\s*[^\r\n]+', re.IGNORECASE), 'Authorization: [REDACTED]'),
+    (re.compile(r'Authorization\s*:\s*Bearer\s+[^\r\n\s,]+', re.IGNORECASE), 'Authorization: Bearer [REDACTED]'),
+    (re.compile(r'Authorization\s*:\s*Basic\s+[^\r\n\s,]+', re.IGNORECASE), 'Authorization: Basic [REDACTED]'),
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{8,}', re.IGNORECASE), 'Bearer [REDACTED]'),
     (re.compile(r'(?:api_key|apikey|x-api-key|key)\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{8,}["\']?', re.IGNORECASE), 'api_key=[REDACTED]'),
     (re.compile(r'(?:password|secret|token|passwd|pwd)\s*[:=]\s*["\']?[^"\'\s,]+["\']?', re.IGNORECASE), 'password=[REDACTED]'),
     (re.compile(r'[?&](?:key|api_key|token|password)=[^&\s]+', re.IGNORECASE), '?key=[REDACTED]'),
     (re.compile(r'(?:postgres(?:ql)?|sqlite|mysql|mongodb|redis):\/\/[^:\s\/]+:[^@\s]+@', re.IGNORECASE), 'postgresql://[REDACTED_USER]:[REDACTED_PASSWORD]@'),
+    (re.compile(r'-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----', re.IGNORECASE), '[REDACTED_PRIVATE_KEY]'),
+    (re.compile(r'ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9._-]{10,}\.[A-Za-z0-9._-]+'), '[REDACTED_JWT]'),
+    (re.compile(r'AKIA[0-9A-Z]{16}'), '[REDACTED_AWS_KEY]'),
+    (re.compile(r'ghp_[0-9a-zA-Z]{36}'), '[REDACTED_GITHUB_TOKEN]'),
+    (re.compile(r'(?:session_id|sessionid|connect\.sid)\s*=\s*[^\s;]+', re.IGNORECASE), 'session_id=[REDACTED]'),
 ]
 
 

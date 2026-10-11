@@ -1624,19 +1624,20 @@ class ThreatHuntingService:
         res = cls.execute_hunt(db, workspace_id, HuntExecutionRequest(query_definition=qdef))
 
         if format_type.lower() == "csv":
+            from backend.services.security_hardening_service import SecurityHardeningService
             output = io.StringIO()
             writer = csv.writer(output)
             writer.writerow(["ID", "Title", "Primary Value", "Secondary Value", "Severity", "Verdict", "Confidence", "Observed At"])
             for itm in res.items:
                 writer.writerow([
-                    itm.id,
-                    itm.title,
-                    itm.primary_value,
-                    itm.secondary_value or "",
-                    itm.severity or "",
-                    itm.verdict or "",
-                    itm.confidence or "",
-                    itm.observed_at.isoformat() if itm.observed_at else "",
+                    SecurityHardeningService.sanitize_csv_cell(itm.id),
+                    SecurityHardeningService.sanitize_csv_cell(itm.title),
+                    SecurityHardeningService.sanitize_csv_cell(itm.primary_value),
+                    SecurityHardeningService.sanitize_csv_cell(itm.secondary_value or ""),
+                    SecurityHardeningService.sanitize_csv_cell(itm.severity or ""),
+                    SecurityHardeningService.sanitize_csv_cell(itm.verdict or ""),
+                    SecurityHardeningService.sanitize_csv_cell(itm.confidence or ""),
+                    SecurityHardeningService.sanitize_csv_cell(itm.observed_at.isoformat() if itm.observed_at else ""),
                 ])
             return output.getvalue(), "text/csv"
 

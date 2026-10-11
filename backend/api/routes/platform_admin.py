@@ -779,3 +779,54 @@ def list_admin_audit_logs(
     if actor:
         items = [i for i in items if i.user == actor]
     return {"items": [i.model_dump() for i in items], "total": total}
+
+
+# ---------------------------------------------------------------------------
+# Section 72: Defensive Security Hardening Diagnostics & Findings Register
+# ---------------------------------------------------------------------------
+
+@router.get("/security/health", summary="Evaluate security health across all 10 trust boundaries")
+def get_security_health_matrix(
+    ctx: AdminAuthContext = Depends(get_admin_context),
+    db: Session = Depends(get_db),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("health.read", ctx.role, ctx.tenant_id)
+    from backend.services.security_hardening_service import SecurityHardeningService
+    return SecurityHardeningService.evaluate_security_health(db)
+
+
+@router.get("/security/findings", summary="Retrieve authoritative Security Findings Register")
+def get_security_findings_register(
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("audit.read", ctx.role, ctx.tenant_id)
+    from backend.services.security_hardening_service import SecurityHardeningService
+    findings = SecurityHardeningService.get_security_findings_register()
+    return {
+        "findings": [
+            {
+                "id": f.id,
+                "severity": f.severity.value,
+                "component": f.component,
+                "description": f.description,
+                "impact": f.impact,
+                "root_cause": f.root_cause,
+                "remediation": f.remediation,
+                "verification": f.verification,
+                "residual_risk": f.residual_risk,
+                "status": f.status.value,
+            }
+            for f in findings
+        ],
+        "total": len(findings)
+    }
+
+
+@router.get("/security/configuration", summary="Validate runtime security configuration")
+def get_security_configuration_check(
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("settings.read", ctx.role, ctx.tenant_id)
+    from backend.services.security_hardening_service import SecurityHardeningService
+    return SecurityHardeningService.validate_security_configuration()
+

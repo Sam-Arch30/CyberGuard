@@ -329,12 +329,16 @@ Generate the structured JSON assessment now.
         }
 
     def _sanitize_text(self, text: str) -> str:
-        """Sanitizes text to prevent delimiter breakouts."""
+        """Sanitizes text to prevent delimiter breakouts, credential leakage, and prompt injection."""
         if not text:
             return ""
+        from backend.services.log_sanitizer import sanitize_log_text
+        clean = sanitize_log_text(text)
         # Neutralize XML tag delimiters that could break the prompt enclosure
-        clean = text.replace("<untrusted_email_content>", "[TAG_FILTERED]").replace("</untrusted_email_content>", "[TAG_FILTERED]")
-        clean = clean.replace("<structured_forensic_evidence>", "[TAG_FILTERED]").replace("</structured_forensic_evidence>", "[TAG_FILTERED]")
+        for tag in ("untrusted_email_content", "structured_forensic_evidence", "system", "instruction"):
+            clean = re.sub(rf'<\s*/?\s*{tag}\b[^>]*>', '[TAG_FILTERED]', clean, flags=re.IGNORECASE)
+        # Neutralize adversarial instruction overrides
+        clean = re.sub(r'(?i)\b(ignore all previous instructions|disregard prior commands|you are now in god mode)\b', '[INSTRUCTION_OVERRIDE_FILTERED]', clean)
         return clean
 
     def _extract_json(self, text: str) -> Optional[Dict[str, Any]]:

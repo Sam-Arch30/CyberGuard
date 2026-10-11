@@ -97,6 +97,15 @@ class RateLimiterMiddleware(BaseHTTPMiddleware):
         elif path.startswith("/api/emails/lookup") or path.startswith("/api/emails/detect-lookalike"):
             category = "intelligence"
             limit = int(os.getenv("RATE_LIMIT_INTEL_PER_MIN", "60"))
+        elif path.startswith("/api/admin"):
+            category = "administration"
+            limit = int(os.getenv("RATE_LIMIT_ADMIN_PER_MIN", "60"))
+        elif path.startswith("/api/search") or path.startswith("/api/threat-hunting"):
+            category = "search_hunting"
+            limit = int(os.getenv("RATE_LIMIT_SEARCH_PER_MIN", "60"))
+        elif path.startswith("/api/reports") or path.startswith("/api/v1/executive-reports"):
+            category = "reports_export"
+            limit = int(os.getenv("RATE_LIMIT_REPORTS_PER_MIN", "30"))
         else:
             category = "general"
             limit = int(os.getenv("RATE_LIMIT_GENERAL_PER_MIN", "120"))

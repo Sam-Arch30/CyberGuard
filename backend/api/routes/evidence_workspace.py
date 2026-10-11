@@ -517,12 +517,14 @@ def download_evidence(
         tenant_id=tenant_id,
     )
 
-    filename = detail.original_filename or f"evidence_{detail.evidence_id}.bin"
+    raw_filename = detail.original_filename or f"evidence_{detail.evidence_id}.bin"
+    from backend.services.upload_security import UploadSecurityService
+    safe_filename = UploadSecurityService.sanitize_filename(raw_filename).replace('"', '').replace('\r', '').replace('\n', '')
     return StreamingResponse(
         io.BytesIO(raw_bytes),
         media_type="application/octet-stream",
         headers={
-            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Disposition": f'attachment; filename="{safe_filename}"',
             "X-Content-Type-Options": "nosniff",
             "Content-Security-Policy": "default-src 'none'",
         },
