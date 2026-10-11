@@ -325,6 +325,37 @@ def _prevent_audit_log_delete(mapper, connection, target):
     raise PermissionError("Audit log records are append-only and immutable. Deletions are prohibited.")
 
 
+class ReportTemplateModel(Base):
+    """
+    Section 69: Versioned report template defining section composition,
+    visual layout, ordering, classification defaults, and controlled data bindings.
+    """
+    __tablename__ = "report_templates"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(128), nullable=False, default="default", index=True)
+    tenant_id = Column(String(128), nullable=False, default="default", index=True)
+    template_key = Column(String(64), nullable=False, index=True)
+    template_name = Column(String(128), nullable=False)
+    report_type = Column(String(64), nullable=False, index=True)
+    version = Column(Integer, nullable=False, default=1)
+    description = Column(Text, nullable=True)
+    sections_config_json = Column(Text, nullable=False, default="[]")
+    default_classification = Column(String(32), nullable=False, default="CONFIDENTIAL")
+    default_redaction = Column(String(32), nullable=False, default="NONE")
+    is_system = Column(Boolean, nullable=False, default=False)
+    is_active = Column(Boolean, nullable=False, default=True)
+    created_by = Column(String(100), nullable=False, default="SYSTEM")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    reports = relationship("ReportModel", back_populates="template")
+
+    __table_args__ = (
+        Index("ix_rt_ws_key_ver", "workspace_id", "template_key", "version", unique=True),
+    )
+
+
 class ReportModel(Base):
     __tablename__ = "reports"
 
@@ -345,20 +376,100 @@ class ReportModel(Base):
     analysis_run_id = Column(String(36), ForeignKey("analysis_runs.id", ondelete="SET NULL"), nullable=True, index=True)
     sha256 = Column(String(64), nullable=True, index=True)
     investigation_id = Column(String(128), nullable=True, index=True)
-    report_type = Column(String(30), default="ANALYST", nullable=False)
-    status = Column(String(30), default="READY", nullable=False)
+    report_type = Column(String(64), default="ANALYST", nullable=False)
+    status = Column(String(32), default="READY", nullable=False)
     report_version = Column(Integer, default=1, nullable=False)
-    classification = Column(String(30), default="CONFIDENTIAL", nullable=False)
-    redaction_level = Column(String(30), default="NONE", nullable=False)
+    classification = Column(String(32), default="CONFIDENTIAL", nullable=False)
+    redaction_level = Column(String(32), default="NONE", nullable=False)
     confidence = Column(Float, nullable=True, default=1.0)
     content_options_json = Column(Text, nullable=True, default="{}")
     snapshot_data_json = Column(Text, nullable=True, default="{}")
     quality_check_json = Column(Text, nullable=True, default="{}")
     superseded_by = Column(String(36), nullable=True)
     workspace_id = Column(String(128), nullable=True, default="default", index=True)
+    tenant_id = Column(String(128), nullable=False, default="default", index=True)
     format = Column(String(20), default="PDF", nullable=False)
     generator_version = Column(String(50), default="1.0.0", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    # Section 69 additions
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    template_id = Column(String(36), ForeignKey("report_templates.id", ondelete="SET NULL"), nullable=True, index=True)
+    template_version = Column(Integer, nullable=False, default=1)
+    source_snapshot_id = Column(String(36), nullable=True, index=True)
+    created_by = Column(String(100), nullable=True, default="SOC Analyst")
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+    generated_at = Column(DateTime, nullable=True)
+    finalized_at = Column(DateTime, nullable=True)
+    finalized_by = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    approved_by = Column(String(100), nullable=True)
+    review_notes_json = Column(Text, nullable=True, default="[]")
+    reviewers_json = Column(Text, nullable=True, default="[]")
+    evidence_gaps_json = Column(Text, nullable=True, default="[]")
+    recommendations_json = Column(Text, nullable=True, default="[]")
+    is_immutable = Column(Boolean, nullable=False, default=False)
+    html_content = Column(Text, nullable=True)
+    source_data_hash = Column(String(64), nullable=True)
+
+    template = relationship("ReportTemplateModel", back_populates="reports", foreign_keys=[template_id])
+    snapshots = relationship("ReportSnapshotModel", back_populates="report", cascade="all, delete-orphan")
+    share_links = relationship("ReportShareLinkModel", back_populates="report", cascade="all, delete-orphan")
+
+
+class ReportSnapshotModel(Base):
+    """
+    Section 69: Immutable point-in-time snapshot of evidence and investigation telemetry.
+    Backs the report to guarantee repeatability, prevent data drift, and trace provenance.
+    """
+    __tablename__ = "report_snapshots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    report_id = Column(String(36), ForeignKey("reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(128), nullable=False, default="default", index=True)
+    tenant_id = Column(String(128), nullable=False, default="default", index=True)
+    snapshot_hash = Column(String(64), nullable=False, index=True)
+    source_identifiers_json = Column(Text, nullable=False, default="{}")
+    source_versions_json = Column(Text, nullable=False, default="{}")
+    snapshot_payload_json = Column(Text, nullable=False, default="{}")
+    epistemic_labels_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    report = relationship("ReportModel", back_populates="snapshots")
+
+    __table_args__ = (
+        Index("ix_rs_ws_report", "workspace_id", "report_id"),
+    )
+
+
+class ReportShareLinkModel(Base):
+    """
+    Section 69: Cryptographically secure, time-bounded, revocable external share link for report artifacts.
+    """
+    __tablename__ = "report_share_links"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    report_id = Column(String(36), ForeignKey("reports.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(128), nullable=False, default="default", index=True)
+    tenant_id = Column(String(128), nullable=False, default="default", index=True)
+    token_hash = Column(String(64), unique=True, nullable=False, index=True)
+    format = Column(String(20), nullable=False, default="PDF")
+    classification = Column(String(32), nullable=False, default="CONFIDENTIAL")
+    redaction_level = Column(String(32), nullable=False, default="STANDARD")
+    expires_at = Column(DateTime, nullable=False)
+    max_uses = Column(Integer, nullable=False, default=10)
+    use_count = Column(Integer, nullable=False, default=0)
+    is_revoked = Column(Boolean, nullable=False, default=False)
+    revoked_at = Column(DateTime, nullable=True)
+    revoked_by = Column(String(100), nullable=True)
+    created_by = Column(String(100), nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    report = relationship("ReportModel", back_populates="share_links")
+
+    __table_args__ = (
+        Index("ix_rsl_ws_report", "workspace_id", "report_id"),
+    )
 
 
 class EmailAnalysisModel(Base):
@@ -5834,6 +5945,205 @@ class InvestigationGapModel(Base):
         Index("ix_ig_ws_inv", "workspace_id", "investigation_id"),
         Index("ix_ig_cat_sev", "category", "severity"),
     )
+
+
+# =============================================================================
+# SECTION 70: SECURITY OPERATIONS AUTOMATION MODELS
+# =============================================================================
+
+class AutomationWorkflowModel(Base):
+    """
+    Section 70: Authoritative Security Operations Automation Workflow definition.
+    Coordinates SOC playbooks, investigation actions, case management, and response tasks.
+    """
+    __tablename__ = "automation_workflows"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    workflow_type = Column(String(64), nullable=False, default="ALERT_TRIAGE", index=True)
+    status = Column(String(32), nullable=False, default="DRAFT", index=True)  # DRAFT, VALIDATING, ACTIVE, PAUSED, DISABLED, ARCHIVED
+    version = Column(Integer, nullable=False, default=1)
+    owner_id = Column(String(100), nullable=False, default="SOC Analyst")
+    team_id = Column(String(100), nullable=True)
+    trigger_type = Column(String(64), nullable=False, index=True)
+    trigger_config_json = Column(Text, nullable=False, default="{}")
+    conditions_json = Column(Text, nullable=False, default="{}")
+    actions_json = Column(Text, nullable=False, default="[]")
+    approval_policy_json = Column(Text, nullable=False, default="{}")
+    execution_limits_json = Column(Text, nullable=False, default="{}")
+    is_active = Column(Boolean, nullable=False, default=False)
+    created_by = Column(String(100), nullable=False, default="SOC Analyst")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    versions = relationship("AutomationWorkflowVersionModel", back_populates="workflow", cascade="all, delete-orphan", order_by="AutomationWorkflowVersionModel.version.desc()")
+    runs = relationship("AutomationRunModel", back_populates="workflow")
+
+    __table_args__ = (
+        Index("ix_aw_ws_status", "workspace_id", "status"),
+        Index("ix_aw_ws_trigger", "workspace_id", "trigger_type"),
+    )
+
+
+class AutomationWorkflowVersionModel(Base):
+    """
+    Section 70: Immutable snapshot of an activated workflow version.
+    Ensures that active automation rules cannot be mutated in-place.
+    """
+    __tablename__ = "automation_workflow_versions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    workflow_id = Column(String(36), ForeignKey("automation_workflows.id", ondelete="CASCADE"), nullable=False, index=True)
+    version = Column(Integer, nullable=False)
+    definition_json = Column(Text, nullable=False)  # Full serialized config of trigger, conditions, actions, limits
+    status = Column(String(32), nullable=False, default="ACTIVE")
+    change_summary = Column(Text, nullable=True)
+    validated_at = Column(DateTime, nullable=True)
+    created_by = Column(String(100), nullable=False, default="SOC Analyst")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    workflow = relationship("AutomationWorkflowModel", back_populates="versions")
+
+    __table_args__ = (
+        Index("ix_awv_wf_version", "workflow_id", "version", unique=True),
+    )
+
+
+class AutomationRunModel(Base):
+    """
+    Section 70: Execution record of an automated security operations workflow.
+    Tracks end-to-end execution, steps, approval gates, failure classifications, and real metrics.
+    """
+    __tablename__ = "automation_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    workflow_id = Column(String(36), ForeignKey("automation_workflows.id", ondelete="SET NULL"), nullable=True, index=True)
+    workflow_version = Column(Integer, nullable=False, default=1)
+    status = Column(String(32), nullable=False, default="QUEUED", index=True)  # QUEUED, RUNNING, WAITING_FOR_APPROVAL, PAUSED, PARTIALLY_COMPLETED, COMPLETED, FAILED, CANCELLED, TIMED_OUT
+    trigger_type = Column(String(64), nullable=False, index=True)
+    trigger_resource_type = Column(String(64), nullable=True, index=True)
+    trigger_resource_id = Column(String(64), nullable=True, index=True)
+    trigger_payload_json = Column(Text, nullable=False, default="{}")
+    execution_mode = Column(String(32), nullable=False, default="PRODUCTION")  # PRODUCTION, DRY_RUN, TEST, SIMULATION
+    idempotency_key = Column(String(128), nullable=True, index=True)
+    job_id = Column(String(64), nullable=True, index=True)
+    parent_run_id = Column(String(36), nullable=True, index=True)
+    recursion_depth = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    paused_at = Column(DateTime, nullable=True)
+    timeout_at = Column(DateTime, nullable=True)
+    current_step_index = Column(Integer, nullable=False, default=0)
+    total_steps = Column(Integer, nullable=False, default=0)
+    completed_steps = Column(Integer, nullable=False, default=0)
+    failed_steps = Column(Integer, nullable=False, default=0)
+    skipped_steps = Column(Integer, nullable=False, default=0)
+    error_message = Column(Text, nullable=True)
+    failure_category = Column(String(64), nullable=True)  # VALIDATION_FAILURE, AUTHORIZATION_FAILURE, POLICY_DENIED, etc.
+    budget_consumed_json = Column(Text, nullable=False, default="{}")
+    output_summary_json = Column(Text, nullable=False, default="{}")
+    explainability_trace_json = Column(Text, nullable=False, default="{}")
+    created_by = Column(String(100), nullable=False, default="SYSTEM")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    workflow = relationship("AutomationWorkflowModel", back_populates="runs")
+    steps = relationship("AutomationRunStepModel", back_populates="run", cascade="all, delete-orphan", order_by="AutomationRunStepModel.step_index.asc()")
+    approvals = relationship("AutomationApprovalRequestModel", back_populates="run", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        Index("ix_ar_ws_status", "workspace_id", "status"),
+        Index("ix_ar_ws_trigger", "workspace_id", "trigger_resource_type", "trigger_resource_id"),
+    )
+
+
+class AutomationRunStepModel(Base):
+    """
+    Section 70: Discrete execution step within an automation run.
+    Contains action parameters, risk classification, approval gates, verification results, and execution metrics.
+    """
+    __tablename__ = "automation_run_steps"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    run_id = Column(String(36), ForeignKey("automation_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_index = Column(Integer, nullable=False)
+    step_key = Column(String(64), nullable=False)
+    action_id = Column(String(64), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    status = Column(String(32), nullable=False, default="PENDING", index=True)  # PENDING, RUNNING, WAITING_FOR_APPROVAL, APPROVED, REJECTED, COMPLETED, PARTIALLY_COMPLETED, FAILED, SKIPPED, TIMED_OUT, POLICY_DENIED
+    risk_classification = Column(String(32), nullable=False, default="LOW_IMPACT")  # READ_ONLY, LOW_IMPACT, MODERATE_IMPACT, HIGH_IMPACT, DESTRUCTIVE
+    approval_level = Column(String(32), nullable=False, default="AUTOMATIC")  # AUTOMATIC, ANALYST_APPROVAL, SENIOR_ANALYST_APPROVAL, ADMIN_APPROVAL, FORBIDDEN
+    requires_approval = Column(Boolean, nullable=False, default=False)
+    approval_id = Column(String(36), nullable=True)
+    approval_requested_at = Column(DateTime, nullable=True)
+    approval_decision = Column(String(32), nullable=True)
+    approved_by = Column(String(100), nullable=True)
+    approved_at = Column(DateTime, nullable=True)
+    approval_reason = Column(Text, nullable=True)
+    approval_expires_at = Column(DateTime, nullable=True)
+    input_params_json = Column(Text, nullable=False, default="{}")
+    output_data_json = Column(Text, nullable=False, default="{}")
+    verification_result_json = Column(Text, nullable=False, default="{}")
+    verified_state = Column(Boolean, nullable=False, default=False)
+    error_message = Column(Text, nullable=True)
+    failure_category = Column(String(64), nullable=True)
+    retry_count = Column(Integer, nullable=False, default=0)
+    max_retries = Column(Integer, nullable=False, default=0)
+    execution_duration_ms = Column(Integer, nullable=False, default=0)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    run = relationship("AutomationRunModel", back_populates="steps")
+
+    __table_args__ = (
+        Index("ix_ars_run_idx", "run_id", "step_index"),
+    )
+
+
+class AutomationApprovalRequestModel(Base):
+    """
+    Section 70: Explicit human-in-the-loop approval gate for consequential actions.
+    Enforces expiration, audit trails, and non-repudiation.
+    """
+    __tablename__ = "automation_approval_requests"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    run_id = Column(String(36), ForeignKey("automation_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    step_id = Column(String(36), ForeignKey("automation_run_steps.id", ondelete="CASCADE"), nullable=False, index=True)
+    action_id = Column(String(64), nullable=False)
+    status = Column(String(32), nullable=False, default="PENDING", index=True)  # PENDING, APPROVED, REJECTED, EXPIRED, CANCELLED
+    required_role = Column(String(64), nullable=False, default="analyst")
+    requested_by = Column(String(100), nullable=False, default="SYSTEM")
+    requested_at = Column(DateTime, default=get_utc_now, nullable=False)
+    decision = Column(String(32), nullable=True)  # APPROVED, REJECTED
+    decided_by = Column(String(100), nullable=True)
+    decided_at = Column(DateTime, nullable=True)
+    reason = Column(Text, nullable=True)
+    expires_at = Column(DateTime, nullable=False)
+    action_payload_json = Column(Text, nullable=False, default="{}")
+    context_summary_json = Column(Text, nullable=False, default="{}")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    run = relationship("AutomationRunModel", back_populates="approvals")
+    step = relationship("AutomationRunStepModel")
+
+    __table_args__ = (
+        Index("ix_aar_ws_status", "workspace_id", "status"),
+    )
+
 
 
 
