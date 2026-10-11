@@ -1323,6 +1323,57 @@ async def handle_historical_correlation_sweep_job(ctx: JobExecutionContext, db: 
     }
 
 
+@register_handler(JobTypeEnum.ATTACK_SURFACE_REFRESH.value)
+async def handle_attack_surface_refresh_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 62: Periodic/scheduled refresh of attack surface, evaluating exposures,
+    recomputing risk, and snapshotting state changes.
+    """
+    from backend.services.attack_surface_service import AttackSurfaceService
+    from backend.schemas.attack_surface import AttackSurfaceDiscoveryRequest
+
+    ctx.update_progress(db, 10.0, "INITIALIZING", "Starting attack surface refresh...")
+    req = AttackSurfaceDiscoveryRequest(
+        sync_from_endpoints=ctx.payload.get("sync_from_endpoints", True),
+        sync_from_identities=ctx.payload.get("sync_from_identities", True),
+        sync_from_telemetry=ctx.payload.get("sync_from_telemetry", True),
+        resolve_dns_records=ctx.payload.get("resolve_dns_records", True),
+    )
+    res = AttackSurfaceService.run_discovery_sync(db, ctx.workspace_id, req)
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Attack surface refresh completed: {res.assets_discovered} assets, {res.exposures_created} exposures."
+    )
+    return res.model_dump()
+
+
+@register_handler(JobTypeEnum.ATTACK_SURFACE_DISCOVERY.value)
+async def handle_attack_surface_discovery_job(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 62: Attack surface discovery sweep over authorized scopes.
+    """
+    from backend.services.attack_surface_service import AttackSurfaceService
+    from backend.schemas.attack_surface import AttackSurfaceDiscoveryRequest
+
+    ctx.update_progress(db, 10.0, "DISCOVERING", "Executing authorized attack surface discovery...")
+    req = AttackSurfaceDiscoveryRequest(
+        sync_from_endpoints=ctx.payload.get("sync_from_endpoints", True),
+        sync_from_identities=ctx.payload.get("sync_from_identities", True),
+        sync_from_telemetry=ctx.payload.get("sync_from_telemetry", True),
+        resolve_dns_records=ctx.payload.get("resolve_dns_records", True),
+    )
+    res = AttackSurfaceService.run_discovery_sync(db, ctx.workspace_id, req)
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Discovery sweep completed: {res.assets_discovered} assets discovered/synchronized."
+    )
+    return res.model_dump()
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

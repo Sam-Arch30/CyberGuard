@@ -12,6 +12,7 @@ import {
   Layers,
   Binary,
   GitMerge,
+  Globe,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -128,6 +129,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       matchPrefixes: ['/correlations', '/cross-source-correlation'],
       icon: GitMerge,
       description: 'Cross-source correlation, unified entity resolution & composite signals',
+    },
+    {
+      id: 'attack-surface',
+      name: 'Attack Surface',
+      path: '/attack-surface',
+      matchPrefixes: ['/attack-surface', '/assets'],
+      icon: Globe,
+      description: 'Asset discovery, external/internal exposure mapping & risk prioritization',
     },
     {
       id: 'incidents',

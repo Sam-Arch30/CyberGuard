@@ -4876,6 +4876,222 @@ class EntityResolutionRecordModel(Base):
             return {}
 
 
+# ============================================================================
+# SECTION 62: ATTACK SURFACE INTELLIGENCE MODELS
+# ============================================================================
+
+class AssetModel(Base):
+    """
+    Section 62: Normalized Asset representation.
+    Tracks internal, external, and identity assets, their exposure state, ownership,
+    criticality, and links to Knowledge Graph entities.
+    """
+    __tablename__ = "assets"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    asset_type = Column(String(50), nullable=False, index=True)  # DOMAIN, SUBDOMAIN, PUBLIC_IP, PRIVATE_IP, ENDPOINT, SERVER, DEVICE, APPLICATION, WEB_APPLICATION, API, SERVICE, CERTIFICATE, CLOUD_RESOURCE, EMAIL_INFRASTRUCTURE, IDENTITY, USER_ACCOUNT, SERVICE_ACCOUNT
+    canonical_name = Column(String(500), nullable=False, index=True)  # Lowercased FQDN, standardized IP, device UID, user email
+    display_name = Column(String(255), nullable=False)
+    status = Column(String(32), nullable=False, default="ACTIVE", index=True)  # DISCOVERED, ACTIVE, INACTIVE, STALE, RETIRED, UNKNOWN
+    exposure_state = Column(String(32), nullable=False, default="UNKNOWN", index=True)  # PUBLICLY_EXPOSED, INTERNALLY_REACHABLE, INTERNALLY_ONLY, UNKNOWN
+    criticality = Column(String(20), nullable=False, default="MEDIUM", index=True)  # CRITICAL, HIGH, MEDIUM, LOW, UNKNOWN
+    owner = Column(String(100), nullable=True)  # Owner name/email, "Unknown" if unassigned
+    team = Column(String(100), nullable=True)
+    business_unit = Column(String(100), nullable=True)
+    environment = Column(String(32), nullable=False, default="UNKNOWN", index=True)  # PRODUCTION, STAGING, DEVELOPMENT, CORP, LAB, UNKNOWN
+    ownership_confidence = Column(String(30), nullable=False, default="UNKNOWN")  # MANUAL, CMDB, DIRECTORY, ENDPOINT_AGENT, CLOUD_INVENTORY, DOMAIN_MAPPING, INFERENCE, UNKNOWN
+    source = Column(String(50), nullable=False, default="INTERNAL_DISCOVERY", index=True)  # ENDPOINT_AGENT, EMAIL_ANALYSIS, URL_ANALYSIS, DOMAIN_ANALYSIS, NETWORK_TELEMETRY, API_TELEMETRY, AUTHENTICATION, THREAT_INTELLIGENCE, WATCHLIST, INVESTIGATION, THREAT_HUNT, MANUAL_ANALYST, EXTERNAL_DISCOVERY, INTERNAL_DISCOVERY
+    external_id = Column(String(255), nullable=True, index=True)  # Pointer to DeviceModel.id, ProtectedIdentityModel.id, or external CMDB
+    canonical_entity_id = Column(String(128), nullable=True, index=True)  # Pointer to Knowledge Graph EntityModel.id
+    risk_score = Column(Float, nullable=False, default=0.0)  # Bounded risk from Unified Risk Engine (0.0 - 100.0)
+    risk_level = Column(String(20), nullable=False, default="LOW")
+    active_finding_count = Column(Integer, nullable=False, default=0)
+    active_exposure_count = Column(Integer, nullable=False, default=0)
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    last_scanned_at = Column(DateTime, nullable=True)
+    last_analyzed_at = Column(DateTime, nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    exposures = relationship("ExposureModel", back_populates="asset", cascade="all, delete-orphan", lazy="selectin")
+    services = relationship("AssetServiceModel", back_populates="asset", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_assets_ws_type_canon", "workspace_id", "asset_type", "canonical_name", unique=True),
+        Index("ix_assets_ws_status_exp", "workspace_id", "status", "exposure_state"),
+        Index("ix_assets_ws_crit_risk", "workspace_id", "criticality", "risk_score"),
+        Index("ix_assets_ws_last_seen", "workspace_id", "last_seen_at"),
+    )
+
+    @property
+    def metadata_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.metadata_json or "{}")
+        except Exception:
+            return {}
+
+
+class ExposureModel(Base):
+    """
+    Section 62: Actionable Asset Exposure representation.
+    Tracks security exposures (public exposure, unknown assets, unmapped domains,
+    unapproved ports, exposed APIs) separate from software vulnerabilities.
+    """
+    __tablename__ = "asset_exposures"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    asset_id = Column(String(36), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    exposure_type = Column(String(50), nullable=False, index=True)  # PUBLIC_ASSET, UNKNOWN_ASSET, UNKNOWN_SERVICE, EXPOSED_API, EXPOSED_IDENTITY, STALE_ASSET, UNMAPPED_DOMAIN, UNEXPECTED_ENDPOINT, UNAPPROVED_PORT, CERTIFICATE_EXPIRING
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    status = Column(String(30), nullable=False, default="OPEN", index=True)  # OPEN, RESOLVED, ACCEPTED, SUPPRESSED, STALE, UNKNOWN
+    severity = Column(String(20), nullable=False, default="MEDIUM", index=True)  # CRITICAL, HIGH, MEDIUM, LOW, INFO
+    confidence = Column(Float, nullable=False, default=1.0)
+    remediation_guidance = Column(Text, nullable=True)
+    evidence_refs_json = Column(Text, default="[]", nullable=False)
+    source_refs_json = Column(Text, default="[]", nullable=False)
+    risk_context_json = Column(Text, default="{}", nullable=False)
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(String(100), nullable=True)
+    resolution_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    asset = relationship("AssetModel", back_populates="exposures")
+
+    __table_args__ = (
+        Index("ix_ae_ws_status_sev", "workspace_id", "status", "severity"),
+        Index("ix_ae_ws_type", "workspace_id", "exposure_type"),
+        Index("ix_ae_asset_type_status", "asset_id", "exposure_type", "status"),
+    )
+
+    @property
+    def evidence_refs(self) -> List[str]:
+        try:
+            return json.loads(self.evidence_refs_json or "[]")
+        except Exception:
+            return []
+
+    @property
+    def source_refs(self) -> List[str]:
+        try:
+            return json.loads(self.source_refs_json or "[]")
+        except Exception:
+            return []
+
+    @property
+    def risk_context(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.risk_context_json or "{}")
+        except Exception:
+            return {}
+
+
+class AssetServiceModel(Base):
+    """
+    Section 62: Network Service & Port observation associated with an asset.
+    Preserves actual observed port, protocol, service banner, and exposure without speculation.
+    """
+    __tablename__ = "asset_services"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    asset_id = Column(String(36), ForeignKey("assets.id", ondelete="CASCADE"), nullable=False, index=True)
+    port = Column(Integer, nullable=True, index=True)
+    protocol = Column(String(20), nullable=False, default="TCP")  # TCP, UDP, ICMP
+    service_name = Column(String(100), nullable=False, default="unknown", index=True)  # HTTP, HTTPS, SSH, SMTP, DNS, RDP, API, etc.
+    service_version = Column(String(100), nullable=True)
+    transport = Column(String(20), nullable=False, default="IP")
+    exposure = Column(String(30), nullable=False, default="UNKNOWN", index=True)  # PUBLIC, INTERNAL, RESTRICTED, UNKNOWN
+    source = Column(String(50), nullable=False, default="DISCOVERY")
+    banner_snippet = Column(Text, nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    first_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    last_seen_at = Column(DateTime, default=get_utc_now, nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    asset = relationship("AssetModel", back_populates="services")
+
+    __table_args__ = (
+        Index("ix_as_asset_port_proto", "asset_id", "port", "protocol"),
+        Index("ix_as_ws_service_exp", "workspace_id", "service_name", "exposure"),
+    )
+
+    @property
+    def metadata_dict(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.metadata_json or "{}")
+        except Exception:
+            return {}
+
+
+class AttackSurfaceScopeModel(Base):
+    """
+    Section 62: Explicit, tenant-authorized attack surface discovery scope.
+    Strictly controls which domains, CIDRs, IPs, or cloud accounts CyberGuard is authorized
+    to evaluate, preventing uncontrolled internet scanning.
+    """
+    __tablename__ = "attack_surface_scopes"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    scope_type = Column(String(30), nullable=False, index=True)  # DOMAIN, CIDR, IP, CLOUD_ACCOUNT, ASN
+    target = Column(String(255), nullable=False, index=True)  # e.g. "company.example", "*.company.example", "203.0.113.0/24"
+    is_authorized = Column(Boolean, nullable=False, default=True, index=True)
+    description = Column(Text, default="", nullable=False)
+    created_by = Column(String(100), nullable=False, default="system")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    __table_args__ = (
+        Index("ix_ass_ws_target", "workspace_id", "target", unique=True),
+    )
+
+
+class AttackSurfaceSnapshotModel(Base):
+    """
+    Section 62: Periodic attack surface evaluation snapshot.
+    Enables diff comparison (added assets, removed assets, new exposures, resolved exposures)
+    between inspection cycles without losing historical evidence.
+    """
+    __tablename__ = "attack_surface_snapshots"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    snapshot_name = Column(String(255), nullable=False)
+    total_assets = Column(Integer, nullable=False, default=0)
+    exposed_assets = Column(Integer, nullable=False, default=0)
+    unknown_assets = Column(Integer, nullable=False, default=0)
+    open_exposures = Column(Integer, nullable=False, default=0)
+    critical_assets = Column(Integer, nullable=False, default=0)
+    high_risk_assets = Column(Integer, nullable=False, default=0)
+    assets_added = Column(Integer, nullable=False, default=0)
+    assets_removed = Column(Integer, nullable=False, default=0)
+    exposures_added = Column(Integer, nullable=False, default=0)
+    exposures_resolved = Column(Integer, nullable=False, default=0)
+    diff_summary_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_assnap_ws_time", "workspace_id", "created_at"),
+    )
+
+    @property
+    def diff_summary(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.diff_summary_json or "{}")
+        except Exception:
+            return {}
+
+
+
 
 
 

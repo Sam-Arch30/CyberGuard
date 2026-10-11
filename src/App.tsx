@@ -37,6 +37,7 @@ import { Watchlists } from './pages/Watchlists';
 import { ThreatHunting } from './pages/ThreatHunting';
 import { DetectionRules } from './pages/DetectionRules';
 import { CrossSourceCorrelationPage } from './pages/CrossSourceCorrelationPage';
+import { AttackSurfacePage } from './pages/AttackSurfacePage';
 
 function AppContent() {
   return (
@@ -64,6 +65,11 @@ function AppContent() {
         <Route path="/correlations" element={<CrossSourceCorrelationPage />} />
         <Route path="/correlations/:id" element={<CrossSourceCorrelationPage />} />
         <Route path="/cross-source-correlation" element={<Navigate to="/correlations" replace />} />
+
+        {/* Section 62: Attack Surface Intelligence */}
+        <Route path="/attack-surface" element={<AttackSurfacePage />} />
+        <Route path="/attack-surface/:id" element={<AttackSurfacePage />} />
+        <Route path="/assets" element={<Navigate to="/attack-surface" replace />} />
 
         {/* Canonical Investigation Workspace Routes */}
         <Route path="/investigations/:id" element={<InvestigationWorkspace />} />
