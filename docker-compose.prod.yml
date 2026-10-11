@@ -1,0 +1,57 @@
+# =====================================================================
+# CyberGuard AI - Production Docker Compose Override
+# Section 74: Strict resource limits, no public DB exposure, production security
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+# =====================================================================
+services:
+  postgresql:
+    # Security: In production, do NOT expose postgresql port to the host
+    ports: !reset []
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4096M
+        reservations:
+          cpus: '0.5'
+          memory: 1024M
+
+  backend:
+    environment:
+      CYBERGUARD_ENV: PRODUCTION
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  worker:
+    environment:
+      CYBERGUARD_ENV: PRODUCTION
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2048M
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  frontend:
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+        reservations:
+          cpus: '0.1'
+          memory: 128M

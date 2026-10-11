@@ -69,11 +69,13 @@ from backend.api.routes.evidence_workspace import router as evidence_workspace_r
 from backend.api.routes.executive_reports import router as executive_reports_router
 from backend.api.routes.automation import router as automation_router
 from backend.api.routes.platform_admin import router as platform_admin_router
+from backend.api.routes.health import router as health_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
 from backend.services.log_sanitizer import configure_production_logging
 from backend.db.session import engine, Base, init_db
+from backend.config.deployment_config import global_deployment_config
 import backend.db.models  # Register models
 
 # Initialize production-safe logging with secret redaction
@@ -212,6 +214,7 @@ app.include_router(notifications_router)
 app.include_router(alert_clusters_router)
 app.include_router(alert_correlate_router)
 app.include_router(alerts_router)
+app.include_router(health_router)
 
 from backend.api.routes.benchmark import reset_workspace_state
 app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"], tags=["Workspace"])
@@ -224,34 +227,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": f"Internal Server Error: {str(exc)}", "error_code": "INTERNAL_SERVER_ERROR"}
     )
-
-
-@app.get("/health", tags=["Health"])
-@app.get("/api/health", tags=["Health"])
-async def health_check():
-    """
-    Service health check endpoint.
-    Performs active database connectivity check.
-    """
-    db_status = "ok"
-    try:
-        with engine.connect() as conn:
-            conn.execute(text("SELECT 1"))
-    except Exception as exc:
-        return JSONResponse(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "status": "degraded",
-                "service": "cybersecurity-email-parser",
-                "database": f"unhealthy: {str(exc)}"
-            }
-        )
-
-    return {
-        "status": "ok",
-        "service": "cybersecurity-email-parser",
-        "database": db_status
-    }
 
 
 if __name__ == "__main__":

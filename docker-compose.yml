@@ -1,18 +1,24 @@
+# =====================================================================
+# CyberGuard AI - Base Docker Compose Configuration (Development & Local Orchestration)
+# Section 74: Network isolation, persistent volumes, and health monitoring
+# =====================================================================
 services:
   postgresql:
     image: postgres:16-alpine
-    container_name: mailtrace-postgresql
+    container_name: cyberguard-postgresql
     restart: unless-stopped
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-mailtrace}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mailtrace_password}
-      POSTGRES_DB: ${POSTGRES_DB:-mailtrace}
+      POSTGRES_USER: ${POSTGRES_USER:-cyberguard}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cyberguard_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-cyberguard}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
+    networks:
+      - backend_internal_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mailtrace} -d ${POSTGRES_DB:-mailtrace}"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cyberguard} -d ${POSTGRES_DB:-cyberguard}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -22,10 +28,11 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: mailtrace-backend
+    container_name: cyberguard-backend
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-mailtrace}:${POSTGRES_PASSWORD:-mailtrace_password}@postgresql:5432/${POSTGRES_DB:-mailtrace}
+      CYBERGUARD_ENV: ${CYBERGUARD_ENV:-DEVELOPMENT}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberguard}:${POSTGRES_PASSWORD:-cyberguard_secure_password}@postgresql:5432/${POSTGRES_DB:-cyberguard}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       IP_INTELLIGENCE_PROVIDER: ${IP_INTELLIGENCE_PROVIDER:-ipapi}
@@ -41,22 +48,29 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gemini-1.5-flash}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
       CYBERGUARD_STORAGE_ROOT: ${CYBERGUARD_STORAGE_ROOT:-/app/backend/data/storage}
+      CYBERGUARD_AUTH_SECRET: ${CYBERGUARD_AUTH_SECRET:-dev_insecure_ephemeral_jwt_secret_key_32chars_min}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       RATE_LIMIT_ANALYSIS_PER_MIN: ${RATE_LIMIT_ANALYSIS_PER_MIN:-20}
       RATE_LIMIT_LLM_PER_MIN: ${RATE_LIMIT_LLM_PER_MIN:-10}
       RATE_LIMIT_INTEL_PER_MIN: ${RATE_LIMIT_INTEL_PER_MIN:-60}
       RATE_LIMIT_GENERAL_PER_MIN: ${RATE_LIMIT_GENERAL_PER_MIN:-120}
+      WORKER_CONCURRENCY: ${WORKER_CONCURRENCY:-4}
+      BACKGROUND_WORKER_ENABLED: "false" # In-container dedicated worker process handles jobs
     volumes:
       - cyberguard_storage:/app/backend/data/storage
       - eml_evidence_data:/app/backend/data/eml_store
       - reports_data:/app/backend/data/reports
+      - backup_data:/app/backend/data/backups
     ports:
       - "${BACKEND_PORT:-8000}:8000"
+    networks:
+      - backend_internal_net
+      - frontend_net
     depends_on:
       postgresql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health/ready"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -66,11 +80,12 @@ services:
     build:
       context: .
       dockerfile: backend/Dockerfile
-    container_name: mailtrace-worker
+    container_name: cyberguard-worker
     command: ["python", "-m", "backend.worker"]
     restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql://${POSTGRES_USER:-mailtrace}:${POSTGRES_PASSWORD:-mailtrace_password}@postgresql:5432/${POSTGRES_DB:-mailtrace}
+      CYBERGUARD_ENV: ${CYBERGUARD_ENV:-DEVELOPMENT}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberguard}:${POSTGRES_PASSWORD:-cyberguard_secure_password}@postgresql:5432/${POSTGRES_DB:-cyberguard}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       IP_INTELLIGENCE_PROVIDER: ${IP_INTELLIGENCE_PROVIDER:-ipapi}
       IP_INTELLIGENCE_API_KEY: ${IP_INTELLIGENCE_API_KEY:-}
@@ -83,6 +98,8 @@ services:
       - cyberguard_storage:/app/backend/data/storage
       - eml_evidence_data:/app/backend/data/eml_store
       - reports_data:/app/backend/data/reports
+    networks:
+      - backend_internal_net
     depends_on:
       postgresql:
         condition: service_healthy
@@ -95,10 +112,12 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-}
-    container_name: mailtrace-frontend
+    container_name: cyberguard-frontend
     restart: unless-stopped
     ports:
       - "${FRONTEND_PORT:-3000}:80"
+    networks:
+      - frontend_net
     depends_on:
       backend:
         condition: service_healthy
@@ -109,6 +128,12 @@ services:
       retries: 3
       start_period: 5s
 
+networks:
+  frontend_net:
+    driver: bridge
+  backend_internal_net:
+    driver: bridge
+
 volumes:
   postgres_data:
     driver: local
@@ -118,4 +143,5 @@ volumes:
     driver: local
   reports_data:
     driver: local
-
+  backup_data:
+    driver: local
