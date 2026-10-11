@@ -40,6 +40,7 @@ import { CrossSourceCorrelationPage } from './pages/CrossSourceCorrelationPage';
 import { AttackSurfacePage } from './pages/AttackSurfacePage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ThreatActorWorkspace } from './pages/ThreatActorWorkspace';
+import { EvidenceWorkspace } from './pages/EvidenceWorkspace';
 
 function AppContent() {
   return (
@@ -95,7 +96,10 @@ function AppContent() {
         <Route path="/attack-path" element={<InvestigationWorkspace />} />
         <Route path="/graph" element={<InvestigationWorkspace />} />
         <Route path="/timeline" element={<InvestigationWorkspace />} />
-        <Route path="/evidence" element={<InvestigationWorkspace />} />
+        <Route path="/evidence" element={<EvidenceWorkspace />} />
+        <Route path="/evidence/:id" element={<EvidenceWorkspace />} />
+        <Route path="/forensics" element={<EvidenceWorkspace />} />
+        <Route path="/forensics/:id" element={<EvidenceWorkspace />} />
         <Route path="/intelligence" element={<InvestigationWorkspace />} />
         <Route path="/response" element={<InvestigationWorkspace />} />
         <Route path="/report" element={<InvestigationWorkspace />} />

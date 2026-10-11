@@ -14,6 +14,7 @@ import {
   GitMerge,
   Globe,
   Boxes,
+  Scale,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -170,6 +171,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
       icon: ShieldAlert,
       description: 'Deep-dive forensic analysis, attack graphs & response workflows',
+    },
+    {
+      id: 'evidence',
+      name: 'Evidence & Forensics',
+      path: '/evidence',
+      matchPrefixes: ['/evidence', '/forensics'],
+      icon: Scale,
+      description: 'Cryptographic integrity, chain-of-custody, provenance & legal exports',
     },
     {
       id: 'reports',

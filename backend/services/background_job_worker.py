@@ -1562,6 +1562,59 @@ async def handle_case_management_jobs(ctx: JobExecutionContext, db: Session) -> 
         return {"status": "METRICS_AGGREGATED", "metrics": metrics.model_dump()}
 
 
+@register_handler(JobTypeEnum.EVIDENCE_INTEGRITY_SWEEP.value)
+@register_handler(JobTypeEnum.EVIDENCE_BATCH_VERIFICATION.value)
+@register_handler(JobTypeEnum.EVIDENCE_FORENSIC_PACKAGE.value)
+async def handle_evidence_workspace_jobs(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 68: Asynchronous Evidence & Forensics background job handler.
+    Executes scheduled integrity audits, batch verifications, and forensic manifest packaging.
+    """
+    from backend.services.evidence_service import EvidenceService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    job_type = getattr(ctx, "job_type", "")
+    workspace_id = getattr(ctx, "workspace_id", "default") or "default"
+
+    if job_type == JobTypeEnum.EVIDENCE_FORENSIC_PACKAGE.value:
+        evidence_id = params.get("evidence_id") or getattr(ctx, "resource_id", None)
+        if not evidence_id:
+            raise PermanentJobError("Missing required 'evidence_id' for EVIDENCE_FORENSIC_PACKAGE job.")
+        ctx.update_progress(db, 20.0, "RUNNING", f"Compiling forensic manifest package for {evidence_id}...")
+        manifest = EvidenceService.export_evidence_manifest(db, evidence_id, current_user="Background Worker", tenant_id=workspace_id)
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Forensic manifest package {manifest.manifest_id} created.")
+        return manifest.model_dump()
+
+    else:
+        # Integrity or batch verification sweep
+        ctx.update_progress(db, 25.0, "RUNNING", f"Sweeping evidence records for tenant {workspace_id}...")
+        evidence_list = EvidenceService.list_evidence(db, tenant_id=workspace_id, page=1, page_size=100)
+        verified_count = 0
+        mismatched_count = 0
+
+        total = len(evidence_list.items)
+        for idx, item in enumerate(evidence_list.items):
+            res = EvidenceService.verify_integrity(db, item.id, current_user="Automated Audit", tenant_id=workspace_id)
+            if res.match:
+                verified_count += 1
+            else:
+                mismatched_count += 1
+            progress = 25.0 + ((idx + 1) / max(1, total)) * 70.0
+            ctx.update_progress(db, progress, "RUNNING", f"Audited {idx + 1}/{total} evidence records...")
+
+        ctx.update_progress(
+            db,
+            100.0,
+            "COMPLETED",
+            f"Integrity sweep finished: {verified_count} verified, {mismatched_count} mismatches.",
+        )
+        return {
+            "total_audited": total,
+            "verified": verified_count,
+            "mismatches": mismatched_count,
+            "tenant_id": workspace_id,
+        }
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

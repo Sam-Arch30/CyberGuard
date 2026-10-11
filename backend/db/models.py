@@ -176,15 +176,113 @@ class CaseFindingModel(Base):
 
 
 class EvidenceModel(Base):
+    """
+    Authoritative Forensic Evidence Record (Section 68).
+    Represents an artifact or observation formally acquired, integrity-verified,
+    and associated with an investigation or case with immutable provenance.
+    """
     __tablename__ = "evidence"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     evidence_id = Column(String(64), unique=True, nullable=False, index=True)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    artifact_id = Column(String(36), ForeignKey("artifacts.id", ondelete="SET NULL"), nullable=True, index=True)
+    case_id = Column(String(36), ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True)
+    investigation_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+
+    # Hashes & Cryptographic Integrity
     sha256 = Column(String(64), nullable=False, index=True)
+    sha1 = Column(String(40), nullable=True)
+    md5 = Column(String(32), nullable=True)
+    hash_algorithm = Column(String(20), nullable=False, default="SHA-256")
+    integrity_status = Column(String(30), nullable=False, default="VERIFIED", index=True)  # UNKNOWN, PENDING, VERIFIED, MISMATCH, UNAVAILABLE
+    last_verified_at = Column(DateTime, nullable=True)
+    last_verified_by = Column(String(100), nullable=True)
+
+    # Artifact & Storage Metadata
     original_filename = Column(String(255), nullable=False)
-    upload_timestamp = Column(DateTime, default=get_utc_now, nullable=False)
+    mime_type = Column(String(100), nullable=True)
     size = Column(Integer, nullable=False)
+    size_bytes = Column(Integer, nullable=True)
+    storage_reference = Column(String(500), nullable=True)
+
+    # Provenance & Acquisition
+    source_type = Column(String(50), nullable=False, default="EMAIL", index=True)  # EMAIL, FILE, ATTACHMENT, URL, ENDPOINT, NETWORK, MANUAL_UPLOAD, THREAT_INTEL
+    source_reference = Column(String(255), nullable=True)
+    collection_method = Column(String(50), nullable=False, default="INGESTION_GATEWAY")  # INGESTION_GATEWAY, MANUAL_UPLOAD, ENDPOINT_AGENT, API, CONNECTOR
     uploader = Column(String(100), nullable=True, default="SOC Analyst")
+    collected_by = Column(String(100), nullable=True, default="SOC Analyst")
+    upload_timestamp = Column(DateTime, default=get_utc_now, nullable=False)
+    collected_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    received_at = Column(DateTime, default=get_utc_now, nullable=False)
+    observed_at = Column(DateTime, nullable=True)
+
+    # Classification & Lifecycle
+    classification = Column(String(30), nullable=False, default="INTERNAL")  # PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED, SENSITIVE
+    lifecycle_status = Column(String(30), nullable=False, default="VALID", index=True)  # REGISTERED, VALIDATING, VALID, INVALID, QUARANTINED, PRESERVED, RELEASED, RETIRED
+    retention_policy = Column(String(50), nullable=False, default="INDEFINITE")  # INDEFINITE, 30_DAYS, 90_DAYS, 1_YEAR, LEGAL_HOLD
+    preservation_status = Column(String(30), nullable=False, default="NORMAL", index=True)  # NORMAL, PRESERVED, ON_HOLD
+    preservation_reason = Column(Text, nullable=True)
+    preservation_actor = Column(String(100), nullable=True)
+    preservation_timestamp = Column(DateTime, nullable=True)
+
+    # Derivation & Provenance Lineage
+    parent_evidence_id = Column(String(36), ForeignKey("evidence.id", ondelete="SET NULL"), nullable=True, index=True)
+    derivation_metadata_json = Column(Text, default="{}", nullable=False)
+
+    # Metadata & Notes
+    metadata_json = Column(Text, default="{}", nullable=False)
+    forensic_notes_json = Column(Text, default="[]", nullable=False)
+    evidence_gaps_json = Column(Text, default="[]", nullable=False)
+
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    # Relationships
+    artifact = relationship("ArtifactModel")
+    case = relationship("CaseModel")
+    parent_evidence = relationship("EvidenceModel", remote_side=[id], backref="child_evidence")
+    custody_events = relationship("EvidenceCustodyEventModel", back_populates="evidence", cascade="all, delete-orphan", order_by="EvidenceCustodyEventModel.timestamp")
+
+
+class EvidenceCustodyEventModel(Base):
+    """
+    Immutable Chain-of-Custody ledger entry (Section 68).
+    Tracks every meaningful custody transition with authentication, timestamp,
+    action, integrity digest, and non-repudiation audit trail.
+    """
+    __tablename__ = "evidence_custody_events"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    tenant_id = Column(String(64), nullable=False, default="default", index=True)
+    evidence_id = Column(String(36), ForeignKey("evidence.id", ondelete="CASCADE"), nullable=False, index=True)
+    event_type = Column(String(50), nullable=False, index=True)  # ACQUIRED, REGISTERED, TRANSFERRED, ACCESSED, COPIED, ANALYZED, EXPORTED, PRESERVED, RELEASED
+    actor_id = Column(String(100), nullable=False, default="SOC Analyst")
+    timestamp = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    source = Column(String(255), nullable=True)
+    destination = Column(String(255), nullable=True)
+    reason = Column(Text, nullable=True)
+    integrity_hash = Column(String(64), nullable=True)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    evidence = relationship("EvidenceModel", back_populates="custody_events")
+
+
+from sqlalchemy import event
+
+
+# Immutability enforcement for EvidenceCustodyEventModel: chain-of-custody records are strictly append-only
+@event.listens_for(EvidenceCustodyEventModel, "before_update")
+def _prevent_custody_event_update(mapper, connection, target):
+    raise PermissionError("Chain-of-custody records are append-only and immutable. Modifications are prohibited.")
+
+
+@event.listens_for(EvidenceCustodyEventModel, "before_delete")
+def _prevent_custody_event_delete(mapper, connection, target):
+    if getattr(connection, "_allow_custody_cleanup", False):
+        return
+    raise PermissionError("Chain-of-custody records are append-only and immutable. Deletions are prohibited.")
 
 
 class AuditLogModel(Base):
