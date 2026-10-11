@@ -15,6 +15,7 @@ import {
   Globe,
   Boxes,
   Scale,
+  Cpu,
 } from 'lucide-react';
 import { Tooltip } from '../ui';
 import { cn } from '../../utils/cn';
@@ -171,6 +172,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       ],
       icon: ShieldAlert,
       description: 'Deep-dive forensic analysis, attack graphs & response workflows',
+    },
+    {
+      id: 'automation',
+      name: 'Automation (SOAR)',
+      path: '/automation',
+      matchPrefixes: ['/automation', '/soar'],
+      icon: Cpu,
+      description: 'SOAR playbooks, human-in-the-loop approvals & automated response runs',
     },
     {
       id: 'evidence',

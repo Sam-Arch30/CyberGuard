@@ -67,6 +67,7 @@ from backend.api.routes.threat_workspace import router as threat_workspace_route
 from backend.api.routes.investigation_automation import router as investigation_automation_router
 from backend.api.routes.evidence_workspace import router as evidence_workspace_router
 from backend.api.routes.executive_reports import router as executive_reports_router
+from backend.api.routes.automation import router as automation_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -161,6 +162,7 @@ app.include_router(threat_workspace_router)
 app.include_router(investigation_automation_router)
 app.include_router(evidence_workspace_router)
 app.include_router(executive_reports_router)
+app.include_router(automation_router)
 app.include_router(correlation_router)
 app.include_router(reports_router)
 app.include_router(audit_router)

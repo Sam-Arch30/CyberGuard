@@ -1659,6 +1659,46 @@ async def handle_executive_report_jobs(ctx: JobExecutionContext, db: Session) ->
         return {"status": "BATCH_COMPLETED", "metrics": metrics}
 
 
+@register_handler(JobTypeEnum.AUTOMATION_WORKFLOW_RUN.value)
+@register_handler(JobTypeEnum.AUTOMATION_APPROVAL_SWEEP.value)
+async def handle_automation_workflow_jobs(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 70: Asynchronous Security Operations Automation (SOAR) job handler.
+    Executes workflow runs and audits stale pending approval requests.
+    """
+    from backend.db.models import AutomationApprovalRequestModel, AutomationRunModel
+    from backend.services.automation_service import AutomationWorkflowService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    job_type = getattr(ctx, "job_type", "")
+    tenant_id = getattr(ctx, "workspace_id", "default") or "default"
+
+    if job_type == JobTypeEnum.AUTOMATION_WORKFLOW_RUN.value:
+        run_id = params.get("run_id")
+        if not run_id:
+            raise PermanentJobError("Missing 'run_id' for AUTOMATION_WORKFLOW_RUN job.")
+        ctx.update_progress(db, 20.0, "RUNNING", f"Executing automation run {run_id}...")
+        run = AutomationWorkflowService.execute_run_steps(db, run_id=run_id, tenant_id=tenant_id)
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Automation run {run_id} finished with status {run.status}.")
+        return {"run_id": run.id, "status": run.status, "completed_steps": run.completed_steps}
+
+    else:
+        ctx.update_progress(db, 30.0, "RUNNING", "Auditing stale approval requests...")
+        now = datetime.now(timezone.utc)
+        stale_approvals = db.query(AutomationApprovalRequestModel).filter(
+            AutomationApprovalRequestModel.tenant_id == tenant_id,
+            AutomationApprovalRequestModel.status == "PENDING",
+            AutomationApprovalRequestModel.expires_at <= now,
+        ).all()
+        expired_count = 0
+        for app in stale_approvals:
+            app.status = "EXPIRED"
+            expired_count += 1
+        db.commit()
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Expired {expired_count} stale approval requests.")
+        return {"expired_count": expired_count, "status": "SWEEP_COMPLETED"}
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------

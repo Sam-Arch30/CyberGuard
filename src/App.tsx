@@ -41,6 +41,7 @@ import { AttackSurfacePage } from './pages/AttackSurfacePage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ThreatActorWorkspace } from './pages/ThreatActorWorkspace';
 import { EvidenceWorkspace } from './pages/EvidenceWorkspace';
+import { AutomationPage } from './pages/AutomationPage';
 
 function AppContent() {
   return (
@@ -105,6 +106,11 @@ function AppContent() {
         <Route path="/report" element={<InvestigationWorkspace />} />
         <Route path="/email" element={<InvestigationWorkspace />} />
         <Route path="/investigation" element={<InvestigationWorkspace />} />
+
+        {/* Section 70: Security Operations Automation (SOAR) & Workflow Orchestration */}
+        <Route path="/automation" element={<AutomationPage />} />
+        <Route path="/automation/:id" element={<AutomationPage />} />
+        <Route path="/soar" element={<Navigate to="/automation" replace />} />
 
         {/* Contextual Security Tools (Deep Links & Sub-Workflows) */}
         <Route path="/analyze" element={<AnalyzeEmail />} />
