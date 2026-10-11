@@ -57,6 +57,7 @@ from backend.api.routes.watchlists import router as watchlists_router
 from backend.api.routes.threat_hunting import router as threat_hunting_router
 from backend.api.routes.investigation_pivots import router as investigation_pivots_router
 from backend.api.routes.detection_rules import router as detection_rules_router
+from backend.api.routes.detection_pipeline import router as detection_pipeline_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -137,6 +138,9 @@ app.include_router(detection_rules_router, prefix="/api/v1/rules")
 app.include_router(detection_rules_router, prefix="/api/rules")
 app.include_router(detection_rules_router, prefix="/api/detections")
 app.include_router(detection_rules_router, prefix="/detections")
+app.include_router(detection_pipeline_router, prefix="/api/v1/detection")
+app.include_router(detection_pipeline_router, prefix="/api/detection")
+app.include_router(detection_pipeline_router, prefix="/detection")
 app.include_router(correlation_router)
 app.include_router(reports_router)
 app.include_router(audit_router)

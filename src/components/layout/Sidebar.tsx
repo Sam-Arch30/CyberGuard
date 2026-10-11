@@ -156,7 +156,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       id: 'detections',
       name: 'Detection Rules',
       path: '/detections',
-      matchPrefixes: ['/detections', '/rules'],
+      matchPrefixes: ['/detections', '/rules', '/pipeline', '/detection-pipeline'],
       icon: Binary,
       description: 'Detection engineering, versioned rule lifecycles & backtesting',
     },

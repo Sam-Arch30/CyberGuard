@@ -79,6 +79,58 @@ class RuleCostClass(str, Enum):
     UNSUPPORTED = "UNSUPPORTED"
 
 
+# ============================================================================
+# Section 57: Detection Rule Management & Operational Control Enums & Models
+# ============================================================================
+
+class DeploymentStateEnum(str, Enum):
+    DRAFT = "DRAFT"
+    STAGING = "STAGING"
+    PRODUCTION = "PRODUCTION"
+    DISABLED = "DISABLED"
+
+
+class OperationalHealthEnum(str, Enum):
+    HEALTHY = "HEALTHY"
+    DEGRADED = "DEGRADED"
+    FAILING = "FAILING"
+    UNKNOWN = "UNKNOWN"
+
+
+class DependencyTypeEnum(str, Enum):
+    DATA_SOURCE = "DATA_SOURCE"
+    ANALYZER = "ANALYZER"
+    INTELLIGENCE = "INTELLIGENCE"
+    BASELINE = "BASELINE"
+    WATCHLIST = "WATCHLIST"
+
+
+class DependencyHealthEnum(str, Enum):
+    HEALTHY = "HEALTHY"
+    DEGRADED = "DEGRADED"
+    FAILING = "FAILING"
+    UNKNOWN = "UNKNOWN"
+
+
+class MatchDispositionEnum(str, Enum):
+    TRUE_POSITIVE = "TRUE_POSITIVE"
+    FALSE_POSITIVE = "FALSE_POSITIVE"
+    BENIGN = "BENIGN"
+    EXPECTED_ACTIVITY = "EXPECTED_ACTIVITY"
+    NEEDS_REVIEW = "NEEDS_REVIEW"
+
+
+class RuleDependency(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    name: str
+    type: DependencyTypeEnum = DependencyTypeEnum.DATA_SOURCE
+    required: bool = True
+    health: DependencyHealthEnum = DependencyHealthEnum.HEALTHY
+    details: Optional[str] = None
+
+
+
 class RuleFieldType(str, Enum):
     STRING = "STRING"
     NUMBER = "NUMBER"
@@ -537,6 +589,12 @@ class DetectionRuleCreateRequest(BaseModel):
     provenance_id: Optional[str] = None
     provenance_details: Dict[str, Any] = Field(default_factory=dict)
     created_by: str = Field(default="analyst")
+    # Section 57 operational additions
+    owner_id: str = Field(default="analyst")
+    team_id: Optional[str] = None
+    collections: List[str] = Field(default_factory=list)
+    dependencies: List[RuleDependency] = Field(default_factory=list)
+    review_interval_days: int = Field(default=90, ge=1, le=365)
 
 
 class DetectionRuleTuneRequest(BaseModel):
@@ -552,6 +610,12 @@ class DetectionRuleTuneRequest(BaseModel):
     tags: Optional[List[str]] = None
     attack_techniques: Optional[List[str]] = None
     editor: str = Field(default="analyst")
+    # Section 57 operational additions
+    owner_id: Optional[str] = None
+    team_id: Optional[str] = None
+    collections: Optional[List[str]] = None
+    dependencies: Optional[List[RuleDependency]] = None
+    review_interval_days: Optional[int] = None
 
 
 class DetectionRuleBacktestRequest(BaseModel):
@@ -685,6 +749,28 @@ class DetectionRuleResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     versions_count: int = 1
+    # Section 57 Operational additions
+    owner_id: str = "analyst"
+    team_id: Optional[str] = None
+    last_editor_id: Optional[str] = None
+    deployment_state: DeploymentStateEnum = DeploymentStateEnum.DRAFT
+    operational_health: OperationalHealthEnum = OperationalHealthEnum.HEALTHY
+    health_reason: Optional[str] = None
+    health_updated_at: Optional[datetime] = None
+    review_interval_days: int = 90
+    next_review_due: Optional[datetime] = None
+    last_reviewed_at: Optional[datetime] = None
+    dependencies: List[RuleDependency] = Field(default_factory=list)
+    collections: List[str] = Field(default_factory=list)
+    replaced_by_rule_id: Optional[str] = None
+    last_matched_at: Optional[datetime] = None
+    total_match_count: int = 0
+    matches_last_24h: int = 0
+    active_suppressions_count: int = 0
+    # Section 58 Operational additions
+    last_validation_run_id: Optional[str] = None
+    validation_status: Optional[str] = "NOT_RUN"
+    validation_updated_at: Optional[datetime] = None
 
 
 class DetectionRuleListResponse(BaseModel):
@@ -708,4 +794,353 @@ class DetectionRuleStatsResponse(BaseModel):
     precision_rate: float
     cost_distribution: Dict[str, int] = Field(default_factory=dict)
     category_distribution: Dict[str, int] = Field(default_factory=dict)
+
+
+# ============================================================================
+# Section 57: Request & Response DTOs
+# ============================================================================
+
+class RuleSuppressionCreateRequest(BaseModel):
+    name: str = Field(min_length=2, max_length=255)
+    reason: str = Field(min_length=3, max_length=500)
+    scope_type: str = Field(default="ENTITY", description="ENTITY, FIELD, CONDITION, SOURCE, ENVIRONMENT, GLOBAL")
+    scope_target: str = Field(description="Target field e.g. sender_domain, ip_address, recipient, subject")
+    match_value: str = Field(description="Target value e.g. internal-scanner.corp, 10.0.0.1")
+    match_operator: str = Field(default="EQUALS", description="EQUALS, CONTAINS, ENDS_WITH, REGEX")
+    expires_in_days: Optional[int] = Field(default=None, ge=1, le=365)
+    expires_at: Optional[datetime] = None
+
+
+class RuleSuppressionResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    workspace_id: str
+    rule_id: str
+    name: str
+    reason: str
+    scope_type: str
+    scope_target: str
+    match_value: str
+    match_operator: str
+    is_active: bool
+    expires_at: Optional[datetime] = None
+    created_by: str
+    approved_by: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RuleDeploymentRequest(BaseModel):
+    target_state: DeploymentStateEnum = Field(description="STAGING or PRODUCTION")
+    version: Optional[str] = Field(default=None, description="Optional target version e.g. v1, v2")
+    reason: Optional[str] = Field(default=None, max_length=500)
+
+
+class RuleRollbackRequest(BaseModel):
+    target_version: str = Field(description="Target immutable version to roll back to e.g. v1, v2")
+    reason: str = Field(min_length=3, max_length=500, description="Required analytical justification for rollback")
+
+
+class EmergencyDisableRequest(BaseModel):
+    reason: str = Field(min_length=3, max_length=500, description="Required mandatory reason for emergency disable")
+
+
+class DeploymentDryRunResponse(BaseModel):
+    rule_id: str
+    target_version: str
+    validation_status: str  # PASS / FAIL
+    validation_errors: List[str] = Field(default_factory=list)
+    dependency_status: str  # PASS / DEGRADED / FAIL
+    missing_required_dependencies: List[str] = Field(default_factory=list)
+    historical_test_status: str  # PASS / INSUFFICIENT_DATA / FAIL
+    historical_matches_sample: int = 0
+    operational_risk: str  # LOW / MEDIUM / HIGH
+    risk_factors: List[str] = Field(default_factory=list)
+    can_deploy: bool = True
+
+
+class RuleSimulationRequest(BaseModel):
+    sample_size: int = Field(default=50, ge=1, le=500)
+    data_source: Optional[str] = None
+
+
+class RuleSimulationResponse(BaseModel):
+    rule_id: str
+    rule_version: str
+    status: str = "COMPLETED"
+    events_scanned: int = 0
+    matches_count: int = 0
+    simulation_matches: List[Dict[str, Any]] = Field(default_factory=list)
+    duration_ms: float = 0.0
+    is_simulation: bool = True
+
+
+class RuleOwnershipUpdateRequest(BaseModel):
+    owner_id: str = Field(min_length=1, max_length=100)
+    team_id: Optional[str] = Field(default=None, max_length=100)
+    review_interval_days: Optional[int] = Field(default=None, ge=1, le=365)
+
+
+class MatchDispositionRequest(BaseModel):
+    disposition: MatchDispositionEnum
+    notes: Optional[str] = Field(default=None, max_length=500)
+
+
+class RuleQualityMetricsResponse(BaseModel):
+    rule_id: str
+    total_matches: int = 0
+    reviewed_matches: int = 0
+    true_positives: int = 0
+    false_positives: int = 0
+    benign_count: int = 0
+    expected_activity_count: int = 0
+    needs_review_count: int = 0
+    false_positive_rate: Optional[float] = None
+    precision_rate: Optional[float] = None
+    review_coverage_rate: Optional[float] = None
+    insufficient_data: bool = True
+    quality_verdict: str = "INSUFFICIENT_DATA"
+
+
+class RuleOperationalHealthResponse(BaseModel):
+    rule_id: str
+    rule_identifier: Optional[str] = None
+    deployment_state: DeploymentStateEnum
+    operational_health: OperationalHealthEnum
+    health_reason: Optional[str] = None
+    health_updated_at: Optional[datetime] = None
+    execution_count_24h: int = 0
+    success_count_24h: int = 0
+    failure_count_24h: int = 0
+    error_rate_24h: float = 0.0
+    average_duration_ms: float = 0.0
+    p95_duration_ms: float = 0.0
+    matches_last_24h: int = 0
+    matches_prev_24h: int = 0
+    match_rate_anomaly: bool = False
+    anomaly_details: Optional[str] = None
+    zero_match: bool = False
+    is_stale: bool = False
+    review_due: bool = False
+    next_review_due: Optional[datetime] = None
+    days_until_review: Optional[int] = None
+    dependencies: List[RuleDependency] = Field(default_factory=list)
+    dependency_health_summary: str = "HEALTHY"
+
+
+class BulkRuleOperationRequest(BaseModel):
+    rule_ids: List[str] = Field(min_length=1, max_length=200)
+    operation: str = Field(description="ENABLE, DISABLE, ASSIGN_OWNER, ASSIGN_TEAM, ADD_TAG, REMOVE_TAG, SET_COLLECTION, ACTIVATE")
+    owner_id: Optional[str] = None
+    team_id: Optional[str] = None
+    tag: Optional[str] = None
+    collection: Optional[str] = None
+    reason: Optional[str] = None
+
+
+class BulkRuleOperationResponse(BaseModel):
+    operation: str
+    total_requested: int
+    succeeded_count: int
+    failed_count: int
+    succeeded_rule_ids: List[str] = Field(default_factory=list)
+    failed_rules: List[Dict[str, str]] = Field(default_factory=list)
+
+
+class OperationalOverviewResponse(BaseModel):
+    workspace_id: str
+    total_rules: int
+    active_rules: int
+    staging_rules: int
+    draft_rules: int
+    disabled_rules: int
+    healthy_rules: int
+    degraded_rules: int
+    failing_rules: int
+    unknown_health_rules: int
+    review_due_count: int
+    stale_rules_count: int
+    zero_match_count: int
+    high_fp_count: int
+    unusual_match_rate_count: int
+    total_matches_24h: int
+    coverage_by_source: Dict[str, int] = Field(default_factory=dict)
+    coverage_by_collection: Dict[str, int] = Field(default_factory=dict)
+
+
+# ============================================================================
+# Section 58: Automated Detection Validation & Continuous Rule Quality Schemas
+# ============================================================================
+
+class ValidationStatusEnum(str, Enum):
+    NOT_RUN = "NOT_RUN"
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    PASS = "PASS"
+    PASS_WITH_WARNINGS = "PASS_WITH_WARNINGS"
+    FAIL = "FAIL"
+    BLOCKED = "BLOCKED"
+    CANCELLED = "CANCELLED"
+    TIMED_OUT = "TIMED_OUT"
+    STALE = "STALE"
+
+
+class ValidationTypeEnum(str, Enum):
+    FULL = "FULL"
+    STRUCTURAL = "STRUCTURAL"
+    DEPENDENCY = "DEPENDENCY"
+    DATA_COMPATIBILITY = "DATA_COMPATIBILITY"
+    EXECUTION = "EXECUTION"
+    REGRESSION = "REGRESSION"
+    PERFORMANCE = "PERFORMANCE"
+    BEHAVIOR = "BEHAVIOR"
+    FIXTURES = "FIXTURES"
+    CONTINUOUS = "CONTINUOUS"
+    GATE_CHECK = "GATE_CHECK"
+
+
+class ValidationTriggerEnum(str, Enum):
+    MANUAL = "MANUAL"
+    SCHEDULED = "SCHEDULED"
+    CONTINUOUS = "CONTINUOUS"
+    VERSION_CREATED = "VERSION_CREATED"
+    DEPLOYMENT_GATE = "DEPLOYMENT_GATE"
+    SCHEMA_CHANGE = "SCHEMA_CHANGE"
+    DEPENDENCY_CHANGE = "DEPENDENCY_CHANGE"
+    HEALTH_DEGRADED = "HEALTH_DEGRADED"
+
+
+class ValidationCategoryEnum(str, Enum):
+    STRUCTURAL = "STRUCTURAL"
+    DEPENDENCY = "DEPENDENCY"
+    DATA_COMPATIBILITY = "DATA_COMPATIBILITY"
+    EXECUTION = "EXECUTION"
+    REGRESSION = "REGRESSION"
+    PERFORMANCE = "PERFORMANCE"
+    BEHAVIOR = "BEHAVIOR"
+    FIXTURE = "FIXTURE"
+    OPERATIONAL = "OPERATIONAL"
+
+
+class ValidationSeverityEnum(str, Enum):
+    INFO = "INFO"
+    LOW = "LOW"
+    MEDIUM = "MEDIUM"
+    HIGH = "HIGH"
+    CRITICAL = "CRITICAL"
+
+
+class FixtureTypeEnum(str, Enum):
+    POSITIVE = "POSITIVE"
+    NEGATIVE = "NEGATIVE"
+
+
+class ValidationRunRequest(BaseModel):
+    validation_type: ValidationTypeEnum = ValidationTypeEnum.FULL
+    trigger_type: ValidationTriggerEnum = ValidationTriggerEnum.MANUAL
+    version: Optional[str] = None
+    baseline_version: Optional[str] = None
+    data_window_days: int = Field(default=7, ge=1, le=90)
+    run_async: bool = False
+    idempotency_key: Optional[str] = None
+
+
+class ValidationResultItem(BaseModel):
+    id: str
+    category: ValidationCategoryEnum
+    status: ValidationStatusEnum
+    severity: ValidationSeverityEnum
+    code: str
+    message: str
+    observed_value: Any = Field(default_factory=dict)
+    expected_value: Any = Field(default_factory=dict)
+    baseline_value: Any = Field(default_factory=dict)
+    evidence: Any = Field(default_factory=dict)
+    created_at: Optional[datetime] = None
+
+
+class ValidationRunResponse(BaseModel):
+    id: str
+    workspace_id: str
+    rule_id: str
+    rule_version: str
+    validation_type: ValidationTypeEnum
+    status: ValidationStatusEnum
+    trigger_type: ValidationTriggerEnum
+    started_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    duration_ms: Optional[float] = None
+    requested_by: str
+    executed_by: Optional[str] = None
+    job_id: Optional[str] = None
+    baseline_rule_version: Optional[str] = None
+    is_stale: bool = False
+    stale_reason: Optional[str] = None
+    results_count: int = 0
+    pass_count: int = 0
+    warning_count: int = 0
+    fail_count: int = 0
+    blocked_count: int = 0
+    summary: Dict[str, Any] = Field(default_factory=dict)
+    checks: List[ValidationResultItem] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+    created_at: datetime
+
+
+class DeploymentGateCheckResponse(BaseModel):
+    rule_id: str
+    version: str
+    can_promote: bool
+    status: ValidationStatusEnum
+    gate_messages: List[str] = Field(default_factory=list)
+    blocking_reasons: List[str] = Field(default_factory=list)
+    warning_reasons: List[str] = Field(default_factory=list)
+    last_run_id: Optional[str] = None
+    validated_at: Optional[datetime] = None
+
+
+class TestFixtureCreateRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+    description: Optional[str] = ""
+    fixture_type: FixtureTypeEnum = FixtureTypeEnum.POSITIVE
+    payload: Dict[str, Any]
+    expected_match: bool = True
+    is_active: bool = True
+
+
+class TestFixtureResponse(BaseModel):
+    id: str
+    workspace_id: str
+    rule_id: str
+    name: str
+    description: str
+    fixture_type: FixtureTypeEnum
+    payload: Dict[str, Any]
+    expected_match: bool
+    is_active: bool
+    last_run_at: Optional[datetime] = None
+    last_result: Optional[str] = None
+    last_error: Optional[str] = None
+    created_by: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class ValidationOverviewStats(BaseModel):
+    workspace_id: str
+    total_rules: int
+    passed_rules: int
+    warning_rules: int
+    failed_rules: int
+    blocked_rules: int
+    stale_rules: int
+    not_run_rules: int
+    total_validation_runs_24h: int
+    avg_validation_duration_ms: float
+    schema_drift_detected_count: int
+    performance_regression_count: int
+    critical_gate_blocked_count: int
+
+
 

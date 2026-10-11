@@ -1938,8 +1938,34 @@ class CandidateRuleModel(Base):
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
-    versions = relationship("CandidateRuleVersionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin")
-    executions = relationship("CandidateRuleExecutionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin")
+    # Section 57: Detection Rule Management & Operational Control
+    owner_id = Column(String(100), nullable=False, default="analyst", index=True)
+    team_id = Column(String(100), nullable=True, index=True)
+    last_editor_id = Column(String(100), nullable=True)
+    deployment_state = Column(String(30), nullable=False, default="DRAFT", index=True)  # DRAFT, STAGING, PRODUCTION, DISABLED
+    operational_health = Column(String(30), nullable=False, default="HEALTHY", index=True)  # HEALTHY, DEGRADED, FAILING, UNKNOWN
+    health_reason = Column(String(500), nullable=True)
+    health_updated_at = Column(DateTime, nullable=True)
+    review_interval_days = Column(Integer, nullable=False, default=90)
+    next_review_due = Column(DateTime, nullable=True, index=True)
+    last_reviewed_at = Column(DateTime, nullable=True)
+    dependencies_json = Column(Text, default="[]", nullable=False)
+    collections_json = Column(Text, default="[]", nullable=False)
+    replaced_by_rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="SET NULL"), nullable=True)
+    last_matched_at = Column(DateTime, nullable=True, index=True)
+    total_match_count = Column(Integer, nullable=False, default=0)
+
+    # Section 58: Automated Detection Validation & Continuous Rule Quality
+    last_validation_run_id = Column(String(36), nullable=True)
+    validation_status = Column(String(30), nullable=False, default="NOT_RUN", index=True)  # NOT_RUN, QUEUED, RUNNING, PASS, PASS_WITH_WARNINGS, FAIL, BLOCKED, CANCELLED, TIMED_OUT, STALE
+    validation_updated_at = Column(DateTime, nullable=True)
+
+    versions = relationship("CandidateRuleVersionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[CandidateRuleVersionModel.rule_id]")
+    executions = relationship("CandidateRuleExecutionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[CandidateRuleExecutionModel.rule_id]")
+    suppressions = relationship("RuleSuppressionModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[RuleSuppressionModel.rule_id]")
+    validation_runs = relationship("DetectionValidationRunModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[DetectionValidationRunModel.rule_id]")
+    fixtures = relationship("DetectionRuleTestFixtureModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[DetectionRuleTestFixtureModel.rule_id]")
+    matches = relationship("DetectionMatchModel", back_populates="rule", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[DetectionMatchModel.rule_id]")
 
     __table_args__ = (
         Index("ix_cr_ws_status", "workspace_id", "status"),
@@ -1947,6 +1973,10 @@ class CandidateRuleModel(Base):
         Index("ix_cr_ws_cat", "workspace_id", "category"),
         Index("ix_cr_ws_fp", "workspace_id", "normalized_fingerprint"),
         Index("ix_cr_ws_ident", "workspace_id", "rule_identifier"),
+        Index("ix_cr_ws_depstate", "workspace_id", "deployment_state"),
+        Index("ix_cr_ws_health", "workspace_id", "operational_health"),
+        Index("ix_cr_ws_owner", "workspace_id", "owner_id"),
+        Index("ix_cr_ws_valstatus", "workspace_id", "validation_status"),
     )
 
     @property
@@ -1960,6 +1990,10 @@ class CandidateRuleModel(Base):
     @property
     def definition(self) -> Dict[str, Any]:
         return json.loads(self.definition_json or "{}")
+
+    @definition.setter
+    def definition(self, val: Any) -> None:
+        self.definition_json = json.dumps(val) if isinstance(val, (dict, list)) else (val or "{}")
 
     @property
     def thresholds(self) -> Dict[str, Any]:
@@ -1984,6 +2018,15 @@ class CandidateRuleModel(Base):
     @property
     def provenance_details(self) -> Dict[str, Any]:
         return json.loads(self.provenance_details_json or "{}")
+
+    @property
+    def dependencies(self) -> List[Dict[str, Any]]:
+        return json.loads(self.dependencies_json or "[]")
+
+    @property
+    def collections(self) -> List[str]:
+        return json.loads(self.collections_json or "[]")
+
 
 
 class CandidateRuleVersionModel(Base):
@@ -2018,6 +2061,10 @@ class CandidateRuleVersionModel(Base):
     @property
     def definition(self) -> Dict[str, Any]:
         return json.loads(self.definition_json or "{}")
+
+    @definition.setter
+    def definition(self, val: Any) -> None:
+        self.definition_json = json.dumps(val) if isinstance(val, (dict, list)) else (val or "{}")
 
     @property
     def thresholds(self) -> Dict[str, Any]:
@@ -2058,14 +2105,20 @@ class CandidateRuleExecutionModel(Base):
     execution_time_ms = Column(Float, nullable=False, default=0.0)
     is_false_positive = Column(Boolean, nullable=True)
     feedback_reason = Column(String(255), nullable=True)
+    disposition = Column(String(30), nullable=True, index=True)  # TRUE_POSITIVE, FALSE_POSITIVE, BENIGN, EXPECTED_ACTIVITY, NEEDS_REVIEW
+    disposition_by = Column(String(100), nullable=True)
+    disposition_at = Column(DateTime, nullable=True)
+    disposition_notes = Column(String(500), nullable=True)
+    suppression_applied_id = Column(String(36), nullable=True)
     executed_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
 
-    rule = relationship("CandidateRuleModel", back_populates="executions")
+    rule = relationship("CandidateRuleModel", back_populates="executions", foreign_keys=[rule_id])
 
     __table_args__ = (
         Index("ix_cre_ws_mode_matched", "workspace_id", "mode", "matched"),
         Index("ix_cre_executed_at", "executed_at"),
         Index("ix_cre_detection_id", "detection_id"),
+        Index("ix_cre_disposition", "disposition"),
     )
 
     @property
@@ -2075,6 +2128,184 @@ class CandidateRuleExecutionModel(Base):
     @property
     def match_explanation(self) -> Dict[str, Any]:
         return json.loads(self.match_explanation_json or "{}")
+
+
+class RuleSuppressionModel(Base):
+    """
+    Section 57: Controlled suppression exception rule for detection rules.
+    Allows time-bounded, scoped false-positive suppression without disabling rules.
+    """
+    __tablename__ = "rule_suppressions"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    reason = Column(String(500), nullable=False)
+    scope_type = Column(String(50), nullable=False, default="ENTITY")  # ENTITY, FIELD, CONDITION, SOURCE, ENVIRONMENT, GLOBAL
+    scope_target = Column(String(100), nullable=False)  # e.g. "sender_domain", "ip_address", "recipient", "subject"
+    match_value = Column(String(255), nullable=False)  # e.g. "internal-scanner.corp", "10.0.0.1"
+    match_operator = Column(String(30), nullable=False, default="EQUALS")  # EQUALS, CONTAINS, ENDS_WITH, REGEX
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    expires_at = Column(DateTime, nullable=True, index=True)
+    created_by = Column(String(100), nullable=False, default="analyst")
+    approved_by = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    rule = relationship("CandidateRuleModel", back_populates="suppressions", foreign_keys=[rule_id])
+
+    __table_args__ = (
+        Index("ix_rs_ws_rule_active", "workspace_id", "rule_id", "is_active"),
+        Index("ix_rs_expires_at", "expires_at"),
+    )
+
+
+# ============================================================================
+# SECTION 58: AUTOMATED DETECTION VALIDATION & CONTINUOUS RULE QUALITY MODELS
+# ============================================================================
+
+class DetectionValidationRunModel(Base):
+    """
+    Section 58: Persistent validation run record for candidate and production detection rules.
+    Tracks multi-dimensional validation lifecycle, baseline comparison, gate results, and freshness.
+    """
+    __tablename__ = "detection_validation_runs"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    rule_version_id = Column(String(36), ForeignKey("candidate_rule_versions.id", ondelete="SET NULL"), nullable=True, index=True)
+    rule_version = Column(String(20), nullable=False, default="v1", index=True)
+    validation_type = Column(String(50), nullable=False, default="FULL", index=True)  # FULL, STRUCTURAL, DEPENDENCY, DATA_COMPATIBILITY, EXECUTION, REGRESSION, PERFORMANCE, BEHAVIOR, FIXTURES, CONTINUOUS, GATE_CHECK
+    status = Column(String(30), nullable=False, default="NOT_RUN", index=True)  # NOT_RUN, QUEUED, RUNNING, PASS, PASS_WITH_WARNINGS, FAIL, BLOCKED, CANCELLED, TIMED_OUT, STALE
+    trigger_type = Column(String(50), nullable=False, default="MANUAL", index=True)  # MANUAL, SCHEDULED, CONTINUOUS, VERSION_CREATED, DEPLOYMENT_GATE, SCHEMA_CHANGE, DEPENDENCY_CHANGE, HEALTH_DEGRADED
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    requested_by = Column(String(100), nullable=False, default="analyst")
+    executed_by = Column(String(100), nullable=True)
+    job_id = Column(String(36), nullable=True, index=True)
+    idempotency_key = Column(String(128), nullable=True, index=True)
+    baseline_run_id = Column(String(36), ForeignKey("detection_validation_runs.id", ondelete="SET NULL"), nullable=True)
+    baseline_rule_version = Column(String(20), nullable=True)
+    data_window_start = Column(DateTime, nullable=True)
+    data_window_end = Column(DateTime, nullable=True)
+    is_stale = Column(Boolean, nullable=False, default=False, index=True)
+    stale_reason = Column(String(255), nullable=True)
+    summary_json = Column(Text, default="{}", nullable=False)
+    metadata_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    rule = relationship("CandidateRuleModel", back_populates="validation_runs", foreign_keys=[rule_id])
+    results = relationship("DetectionValidationResultModel", back_populates="run", cascade="all, delete-orphan", lazy="selectin", foreign_keys="[DetectionValidationResultModel.run_id]")
+
+    __table_args__ = (
+        Index("ix_dvr_ws_rule_status", "workspace_id", "rule_id", "status"),
+        Index("ix_dvr_rule_ver", "rule_id", "rule_version"),
+        Index("ix_dvr_created_at", "created_at"),
+        Index("ix_dvr_idempotency", "workspace_id", "idempotency_key"),
+    )
+
+    @property
+    def summary(self) -> Dict[str, Any]:
+        return json.loads(self.summary_json or "{}")
+
+    @property
+    def metadata_dict(self) -> Dict[str, Any]:
+        return json.loads(self.metadata_json or "{}")
+
+
+class DetectionValidationResultModel(Base):
+    """
+    Section 58: Structured, evidence-backed individual validation check result.
+    Covers STRUCTURAL, DEPENDENCY, DATA_COMPATIBILITY, EXECUTION, REGRESSION, PERFORMANCE, BEHAVIOR, FIXTURE, OPERATIONAL.
+    """
+    __tablename__ = "detection_validation_results"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    run_id = Column(String(36), ForeignKey("detection_validation_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    rule_id = Column(String(36), nullable=False, index=True)
+    category = Column(String(50), nullable=False, index=True)  # STRUCTURAL, DEPENDENCY, DATA_COMPATIBILITY, EXECUTION, REGRESSION, PERFORMANCE, BEHAVIOR, FIXTURE, OPERATIONAL
+    status = Column(String(30), nullable=False, default="PASS", index=True)  # PASS, PASS_WITH_WARNINGS, FAIL, BLOCKED, NOT_RUN, SKIPPED
+    severity = Column(String(20), nullable=False, default="INFO")  # INFO, LOW, MEDIUM, HIGH, CRITICAL
+    code = Column(String(100), nullable=False, index=True)
+    message = Column(String(500), nullable=False)
+    observed_value_json = Column(Text, default="{}", nullable=False)
+    expected_value_json = Column(Text, default="{}", nullable=False)
+    baseline_value_json = Column(Text, default="{}", nullable=False)
+    evidence_json = Column(Text, default="{}", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    run = relationship("DetectionValidationRunModel", back_populates="results", foreign_keys=[run_id])
+
+    __table_args__ = (
+        Index("ix_dvres_run_category", "run_id", "category"),
+        Index("ix_dvres_status", "status"),
+    )
+
+    @property
+    def observed_value(self) -> Any:
+        try:
+            return json.loads(self.observed_value_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def expected_value(self) -> Any:
+        try:
+            return json.loads(self.expected_value_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def baseline_value(self) -> Any:
+        try:
+            return json.loads(self.baseline_value_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def evidence(self) -> Any:
+        try:
+            return json.loads(self.evidence_json or "{}")
+        except Exception:
+            return {}
+
+
+class DetectionRuleTestFixtureModel(Base):
+    """
+    Section 58: Controlled deterministic positive and negative test fixtures for detection rules.
+    Enables reproducible continuous behavioral validation without fabricating synthetic production events.
+    """
+    __tablename__ = "detection_rule_fixtures"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    name = Column(String(255), nullable=False)
+    description = Column(String(500), nullable=False, default="")
+    fixture_type = Column(String(20), nullable=False, default="POSITIVE", index=True)  # POSITIVE, NEGATIVE
+    payload_json = Column(Text, default="{}", nullable=False)
+    expected_match = Column(Boolean, nullable=False, default=True)
+    is_active = Column(Boolean, nullable=False, default=True, index=True)
+    last_run_at = Column(DateTime, nullable=True)
+    last_result = Column(String(20), nullable=True)  # PASS, FAIL, BLOCKED
+    last_error = Column(String(500), nullable=True)
+    created_by = Column(String(100), nullable=False, default="analyst")
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    rule = relationship("CandidateRuleModel", back_populates="fixtures", foreign_keys=[rule_id])
+
+    __table_args__ = (
+        Index("ix_drf_ws_rule_active", "workspace_id", "rule_id", "is_active"),
+    )
+
+    @property
+    def payload(self) -> Dict[str, Any]:
+        return json.loads(self.payload_json or "{}")
 
 
 # ============================================================================
@@ -4305,6 +4536,111 @@ class HuntHypothesisModel(Base):
         Index("ix_hh_ws_status", "workspace_id", "status"),
         Index("ix_hh_ws_inv", "workspace_id", "investigation_id"),
     )
+
+
+class DetectionMatchModel(Base):
+    """
+    Section 59: Persistent First-Class Detection Match representation.
+    Bridges detection rules to findings, risk scores, alerts, and investigations.
+    """
+    __tablename__ = "detection_matches"
+
+    id = Column(String(64), primary_key=True, default=lambda: f"DET-{generate_uuid()[:12]}")
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    rule_id = Column(String(36), ForeignKey("candidate_rules.id", ondelete="CASCADE"), nullable=False, index=True)
+    rule_version = Column(String(20), nullable=False, index=True)
+    event_id = Column(String(64), nullable=False, index=True)
+    execution_id = Column(String(36), ForeignKey("candidate_rule_executions.id", ondelete="SET NULL"), nullable=True, index=True)
+    finding_id = Column(String(36), ForeignKey("findings.id", ondelete="SET NULL"), nullable=True, index=True)
+    alert_id = Column(String(36), ForeignKey("notifications.id", ondelete="SET NULL"), nullable=True, index=True)
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    mode = Column(String(20), nullable=False, default="PRODUCTION", index=True)  # PRODUCTION, SHADOW, REPLAY
+    status = Column(String(30), nullable=False, default="ACTIVE", index=True)  # ACTIVE, SUPPRESSED, DISMISSED, INVESTIGATED
+    severity = Column(String(20), nullable=False, default="MEDIUM", index=True)
+    confidence = Column(Float, nullable=False, default=1.0)
+    matched_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+    matched_fields_json = Column(Text, default="[]", nullable=False)
+    evidence_json = Column(Text, default="{}", nullable=False)
+    provenance_json = Column(Text, default="{}", nullable=False)
+    explanation_text = Column(Text, default="", nullable=False)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+
+    rule = relationship("CandidateRuleModel", back_populates="matches", foreign_keys=[rule_id])
+    execution = relationship("CandidateRuleExecutionModel", foreign_keys=[execution_id])
+    finding = relationship("FindingModel", foreign_keys=[finding_id])
+    alert = relationship("NotificationModel", foreign_keys=[alert_id])
+    incident = relationship("IncidentModel", foreign_keys=[incident_id])
+
+    __table_args__ = (
+        Index("ix_dm_ws_matched_at", "workspace_id", "matched_at"),
+        Index("ix_dm_rule_matched_at", "rule_id", "matched_at"),
+        Index("ix_dm_event_ws", "workspace_id", "event_id"),
+        Index("ix_dm_mode_status", "mode", "status"),
+    )
+
+    @property
+    def matched_fields(self) -> List[str]:
+        try:
+            return json.loads(self.matched_fields_json or "[]")
+        except Exception:
+            return []
+
+    @property
+    def evidence(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.evidence_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def provenance(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.provenance_json or "{}")
+        except Exception:
+            return {}
+
+
+class DetectionDeadLetterModel(Base):
+    """
+    Section 59: Dead-Letter Event Repository for Unrecoverable or Poison Telemetry.
+    Prevents silent event dropping while ensuring non-blocking pipeline operation.
+    """
+    __tablename__ = "detection_dead_letters"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    event_id = Column(String(64), nullable=False, index=True)
+    source_type = Column(String(50), nullable=False, default="GENERIC", index=True)
+    failure_stage = Column(String(50), nullable=False, default="NORMALIZATION", index=True)  # NORMALIZATION, APPLICABILITY, EVALUATION, DOWNSTREAM
+    error_code = Column(String(100), nullable=False, index=True)
+    error_message = Column(Text, nullable=False)
+    attempt_count = Column(Integer, nullable=False, default=1)
+    payload_json = Column(Text, default="{}", nullable=False)
+    provenance_json = Column(Text, default="{}", nullable=False)
+    resolved = Column(Boolean, default=False, nullable=False, index=True)
+    resolved_by = Column(String(100), nullable=True)
+    resolved_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False, index=True)
+
+    __table_args__ = (
+        Index("ix_ddl_ws_stage", "workspace_id", "failure_stage"),
+        Index("ix_ddl_ws_created", "workspace_id", "created_at"),
+    )
+
+    @property
+    def payload(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.payload_json or "{}")
+        except Exception:
+            return {}
+
+    @property
+    def provenance(self) -> Dict[str, Any]:
+        try:
+            return json.loads(self.provenance_json or "{}")
+        except Exception:
+            return {}
+
 
 
 

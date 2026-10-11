@@ -102,6 +102,8 @@ function AppContent() {
         <Route path="/threat-hunting" element={<ThreatHunting />} />
         <Route path="/detections" element={<DetectionRules />} />
         <Route path="/detections/:id" element={<DetectionRules />} />
+        <Route path="/pipeline" element={<DetectionRules defaultTab="pipeline" />} />
+        <Route path="/detection-pipeline" element={<DetectionRules defaultTab="pipeline" />} />
         <Route path="/rules" element={<Navigate to="/detections" replace />} />
         <Route path="/detection-rules" element={<Navigate to="/detections" replace />} />
         <Route path="/benchmarks" element={<BenchmarkEvaluation />} />

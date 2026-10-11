@@ -71,6 +71,9 @@ from backend.schemas.detection_rules import (
     RuleProvenanceType,
     RuleValidationResponse,
     RuleVersionDiff,
+    DeploymentStateEnum,
+    OperationalHealthEnum,
+    RuleDependency,
 )
 from backend.schemas.realtime import RealtimeEventTypeEnum, RealtimeResourceScopeEnum
 from backend.services.realtime_service import RealtimePublisher
@@ -500,6 +503,15 @@ class DetectionRuleLifecycleService:
             attack_techniques_json=json.dumps(request.attack_techniques or []),
             is_system_rule=False,
             created_by=request.created_by,
+            # Section 57 operational additions
+            owner_id=request.owner_id or request.created_by or "analyst",
+            team_id=request.team_id,
+            deployment_state=DeploymentStateEnum.DRAFT.value,
+            operational_health=OperationalHealthEnum.HEALTHY.value,
+            review_interval_days=request.review_interval_days or 90,
+            next_review_due=get_utc_now() + timedelta(days=request.review_interval_days or 90),
+            dependencies_json=json.dumps([d.model_dump() for d in (request.dependencies or [])]),
+            collections_json=json.dumps(request.collections or []),
         )
         db.add(rule)
 
@@ -594,6 +606,17 @@ class DetectionRuleLifecycleService:
         rule.cost_class = validation.cost_class.value
         rule.normalized_fingerprint = validation.normalized_fingerprint
         rule.status = RuleLifecycleStatus.CANDIDATE.value
+        rule.last_editor_id = actor_id
+        if req.owner_id:
+            rule.owner_id = req.owner_id
+        if req.team_id:
+            rule.team_id = req.team_id
+        if req.collections is not None:
+            rule.collections_json = json.dumps(req.collections)
+        if req.dependencies is not None:
+            rule.dependencies_json = json.dumps([d.model_dump() for d in req.dependencies])
+        if req.review_interval_days:
+            rule.review_interval_days = req.review_interval_days
 
         change_desc = req.change_description or req.change_reason or "Tuned rule version"
 
@@ -1093,6 +1116,10 @@ class DetectionRuleLifecycleService:
                 is_staged = (rule.status == RuleLifecycleStatus.STAGED.value)
                 mode = "SHADOW" if is_staged else "PRODUCTION"
 
+                # Check Section 57 suppression exception rules
+                from backend.services.detection_rule_management_service import DetectionRuleManagementService
+                suppression = DetectionRuleManagementService.check_suppression(db, rule.id, event_payload)
+
                 # Record execution log
                 exec_log = CandidateRuleExecutionModel(
                     id=generate_uuid(),
@@ -1106,15 +1133,20 @@ class DetectionRuleLifecycleService:
                         "rule_identifier": rule.rule_identifier,
                         "rule_name": rule.name,
                         "explanation": eval_res["explanation"],
+                        "suppressed": bool(suppression is not None),
+                        "suppression_reason": suppression.reason if suppression else None,
                     }),
                     detection_id=detection_id,
                     event_id=event_payload.get("event_id"),
+                    suppression_applied_id=suppression.id if suppression else None,
                 )
                 db.add(exec_log)
 
-                # If rule is ACTIVE, generate a FindingModel record
+                # If rule is ACTIVE and NOT suppressed, generate a FindingModel record and update telemetry counts
                 finding_id = None
-                if not is_staged:
+                if not is_staged and not suppression:
+                    rule.total_match_count = (getattr(rule, "total_match_count", 0) or 0) + 1
+                    rule.last_matched_at = get_utc_now()
                     finding_id = generate_uuid()
                     finding = FindingModel(
                         id=finding_id,
@@ -1373,6 +1405,23 @@ class DetectionRuleLifecycleService:
     def model_to_response(cls, cand: CandidateRuleModel) -> DetectionRuleResponse:
         definition_dict = cand.definition if isinstance(cand.definition, dict) else json.loads(cand.definition_json or "{}")
         def_obj = RuleDefinition.model_validate(definition_dict)
+
+        dep_state_val = getattr(cand, "deployment_state", None) or DeploymentStateEnum.DRAFT.value
+        dep_state = DeploymentStateEnum(dep_state_val) if dep_state_val in DeploymentStateEnum._value2member_map_ else DeploymentStateEnum.DRAFT
+
+        op_health_val = getattr(cand, "operational_health", None) or OperationalHealthEnum.HEALTHY.value
+        op_health = OperationalHealthEnum(op_health_val) if op_health_val in OperationalHealthEnum._value2member_map_ else OperationalHealthEnum.HEALTHY
+
+        parsed_deps = []
+        raw_deps = getattr(cand, "dependencies", []) or []
+        for d in raw_deps:
+            try:
+                parsed_deps.append(RuleDependency.model_validate(d))
+            except Exception:
+                pass
+
+        suppressions_count = len(cand.suppressions) if getattr(cand, "suppressions", None) else 0
+
         return DetectionRuleResponse(
             id=cand.id,
             workspace_id=cand.workspace_id,
@@ -1411,6 +1460,27 @@ class DetectionRuleLifecycleService:
             created_at=cand.created_at,
             updated_at=cand.updated_at,
             versions_count=len(cand.versions) if getattr(cand, "versions", None) else 1,
+            # Section 57 additions
+            owner_id=getattr(cand, "owner_id", None) or cand.created_by or "analyst",
+            team_id=getattr(cand, "team_id", None),
+            last_editor_id=getattr(cand, "last_editor_id", None),
+            deployment_state=dep_state,
+            operational_health=op_health,
+            health_reason=getattr(cand, "health_reason", None),
+            health_updated_at=getattr(cand, "health_updated_at", None),
+            review_interval_days=getattr(cand, "review_interval_days", 90) or 90,
+            next_review_due=getattr(cand, "next_review_due", None),
+            last_reviewed_at=getattr(cand, "last_reviewed_at", None),
+            dependencies=parsed_deps,
+            collections=getattr(cand, "collections", []) or [],
+            replaced_by_rule_id=getattr(cand, "replaced_by_rule_id", None),
+            last_matched_at=getattr(cand, "last_matched_at", None),
+            total_match_count=getattr(cand, "total_match_count", 0) or 0,
+            matches_last_24h=0,
+            active_suppressions_count=suppressions_count,
+            last_validation_run_id=getattr(cand, "last_validation_run_id", None),
+            validation_status=getattr(cand, "validation_status", "NOT_RUN") or "NOT_RUN",
+            validation_updated_at=getattr(cand, "validation_updated_at", None),
         )
 
     @classmethod

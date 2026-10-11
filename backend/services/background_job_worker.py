@@ -1007,6 +1007,222 @@ async def handle_detection_rule_backtest(ctx: JobExecutionContext, db: Session) 
     return res.model_dump()
 
 
+@register_handler(JobTypeEnum.DETECTION_RULE_HEALTH_EVALUATION.value)
+async def handle_detection_rule_health_evaluation(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 57: Asynchronous background health evaluation across detection rules.
+    """
+    from backend.services.detection_rule_management_service import DetectionRuleManagementService
+
+    rule_id = ctx.resource_id or ctx.payload.get("rule_id")
+    ctx.update_progress(db, 25.0, "RUNNING", "Evaluating operational health signals...")
+
+    if rule_id:
+        res = DetectionRuleManagementService.evaluate_rule_health(
+            db=db,
+            rule_id=rule_id,
+            workspace_id=ctx.workspace_id,
+        )
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Rule health evaluated: {res.operational_health.value}")
+        return res.model_dump()
+    else:
+        summary = DetectionRuleManagementService.evaluate_all_rules_health(
+            db=db,
+            workspace_id=ctx.workspace_id,
+        )
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Evaluated {summary['total_evaluated']} rules.")
+        return summary
+
+
+@register_handler(JobTypeEnum.DETECTION_RULE_SIMULATION.value)
+async def handle_detection_rule_simulation(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 57: Asynchronous background simulation for detection rules against security telemetry.
+    """
+    from backend.schemas.detection_rules import RuleSimulationRequest
+    from backend.services.detection_rule_management_service import DetectionRuleManagementService
+
+    rule_id = ctx.resource_id or ctx.payload.get("rule_id")
+    if not rule_id:
+        raise PermanentJobError("Missing 'rule_id' in simulation job payload.")
+
+    raw_req = ctx.payload.get("simulation_request", {})
+    try:
+        sim_req = RuleSimulationRequest.model_validate(raw_req)
+    except Exception as exc:
+        raise PermanentJobError(f"Malformed simulation request: {exc}")
+
+    ctx.update_progress(db, 30.0, "RUNNING", f"Simulating rule {rule_id} across {sim_req.sample_size} events...")
+
+    res = DetectionRuleManagementService.simulate_rule(
+        db=db,
+        rule_id=rule_id,
+        req=sim_req,
+        workspace_id=ctx.workspace_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Simulation completed: {res.matches_count} matches observed in {res.duration_ms}ms.",
+    )
+    return res.model_dump()
+
+
+@register_handler(JobTypeEnum.DETECTION_RULE_BULK_OPERATION.value)
+async def handle_detection_rule_bulk_operation(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 57: Asynchronous bulk operation across multiple detection rules.
+    """
+    from backend.schemas.detection_rules import BulkRuleOperationRequest
+    from backend.services.detection_rule_management_service import DetectionRuleManagementService
+
+    raw_req = ctx.payload.get("bulk_request", {})
+    try:
+        bulk_req = BulkRuleOperationRequest.model_validate(raw_req)
+    except Exception as exc:
+        raise PermanentJobError(f"Malformed bulk operation request: {exc}")
+
+    user_id = ctx.payload.get("user_id") or getattr(ctx, "user_id", None) or "system"
+    ctx.update_progress(db, 20.0, "RUNNING", f"Executing bulk {bulk_req.operation} across {len(bulk_req.rule_ids)} rules...")
+
+    res = DetectionRuleManagementService.execute_bulk_operation(
+        db=db,
+        req=bulk_req,
+        actor=user_id,
+        workspace_id=ctx.workspace_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Bulk {res.operation} completed: {res.succeeded_count} succeeded, {res.failed_count} failed.",
+    )
+    return res.model_dump()
+
+
+@register_handler(JobTypeEnum.DETECTION_RULE_VALIDATION_RUN.value)
+async def handle_detection_rule_validation_run(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 58: Asynchronous background continuous validation run for detection rules.
+    """
+    from backend.services.detection_rule_validation_service import DetectionRuleValidationService
+
+    run_id = ctx.resource_id or ctx.payload.get("run_id")
+    if not run_id:
+        raise PermanentJobError("Missing 'run_id' in validation run job payload.")
+
+    ctx.update_progress(db, 20.0, "RUNNING", f"Executing validation run {run_id}...")
+
+    res = DetectionRuleValidationService.execute_validation_run(
+        db=db,
+        run_id=run_id,
+        workspace_id=ctx.workspace_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Validation run completed with status: {res.status.value}. Checks: {res.results_count}.",
+    )
+    return res.model_dump()
+
+
+@register_handler(JobTypeEnum.DETECTION_RULE_CONTINUOUS_SWEEP.value)
+async def handle_detection_rule_continuous_sweep(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 58: Scheduled continuous quality sweep across detection rules.
+    """
+    from backend.services.detection_rule_validation_service import DetectionRuleValidationService
+
+    ctx.update_progress(db, 15.0, "RUNNING", "Executing continuous quality sweep across detection rules...")
+
+    res = DetectionRuleValidationService.continuous_quality_sweep(
+        db=db,
+        workspace_id=ctx.workspace_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Continuous sweep completed. Rules checked: {res['rules_checked']}, Stale: {res['stale_detected']}, Scheduled: {res['runs_scheduled']}.",
+    )
+    return res
+
+
+@register_handler(JobTypeEnum.DETECTION_PIPELINE_BATCH_RUN.value)
+async def handle_detection_pipeline_batch_run(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 59: Unified Threat Detection Pipeline asynchronous batch ingestion & evaluation.
+    """
+    from backend.services.unified_threat_detection_pipeline_service import UnifiedThreatDetectionPipelineService
+    from backend.schemas.detection_pipeline import BatchEventIngestRequest, EventIngestRequest, PipelineModeEnum
+
+    events_raw = ctx.payload.get("events", [])
+    mode_str = ctx.payload.get("mode", PipelineModeEnum.PRODUCTION.value)
+    mode = PipelineModeEnum(mode_str) if mode_str in [m.value for m in PipelineModeEnum] else PipelineModeEnum.PRODUCTION
+
+    ctx.update_progress(db, 10.0, "INGESTING", f"Starting batch processing of {len(events_raw)} events...")
+
+    batch_request = BatchEventIngestRequest(
+        events=[EventIngestRequest(**ev) for ev in events_raw],
+        mode=mode,
+        stop_on_error=ctx.payload.get("stop_on_error", False),
+    )
+
+    res = UnifiedThreatDetectionPipelineService.process_batch(
+        db=db,
+        batch_request=batch_request,
+        user_id=ctx.payload.get("user_id"),
+        workspace_id=ctx.workspace_id,
+        job_id=ctx.job_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Batch pipeline processed: total={res.total_events}, matched={res.matched_events}, errors={res.error_events}."
+    )
+    return res.model_dump()
+
+
+@register_handler(JobTypeEnum.DETECTION_PIPELINE_REPLAY.value)
+async def handle_detection_pipeline_replay(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 59: Controlled historical replay over past security events without generating production alerts.
+    """
+    from backend.services.unified_threat_detection_pipeline_service import UnifiedThreatDetectionPipelineService
+    from backend.schemas.detection_pipeline import PipelineReplayRequest
+
+    replay_req = PipelineReplayRequest(
+        start_time=ctx.payload.get("start_time"),
+        end_time=ctx.payload.get("end_time"),
+        rule_ids=ctx.payload.get("rule_ids"),
+        max_events=ctx.payload.get("max_events", 1000),
+    )
+
+    ctx.update_progress(db, 10.0, "REPLAYING", "Starting historical event replay...")
+
+    res = UnifiedThreatDetectionPipelineService.replay_historical_events(
+        db=db,
+        replay_request=replay_req,
+        user_id=ctx.payload.get("user_id"),
+        workspace_id=ctx.workspace_id,
+        job_id=ctx.job_id,
+    )
+
+    ctx.update_progress(
+        db,
+        100.0,
+        "COMPLETED",
+        f"Historical replay completed: replayed={res.total_events}, matched={res.matched_events}, errors={res.error_events}."
+    )
+    return res.model_dump()
 
 
 # ---------------------------------------------------------------------------
