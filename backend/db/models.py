@@ -92,6 +92,12 @@ class CaseModel(Base):
     incident = relationship("IncidentModel", foreign_keys=[incident_id], lazy="selectin")
     campaign = relationship("CampaignModel", foreign_keys=[campaign_id], lazy="selectin")
 
+    __table_args__ = (
+        Index("ix_cases_workspace_status", "workspace_id", "status"),
+        Index("ix_cases_workspace_updated", "workspace_id", "updated_at"),
+        Index("ix_cases_workspace_priority", "workspace_id", "priority"),
+    )
+
 
 class CaseTaskModel(Base):
     """
@@ -243,6 +249,12 @@ class EvidenceModel(Base):
     case = relationship("CaseModel")
     parent_evidence = relationship("EvidenceModel", remote_side=[id], backref="child_evidence")
     custody_events = relationship("EvidenceCustodyEventModel", back_populates="evidence", cascade="all, delete-orphan", order_by="EvidenceCustodyEventModel.timestamp")
+
+    __table_args__ = (
+        Index("ix_evidence_tenant_integrity", "tenant_id", "integrity_status"),
+        Index("ix_evidence_tenant_source", "tenant_id", "source_type"),
+        Index("ix_evidence_tenant_upload", "tenant_id", "upload_timestamp"),
+    )
 
 
 class EvidenceCustodyEventModel(Base):
@@ -1098,6 +1110,12 @@ class IncidentModel(Base):
     sla_state = relationship("IncidentSLAStateModel", back_populates="incident", uselist=False, cascade="all, delete-orphan", lazy="selectin")
     workflow_executions = relationship("IncidentWorkflowExecutionModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentWorkflowExecutionModel.executed_at)", lazy="selectin")
     sla_pause_logs = relationship("IncidentSLAPauseLogModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentSLAPauseLogModel.timestamp)", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_incidents_workspace_status", "workspace_id", "status"),
+        Index("ix_incidents_workspace_created", "workspace_id", "created_at"),
+        Index("ix_incidents_workspace_severity", "workspace_id", "severity"),
+    )
 
 
 class IncidentTimelineEventModel(Base):

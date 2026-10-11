@@ -830,3 +830,69 @@ def get_security_configuration_check(
     from backend.services.security_hardening_service import SecurityHardeningService
     return SecurityHardeningService.validate_security_configuration()
 
+
+# ---------------------------------------------------------------------------
+# Section 73: Performance Diagnostics & Observability
+# ---------------------------------------------------------------------------
+
+@router.get("/performance/metrics", summary="Retrieve aggregated latency percentiles and performance budgets")
+def get_performance_metrics(
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("health.read", ctx.role, ctx.tenant_id)
+    from backend.services.performance_service import global_performance_tracker
+    return global_performance_tracker.get_metrics_summary()
+
+
+@router.get("/performance/slow-operations", summary="Retrieve recent slow operation diagnostics")
+def get_slow_operations(
+    limit: int = Query(default=50, ge=1, le=200),
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("health.read", ctx.role, ctx.tenant_id)
+    from backend.services.performance_service import global_performance_tracker
+    records = global_performance_tracker.get_slow_operations(limit=limit)
+    return {
+        "slow_operations": records,
+        "total": len(records),
+    }
+
+
+@router.get("/performance/circuits", summary="Inspect external provider circuit breakers")
+def get_circuit_breaker_statuses(
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("health.read", ctx.role, ctx.tenant_id)
+    from backend.services.circuit_breaker import CircuitBreakerRegistry
+    statuses = CircuitBreakerRegistry.get_all_statuses()
+    return {
+        "circuits": statuses,
+        "total": len(statuses),
+    }
+
+
+@router.post("/performance/circuits/{service_name}/reset", summary="Reset a specific circuit breaker")
+def reset_circuit_breaker(
+    service_name: str,
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("settings.manage", ctx.role, ctx.tenant_id)
+    from backend.services.circuit_breaker import CircuitBreakerRegistry
+    cb = CircuitBreakerRegistry.get_breaker(service_name)
+    cb.reset()
+    return {
+        "status": "RESET",
+        "service_name": service_name,
+        "circuit": cb.get_status(),
+    }
+
+
+@router.get("/performance/cache-stats", summary="Inspect multi-tenant cache metrics")
+def get_cache_statistics(
+    ctx: AdminAuthContext = Depends(get_admin_context),
+) -> Dict[str, Any]:
+    PlatformAdminService.verify_permission("health.read", ctx.role, ctx.tenant_id)
+    from backend.services.cache_service import global_cache_manager
+    return global_cache_manager.get_stats()
+
+

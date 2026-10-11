@@ -542,6 +542,24 @@ class AnalysisOrchestrator:
         completed_tasks_count = 0
         failed_tasks_count = 0
 
+        # Section 73: In-memory task lookup map to eliminate N+1 database queries for dependencies
+        task_map: Dict[str, AnalysisTaskModel] = {t.id: t for t in tasks}
+
+        # Section 73: Parsed email cache to avoid redundant parsing across analyzer tasks
+        cached_parsed_email: Optional[Any] = None
+
+        def get_parsed_email() -> Optional[Any]:
+            nonlocal cached_parsed_email
+            if cached_parsed_email is None and raw_bytes:
+                try:
+                    from backend.services.email_parser import EmailParserService
+                    cached_parsed_email = EmailParserService.parse_eml_bytes(
+                        raw_bytes, artifact.name if artifact else "email.eml"
+                    )
+                except Exception as parse_err:
+                    logger.warning("Email parsing error in orchestrator: %s", parse_err)
+            return cached_parsed_email
+
         # Execute tasks sequentially according to DAG
         for task in tasks:
             # Check if run was cancelled in background
@@ -552,11 +570,11 @@ class AnalysisOrchestrator:
                 db.commit()
                 continue
 
-            # Check dependencies
+            # Check dependencies using in-memory task_map (eliminates N+1 query loop)
             dep_ids = json.loads(task.dependency_ids_json or "[]")
             deps_ok = True
             for d_id in dep_ids:
-                dep_task = db.query(AnalysisTaskModel).filter(AnalysisTaskModel.id == d_id).first()
+                dep_task = task_map.get(d_id) or db.query(AnalysisTaskModel).filter(AnalysisTaskModel.id == d_id).first()
                 if dep_task and dep_task.status in ("FAILED", "BLOCKED", "CANCELLED"):
                     deps_ok = False
                     break
@@ -594,19 +612,17 @@ class AnalysisOrchestrator:
                     task.message = f"Evidence validated ({result_count} bytes, SHA-256 verified)"
 
                 elif task.task_type == "MIME_PARSING" and art_type == "EMAIL":
-                    from backend.services.email_parser import EmailParserService
-                    parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                    h_info = getattr(parsed, "headers", None)
+                    parsed = get_parsed_email()
+                    h_info = getattr(parsed, "headers", None) if parsed else None
                     if h_info and hasattr(h_info, "model_dump"):
                         result_count = len([k for k, v in h_info.model_dump().items() if v])
                     else:
                         result_count = len(getattr(h_info, "__dict__", {}))
-                    task.message = f"Email parsed ({result_count} headers extracted, subject: {parsed.subject[:35] if parsed.subject else 'None'})"
+                    task.message = f"Email parsed ({result_count} headers extracted, subject: {parsed.subject[:35] if parsed and parsed.subject else 'None'})"
 
                 elif task.task_type == "AUTHENTICATION_ANALYSIS" and art_type == "EMAIL":
-                    from backend.services.email_parser import EmailParserService
-                    parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                    auth = getattr(parsed, "authentication", None)
+                    parsed = get_parsed_email()
+                    auth = getattr(parsed, "authentication", None) if parsed else None
                     spf_res = getattr(getattr(auth, "spf", None), "result", "none")
                     dkim_res = getattr(getattr(auth, "dkim", None), "result", "none")
                     dmarc_res = getattr(getattr(auth, "dmarc", None), "result", "none")
@@ -650,16 +666,14 @@ class AnalysisOrchestrator:
                         )
 
                 elif task.task_type == "SMTP_RELAY_ANALYSIS" and art_type == "EMAIL":
-                    from backend.services.email_parser import EmailParserService
-                    parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                    hops = getattr(getattr(parsed, "relay_analysis", None), "hops", []) or []
+                    parsed = get_parsed_email()
+                    hops = (getattr(getattr(parsed, "relay_analysis", None), "hops", []) if parsed else []) or []
                     result_count = len(hops)
                     task.message = f"Relay chain reconstructed ({result_count} MTA hops traced)"
 
                 elif task.task_type == "ATTACHMENT_DISCOVERY" and art_type == "EMAIL":
-                    from backend.services.email_parser import EmailParserService
-                    parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                    atts = getattr(parsed, "attachments", []) or []
+                    parsed = get_parsed_email()
+                    atts = (getattr(parsed, "attachments", []) if parsed else []) or []
                     result_count = len(atts)
                     task.message = f"Attachment inspection completed ({result_count} attachments found)"
                     for att in atts:
@@ -706,20 +720,18 @@ class AnalysisOrchestrator:
                             )
 
                 elif task.task_type == "IOC_EXTRACTION" and art_type == "EMAIL":
-                    from backend.services.email_parser import EmailParserService
-                    parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                    urls = getattr(parsed, "urls", []) or []
-                    ips = getattr(parsed, "ips", []) or []
-                    doms = getattr(parsed, "domains", []) or []
+                    parsed = get_parsed_email()
+                    urls = (getattr(parsed, "urls", []) if parsed else []) or []
+                    ips = (getattr(parsed, "ips", []) if parsed else []) or []
+                    doms = (getattr(parsed, "domains", []) if parsed else []) or []
                     result_count = len(urls) + len(ips) + len(doms)
                     task.message = f"Extracted {len(urls)} URLs, {len(ips)} IPs, and {len(doms)} domains"
 
                 elif task.task_type == "INTELLIGENCE_ENRICHMENT" and art_type == "EMAIL":
                     from backend.services.lookalike_detector import LookalikeDetectorService
                     detector = LookalikeDetectorService()
-                    from backend.services.email_parser import EmailParserService
-                    parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                    doms = getattr(parsed, "domains", []) or []
+                    parsed = get_parsed_email()
+                    doms = (getattr(parsed, "domains", []) if parsed else []) or []
                     lookalikes = detector.detect_lookalikes_batch(doms)
                     result_count = len(doms)
                     task.message = f"Threat intelligence queried across {result_count} observables"
@@ -769,8 +781,8 @@ class AnalysisOrchestrator:
 
                 elif task.task_type == "NLP_SOCIAL_ENGINEERING" and art_type == "EMAIL":
                     from backend.app.ml.classifier import global_phishing_classifier
-                    from backend.services.email_parser import EmailParserService
-                    b_obj = getattr(parsed, "body", None)
+                    parsed = get_parsed_email()
+                    b_obj = getattr(parsed, "body", None) if parsed else None
                     body_text = getattr(b_obj, "plain_text", "") or getattr(b_obj, "html", "") or str(b_obj or "")
                     body = f"{body_text} {getattr(parsed, 'subject', '') or ''}".strip()
                     pred = global_phishing_classifier.predict(body)
@@ -832,9 +844,8 @@ class AnalysisOrchestrator:
                     score = min(100.0, score)
                     if not findings and art_type == "EMAIL":
                         # Check parsed threat score if available
-                        from backend.services.email_parser import EmailParserService
-                        parsed = EmailParserService.parse_eml_bytes(raw_bytes, artifact.name if artifact else "email.eml")
-                        ts = getattr(parsed, "threat_score", None)
+                        parsed = get_parsed_email()
+                        ts = getattr(parsed, "threat_score", None) if parsed else None
                         if ts:
                             score = float(ts.score or 0.0)
 
@@ -877,6 +888,20 @@ class AnalysisOrchestrator:
             task.completed_at = get_utc_now()
             task.duration_seconds = duration
             task.result_count = result_count
+
+            # Section 73: Record task latency in global performance metrics tracker
+            try:
+                from backend.services.performance_service import global_performance_tracker, PerformanceCategoryEnum
+                global_performance_tracker.record_operation(
+                    category=PerformanceCategoryEnum.ANALYSIS_DAG.value,
+                    operation_name=f"task:{task.task_type}",
+                    duration_ms=duration * 1000.0,
+                    is_error=bool(task_error),
+                    tenant_id=workspace_id,
+                    details={"task_id": task.id, "run_id": run.id, "analyzer_id": task.analyzer_id}
+                )
+            except Exception as trk_err:
+                logger.debug("Metrics recording suppressed: %s", trk_err)
 
             if task_error:
                 task.status = "FAILED"
