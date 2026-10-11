@@ -34,14 +34,52 @@ def generate_incident_number() -> str:
 
 
 class CaseModel(Base):
+    """
+    Section 67: Authoritative SOC Operational Case Management Container.
+    Coordinates security investigations, incidents, evidence, tasks, decisions, response actions, and final resolution.
+    """
     __tablename__ = "cases"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     case_number = Column(String(32), unique=True, nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
     title = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
-    severity = Column(String(20), nullable=False, default="low", index=True)
-    status = Column(String(20), nullable=False, default="open", index=True)
+    severity = Column(String(20), nullable=False, default="MEDIUM", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    priority = Column(String(20), nullable=False, default="P3_MEDIUM", index=True)  # P1_CRITICAL, P2_HIGH, P3_MEDIUM, P4_LOW
+    status = Column(String(20), nullable=False, default="OPEN", index=True)  # NEW, OPEN, IN_PROGRESS, PENDING, ON_HOLD, RESOLVED, CLOSED, CANCELLED
+    category = Column(String(50), nullable=False, default="PHISHING", index=True)  # PHISHING, ACCOUNT_TAKEOVER, MALWARE, etc.
+    classification = Column(String(30), nullable=False, default="INTERNAL", index=True)  # PUBLIC, INTERNAL, CONFIDENTIAL, RESTRICTED
+    owner_id = Column(String(100), nullable=True, index=True)
+    team_id = Column(String(64), nullable=True, index=True)
+    created_by = Column(String(100), nullable=True, default="SYSTEM")
+    incident_id = Column(String(36), ForeignKey("incidents.id", ondelete="SET NULL"), nullable=True, index=True)
+    primary_investigation_id = Column(String(128), nullable=True, index=True)
+    campaign_id = Column(String(36), ForeignKey("campaigns.id", ondelete="SET NULL"), nullable=True, index=True)
+    sla_policy_id = Column(String(36), nullable=True, index=True)
+    sla_status = Column(String(30), nullable=False, default="HEALTHY", index=True)  # HEALTHY, WARNING, BREACHED, PAUSED, MET
+    next_sla_deadline = Column(DateTime, nullable=True, index=True)
+    opened_at = Column(DateTime, default=get_utc_now, nullable=False)
+    resolved_at = Column(DateTime, nullable=True)
+    resolved_by = Column(String(100), nullable=True)
+    resolution_code = Column(String(50), nullable=True, index=True)  # TRUE_POSITIVE, FALSE_POSITIVE, BENIGN_ACTIVITY, etc.
+    resolution_summary = Column(Text, nullable=True)
+    closed_at = Column(DateTime, nullable=True)
+    closed_by = Column(String(100), nullable=True)
+    closure_notes = Column(Text, nullable=True)
+    reopened_at = Column(DateTime, nullable=True)
+    reopened_by = Column(String(100), nullable=True)
+    reopen_reason = Column(Text, nullable=True)
+    duplicate_of_id = Column(String(36), ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True)
+    merged_into_id = Column(String(36), ForeignKey("cases.id", ondelete="SET NULL"), nullable=True, index=True)
+    tags_json = Column(Text, default="[]", nullable=False)
+    custom_fields_json = Column(Text, default="{}", nullable=False)
+    affected_assets_json = Column(Text, default="[]", nullable=False)
+    affected_identities_json = Column(Text, default="[]", nullable=False)
+    related_alerts_json = Column(Text, default="[]", nullable=False)
+    related_evidence_json = Column(Text, default="[]", nullable=False)
+    related_response_actions_json = Column(Text, default="[]", nullable=False)
+    version = Column(Integer, nullable=False, default=1)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
@@ -49,7 +87,39 @@ class CaseModel(Base):
     emails = relationship("CaseEmailModel", back_populates="case", cascade="all, delete-orphan", lazy="selectin")
     notes = relationship("CaseNoteModel", back_populates="case", cascade="all, delete-orphan", order_by="desc(CaseNoteModel.created_at)", lazy="selectin")
     findings = relationship("CaseFindingModel", back_populates="case", cascade="all, delete-orphan", order_by="desc(CaseFindingModel.created_at)", lazy="selectin")
+    tasks = relationship("CaseTaskModel", back_populates="case", cascade="all, delete-orphan", order_by="asc(CaseTaskModel.order_index)", lazy="selectin")
     audit_logs = relationship("AuditLogModel", back_populates="case", cascade="all, delete-orphan", order_by="desc(AuditLogModel.timestamp)", lazy="selectin")
+    incident = relationship("IncidentModel", foreign_keys=[incident_id], lazy="selectin")
+    campaign = relationship("CampaignModel", foreign_keys=[campaign_id], lazy="selectin")
+
+
+class CaseTaskModel(Base):
+    """
+    Section 67: Operational Case Work Item / Task.
+    Tracks investigation checklists, evidence verification, containment approval, and reporting steps.
+    """
+    __tablename__ = "case_tasks"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    case_id = Column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
+    workspace_id = Column(String(64), nullable=False, default="default", index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    status = Column(String(30), nullable=False, default="TODO", index=True)  # TODO, IN_PROGRESS, BLOCKED, COMPLETED, CANCELLED
+    priority = Column(String(20), nullable=False, default="MEDIUM", index=True)  # LOW, MEDIUM, HIGH, CRITICAL
+    assignee_id = Column(String(100), nullable=True, index=True)
+    team_id = Column(String(64), nullable=True)
+    due_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    completed_by = Column(String(100), nullable=True)
+    created_by = Column(String(100), nullable=True, default="SOC Analyst")
+    order_index = Column(Integer, nullable=False, default=0)
+    is_automated_recommendation = Column(Boolean, default=False, nullable=False)
+    source_action_id = Column(String(100), nullable=True)
+    created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
+
+    case = relationship("CaseModel", back_populates="tasks")
 
 
 class CaseEmailModel(Base):
@@ -81,7 +151,10 @@ class CaseNoteModel(Base):
     case_id = Column(String(36), ForeignKey("cases.id", ondelete="CASCADE"), nullable=False, index=True)
     author = Column(String(100), nullable=False, default="SOC Analyst")
     note_text = Column(Text, nullable=False)
+    visibility = Column(String(30), nullable=False, default="ANALYST")  # ANALYST, TEAM, EXECUTIVE, CONFIDENTIAL
+    edit_history_json = Column(Text, default="[]", nullable=False)
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
+    updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
     # Relationships
     case = relationship("CaseModel", back_populates="notes")

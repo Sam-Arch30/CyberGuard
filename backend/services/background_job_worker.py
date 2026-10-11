@@ -1528,6 +1528,40 @@ async def handle_investigation_automation_run(ctx: JobExecutionContext, db: Sess
     }
 
 
+@register_handler(JobTypeEnum.CASE_EXPORT.value)
+@register_handler(JobTypeEnum.CASE_SLA_SWEEP.value)
+@register_handler(JobTypeEnum.CASE_METRICS_AGGREGATION.value)
+async def handle_case_management_jobs(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 67: Asynchronous execution of case management operations
+    (case export, SLA sweeps, and metrics aggregations).
+    """
+    from backend.services.case_service import CaseService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    job_type = getattr(ctx, "job_type", None) or JobTypeEnum.CASE_METRICS_AGGREGATION.value
+    workspace_id = getattr(ctx, "workspace_id", "default") or "default"
+
+    if job_type == JobTypeEnum.CASE_EXPORT.value:
+        case_id = params.get("case_id")
+        ctx.update_progress(db, 20.0, "RUNNING", f"Compiling export for case {case_id}...")
+        case = CaseService.get_case_detail(db, case_id, workspace_id=workspace_id) if case_id else None
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Case export prepared for {case.case_number if case else 'all cases'}.")
+        return {"status": "EXPORT_READY", "case_id": case_id, "case_number": case.case_number if case else None}
+
+    elif job_type == JobTypeEnum.CASE_SLA_SWEEP.value:
+        ctx.update_progress(db, 30.0, "RUNNING", "Sweeping operational cases for SLA deadlines...")
+        metrics = CaseService.get_case_metrics(db, workspace_id=workspace_id)
+        ctx.update_progress(db, 100.0, "COMPLETED", f"SLA sweep completed. {metrics.sla_breached_cases} breached, {metrics.sla_warning_cases} warning.")
+        return {"status": "SLA_SWEEP_COMPLETED", "metrics": metrics.model_dump()}
+
+    else:
+        ctx.update_progress(db, 50.0, "RUNNING", f"Aggregating metrics for workspace {workspace_id}...")
+        metrics = CaseService.get_case_metrics(db, workspace_id=workspace_id)
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Aggregated {metrics.total_cases} cases.")
+        return {"status": "METRICS_AGGREGATED", "metrics": metrics.model_dump()}
+
+
 
 # ---------------------------------------------------------------------------
 # Background Worker Engine

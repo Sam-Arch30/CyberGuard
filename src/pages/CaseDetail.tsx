@@ -31,7 +31,10 @@ import {
   Layers,
   ChevronRight,
   ShieldCheck,
-  Loader2
+  Loader2,
+  CheckSquare,
+  User,
+  RotateCcw
 } from 'lucide-react';
 import type {
   CaseDetail as CaseDetailType,
@@ -47,6 +50,15 @@ import { apiUrl } from '../utils/apiClient';
 import { InfrastructureAttributionSection } from '../components/forensic/InfrastructureAttributionSection';
 import { InvestigationCopilot } from '../components/copilot/InvestigationCopilot';
 import { EvidenceIntegrityModal, type EvidenceRecordData } from '../components/history/EvidenceIntegrityModal';
+import { CaseTasksSection } from '../components/case/CaseTasksSection';
+import { CaseTimelineSection } from '../components/case/CaseTimelineSection';
+import { CaseLinkedEntitiesSection } from '../components/case/CaseLinkedEntitiesSection';
+import {
+  AssignCaseModal,
+  ResolveCaseModal,
+  CloseCaseModal,
+  ReopenCaseModal,
+} from '../components/case/CaseLifecycleModals';
 
 /* ─── Types ──────────────────────────────────────────────── */
 interface BackendReportItem {
@@ -64,20 +76,43 @@ interface BackendReportItem {
   created_at: string;
 }
 
-type CaseViewFilter = 'all' | 'emails' | 'findings' | 'indicators' | 'evidence' | 'reports' | 'correlations' | 'notes' | 'copilot';
+type CaseViewFilter =
+  | 'all'
+  | 'tasks'
+  | 'emails'
+  | 'findings'
+  | 'indicators'
+  | 'entities'
+  | 'evidence'
+  | 'reports'
+  | 'correlations'
+  | 'timeline'
+  | 'notes'
+  | 'copilot';
 
-const STATUS_CONFIG: Record<CaseStatus, { label: string; badge: string }> = {
+const STATUS_CONFIG: Record<string, { label: string; badge: string }> = {
+  NEW: { label: 'New', badge: 'bg-primary-subtle text-primary border-primary/30' },
+  OPEN: { label: 'Open', badge: 'bg-info/10 text-info border-info/30' },
+  IN_PROGRESS: { label: 'In Progress', badge: 'bg-warning/10 text-warning border-warning/30' },
+  PENDING: { label: 'Pending', badge: 'bg-surface-secondary text-foreground-muted border-border' },
+  ON_HOLD: { label: 'On Hold', badge: 'bg-surface-secondary text-foreground-muted border-border' },
+  RESOLVED: { label: 'Resolved', badge: 'bg-success/10 text-success border-success/30' },
+  CLOSED: { label: 'Closed', badge: 'bg-surface-secondary text-foreground-muted border-border' },
   open: { label: 'Open', badge: 'bg-info/10 text-info border-info/30' },
   investigating: { label: 'Investigating', badge: 'bg-warning/10 text-warning border-warning/30' },
   escalated: { label: 'Escalated', badge: 'bg-danger/10 text-danger border-danger/30' },
   resolved: { label: 'Resolved', badge: 'bg-success/10 text-success border-success/30' },
 };
 
-const SEVERITY_CONFIG: Record<CaseSeverity, { label: string; badge: string; dot: string }> = {
+const SEVERITY_CONFIG: Record<string, { label: string; badge: string; dot: string }> = {
   low: { label: 'Low', badge: 'bg-surface-secondary text-foreground-muted border-border', dot: 'bg-foreground-muted' },
   medium: { label: 'Medium', badge: 'bg-warning/10 text-warning border-warning/30', dot: 'bg-warning' },
   high: { label: 'High', badge: 'bg-warning/15 text-warning border-warning/40 font-medium', dot: 'bg-warning' },
   critical: { label: 'Critical', badge: 'bg-danger/10 text-danger border-danger/30 font-semibold', dot: 'bg-danger' },
+  LOW: { label: 'Low', badge: 'bg-surface-secondary text-foreground-muted border-border', dot: 'bg-foreground-muted' },
+  MEDIUM: { label: 'Medium', badge: 'bg-warning/10 text-warning border-warning/30', dot: 'bg-warning' },
+  HIGH: { label: 'High', badge: 'bg-warning/15 text-warning border-warning/40 font-medium', dot: 'bg-warning' },
+  CRITICAL: { label: 'Critical', badge: 'bg-danger/10 text-danger border-danger/30 font-semibold', dot: 'bg-danger' },
 };
 
 export const CaseDetail: React.FC = () => {
@@ -126,6 +161,12 @@ export const CaseDetail: React.FC = () => {
   // Toast banner
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isDownloadingDossier, setIsDownloadingDossier] = useState(false);
+
+  // Section 67 Lifecycle Modals
+  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showResolveModal, setShowResolveModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [showReopenModal, setShowReopenModal] = useState(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -596,6 +637,52 @@ export const CaseDetail: React.FC = () => {
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Finding</span>
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => setShowAssignModal(true)}
+                  className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-secondary border border-border text-foreground font-mono text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                  title="Assign Owner and Team"
+                >
+                  <User className="w-3.5 h-3.5 text-primary" />
+                  <span>Assign</span>
+                </button>
+
+                {!['RESOLVED', 'resolved', 'CLOSED'].includes(caseData.status) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowResolveModal(true)}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-success-surface hover:bg-success-surface/80 border border-success-border text-success font-mono text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                    title="Mark case as resolved with disposition code"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5" />
+                    <span>Resolve</span>
+                  </button>
+                )}
+
+                {['RESOLVED', 'resolved'].includes(caseData.status) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCloseModal(true)}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground font-mono text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                    title="Finalize and close case"
+                  >
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Close</span>
+                  </button>
+                )}
+
+                {['RESOLVED', 'resolved', 'CLOSED'].includes(caseData.status) && (
+                  <button
+                    type="button"
+                    onClick={() => setShowReopenModal(true)}
+                    className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-warning-surface hover:bg-warning-surface/80 border border-warning-border text-warning font-mono text-xs font-semibold transition-all cursor-pointer shadow-xs"
+                    title="Reopen case with justification"
+                  >
+                    <RotateCcw className="w-3.5 h-3.5" />
+                    <span>Reopen</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -679,12 +766,15 @@ export const CaseDetail: React.FC = () => {
       <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-surface rounded-xl border border-border shadow-xs">
         {[
           { id: 'all' as const, label: 'All Aggregated', icon: <Layers className="w-3.5 h-3.5" />, count: undefined },
+          { id: 'tasks' as const, label: 'Tasks', icon: <CheckSquare className="w-3.5 h-3.5" />, count: caseData.tasks?.length ?? 0 },
           { id: 'emails' as const, label: 'Linked Emails', icon: <Mail className="w-3.5 h-3.5" />, count: caseData.emails.length },
           { id: 'findings' as const, label: 'Forensic Findings', icon: <ShieldAlert className="w-3.5 h-3.5" />, count: caseData.findings.length },
           { id: 'indicators' as const, label: 'Indicators & Infra', icon: <Target className="w-3.5 h-3.5" />, count: totalIndicators },
+          { id: 'entities' as const, label: 'Linked Entities', icon: <LinkIcon className="w-3.5 h-3.5" />, count: (caseData.affected_assets?.length || 0) + (caseData.affected_identities?.length || 0) + (caseData.related_alerts?.length || 0) + (caseData.incident_id ? 1 : 0) },
           { id: 'evidence' as const, label: 'Evidence Ledger', icon: <Lock className="w-3.5 h-3.5" />, count: caseData.emails.length },
           { id: 'reports' as const, label: 'Reports & Dossiers', icon: <FileDown className="w-3.5 h-3.5" />, count: reports.length },
           { id: 'correlations' as const, label: 'Correlations', icon: <GitMerge className="w-3.5 h-3.5" />, count: correlations?.related_cases.length ?? 0 },
+          { id: 'timeline' as const, label: 'Timeline', icon: <History className="w-3.5 h-3.5" />, count: undefined },
           { id: 'notes' as const, label: 'Notes & Audit', icon: <FileText className="w-3.5 h-3.5" />, count: caseData.notes.length + caseData.audit_logs.length },
           { id: 'copilot' as const, label: 'Copilot', icon: <Sparkles className="w-3.5 h-3.5 text-primary" />, count: 'AI' }
         ].map(tab => {
@@ -716,6 +806,25 @@ export const CaseDetail: React.FC = () => {
 
       {/* 4. CONTENT SECTIONS (Stackable or Filtered) */}
       <div className="space-y-6">
+
+        {/* ── SECTION: OPERATIONAL TASKS & ACTIONS ── */}
+        {(activeFilter === 'all' || activeFilter === 'tasks') && (
+          <CaseTasksSection
+            caseId={caseData.id}
+            tasks={caseData.tasks || []}
+            onTasksUpdated={fetchCaseDetail}
+            showToast={showToast}
+          />
+        )}
+
+        {/* ── SECTION: AUTHORITATIVE LINKED ENTITIES ── */}
+        {(activeFilter === 'all' || activeFilter === 'entities') && (
+          <CaseLinkedEntitiesSection
+            caseData={caseData}
+            onEntityLinked={fetchCaseDetail}
+            showToast={showToast}
+          />
+        )}
 
         {/* ── SECTION 1: LINKED EMAILS & EVIDENCE RUNS ── */}
         {(activeFilter === 'all' || activeFilter === 'emails') && (
@@ -1270,6 +1379,11 @@ export const CaseDetail: React.FC = () => {
           </div>
         )}
 
+        {/* ── SECTION: AUTHORITATIVE MILESTONE TIMELINE ── */}
+        {(activeFilter === 'all' || activeFilter === 'timeline') && (
+          <CaseTimelineSection caseId={caseData.id} />
+        )}
+
         {/* ── SECTION 7: ANALYST NOTES & IMMUTABLE AUDIT TIMELINE ── */}
         {(activeFilter === 'all' || activeFilter === 'notes') && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -1481,6 +1595,39 @@ export const CaseDetail: React.FC = () => {
         onClose={() => setEvidenceModalData(null)}
         evidence={evidenceModalData}
         onReopenWorkspace={(evId) => navigate(`/investigate/${evId}`)}
+      />
+
+      {/* SECTION 67 LIFECYCLE MODALS */}
+      <AssignCaseModal
+        isOpen={showAssignModal}
+        onClose={() => setShowAssignModal(false)}
+        caseData={caseData}
+        onSuccess={fetchCaseDetail}
+        showToast={showToast}
+      />
+
+      <ResolveCaseModal
+        isOpen={showResolveModal}
+        onClose={() => setShowResolveModal(false)}
+        caseData={caseData}
+        onSuccess={fetchCaseDetail}
+        showToast={showToast}
+      />
+
+      <CloseCaseModal
+        isOpen={showCloseModal}
+        onClose={() => setShowCloseModal(false)}
+        caseData={caseData}
+        onSuccess={fetchCaseDetail}
+        showToast={showToast}
+      />
+
+      <ReopenCaseModal
+        isOpen={showReopenModal}
+        onClose={() => setShowReopenModal(false)}
+        caseData={caseData}
+        onSuccess={fetchCaseDetail}
+        showToast={showToast}
       />
     </div>
   );
