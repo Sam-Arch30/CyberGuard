@@ -66,6 +66,7 @@ from backend.api.routes.asset_prioritization import router as prioritization_rou
 from backend.api.routes.threat_workspace import router as threat_workspace_router
 from backend.api.routes.investigation_automation import router as investigation_automation_router
 from backend.api.routes.evidence_workspace import router as evidence_workspace_router
+from backend.api.routes.executive_reports import router as executive_reports_router
 from backend.api.middleware.security_headers import SecurityHeadersMiddleware
 import os
 from backend.api.middleware.rate_limiter import RateLimiterMiddleware
@@ -159,6 +160,7 @@ app.include_router(prioritization_router)
 app.include_router(threat_workspace_router)
 app.include_router(investigation_automation_router)
 app.include_router(evidence_workspace_router)
+app.include_router(executive_reports_router)
 app.include_router(correlation_router)
 app.include_router(reports_router)
 app.include_router(audit_router)

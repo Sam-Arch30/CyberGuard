@@ -13,14 +13,19 @@ import {
   Search,
   ExternalLink,
   FileCode,
+  Layers,
 } from 'lucide-react';
 import type { ReportListItem, ReportDetail } from '../types/report';
 import { reportService } from '../services/reportService';
+import { ExecutiveReportingHub } from '../components/reports/ExecutiveReportingHub';
 
 export const Reports: React.FC = () => {
   const navigate = useNavigate();
   const { id: routeReportId } = useParams<{ id?: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
+
+  // Tab State
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'executive' | 'standard'>('executive');
 
   // State
   const [reportsList, setReportsList] = useState<ReportListItem[]>([]);
@@ -194,8 +199,41 @@ export const Reports: React.FC = () => {
         </div>
       </div>
 
-      {/* Main Catalog & Document Viewer Layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      {/* Top Level Navigation Tabs */}
+      <div className="flex items-center space-x-2 border-b border-border pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveWorkspaceTab('executive')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+            activeWorkspaceTab === 'executive'
+              ? 'bg-primary text-primary-foreground shadow-xs'
+              : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
+          }`}
+        >
+          <FileText className="w-3.5 h-3.5" />
+          <span>Executive Intelligence & Dissemination Hub</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/20 ml-1">Section 69</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveWorkspaceTab('standard')}
+          className={`flex items-center space-x-2 px-4 py-2 rounded-lg text-xs font-mono font-semibold transition-all cursor-pointer ${
+            activeWorkspaceTab === 'standard'
+              ? 'bg-primary text-primary-foreground shadow-xs'
+              : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
+          }`}
+        >
+          <Layers className="w-3.5 h-3.5" />
+          <span>Standard Forensic Dossiers (Section 42)</span>
+        </button>
+      </div>
+
+      {activeWorkspaceTab === 'executive' ? (
+        <ExecutiveReportingHub />
+      ) : (
+        /* Main Catalog & Document Viewer Layout */
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column: Reports List & Search / Filters */}
         <div className="space-y-3">
           <div className="bg-surface p-3.5 rounded-card border border-border space-y-3">
@@ -488,6 +526,8 @@ export const Reports: React.FC = () => {
           )}
         </div>
       </div>
-    </div>
-  );
+    )}
+  </div>
+);
 };
+

@@ -1616,6 +1616,49 @@ async def handle_evidence_workspace_jobs(ctx: JobExecutionContext, db: Session) 
         }
 
 
+@register_handler(JobTypeEnum.REPORT_SHARE_LINK_SWEEP.value)
+@register_handler(JobTypeEnum.EXECUTIVE_REPORT_BATCH_GENERATE.value)
+async def handle_executive_report_jobs(ctx: JobExecutionContext, db: Session) -> Dict[str, Any]:
+    """
+    Section 69: Asynchronous Executive Reporting & Dissemination job handler.
+    Executes share link expiration sweeps and batch report generation.
+    """
+    from backend.db.models import ReportShareLinkModel, ReportModel
+    from backend.services.executive_report_service import ExecutiveReportService
+
+    params = getattr(ctx, "payload", None) or getattr(ctx, "parameters", None) or {}
+    job_type = getattr(ctx, "job_type", "")
+    workspace_id = getattr(ctx, "workspace_id", "default") or "default"
+
+    if job_type == JobTypeEnum.REPORT_SHARE_LINK_SWEEP.value:
+        ctx.update_progress(db, 20.0, "RUNNING", f"Sweeping expired share links in workspace {workspace_id}...")
+        now = datetime.now(timezone.utc)
+        links = (
+            db.query(ReportShareLinkModel)
+            .filter(
+                ReportShareLinkModel.workspace_id == workspace_id,
+                ReportShareLinkModel.is_revoked == False,
+                ReportShareLinkModel.expires_at <= now,
+            )
+            .all()
+        )
+        expired_count = 0
+        for lnk in links:
+            lnk.is_revoked = True
+            lnk.revoked_at = now
+            lnk.revoked_by = "SYSTEM_EXPIRATION_SWEEP"
+            expired_count += 1
+        db.commit()
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Sweep finished: {expired_count} expired share links revoked.")
+        return {"status": "SWEEP_COMPLETED", "revoked_count": expired_count}
+
+    else:
+        ctx.update_progress(db, 50.0, "RUNNING", "Processing executive report batch...")
+        metrics = ExecutiveReportService.get_metrics(db, workspace_id=workspace_id)
+        ctx.update_progress(db, 100.0, "COMPLETED", f"Aggregated metrics for {metrics['total_reports']} reports.")
+        return {"status": "BATCH_COMPLETED", "metrics": metrics}
+
+
 # ---------------------------------------------------------------------------
 # Background Worker Engine
 # ---------------------------------------------------------------------------
