@@ -29,7 +29,7 @@ FROM python:3.11-slim AS runtime
 # Install only minimal runtime shared libraries (curl for container healthcheck, libpq5 for PostgreSQL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    libpq5 \
+    libpq5 ffmpeg libsndfile1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Security: Create dedicated unprivileged system user and group (UID/GID 10001)
@@ -71,4 +71,4 @@ HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://localhost:8000/health/live || exit 1
 
 # Start production ASGI server bound to 0.0.0.0:8000
-CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2"]
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]

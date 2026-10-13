@@ -17,12 +17,16 @@ services:
           memory: 1024M
 
   backend:
+    ports: !reset []
     environment:
       CYBERGUARD_ENV: PRODUCTION
+      CYBERGUARD_AUTH_SECRET: ${CYBERGUARD_AUTH_SECRET:?Set a strong CYBERGUARD_AUTH_SECRET}
+      CYBERGUARD_REQUIRE_AUTH: "true"
+      CYBERGUARD_DEMO_MODE: "false"
       DEBUG: "false"
       LOG_LEVEL: INFO
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '2.0'
@@ -34,10 +38,13 @@ services:
   worker:
     environment:
       CYBERGUARD_ENV: PRODUCTION
+      CYBERGUARD_AUTH_SECRET: ${CYBERGUARD_AUTH_SECRET:?Set a strong CYBERGUARD_AUTH_SECRET}
+      CYBERGUARD_REQUIRE_AUTH: "true"
+      CYBERGUARD_DEMO_MODE: "false"
       DEBUG: "false"
       LOG_LEVEL: INFO
     deploy:
-      replicas: 2
+      replicas: 1
       resources:
         limits:
           cpus: '2.0'

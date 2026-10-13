@@ -46,3 +46,16 @@ backend/data/*.db
 backend/data/*.sqlite
 *.db
 *.sqlite
+
+# Never bake local evidence, model downloads or presentation exports into images
+.local-runtime/
+presentation-assets/
+samples/
+*.zip
+backend/data/storage/
+backend/data/eml_store/
+backend/data/reports/
+backend/data/backups/
+backend/data/models/
+backend/data/datasets/
+backend/data/benchmark_results.json
