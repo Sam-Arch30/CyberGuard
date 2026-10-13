@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import {
   BarChart3,
@@ -84,7 +85,7 @@ export const BenchmarkEvaluation: React.FC = () => {
 
   const fetchLatestBenchmark = async () => {
     try {
-      const res = await fetch(apiUrl('/api/benchmark/latest'));
+      const res = await apiFetch(apiUrl('/api/benchmark/latest'));
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -104,7 +105,7 @@ export const BenchmarkEvaluation: React.FC = () => {
     try {
       setRunningBenchmark(true);
       setStatusMessage({ text: 'Executing live benchmark across 60 labelled SAFE samples...', type: 'info' });
-      const res = await fetch(apiUrl('/api/benchmark/run'), { method: 'POST' });
+      const res = await apiFetch(apiUrl('/api/benchmark/run'), { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       setData(json);
@@ -122,7 +123,7 @@ export const BenchmarkEvaluation: React.FC = () => {
   const handleResetDemo = async () => {
     try {
       setResetting(true);
-      const res = await fetch(apiUrl('/api/benchmark/demo-reset'), { method: 'POST' });
+      const res = await apiFetch(apiUrl('/api/benchmark/demo-reset'), { method: 'POST' });
       if (!res.ok) throw new Error(`HTTP error ${res.status}`);
       const json = await res.json();
       setStatusMessage({

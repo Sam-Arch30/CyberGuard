@@ -167,7 +167,7 @@ async def upload_evidence(
     current_user, role = user_info
     tenant_id = x_tenant_id or x_workspace_id or "default"
 
-    raw_bytes = await file.read()
+    raw_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
     if not raw_bytes:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uploaded file cannot be empty.")
 
@@ -218,6 +218,8 @@ def register_evidence_json(
     if body.content_base64:
         try:
             raw_bytes = base64.b64decode(body.content_base64)
+        except HTTPException:
+            raise
         except Exception as exc:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Invalid base64 payload: {exc}")
     elif body.raw_content_utf8 is not None:
@@ -499,6 +501,8 @@ def download_evidence(
         raw_bytes = evidence_storage.retrieve_bytes(storage_key)
     except KeyError as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Evidence artifact bytes unavailable: {exc}")
 

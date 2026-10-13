@@ -1,0 +1,78 @@
+{
+  "ingestion_id": "75d3c646-9715-4b63-ab90-f6b262c8dfc0",
+  "artifact_id": "92a5d381-d174-4af1-9a00-45860476c183",
+  "artifact_type": "AUDIO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-tone.ogg",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "864b9b38b865c0793bb6f2d9837390cb9ce3ca58efa753f9c301ea27ccdf0374",
+  "size": 5152,
+  "mime_type": "audio/ogg",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "AUDIO",
+    "detected_mime": "audio/ogg",
+    "reported_mime": "audio/ogg",
+    "confidence": 0.9,
+    "detector": "audio_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 5152,
+      "original_filename": "synthetic-tone.ogg",
+      "format": "OGG"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/86/864b9b38b865c0793bb6f2d9837390cb9ce3ca58efa753f9c301ea27ccdf0374/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-tone.ogg",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "AUDIO",
+      "detected_mime": "audio/ogg",
+      "reported_mime": "audio/ogg",
+      "confidence": 0.9,
+      "detector": "audio_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 5152,
+        "original_filename": "synthetic-tone.ogg",
+        "format": "OGG"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:36.989931",
+  "evidence_id": "EVD-864B9B38B8",
+  "investigation_id": "2b9c55d7-d502-46b8-9563-6beddc2e48ea",
+  "analysis_run_id": "e9e9c5c7-e64c-4606-a4b6-ecb8e61de363",
+  "duplicate": false
+}

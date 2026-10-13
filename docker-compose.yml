@@ -9,12 +9,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-cyberguard}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cyberguard_secure_password}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB:-cyberguard}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     networks:
       - backend_internal_net
     healthcheck:
@@ -31,8 +31,11 @@ services:
     container_name: cyberguard-backend
     restart: unless-stopped
     environment:
+      CYBERGUARD_REQUIRE_AUTH: "true"
+      CYBERGUARD_DEMO_MODE: "false"
+      CYBERGUARD_SERVER_CREDENTIALS: ${CYBERGUARD_SERVER_CREDENTIALS:?Configure server-issued credentials}
       CYBERGUARD_ENV: ${CYBERGUARD_ENV:-DEVELOPMENT}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberguard}:${POSTGRES_PASSWORD:-cyberguard_secure_password}@postgresql:5432/${POSTGRES_DB:-cyberguard}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberguard}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB:-cyberguard}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       IP_INTELLIGENCE_PROVIDER: ${IP_INTELLIGENCE_PROVIDER:-ipapi}
@@ -48,7 +51,7 @@ services:
       LLM_MODEL: ${LLM_MODEL:-gemini-1.5-flash}
       MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-10}
       CYBERGUARD_STORAGE_ROOT: ${CYBERGUARD_STORAGE_ROOT:-/app/backend/data/storage}
-      CYBERGUARD_AUTH_SECRET: ${CYBERGUARD_AUTH_SECRET:-dev_insecure_ephemeral_jwt_secret_key_32chars_min}
+      CYBERGUARD_AUTH_SECRET: ${CYBERGUARD_AUTH_SECRET:?Set a strong CYBERGUARD_AUTH_SECRET}
       RATE_LIMIT_ENABLED: ${RATE_LIMIT_ENABLED:-true}
       RATE_LIMIT_ANALYSIS_PER_MIN: ${RATE_LIMIT_ANALYSIS_PER_MIN:-20}
       RATE_LIMIT_LLM_PER_MIN: ${RATE_LIMIT_LLM_PER_MIN:-10}
@@ -85,7 +88,7 @@ services:
     restart: unless-stopped
     environment:
       CYBERGUARD_ENV: ${CYBERGUARD_ENV:-DEVELOPMENT}
-      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberguard}:${POSTGRES_PASSWORD:-cyberguard_secure_password}@postgresql:5432/${POSTGRES_DB:-cyberguard}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-cyberguard}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@postgresql:5432/${POSTGRES_DB:-cyberguard}
       LOG_LEVEL: ${LOG_LEVEL:-INFO}
       IP_INTELLIGENCE_PROVIDER: ${IP_INTELLIGENCE_PROVIDER:-ipapi}
       IP_INTELLIGENCE_API_KEY: ${IP_INTELLIGENCE_API_KEY:-}

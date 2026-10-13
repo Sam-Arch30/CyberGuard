@@ -1,0 +1,81 @@
+{
+  "ingestion_id": "5071ff80-c67c-4801-bf41-3fdb3892e331",
+  "artifact_id": "3e6725ee-40ef-424e-bc6e-5046601d304b",
+  "artifact_type": "VIDEO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-color-bars.avi",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "d71399f983986048ca029b7856303eecd20aeea357ce50029a6c732e14a48559",
+  "size": 47926,
+  "mime_type": "video/x-msvideo",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "VIDEO",
+    "detected_mime": "video/x-msvideo",
+    "reported_mime": "video/avi",
+    "confidence": 0.9,
+    "detector": "video_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+      "Reported MIME type differs from the detected content signature."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 47926,
+      "original_filename": "synthetic-color-bars.avi",
+      "format": "AVI"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/d7/d71399f983986048ca029b7856303eecd20aeea357ce50029a6c732e14a48559/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+    "Reported MIME type differs from the detected content signature."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-color-bars.avi",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "VIDEO",
+      "detected_mime": "video/x-msvideo",
+      "reported_mime": "video/avi",
+      "confidence": 0.9,
+      "detector": "video_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+        "Reported MIME type differs from the detected content signature."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 47926,
+        "original_filename": "synthetic-color-bars.avi",
+        "format": "AVI"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.307258",
+  "evidence_id": "EVD-D71399F983",
+  "investigation_id": "6871354d-52fd-4092-a7f1-d33656a20a53",
+  "analysis_run_id": "1e181c6b-ac63-4051-a951-a2b522aab858",
+  "duplicate": false
+}

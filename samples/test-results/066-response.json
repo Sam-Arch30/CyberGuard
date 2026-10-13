@@ -1,0 +1,90 @@
+{
+  "artifact_id": "bbe671f0-cf3d-48a5-abb1-c6ec90aa0805",
+  "analysis_run_id": "de3ef330-140c-414e-bece-a0147f3291f1",
+  "pipeline_version": "2.0.0",
+  "classification": "SUSPICIOUS",
+  "risk_score": 25.0,
+  "severity": "MEDIUM",
+  "confidence": 0.85,
+  "summary": "Suspicious file: exhibits active automation (macros/scripts), unusual sections, or extension anomalies.",
+  "identity": {
+    "sha256": "157827d580ea1ae090c851f02e0a8eb083b42c3cb21ec139acd7ffd895f186db",
+    "sha1": "0d5c2f08c59c7c046fb93098536ab474b0df08d8",
+    "md5": "04d872b517423ad9700c0ed0b2ff5968",
+    "size_bytes": 253,
+    "original_filename": "benign-bundle.tar.gz",
+    "safe_display_name": "benign-bundle.tar.gz",
+    "claimed_extension": ".gz",
+    "reported_mime": "application/x-tar",
+    "detected_mime": "application/gzip",
+    "detected_file_type": "GZIP Archive",
+    "is_polyglot": false
+  },
+  "filename_analysis": {
+    "is_double_extension": false,
+    "is_deceptive": false,
+    "has_unicode_deception": false,
+    "detected_control_characters": [],
+    "signals": []
+  },
+  "entropy": {
+    "entropy": 6.89,
+    "level": "normal",
+    "description": "Evaluated entropy",
+    "is_high_entropy": false
+  },
+  "pe_metadata": null,
+  "pdf_metadata": null,
+  "office_metadata": null,
+  "script_metadata": null,
+  "archive_metadata": {
+    "is_archive": true,
+    "archive_type": "ZIP",
+    "total_files": 0,
+    "uncompressed_size": 0,
+    "compression_ratio": 0.0,
+    "is_encrypted": false,
+    "has_nested_archives": false,
+    "has_path_traversal": false,
+    "has_hidden_executables": false,
+    "suspicious_entries": [],
+    "entries": [],
+    "safety_violations": [
+      "Corrupted or malformed archive format: File is not a zip file"
+    ]
+  },
+  "image_metadata": null,
+  "reputation": {
+    "provider": "cyberguard_threat_intel",
+    "sha256_queried": "157827d580ea1ae090c851f02e0a8eb083b42c3cb21ec139acd7ffd895f186db",
+    "verdict": "UNKNOWN",
+    "is_malicious": false,
+    "threat_types": [],
+    "confidence": 0.0,
+    "details": "No external threat intelligence match found for hash (Note: No Match != Safe)",
+    "retrieved_at": "2026-10-13T01:52:45.139858+00:00"
+  },
+  "extracted_urls": [],
+  "extracted_domains": [],
+  "extracted_ips": [],
+  "extracted_emails": [],
+  "extracted_hashes": [],
+  "derived_artifacts": [],
+  "findings_count": 1,
+  "findings": [
+    {
+      "title": "File Type and Extension Mismatch Detected",
+      "description": "ZIP archive disguised with non-archive extension '.gz'",
+      "finding_type": "FILE_TYPE_MISMATCH",
+      "severity": "MEDIUM",
+      "confidence": 0.99,
+      "method": "DETERMINISTIC",
+      "mitre_technique_id": "T1036.008",
+      "remediation": "Treat as high-risk evasion attempt. Validate original provenance before handling."
+    }
+  ],
+  "indicators_count": 176,
+  "relationships_count": 2,
+  "status": "COMPLETED",
+  "created_at": "2026-10-13T01:52:45.150398+00:00"
+}

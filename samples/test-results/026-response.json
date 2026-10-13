@@ -1,0 +1,66 @@
+{
+  "ingestion_id": "0294e140-6897-4944-8fb8-50eec3ad43d4",
+  "artifact_id": "2dc5e1ef-2f69-4516-805e-d9b2e06bc09a",
+  "artifact_type": "TEXT",
+  "input_mode": "FILE_UPLOAD",
+  "name": "password-spray.json",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "5b154bce68f9499226140e7c5f73be7cd82b7b61bf8749af546c29b8106b26d7",
+  "size": 4370,
+  "mime_type": "text/plain",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "TEXT",
+    "detected_mime": "text/plain",
+    "reported_mime": "application/json",
+    "confidence": 0.85,
+    "detector": "plain_text_utf8",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "nlp_classifier"
+    ],
+    "metadata": {
+      "size_bytes": 4370,
+      "original_filename": "password-spray.json",
+      "char_count": 4370
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/5b/5b154bce68f9499226140e7c5f73be7cd82b7b61bf8749af546c29b8106b26d7/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "nlp_classifier"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "password-spray.json",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "TEXT",
+      "detected_mime": "text/plain",
+      "reported_mime": "application/json",
+      "confidence": 0.85,
+      "detector": "plain_text_utf8",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "nlp_classifier"
+      ],
+      "metadata": {
+        "size_bytes": 4370,
+        "original_filename": "password-spray.json",
+        "char_count": 4370
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.516596",
+  "evidence_id": "EVD-5B154BCE68",
+  "investigation_id": "82f6532c-dbdb-4ceb-bf5a-e5bf1efc620d",
+  "analysis_run_id": "5894a6a2-f1b0-4a8e-a5d2-455b8b43cad1",
+  "duplicate": false
+}

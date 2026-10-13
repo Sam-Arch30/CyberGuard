@@ -17,7 +17,7 @@ def test_health_endpoint_healthy():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["service"] == "cybersecurity-email-parser"
+    assert data["service"] == "cyberguard"
     assert data["database"] == "ok"
 
 
@@ -32,23 +32,30 @@ def test_health_endpoint_degraded_when_db_down():
         assert "unhealthy" in data["database"]
 
 
-def test_init_db_retry_success():
-    """Verify init_db retries on initial failure and succeeds on subsequent attempt."""
+def test_init_db_retry_success(tmp_path, caplog):
+    """Retry a failed connection, then create and inspect a real isolated schema."""
+    from sqlalchemy import create_engine, inspect
+    isolated = create_engine('sqlite:///' + (tmp_path / 'retry.db').as_posix())
+    real_connect = isolated.connect
     call_count = 0
 
-    def mock_connect():
+    def connect():
         nonlocal call_count
         call_count += 1
-        if call_count < 2:
-            raise OperationalError("starting up", {}, Exception("starting up"))
-        mock_conn = MagicMock()
-        return mock_conn
+        if call_count == 1:
+            raise OperationalError('starting up', {}, Exception('starting up'))
+        return real_connect()
 
-    with patch("backend.db.session.engine.connect", side_effect=mock_connect):
-        with patch("backend.db.session.Base.metadata.create_all"):
+    try:
+        with patch('backend.db.session.engine', isolated), patch.object(isolated, 'connect', side_effect=connect):
             success = init_db(max_retries=3, retry_delay=0.01)
-            assert success is True
-            assert call_count == 2
+        assert success is True
+        assert call_count == 4  # Failed attempt, retry, create_all, additive schema transaction.
+        assert len([r for r in caplog.records if 'Database not ready (attempt 1/3)' in r.message]) == 1
+        assert 'artifacts' in inspect(isolated).get_table_names()
+        assert 'workspace_id' in {column['name'] for column in inspect(isolated).get_columns('artifacts')}
+    finally:
+        isolated.dispose()
 
 
 def test_init_db_exhausted_retries_raises():

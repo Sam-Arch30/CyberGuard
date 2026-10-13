@@ -53,7 +53,7 @@ def evaluate_novelty(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Novelty evaluation failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Novelty evaluation failed.')
 
 
 # ============================================================================
@@ -77,7 +77,7 @@ def get_investigation_novelty(
             workspace_id=workspace_id,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get(
@@ -97,7 +97,7 @@ def get_investigation_patterns(
             workspace_id=workspace_id,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get(
@@ -117,7 +117,7 @@ def get_investigation_sequences(
             workspace_id=workspace_id,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get(
@@ -137,7 +137,7 @@ def get_investigation_infrastructure(
             workspace_id=workspace_id,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get(
@@ -157,7 +157,7 @@ def get_investigation_emerging_patterns(
             workspace_id=workspace_id,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 # ============================================================================
@@ -181,7 +181,7 @@ def get_entity_novelty(
             workspace_id=workspace_id,
         )
     except Exception as e:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 # ============================================================================
@@ -215,7 +215,7 @@ def transition_emerging_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 # ============================================================================
@@ -252,7 +252,7 @@ def register_suppression(
         )
     except Exception as e:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 # ============================================================================

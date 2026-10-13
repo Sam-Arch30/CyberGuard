@@ -101,7 +101,7 @@ class URLIndicator(BaseModel):
     value: str
     severity: str = "LOW"
     first_seen: Optional[datetime] = None
-    redirect_hops: int = 0
+    redirect_hops: Optional[int] = None
     is_lookalike: bool = False
     credential_harvesting: bool = False
     reputation: Optional[str] = None
@@ -298,6 +298,7 @@ class AnalysisResultsResponse(BaseModel):
     disclosure levels. Prevents chatty, fragmented network calls.
     """
     run_id: str
+    media_assessment: Optional[Dict[str, Any]] = None
     investigation_id: Optional[str] = None
     evidence_id: Optional[str] = None
     artifact: ArtifactIdentity

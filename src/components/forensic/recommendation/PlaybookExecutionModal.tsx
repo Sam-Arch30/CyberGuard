@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import {
   X,
@@ -52,7 +53,7 @@ export const PlaybookExecutionModal: React.FC<PlaybookExecutionModalProps> = ({
         setLoading(true);
         setError(null);
         try {
-          const res = await fetch(apiUrl(`/api/v1/playbooks/from-recommendation/${recommendation.id}`), {
+          const res = await apiFetch(apiUrl(`/api/v1/playbooks/from-recommendation/${recommendation.id}`), {
             method: 'POST'
           });
           if (res.ok) {
@@ -60,7 +61,7 @@ export const PlaybookExecutionModal: React.FC<PlaybookExecutionModalProps> = ({
             setPlaybook(pb);
           } else {
             // Fallback: list existing playbooks to find match or default
-            const listRes = await fetch(apiUrl('/api/v1/playbooks'));
+            const listRes = await apiFetch(apiUrl('/api/v1/playbooks'));
             if (listRes.ok) {
               const list: ResponsePlaybook[] = await listRes.json();
               if (list.length > 0) setPlaybook(list[0]);
@@ -87,7 +88,7 @@ export const PlaybookExecutionModal: React.FC<PlaybookExecutionModalProps> = ({
     if (!playbook) return;
     setError(null);
     try {
-      const res = await fetch(apiUrl(`/api/v1/playbooks/${playbook.id}/simulate`), {
+      const res = await apiFetch(apiUrl(`/api/v1/playbooks/${playbook.id}/simulate`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -110,7 +111,7 @@ export const PlaybookExecutionModal: React.FC<PlaybookExecutionModalProps> = ({
     setExecuting(true);
     setError(null);
     try {
-      const res = await fetch(apiUrl(`/api/v1/playbooks/${playbook.id}/execute`), {
+      const res = await apiFetch(apiUrl(`/api/v1/playbooks/${playbook.id}/execute`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -147,7 +148,7 @@ export const PlaybookExecutionModal: React.FC<PlaybookExecutionModalProps> = ({
     setApproving(true);
     setError(null);
     try {
-      const res = await fetch(apiUrl(`/api/v1/playbooks/executions/${execution.id}/approve`), {
+      const res = await apiFetch(apiUrl(`/api/v1/playbooks/executions/${execution.id}/approve`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -159,7 +160,7 @@ export const PlaybookExecutionModal: React.FC<PlaybookExecutionModalProps> = ({
       if (res.ok) {
         setShowApprovalBox(false);
         // Refresh execution status
-        const pollRes = await fetch(apiUrl(`/api/v1/playbooks/executions/${execution.id}`));
+        const pollRes = await apiFetch(apiUrl(`/api/v1/playbooks/executions/${execution.id}`));
         if (pollRes.ok) {
           const updated: ResponsePlaybookExecution = await pollRes.json();
           setExecution(updated);

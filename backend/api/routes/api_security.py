@@ -4,6 +4,8 @@ Provides routes for API telemetry ingestion, batch analysis, log file uploads,
 artifact re-analysis, engine configuration, and account baseline profile inspection.
 """
 from __future__ import annotations
+from backend.services.upload_security import UploadSecurityService
+from backend.services.structured_telemetry_parser import parse_structured_telemetry, validate_events
 
 import csv
 import io
@@ -51,12 +53,16 @@ async def analyze_single_api_event(
             db=db,
             provider_hint=provider_hint,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing single API event: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"API event analysis failed: {str(e)}",
+            detail='API event analysis failed.',
         )
 
 
@@ -70,17 +76,25 @@ async def analyze_batch_api_events(
     Analyze a batch of API telemetry events.
     """
     try:
+        validate_events(events)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    try:
         response = await global_api_pipeline.analyze_events(
             raw_events=events,
             db=db,
             provider_hint=provider_hint,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing batch API events: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch API analysis failed: {str(e)}",
+            detail='Batch API analysis failed.',
         )
 
 
@@ -94,58 +108,29 @@ async def upload_api_log_file(
     Upload and analyze API telemetry logs (JSON array, JSON lines, or CSV).
     """
     try:
-        content_bytes = await file.read()
-        text_content = content_bytes.decode("utf-8", errors="replace")
-
-        raw_events: List[Any] = []
-        filename = (file.filename or "").lower()
-
-        # Try parsing JSON first
-        if filename.endswith(".json") or text_content.strip().startswith(("[", "{")):
-            try:
-                parsed = json.loads(text_content)
-                if isinstance(parsed, list):
-                    raw_events = parsed
-                elif isinstance(parsed, dict):
-                    raw_events = [parsed]
-            except json.JSONDecodeError:
-                # Try JSON Lines
-                for line in text_content.splitlines():
-                    line = line.strip()
-                    if line:
-                        try:
-                            raw_events.append(json.loads(line))
-                        except json.JSONDecodeError:
-                            continue
-
-        # If not parsed as JSON, try CSV
-        if not raw_events and (filename.endswith(".csv") or "," in text_content.splitlines()[0] if text_content.splitlines() else False):
-            reader = csv.DictReader(io.StringIO(text_content))
-            for row in reader:
-                raw_events.append(dict(row))
-            if not provider_hint:
-                provider_hint = "generic_csv"
-
-        if not raw_events:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Unable to parse log file as JSON, JSON Lines, or CSV.",
-            )
-
+        content_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
+        try:
+            raw_events = parse_structured_telemetry(content_bytes, file.filename or '', file.content_type or '')
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
         response = await global_api_pipeline.analyze_events(
             raw_events=raw_events,
             db=db,
             provider_hint=provider_hint,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
 
+    except HTTPException:
+        raise
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error processing uploaded API log: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"API log processing failed: {str(e)}",
+            detail='API log processing failed.',
         )
 
 
@@ -162,14 +147,18 @@ async def reanalyze_api_artifact(
             artifact_id=artifact_id,
             db=db,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error reanalyzing API artifact {artifact_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"API re-analysis failed: {str(e)}",
+            detail='API re-analysis failed.',
         )
 
 

@@ -42,7 +42,7 @@ def get_actor_and_role(
     x_role: Optional[str] = Header(None, alias="X-Role"),
     x_user_role: Optional[str] = Header(None, alias="X-User-Role"),
     authorization: Optional[str] = Header(None, alias="Authorization"),
-) -> Tuple_Role:
+) -> str:
     role = (x_role or x_user_role or "").strip().lower()
     if not role and authorization:
         auth_clean = authorization.strip().lower()

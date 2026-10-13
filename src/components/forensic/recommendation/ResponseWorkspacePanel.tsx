@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   ShieldAlert,
@@ -73,7 +74,7 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const recsRes = await fetch(apiUrl(`/api/v1/recommendations/by-scope/${scopeType}/${effectiveScopeId}`));
+      const recsRes = await apiFetch(apiUrl(`/api/v1/recommendations/by-scope/${scopeType}/${effectiveScopeId}`));
       if (recsRes.ok) {
         const data = await recsRes.json();
         setRecommendations(data.recommendations || []);
@@ -81,13 +82,13 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
         setRecommendations([]);
       }
 
-      const capsRes = await fetch(apiUrl('/api/v1/recommendations/capabilities'));
+      const capsRes = await apiFetch(apiUrl('/api/v1/recommendations/capabilities'));
       if (capsRes.ok) {
         const caps = await capsRes.json();
         setCapabilities(caps || []);
       }
 
-      const ovRes = await fetch(apiUrl(`/api/v1/recommendations/summary/${scopeType}/${effectiveScopeId}`));
+      const ovRes = await apiFetch(apiUrl(`/api/v1/recommendations/summary/${scopeType}/${effectiveScopeId}`));
       if (ovRes.ok) {
         const ov = await ovRes.json();
         setOverview(ov);
@@ -135,7 +136,7 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
         };
       }
 
-      const res = await fetch(apiUrl('/api/v1/recommendations/generate'), {
+      const res = await apiFetch(apiUrl('/api/v1/recommendations/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -145,7 +146,7 @@ export const ResponseWorkspacePanel: React.FC<ResponseWorkspacePanelProps> = ({
         const data = await res.json();
         setRecommendations(data.recommendations || []);
         // Refresh overview
-        const ovRes = await fetch(apiUrl(`/api/v1/recommendations/summary/${scopeType}/${effectiveScopeId}`));
+        const ovRes = await apiFetch(apiUrl(`/api/v1/recommendations/summary/${scopeType}/${effectiveScopeId}`));
         if (ovRes.ok) {
           const ov = await ovRes.json();
           setOverview(ov);

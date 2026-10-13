@@ -4,6 +4,8 @@ Provides routes for network telemetry ingestion, NetFlow/DNS batch analysis,
 log uploads, artifact re-analysis, and engine configuration.
 """
 from __future__ import annotations
+from backend.services.upload_security import UploadSecurityService
+from backend.services.structured_telemetry_parser import parse_structured_telemetry, validate_events
 
 import csv
 import json
@@ -50,12 +52,18 @@ async def analyze_single_network_event(
             db=db,
             provider_hint=provider_hint,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as e:
         logger.error(f"Error analyzing single network event: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Network analysis failed: {str(e)}",
+            detail='Network analysis failed.',
         )
 
 
@@ -69,17 +77,27 @@ async def analyze_batch_network_events(
     Analyze a batch of network flow or DNS query records.
     """
     try:
+        validate_events(events)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    try:
         response = await global_network_pipeline.analyze_events(
             raw_events=events,
             db=db,
             provider_hint=provider_hint,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as e:
         logger.error(f"Error analyzing batch network events: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch network analysis failed: {str(e)}",
+            detail='Batch network analysis failed.',
         )
 
 
@@ -93,39 +111,28 @@ async def upload_network_log_file(
     Upload and analyze network telemetry logs (JSON array, JSON lines, or CSV).
     """
     try:
-        content_bytes = await file.read()
-        text_content = content_bytes.decode("utf-8", errors="replace")
-
-        # Try parsing JSON
-        raw_events: List[Any] = []
+        content_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
         try:
-            parsed = json.loads(text_content)
-            if isinstance(parsed, list):
-                raw_events = parsed
-            elif isinstance(parsed, dict) and "events" in parsed and isinstance(parsed["events"], list):
-                raw_events = parsed["events"]
-            else:
-                raw_events = [parsed]
-        except Exception:
-            # Fallback: CSV or lines
-            lines = text_content.splitlines()
-            if lines and "," in lines[0]:
-                reader = csv.DictReader(lines)
-                raw_events = list(reader)
-            else:
-                raw_events = [line.strip() for line in lines if line.strip()]
-
+            raw_events = parse_structured_telemetry(content_bytes, file.filename or '', file.content_type or '')
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=str(exc))
         response = await global_network_pipeline.analyze_events(
             raw_events=raw_events,
             db=db,
             provider_hint=provider_hint,
         )
+        if response.events_analyzed_count == 0:
+            raise HTTPException(status_code=422, detail="No usable telemetry events. Check provider fields and event format.")
         return response
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as e:
         logger.error(f"Error analyzing uploaded network log: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Network log file analysis failed: {str(e)}",
+            detail='Network log file analysis failed.',
         )
 
 
@@ -142,11 +149,15 @@ async def analyze_stored_network_artifact(
         return await global_network_pipeline.analyze_artifact(artifact_id=artifact_id, db=db)
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
     except Exception as e:
         logger.error(f"Error re-analyzing network artifact {artifact_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Network artifact re-analysis failed: {str(e)}",
+            detail='Network artifact re-analysis failed.',
         )
 
 

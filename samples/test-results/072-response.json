@@ -1,0 +1,115 @@
+{
+  "analysis_run_id": "2a1405fd-6321-4d14-9d66-70a379127d6c",
+  "artifact_id": "b627d326-9402-4668-9139-266153224037",
+  "events_analyzed_count": 12,
+  "accounts_observed_count": 0,
+  "sessions_observed_count": 0,
+  "unique_endpoints_count": 1,
+  "unique_source_ips_count": 1,
+  "total_request_bytes": 0,
+  "total_response_bytes": 0,
+  "overall_risk_score": 30.0,
+  "overall_severity": "HIGH",
+  "confidence": 0.92,
+  "classification": "HIGH_RISK_API_ABUSE",
+  "findings": [
+    {
+      "finding_type": "REPEATED_AUTHORIZATION_FAILURES",
+      "title": "Repeated Authorization Failures for 198.51.100.20 (12 denials across 1 routes)",
+      "description": "Observed 12 HTTP 403 Forbidden responses for '198.51.100.20' across 1 distinct endpoints in 11.0s, suggesting privilege boundary probing.",
+      "severity": "HIGH",
+      "confidence": 0.9,
+      "risk_contribution": 35.0,
+      "method": "DETERMINISTIC",
+      "rule_id": "API_AUTHZ_001",
+      "rule_version": "1.0.0",
+      "category": "AUTHORIZATION_ANOMALY",
+      "target_account": null,
+      "target_session": null,
+      "target_source_ip": "198.51.100.20",
+      "target_endpoint": null,
+      "evidence_items": [
+        {
+          "key": "actor_identifier",
+          "value": "198.51.100.20",
+          "source": "auth_failure_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        },
+        {
+          "key": "authz_failure_count",
+          "value": "12",
+          "source": "auth_failure_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        },
+        {
+          "key": "probed_routes_count",
+          "value": "1",
+          "source": "auth_failure_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        },
+        {
+          "key": "sample_probed_routes",
+          "value": "/api/users",
+          "source": "auth_failure_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        }
+      ],
+      "mitre_attack_ids": [
+        "T1078"
+      ],
+      "limitation": "A user navigating a dashboard with revoked roles or partial permissions can receive clustered 403 responses."
+    },
+    {
+      "finding_type": "PERIODIC_API_ACTIVITY",
+      "title": "Periodic Automated API Activity for 198.51.100.20 (Mean: 1.0s, CV: 0.000)",
+      "description": "Observed regular periodic intervals from actor '198.51.100.20' across 11 connections with mean interval 1.0s and minimal jitter (CV: 0.000), consistent with automated scheduling.",
+      "severity": "LOW",
+      "confidence": 0.85,
+      "risk_contribution": 8.0,
+      "method": "DETERMINISTIC",
+      "rule_id": "API_PERIOD_001",
+      "rule_version": "1.0.0",
+      "category": "PERIODICITY_ANOMALY",
+      "target_account": null,
+      "target_session": null,
+      "target_source_ip": "198.51.100.20",
+      "target_endpoint": null,
+      "evidence_items": [
+        {
+          "key": "actor_identifier",
+          "value": "198.51.100.20",
+          "source": "periodicity_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        },
+        {
+          "key": "mean_interval_seconds",
+          "value": "1.00",
+          "source": "periodicity_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        },
+        {
+          "key": "coefficient_of_variation",
+          "value": "0.0000",
+          "source": "periodicity_engine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-13T01:52:45.276495Z"
+        }
+      ],
+      "mitre_attack_ids": [
+        "T1059"
+      ],
+      "limitation": "Health check probes, cron sync daemons, and microservice status heartbeats regularly generate low-jitter periodic calls."
+    }
+  ],
+  "corroborated_threat_events": [],
+  "account_profiles": {},
+  "api_abuse_suspected": false,
+  "possible_exfiltration_detected": false,
+  "created_at": "2026-10-13T01:52:45.289538Z"
+}

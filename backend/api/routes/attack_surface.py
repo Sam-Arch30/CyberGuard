@@ -83,7 +83,7 @@ def get_attack_surface_overview(
         logger.error(f"Failed to fetch attack surface overview: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to retrieve attack surface overview: {str(exc)}",
+            detail='Failed to retrieve attack surface overview.',
         )
 
 
@@ -151,7 +151,7 @@ def create_asset(
         logger.error(f"Error creating asset: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create asset: {str(exc)}",
+            detail='Failed to create asset.',
         )
 
 
@@ -174,7 +174,7 @@ def get_asset_detail(
         logger.error(f"Failed to get asset detail for {asset_id}: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to fetch asset detail: {str(exc)}",
+            detail='Failed to fetch asset detail.',
         )
 
 
@@ -204,7 +204,7 @@ def update_asset(
         logger.error(f"Failed to update asset {asset_id}: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to update asset: {str(exc)}",
+            detail='Failed to update asset.',
         )
 
 
@@ -292,7 +292,7 @@ def resolve_exposure(
         logger.error(f"Failed to resolve exposure {exposure_id}: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to resolve exposure: {str(exc)}",
+            detail='Failed to resolve exposure.',
         )
 
 
@@ -355,7 +355,7 @@ def review_unknown_asset(
         logger.error(f"Failed to review unknown asset {asset_id}: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to review unknown asset: {str(exc)}",
+            detail='Failed to review unknown asset.',
         )
 
 
@@ -406,7 +406,7 @@ def create_scope(
         logger.error(f"Failed to create discovery scope: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to create discovery scope: {str(exc)}",
+            detail='Failed to create discovery scope.',
         )
 
 
@@ -455,7 +455,7 @@ def run_discovery(
         logger.error(f"Discovery run failed: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Discovery run failed: {str(exc)}",
+            detail='Discovery run failed.',
         )
 
 
@@ -475,5 +475,5 @@ def get_attack_surface_diff(
         logger.error(f"Failed to get attack surface diff: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to calculate attack surface diff: {str(exc)}",
+            detail='Failed to calculate attack surface diff.',
         )

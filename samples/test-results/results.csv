@@ -1,0 +1,97 @@
+sample,stage,endpoint,http,status,risk,classification,seconds,note
+01-email/benign-meeting.eml,Ingestion,/api/ingest,200,PASS,,,1.254,SUPPORTED
+01-email/suspicious-credential-request.eml,Ingestion,/api/ingest,200,PASS,,,0.81,SUPPORTED
+01-email/suspicious-payment-request.eml,Ingestion,/api/ingest,200,PASS,,,0.09,SUPPORTED
+02-documents/benign-note.txt,Ingestion,/api/ingest,200,PASS,,,0.075,SUPPORTED
+02-documents/suspicious-message.txt,Ingestion,/api/ingest,200,PASS,,,0.078,SUPPORTED
+02-documents/sample.html,Ingestion,/api/ingest,200,PASS,,,0.08,SUPPORTED
+02-documents/sample.rtf,Ingestion,/api/ingest,200,PASS,,,0.077,SUPPORTED
+02-documents/sample.xml,Ingestion,/api/ingest,200,PASS,,,0.076,SUPPORTED
+02-documents/sample.md,Ingestion,/api/ingest,200,PASS,,,0.079,SUPPORTED
+02-documents/benign-document.pdf,Ingestion,/api/ingest,200,PASS,,,0.075,SUPPORTED
+03-images/synthetic-card.png,Ingestion,/api/ingest,200,PASS,,,0.078,SUPPORTED
+03-images/synthetic-card.jpg,Ingestion,/api/ingest,200,PASS,,,0.082,SUPPORTED
+03-images/synthetic-card.webp,Ingestion,/api/ingest,200,PASS,,,0.082,SUPPORTED
+03-images/synthetic-card.gif,Ingestion,/api/ingest,200,PASS,,,0.078,SUPPORTED
+03-images/synthetic-card.bmp,Ingestion,/api/ingest,200,PASS,,,0.081,SUPPORTED
+03-images/synthetic-diagram.svg,Ingestion,/api/ingest,200,PASS,,,0.078,SUPPORTED
+04-audio/synthetic-tone.wav,Ingestion,/api/ingest,200,PASS,,,0.156,PARTIALLY_SUPPORTED
+04-audio/synthetic-tone.mp3,Ingestion,/api/ingest,200,PASS,,,0.077,PARTIALLY_SUPPORTED
+04-audio/synthetic-tone.ogg,Ingestion,/api/ingest,200,PASS,,,0.077,PARTIALLY_SUPPORTED
+04-audio/synthetic-tone.flac,Ingestion,/api/ingest,200,PASS,,,0.077,PARTIALLY_SUPPORTED
+05-video/synthetic-color-bars.mp4,Ingestion,/api/ingest,200,PASS,,,0.081,PARTIALLY_SUPPORTED
+05-video/synthetic-color-bars.mov,Ingestion,/api/ingest,200,PASS,,,0.081,PARTIALLY_SUPPORTED
+05-video/synthetic-color-bars.avi,Ingestion,/api/ingest,200,PASS,,,0.077,PARTIALLY_SUPPORTED
+05-video/synthetic-color-bars.webm,Ingestion,/api/ingest,200,PASS,,,0.052,PARTIALLY_SUPPORTED
+06-logs/normal-auth.json,Ingestion,/api/ingest,200,PASS,,,0.077,SUPPORTED
+06-logs/password-spray.json,Ingestion,/api/ingest,200,PASS,,,0.079,SUPPORTED
+06-logs/authentication-events.jsonl,Ingestion,/api/ingest,200,PASS,,,0.076,SUPPORTED
+06-logs/network-connections.csv,Ingestion,/api/ingest,200,PASS,,,0.079,SUPPORTED
+06-logs/sample-access.log,Ingestion,/api/ingest,200,PASS,,,0.08,SUPPORTED
+06-logs/api-events.json,Ingestion,/api/ingest,200,PASS,,,0.076,SUPPORTED
+07-identity/trusted-profile.json,Ingestion,/api/ingest,200,PASS,,,0.081,SUPPORTED
+07-identity/identity-claim.txt,Ingestion,/api/ingest,200,PASS,,,0.084,SUPPORTED
+08-archives/benign-bundle.zip,Ingestion,/api/ingest,200,PASS,,,0.076,SUPPORTED
+08-archives/benign-bundle.tar.gz,Ingestion,/api/ingest,200,PASS,,,0.08,SUPPORTED
+09-binary/benign-data.bin,Ingestion,/api/ingest,200,PASS,,,0.079,SUPPORTED
+10-invalid/empty.txt,Ingestion,/api/ingest,400,PASS,,,0.003,Uploaded file is empty (0 bytes).
+10-invalid/malformed.json,Ingestion,/api/ingest,200,WARN,,,0.079,"Invalid original evidence retained. Invalid structured log content; retained as original evidence, not parsed events."
+10-invalid/broken.pdf,Ingestion,/api/ingest,200,WARN,,,0.079,"Invalid original evidence retained. Invalid or truncated PDF structure, or extension/content mismatch. Original bytes retained; PDF decoding not verified."
+10-invalid/broken.mp4,Ingestion,/api/ingest,200,WARN,,,0.078,"Invalid original evidence retained. Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.; Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.; Content signature does not match the declared extension; format is unverified.; Reported MIME type differs from the detected content signature."
+10-invalid/jpeg-with-pdf-extension.pdf,Ingestion,/api/ingest,200,WARN,,,0.043,"Invalid original evidence retained. Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.; Reported MIME type differs from the detected content signature.; Invalid or truncated PDF structure, or extension/content mismatch. Original bytes retained; PDF decoding not verified.; Duplicate artifact: This content has been previously observed and analyzed in CyberGuard."
+01-email/benign-meeting.eml,Email analysis,/api/emails/analyze,200,PASS,10,,1.725,
+01-email/suspicious-credential-request.eml,Email analysis,/api/emails/analyze,200,PASS,30,,2.432,
+01-email/suspicious-payment-request.eml,Email analysis,/api/emails/analyze,200,PASS,28,,1.389,
+02-documents/benign-note.txt,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.028,
+02-documents/suspicious-message.txt,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.019,
+02-documents/sample.html,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.016,
+02-documents/sample.rtf,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.016,
+02-documents/sample.xml,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.016,
+02-documents/sample.md,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.017,
+02-documents/benign-document.pdf,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.017,
+03-images/synthetic-card.png,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.289,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+03-images/synthetic-card.jpg,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.02,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+03-images/synthetic-card.webp,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.071,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+03-images/synthetic-card.gif,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.024,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+03-images/synthetic-card.bmp,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.029,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+03-images/synthetic-diagram.svg,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.025,
+04-audio/synthetic-tone.wav,Media analysis,/api/multimedia/upload,200,PASS,35.2,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.068,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+04-audio/synthetic-tone.mp3,Media analysis,/api/multimedia/upload,200,PASS,35.2,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.043,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+04-audio/synthetic-tone.ogg,Media analysis,/api/multimedia/upload,200,PASS,35.2,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.043,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+04-audio/synthetic-tone.flac,Media analysis,/api/multimedia/upload,200,PASS,35.2,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.042,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+05-video/synthetic-color-bars.mp4,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.049,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+05-video/synthetic-color-bars.mov,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.049,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+05-video/synthetic-color-bars.avi,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.048,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+05-video/synthetic-color-bars.webm,Media analysis,/api/multimedia/upload,200,PASS,29.0,SYNTHETIC_MEDIA_SIGNALS_DETECTED,0.049,COMPLETED; heuristic assessment only; deepfake accuracy is not established.
+08-archives/benign-bundle.zip,File analysis,/api/files/analyze,200,PASS,0.0,UNVERIFIED,0.024,
+08-archives/benign-bundle.tar.gz,File analysis,/api/files/analyze,200,PASS,25.0,SUSPICIOUS,0.018,
+09-binary/benign-data.bin,File analysis,/api/files/analyze,200,PASS,0.0,UNKNOWN,0.017,
+06-logs/normal-auth.json,Authentication analysis,/api/auth-security/upload-log,200,PASS,0.0,NORMAL_AUTHENTICATION,0.024,
+06-logs/password-spray.json,Authentication analysis,/api/auth-security/upload-log,200,PASS,65.0,CREDENTIAL_ATTACK_DETECTED,0.032,
+06-logs/authentication-events.jsonl,Authentication analysis,/api/auth-security/upload-log,200,PASS,65.0,CREDENTIAL_ATTACK_DETECTED,0.031,
+06-logs/network-connections.csv,Network analysis,/api/network-security/upload-log,200,PASS,40.0,ANOMALOUS_NETWORK_TRAFFIC,0.014,
+06-logs/api-events.json,API analysis,/api/api-security/upload-log,200,PASS,30.0,HIGH_RISK_API_ABUSE,0.017,
+10-invalid/malformed.json,Invalid JSON validation,/api/auth-security/upload-log,422,PASS,,,0.003,"Invalid JSON at line 1, column 13: Expecting value."
+10-invalid/broken.mp4,Invalid video analysis,/api/multimedia/upload,422,PASS,,,0.011,"No cryptographic Content Credentials found; analysis relies on structural heuristics.; Authenticity assessments represent scientific evidentiary hypotheses, not legal certification.; CyberGuard does not perform unconstrained facial or biometric surveillance.; No supported media signature was identified.; Calibrated authenticity confidence is unavailable (confidence=0); configured detector scores and thresholds are heuristic, not learned deepfake probabilities.; Risk scores reflect heuristic signals, not a calibrated probability of deepfake content. A zero score does not establish authenticity."
+07-identity/trusted-profile.json,Profile creation,/api/impersonation/profiles,201,PASS,,,0.011,
+07-identity/identity-claim.txt,Trusted identity,/api/impersonation/analyze,200,PASS,0.0,NO_IMPERSONATION_EVIDENCE,0.018,
+07-identity/identity-claim.txt,Suspicious identity,/api/impersonation/analyze,200,PASS,60.0,IMPERSONATION_SUSPECTED,0.019,
+01-email/benign-meeting.eml,Report generation,/api/reports/generate?format=json,200,PASS,,,0.051,
+01-email/benign-meeting.eml,Report download,/api/reports/{id}/download,200,PASS,,,0.01,Valid PDF header and nonempty download
+01-email/suspicious-credential-request.eml,Report generation,/api/reports/generate?format=json,200,PASS,,,0.045,
+01-email/suspicious-credential-request.eml,Report download,/api/reports/{id}/download,200,PASS,,,0.008,Valid PDF header and nonempty download
+01-email/suspicious-payment-request.eml,Report generation,/api/reports/generate?format=json,200,PASS,,,0.05,
+01-email/suspicious-payment-request.eml,Report download,/api/reports/{id}/download,200,PASS,,,0.009,Valid PDF header and nonempty download
+07-identity/identity-claim.txt,Trusted identity (canonical fields),/api/impersonation/analyze,200,PASS,0.0,NO_IMPERSONATION_EVIDENCE,0,Canonical domain fields validated against parsed addresses.
+07-identity/identity-claim.txt,Suspicious identity (canonical fields),/api/impersonation/analyze,200,PASS,60.0,IMPERSONATION_SUSPECTED,0,Canonical domain fields validated against parsed addresses.
+Normal authentication control,Detection control,—,—,PASS,,,0,"Observed NORMAL_AUTHENTICATION, risk 0.0."
+Password-spray JSON control,Detection control,—,—,PASS,,,0,"Observed CREDENTIAL_ATTACK_DETECTED, risk 65.0."
+Equivalent JSONL control,Detection control,—,—,PASS,,,0,Same 24 events: JSON 65.0 / CREDENTIAL_ATTACK_DETECTED; JSONL 65.0 / CREDENTIAL_ATTACK_DETECTED. Account and finding equivalence also checked.
+Trusted identity through UI contract,Detection control,—,—,PASS,,,0,Trusted sender: NO_IMPERSONATION_EVIDENCE at 0.0. Uses exact frontend address fields; domains derived server-side.
+Identity discrimination through UI contract,Detection control,—,—,PASS,,,0,Trusted 0.0 / NO_IMPERSONATION_EVIDENCE; suspicious 60.0 / IMPERSONATION_SUSPECTED.
+Malformed JSON log rejection,Detection control,—,—,PASS,,,0,"Malformed .json returned HTTP 422: Invalid JSON at line 1, column 13: Expecting value."
+Media detection coverage,Detection control,—,—,PASS,,,0,0 valid files remain inconclusive. Completed heuristic checks do not establish deepfake detection accuracy.
+Valid media decoding control,Detection control,—,—,PASS,,,0,Verified processing status and successful detector execution for 13 valid image/audio/video samples.
+Deepfake accuracy evaluation,Detection control,—,—,WARN,,,0,"Synthetic graphics, tones and color bars contain no labelled real/fake faces or speech. Held-out deepfake accuracy remains unverified."
+Trusted sender profile persistence,Detection control,—,—,PASS,,,0,Reloaded protected profile must retain its configured trusted sender address.
+Canonical identity engine control,Detection control,—,—,PASS,,,0,"Canonical fields: [('NO_IMPERSONATION_EVIDENCE', 0.0), ('IMPERSONATION_SUSPECTED', 60.0)]"

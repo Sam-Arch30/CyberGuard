@@ -211,7 +211,7 @@ class GenericAuthAdapter(BaseAuthAdapter):
             is_vpn_or_proxy=d.get("is_vpn_or_proxy"),
             provider=self.provider_name,
             raw_artifact_id=d.get("raw_artifact_id"),
-            metadata={k: v for k, v in d.items() if k not in ("id", "timestamp", "account_id")},
+            metadata={**{k: v for k, v in d.items() if k not in ("id", "timestamp", "account_id")}, "timestamp_supplied": bool(d.get("timestamp") or d.get("time") or d.get("event_time") or d.get("date"))},
         )
 
     def _parse_timestamp(self, ts_raw: Any) -> datetime:

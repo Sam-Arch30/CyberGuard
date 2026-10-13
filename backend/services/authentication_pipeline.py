@@ -200,19 +200,8 @@ class AuthenticationSecurityPipeline:
         if not raw_bytes:
             raise ValueError(f"Stored evidence bytes missing for artifact {artifact_id}.")
 
-        # Parse JSON array or single object or text lines
-        try:
-            parsed = json.loads(raw_bytes.decode("utf-8", errors="replace"))
-            if isinstance(parsed, list):
-                raw_events = parsed
-            elif isinstance(parsed, dict) and "events" in parsed and isinstance(parsed["events"], list):
-                raw_events = parsed["events"]
-            else:
-                raw_events = [parsed]
-        except Exception:
-            # Fallback: line-by-line log lines
-            lines = raw_bytes.decode("utf-8", errors="replace").splitlines()
-            raw_events = [line for line in lines if line.strip()]
+        from backend.services.auth_log_parser import parse_auth_log
+        raw_events = parse_auth_log(raw_bytes, artifact.name or '', artifact.mime_type or '')
 
         return await self.analyze_events(
             raw_events=raw_events,
@@ -229,6 +218,9 @@ class AuthenticationSecurityPipeline:
         for ev in events:
             # Fingerprint tuple: account_id, timestamp, source_ip, result, failure_reason
             fp = f"{ev.account_id}:{ev.timestamp.isoformat()}:{ev.source_ip}:{ev.result.value}:{ev.failure_reason.value if ev.failure_reason else ''}"
+            if ev.metadata.get("timestamp_supplied") is False:
+                deduped.append(ev)
+                continue
             if fp not in seen:
                 seen.add(fp)
                 deduped.append(ev)

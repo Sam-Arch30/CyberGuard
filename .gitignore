@@ -53,3 +53,9 @@ backend/data/datasets/*
 *.sln
 *.sw?
 .freebuff/
+.local-runtime/
+backend/data/models/deepfake_vit/
+.local-runtime/presentation-dist/
+presentation-assets/source-samples/
+/*.zip
+

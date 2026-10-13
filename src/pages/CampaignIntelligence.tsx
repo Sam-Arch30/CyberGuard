@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -85,7 +86,7 @@ export const CampaignIntelligence: React.FC = () => {
   // Fetch campaign cards list and candidates
   const refreshCampaigns = () => {
     setLoadingList(true);
-    fetch(apiUrl('/api/campaigns'))
+    apiFetch(apiUrl('/api/campaigns'))
       .then(res => (res.ok ? res.json() : []))
       .then((data: CampaignClusterItem[]) => {
         if (data && data.length > 0) {
@@ -111,7 +112,7 @@ export const CampaignIntelligence: React.FC = () => {
   useEffect(() => {
     if (!selectedCampId) return;
     setLoadingDetail(true);
-    fetch(apiUrl(`/api/campaigns/${selectedCampId}`))
+    apiFetch(apiUrl(`/api/campaigns/${selectedCampId}`))
       .then(res => (res.ok ? res.json() : null))
       .then((detail: CampaignDetail) => {
         if (detail) {

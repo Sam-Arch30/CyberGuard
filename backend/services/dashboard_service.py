@@ -194,7 +194,7 @@ class DashboardService:
         ).count()
 
         open_cases = db.query(CaseModel).filter(
-            CaseModel.status.in_(["open", "investigating", "escalated"])
+            CaseModel.status.in_(["open", "investigating", "escalated", "NEW", "OPEN", "IN_PROGRESS", "PENDING", "ON_HOLD"])
         ).count()
 
         top_metrics = DashboardMetrics(

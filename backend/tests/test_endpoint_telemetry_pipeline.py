@@ -442,11 +442,13 @@ def test_collector_capabilities_and_query_apis(client, db_session):
     assert "device_health_telemetry_collector" in collector_ids
 
     # 2. Test capabilities when explicitly querying Windows on macOS
-    resp_win = client.get("/api/v1/endpoint/capabilities?platform=windows")
+    import sys
+    foreign_platform = "linux" if sys.platform == "win32" else "windows"
+    resp_win = client.get(f"/api/v1/endpoint/capabilities?platform={foreign_platform}")
     assert resp_win.status_code == 200
     win_caps = resp_win.json()
     for wc in win_caps:
-        assert wc["platform"] == "windows"
+        assert wc["platform"] == foreign_platform
         assert wc["capability_state"] == "UNAVAILABLE"
 
     # 3. Test telemetry querying endpoint

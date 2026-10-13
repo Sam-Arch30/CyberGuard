@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 52: Threat Intelligence & External Intelligence Enrichment Client Service.
  */
@@ -21,7 +22,7 @@ export const threatIntelligenceService = {
   ): Promise<AggregatedIndicatorIntelligence> {
     const encodedVal = encodeURIComponent(indicatorValue);
     const url = `${API_BASE}/indicator/${indicatorType}/${encodedVal}${forceRefresh ? '?force_refresh=true' : ''}`;
-    const res = await fetch(url);
+    const res = await apiFetch(url);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `Failed to fetch intelligence (HTTP ${res.status})`);
@@ -37,7 +38,7 @@ export const threatIntelligenceService = {
     indicatorValue: string
   ): Promise<AggregatedIndicatorIntelligence> {
     const encodedVal = encodeURIComponent(indicatorValue);
-    const res = await fetch(`${API_BASE}/indicator/${indicatorType}/${encodedVal}/refresh`, {
+    const res = await apiFetch(`${API_BASE}/indicator/${indicatorType}/${encodedVal}/refresh`, {
       method: 'POST',
     });
     if (!res.ok) {
@@ -55,7 +56,7 @@ export const threatIntelligenceService = {
     indicatorValue: string
   ): Promise<IndicatorHistoryResponse> {
     const encodedVal = encodeURIComponent(indicatorValue);
-    const res = await fetch(`${API_BASE}/indicator/${indicatorType}/${encodedVal}/history`);
+    const res = await apiFetch(`${API_BASE}/indicator/${indicatorType}/${encodedVal}/history`);
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `Failed to fetch indicator history (HTTP ${res.status})`);
@@ -67,7 +68,7 @@ export const threatIntelligenceService = {
    * Lists all configured threat intelligence providers and their operational health.
    */
   async listProviders(): Promise<ThreatIntelProviderConfig[]> {
-    const res = await fetch(`${API_BASE}/providers`);
+    const res = await apiFetch(`${API_BASE}/providers`);
     if (!res.ok) {
       throw new Error(`Failed to list threat intelligence providers (HTTP ${res.status})`);
     }
@@ -87,7 +88,7 @@ export const threatIntelligenceService = {
       timeout_seconds?: number;
     }
   ): Promise<ThreatIntelProviderConfig> {
-    const res = await fetch(`${API_BASE}/providers/${providerName}`, {
+    const res = await apiFetch(`${API_BASE}/providers/${providerName}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(req),
@@ -108,7 +109,7 @@ export const threatIntelligenceService = {
     message: string;
     capabilities: Record<string, any>;
   }> {
-    const res = await fetch(`${API_BASE}/providers/${providerName}/health`, {
+    const res = await apiFetch(`${API_BASE}/providers/${providerName}/health`, {
       method: 'POST',
     });
     if (!res.ok) {
@@ -123,7 +124,7 @@ export const threatIntelligenceService = {
   async classifyPrivacy(value: string, type?: string): Promise<PrivacyPolicyClassification> {
     const params = new URLSearchParams({ value });
     if (type) params.append('type', type);
-    const res = await fetch(`${API_BASE}/privacy/classify?${params.toString()}`);
+    const res = await apiFetch(`${API_BASE}/privacy/classify?${params.toString()}`);
     if (!res.ok) {
       throw new Error(`Failed to classify indicator privacy (HTTP ${res.status})`);
     }
@@ -142,7 +143,7 @@ export const threatIntelligenceService = {
     results: AggregatedIndicatorIntelligence[];
     partial_failures: any[];
   }> {
-    const res = await fetch(`${API_BASE}/batch-enrich`, {
+    const res = await apiFetch(`${API_BASE}/batch-enrich`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ indicators, force_refresh: forceRefresh }),

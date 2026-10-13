@@ -152,7 +152,7 @@ def enroll_agent(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e:
         logger.error(f"Agent enrollment failure: {e}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Enrollment failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Enrollment failed.')
 
 
 # =============================================================================
@@ -264,7 +264,7 @@ def ingest_events(
         logger.error(f"Telemetry batch ingestion error: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ingestion processing error: {str(exc)}"
+            detail='Ingestion processing error.'
         )
 
 

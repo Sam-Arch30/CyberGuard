@@ -1,0 +1,79 @@
+{
+  "artifact_id": "72108145-80ac-40d8-a8e9-7cb998dbe819",
+  "analysis_run_id": "ee4d1a28-be46-4c1e-9e26-2e8264ef0a88",
+  "pipeline_version": "2.0.0",
+  "classification": "UNVERIFIED",
+  "risk_score": 0.0,
+  "severity": "LOW",
+  "confidence": 0.0,
+  "summary": "No suspicious static indicators were observed. These limited checks do not establish file safety or verified decoding.",
+  "identity": {
+    "sha256": "c0c1ad30cf39494e9d0c027d147182375826500b49012b32e93e216d6dcd2428",
+    "sha1": "9a0eafdfba220659a54b8e952019b8f46d5b6ead",
+    "md5": "bca17c0acc5a43a6a4b69447e9d727ff",
+    "size_bytes": 95,
+    "original_filename": "suspicious-message.txt",
+    "safe_display_name": "suspicious-message.txt",
+    "claimed_extension": ".txt",
+    "reported_mime": "text/plain",
+    "detected_mime": "text/plain",
+    "detected_file_type": "Plain text",
+    "is_polyglot": false
+  },
+  "filename_analysis": {
+    "is_double_extension": false,
+    "is_deceptive": false,
+    "has_unicode_deception": false,
+    "detected_control_characters": [],
+    "signals": []
+  },
+  "entropy": {
+    "entropy": 4.81,
+    "level": "normal",
+    "description": "Evaluated entropy",
+    "is_high_entropy": false
+  },
+  "pe_metadata": null,
+  "pdf_metadata": null,
+  "office_metadata": null,
+  "script_metadata": null,
+  "archive_metadata": null,
+  "image_metadata": null,
+  "reputation": {
+    "provider": "cyberguard_threat_intel",
+    "sha256_queried": "c0c1ad30cf39494e9d0c027d147182375826500b49012b32e93e216d6dcd2428",
+    "verdict": "UNKNOWN",
+    "is_malicious": false,
+    "threat_types": [],
+    "confidence": 0.0,
+    "details": "No external threat intelligence match found for hash (Note: No Match != Safe)",
+    "retrieved_at": "2026-10-13T01:52:44.152534+00:00"
+  },
+  "extracted_urls": [
+    "https://login-check.example/login"
+  ],
+  "extracted_domains": [
+    "login-check.example"
+  ],
+  "extracted_ips": [],
+  "extracted_emails": [],
+  "extracted_hashes": [],
+  "derived_artifacts": [],
+  "findings_count": 1,
+  "findings": [
+    {
+      "title": "External URLs Embedded in File Payload (1 discovered)",
+      "description": "File contains printable external URL references: https://login-check.example/login.",
+      "finding_type": "EXTERNAL_URL_EMBEDDED",
+      "severity": "LOW",
+      "confidence": 1.0,
+      "method": "DETERMINISTIC",
+      "mitre_technique_id": null,
+      "remediation": null
+    }
+  ],
+  "indicators_count": 160,
+  "relationships_count": 2,
+  "status": "COMPLETED",
+  "created_at": "2026-10-13T01:52:44.165056+00:00"
+}

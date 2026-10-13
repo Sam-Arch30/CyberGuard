@@ -157,3 +157,14 @@ class UploadSecurityService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Uploaded file does not appear to be a valid RFC-822 email format. Standard email headers were not detected."
             )
+
+    @staticmethod
+    async def read_bounded_upload(file, max_bytes=MAX_UPLOAD_SIZE_BYTES, chunk_size=65536):
+        payload = bytearray()
+        while True:
+            chunk = await file.read(min(chunk_size, max_bytes - len(payload) + 1))
+            if not chunk:
+                return bytes(payload)
+            payload.extend(chunk)
+            if len(payload) > max_bytes:
+                raise HTTPException(413, "Uploaded file exceeds the allowed size.")

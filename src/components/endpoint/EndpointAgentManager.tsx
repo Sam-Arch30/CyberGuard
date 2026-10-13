@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import {
   Shield,
@@ -68,9 +69,9 @@ export const EndpointAgentManager: React.FC = () => {
     try {
       setLoading(true);
       const [agentsRes, devicesRes, metricsRes] = await Promise.all([
-        fetch('/api/v1/endpoint/agents').then(r => r.ok ? r.json() : []),
-        fetch('/api/v1/endpoint/devices').then(r => r.ok ? r.json() : []),
-        fetch('/api/v1/endpoint/metrics').then(r => r.ok ? r.json() : null)
+        apiFetch('/api/v1/endpoint/agents').then(r => r.ok ? r.json() : []),
+        apiFetch('/api/v1/endpoint/devices').then(r => r.ok ? r.json() : []),
+        apiFetch('/api/v1/endpoint/metrics').then(r => r.ok ? r.json() : null)
       ]);
       setAgents(agentsRes);
       setDevices(devicesRes);
@@ -92,7 +93,7 @@ export const EndpointAgentManager: React.FC = () => {
   const handleCreateToken = async () => {
     try {
       setGeneratingToken(true);
-      const res = await fetch('/api/v1/endpoint/enrollment/tokens', {
+      const res = await apiFetch('/api/v1/endpoint/enrollment/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -118,7 +119,7 @@ export const EndpointAgentManager: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch(`/api/v1/endpoint/agents/${agentId}/revoke?reason=AdminRevoked`, {
+      const res = await apiFetch(`/api/v1/endpoint/agents/${agentId}/revoke?reason=AdminRevoked`, {
         method: 'POST'
       });
       if (res.ok) {
@@ -136,7 +137,7 @@ export const EndpointAgentManager: React.FC = () => {
       setSyntheticStatus('Generating safe synthetic telemetry (PROCESS, DNS, NETWORK, AUTH)...');
 
       // 1. Create short-lived token
-      const tokRes = await fetch('/api/v1/endpoint/enrollment/tokens', {
+      const tokRes = await apiFetch('/api/v1/endpoint/enrollment/tokens', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -149,7 +150,7 @@ export const EndpointAgentManager: React.FC = () => {
       const tokData = await tokRes.json();
 
       // 2. Enroll simulated test agent
-      const enrollRes = await fetch('/api/v1/endpoint/enrollment', {
+      const enrollRes = await apiFetch('/api/v1/endpoint/enrollment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -166,7 +167,7 @@ export const EndpointAgentManager: React.FC = () => {
 
       // 3. Dispatch synthetic events batch
       const nowIso = new Date().toISOString();
-      const eventsRes = await fetch('/api/v1/endpoint/events', {
+      const eventsRes = await apiFetch('/api/v1/endpoint/events', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'

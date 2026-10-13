@@ -491,7 +491,7 @@ class TypeDetector:
 
         if audio_type:
             meta["format"] = audio_type
-            warnings.append("Audio evidence persisted. Deepfake voice analysis is currently NOT_IMPLEMENTED.")
+            warnings.append("Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.")
             return DetectedInput(
                 input_mode=InputModeEnum.FILE_UPLOAD,
                 artifact_type=ArtifactTypeEnum.AUDIO,
@@ -523,7 +523,7 @@ class TypeDetector:
 
         if video_type:
             meta["format"] = video_type
-            warnings.append("Video evidence persisted. Deepfake facial manipulation analysis is currently NOT_IMPLEMENTED.")
+            warnings.append("Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.")
             return DetectedInput(
                 input_mode=InputModeEnum.FILE_UPLOAD,
                 artifact_type=ArtifactTypeEnum.VIDEO,
@@ -923,6 +923,9 @@ class UniversalIngestionService:
             },
             details=f"File '{safe_name}' classified as {classification.artifact_type.value} by detector '{classification.detector}'."
         )
+
+        from backend.services.intake_validation import intake_limitations
+        classification.warnings.extend(intake_limitations(content_bytes, safe_name, reported_mime))
 
         # 3. Persist bytes to content-addressed storage
         try:

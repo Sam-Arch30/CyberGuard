@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Sparkles,
@@ -151,7 +152,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
   const refreshAvailableEmails = async () => {
     const localAnalyses = getAllAvailableAnalyses();
     try {
-      const res = await fetch(apiUrl('/api/dashboard/emails?limit=50'));
+      const res = await apiFetch(apiUrl('/api/dashboard/emails?limit=50'));
       if (res.ok) {
         const data = await res.json();
         if (data && data.items) {
@@ -241,7 +242,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       const formData = new FormData();
       formData.append('file', file);
 
-      const res = await fetch(apiUrl('/api/emails/analyze'), {
+      const res = await apiFetch(apiUrl('/api/emails/analyze'), {
         method: 'POST',
         body: formData
       });
@@ -289,7 +290,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
 
   // Fetch suggested questions for active mode
   useEffect(() => {
-    fetch(apiUrl(`/api/copilot/suggested-questions?mode=${activeMode}`))
+    apiFetch(apiUrl(`/api/copilot/suggested-questions?mode=${activeMode}`))
       .then((res) => res.json())
       .then((data: SuggestedQuestion[]) => {
         setSuggestedQuestions(data);
@@ -386,7 +387,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
       let copilotData: CopilotQueryResponse;
       try {
         // Section 30 API call with authoritative grounding & claim validation
-        const v1Res = await fetch(apiUrl('/api/v1/copilot/query'), {
+        const v1Res = await apiFetch(apiUrl('/api/v1/copilot/query'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -439,7 +440,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
         }
       } catch {
         // Fall back to legacy /api/copilot/query
-        const response = await fetch(apiUrl('/api/copilot/query'), {
+        const response = await apiFetch(apiUrl('/api/copilot/query'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -549,7 +550,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
 
   const handleAddToReport = async (msgId: string, response: CopilotQueryResponse) => {
     try {
-      await fetch(apiUrl('/api/copilot/add-to-report'), {
+      await apiFetch(apiUrl('/api/copilot/add-to-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -588,7 +589,7 @@ export const InvestigationCopilot: React.FC<InvestigationCopilotProps> = ({
     rating: 'HELPFUL' | 'NOT_HELPFUL' | 'INCORRECT' | 'MISSING_EVIDENCE'
   ) => {
     try {
-      await fetch(apiUrl(`/api/v1/copilot/messages/${messageId}/feedback`), {
+      await apiFetch(apiUrl(`/api/v1/copilot/messages/${messageId}/feedback`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

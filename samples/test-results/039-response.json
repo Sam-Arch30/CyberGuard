@@ -1,0 +1,84 @@
+{
+  "ingestion_id": "91a73fb9-9cf5-415e-9656-882a02e566c7",
+  "artifact_id": "a8176d37-7b1a-4706-abbf-1ac0b5a632cd",
+  "artifact_type": "VIDEO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "broken.mp4",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "f8a69ede5e62175fdb7dabb3dc7ef0b22d72e608aa5c3b836f2b18e1b86e1297",
+  "size": 11,
+  "mime_type": "video/mp4",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "VIDEO",
+    "detected_mime": "video/mp4",
+    "reported_mime": "video/mp4",
+    "confidence": 0.9,
+    "detector": "video_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+      "Content signature does not match the declared extension; format is unverified.",
+      "Reported MIME type differs from the detected content signature."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 11,
+      "original_filename": "broken.mp4",
+      "format": "MP4"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/f8/f8a69ede5e62175fdb7dabb3dc7ef0b22d72e608aa5c3b836f2b18e1b86e1297/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+    "Content signature does not match the declared extension; format is unverified.",
+    "Reported MIME type differs from the detected content signature."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "broken.mp4",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "VIDEO",
+      "detected_mime": "video/mp4",
+      "reported_mime": "video/mp4",
+      "confidence": 0.9,
+      "detector": "video_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+        "Content signature does not match the declared extension; format is unverified.",
+        "Reported MIME type differs from the detected content signature."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 11,
+        "original_filename": "broken.mp4",
+        "format": "MP4"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:38.473519",
+  "evidence_id": "EVD-F8A69EDE5E",
+  "investigation_id": "8685ad45-3182-4b2b-89b5-975183500bb8",
+  "analysis_run_id": "b1301227-8297-448b-8c86-9547fdc7d6c6",
+  "duplicate": false
+}

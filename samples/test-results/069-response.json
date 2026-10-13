@@ -1,0 +1,206 @@
+{
+  "analysis_run_id": "36a0e129-1e50-453c-9e22-02e56a969b45",
+  "artifact_id": null,
+  "events_analyzed_count": 24,
+  "accounts_targeted_count": 8,
+  "unique_source_ips_count": 1,
+  "overall_risk_score": 65.0,
+  "overall_severity": "HIGH",
+  "confidence": 0.94,
+  "classification": "CREDENTIAL_ATTACK_DETECTED",
+  "findings": [
+    {
+      "finding_type": "PASSWORD_SPRAY_PATTERN",
+      "title": "Horizontal password-spray pattern detected from IP 198.51.100.20",
+      "description": "Source IP 198.51.100.20 attempted authentication across 8 distinct accounts with at most 3 attempt(s) per account within 92s. This low-and-slow horizontal distribution is a hallmark of password spraying to evade lockouts.",
+      "severity": "HIGH",
+      "confidence": 0.94,
+      "risk_contribution": 65.0,
+      "method": "HEURISTIC",
+      "rule_id": "AUTH_RULE_PASSWORD_SPRAY",
+      "category": "CREDENTIAL_ATTACK",
+      "target_account": null,
+      "evidence_items": [
+        {
+          "key": "source_ip",
+          "value": "198.51.100.20",
+          "source": "PasswordSprayDetector",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:32Z"
+        },
+        {
+          "key": "distinct_accounts_count",
+          "value": "8",
+          "source": "PasswordSprayDetector",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:32Z"
+        },
+        {
+          "key": "max_attempts_per_account",
+          "value": "3",
+          "source": "PasswordSprayDetector",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:32Z"
+        },
+        {
+          "key": "time_window_seconds",
+          "value": "92",
+          "source": "PasswordSprayDetector",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:32Z"
+        },
+        {
+          "key": "targeted_accounts_sample",
+          "value": "user0@example.test,user1@example.test,user2@example.test,user3@example.test,user4@example.test,user5@example.test,user6@example.test,user7@example.test",
+          "source": "PasswordSprayDetector",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:32Z"
+        }
+      ],
+      "mitre_attack_ids": [
+        "T1110.003"
+      ]
+    }
+  ],
+  "corroborated_threat_events": [
+    {
+      "id": "f354eba1-928b-4d01-b62f-8afedbd8d34e",
+      "event_type": "PASSWORD_SPRAY_ATTACK",
+      "severity": "HIGH",
+      "summary": "Source IP 198.51.100.20 attempted authentication across 8 distinct accounts with at most 3 attempt(s) per account within 92s. This low-and-slow horizontal distribution is a hallmark of password spraying to evade lockouts."
+    }
+  ],
+  "account_profiles": {
+    "user4@example.test": {
+      "account_id": "user4@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user1@example.test": {
+      "account_id": "user1@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user3@example.test": {
+      "account_id": "user3@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user0@example.test": {
+      "account_id": "user0@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user5@example.test": {
+      "account_id": "user5@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user2@example.test": {
+      "account_id": "user2@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user7@example.test": {
+      "account_id": "user7@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    },
+    "user6@example.test": {
+      "account_id": "user6@example.test",
+      "baseline_status": "INSUFFICIENT_HISTORY",
+      "first_seen": null,
+      "last_seen": null,
+      "total_successful_logins": 0,
+      "total_failed_logins": 0,
+      "known_source_ips": [],
+      "known_devices": [],
+      "known_countries": [],
+      "known_client_profiles": [],
+      "typical_login_hours": [],
+      "mfa_always_used": false,
+      "last_successful_login_location": null,
+      "last_successful_login_timestamp": null
+    }
+  },
+  "ato_suspected": false,
+  "ato_summary": null,
+  "created_at": "2026-10-13T01:52:45.225460Z"
+}

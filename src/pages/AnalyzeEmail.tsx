@@ -1,3 +1,5 @@
+import { apiDownload } from '../utils/apiClient';
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -75,7 +77,7 @@ export const AnalyzeEmail: React.FC = () => {
 
   const fetchRecent = async () => {
     try {
-      const res = await fetch(apiUrl('/api/dashboard/emails?limit=5'));
+      const res = await apiFetch(apiUrl('/api/dashboard/emails?limit=5'));
       if (res.ok) {
         const data = await res.json();
         if (data && data.items) {
@@ -106,7 +108,7 @@ export const AnalyzeEmail: React.FC = () => {
       // Server in-flight processing
       setPipelineStatus('processing');
 
-      const res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
+      const res = await apiFetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
 
       if (res && res.ok) {
         const data = await res.json();
@@ -411,7 +413,7 @@ export const AnalyzeEmail: React.FC = () => {
                         </button>
                         <button
                           type="button"
-                          onClick={() => window.open(apiUrl(`/api/emails/${encodeURIComponent(evId)}/download`), '_blank')}
+                          onClick={() => void apiDownload(apiUrl(`/api/emails/${encodeURIComponent(evId)}/download`)).catch(error => window.alert(error.message))}
                           className="px-2.5 py-1 rounded-md bg-surface-secondary border border-border hover:border-primary/40 text-foreground hover:text-primary text-[11px] font-mono flex items-center space-x-1 cursor-pointer transition-colors"
                           title="Download RFC-822 .EML"
                         >

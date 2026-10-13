@@ -2,9 +2,9 @@ import os
 import time
 import logging
 from pathlib import Path
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, Column, String, event, inspect
 from sqlalchemy.exc import OperationalError
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.orm import sessionmaker, declarative_base, Session, with_loader_criteria
 
 logger = logging.getLogger("mailtrace.db")
 
@@ -34,7 +34,35 @@ else:
 engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-Base = declarative_base()
+from contextvars import ContextVar
+from fastapi import HTTPException
+request_workspace = ContextVar("request_workspace", default=None)
+class WorkspaceOwned:
+    workspace_id = Column(String(128), nullable=False, default="default", index=True)
+Base = declarative_base(cls=WorkspaceOwned)
+
+@event.listens_for(Session, 'do_orm_execute')
+def scope_workspace(state):
+    workspace = request_workspace.get()
+    if workspace is not None and (state.is_select or state.is_update or state.is_delete):
+        state.statement = state.statement.options(with_loader_criteria(WorkspaceOwned,
+            lambda model: model.workspace_id == workspace, include_aliases=True))
+
+@event.listens_for(Session, 'before_flush')
+def guard_workspace(session, context, instances):
+    workspace = request_workspace.get()
+    if workspace is None: return
+    for row in session.new:
+        if isinstance(row,WorkspaceOwned):
+            if row.workspace_id not in (None,'default',workspace): raise HTTPException(403,'Cross-workspace write denied.')
+            row.workspace_id = workspace
+            if hasattr(row,'tenant_id'):
+                if row.tenant_id not in (None,'default',workspace): raise HTTPException(403,'Cross-tenant write denied.')
+                row.tenant_id = workspace
+    for row in session.dirty.union(session.deleted):
+        if isinstance(row,WorkspaceOwned) and row.workspace_id != workspace:
+            raise HTTPException(403,'Cross-workspace mutation denied.')
+
 
 
 def get_db():
@@ -279,6 +307,9 @@ def init_db(max_retries: int = 15, retry_delay: float = 2.0) -> bool:
                     except Exception:
                         pass
             Base.metadata.create_all(bind=engine)
+            with engine.begin() as conn:
+                from backend.db.workspace_schema import upgrade_workspace_ownership
+                upgrade_workspace_ownership(conn, Base.metadata)
             logger.info("Database connection established and tables verified successfully.")
             return True
         except (OperationalError, Exception) as exc:

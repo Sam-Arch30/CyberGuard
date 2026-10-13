@@ -1,0 +1,82 @@
+{
+  "ingestion_id": "3202d19d-b08e-44a8-b6e0-ff1b3b2d593c",
+  "artifact_id": "2c302067-a89b-4566-93b4-d81fffdc3c4e",
+  "artifact_type": "EMAIL",
+  "input_mode": "FILE_UPLOAD",
+  "name": "benign-meeting.eml",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "e4fc1eb444a78f86b694de342de71096e9dcfe0d753b669ccc0bf2054cb94ba1",
+  "size": 381,
+  "mime_type": "message/rfc822",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "EMAIL",
+    "detected_mime": "message/rfc822",
+    "reported_mime": "message/rfc822",
+    "confidence": 0.98,
+    "detector": "rfc822_header_tokens",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "email_forensics",
+      "auth_analyzer",
+      "nlp_classifier",
+      "threat_scorer",
+      "attribution_engine",
+      "ai_analyst",
+      "digital_impersonation_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 381,
+      "original_filename": "benign-meeting.eml"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/e4/e4fc1eb444a78f86b694de342de71096e9dcfe0d753b669ccc0bf2054cb94ba1/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "email_forensics",
+    "auth_analyzer",
+    "nlp_classifier",
+    "threat_scorer",
+    "attribution_engine",
+    "ai_analyst",
+    "digital_impersonation_analyzer"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "benign-meeting.eml",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "EMAIL",
+      "detected_mime": "message/rfc822",
+      "reported_mime": "message/rfc822",
+      "confidence": 0.98,
+      "detector": "rfc822_header_tokens",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "email_forensics",
+        "auth_analyzer",
+        "nlp_classifier",
+        "threat_scorer",
+        "attribution_engine",
+        "ai_analyst",
+        "digital_impersonation_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 381,
+        "original_filename": "benign-meeting.eml"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:34.706356",
+  "evidence_id": "EVD-E4FC1EB444",
+  "investigation_id": "311503ec-545a-4f9b-8b6c-7bc060061453",
+  "analysis_run_id": "897b5521-0cb7-441c-8cdc-381e2d6b5f6b",
+  "duplicate": false
+}

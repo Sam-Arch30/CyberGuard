@@ -542,6 +542,13 @@ class FileIdentityAnalyzer:
                 metadata={"script_type": detected_type},
             )
 
+        declared_mimes = {'.pdf': 'application/pdf', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                          '.png': 'image/png', '.gif': 'image/gif', '.bmp': 'image/bmp',
+                          '.webp': 'image/webp', '.wav': 'audio/wav'}
+        if not is_mismatch and ext in declared_mimes and detected_mime != declared_mimes[ext]:
+            is_mismatch = True
+            mismatch_desc = f"Declared extension '{ext}' does not match detected content '{detected_mime}'."
+
         if is_mismatch and mismatch_desc:
             result.add_finding(
                 title="File Type and Extension Mismatch Detected",
@@ -1784,6 +1791,10 @@ class FileIOCAnalyzer:
         result = AnalyzerExecutionResult(self.name, self.version)
         sample_text = payload[:self.MAX_EXTRACTED_CHARS].decode("latin-1", errors="ignore")
 
+        # Refang only the bounded analysis copy; preserve original evidence bytes.
+        sample_text = re.sub(r"hxxps?://", lambda m: "https://" if m.group(0).lower().startswith("hxxps") else "http://", sample_text, flags=re.I)
+        sample_text = sample_text.replace("[.]", ".")
+
         urls: Set[str] = set()
         domains: Set[str] = set()
         ips: Set[str] = set()
@@ -1844,6 +1855,9 @@ class FileIOCAnalyzer:
             result.add_indicator(IndicatorTypeEnum.EMAIL_ADDRESS, em, source="FILE_PRINTABLE_STRINGS")
 
         if clean_urls:
+            url_evidence = [result.add_evidence(source="FILE_PRINTABLE_STRINGS", evidence_type="URL",
+                            raw_content=url, parsed_content={"url": url}, metadata={"assessment": "UNVERIFIED"})
+                            for url in clean_urls]
             result.add_finding(
                 title=f"External URLs Embedded in File Payload ({len(clean_urls)} discovered)",
                 description=f"File contains printable external URL references: {', '.join(clean_urls[:3])}.",
@@ -1851,6 +1865,7 @@ class FileIOCAnalyzer:
                 category="IOC",
                 severity=SeverityEnum.LOW,
                 confidence=1.0,
+                evidence_indices=url_evidence,
                 metadata={"urls": clean_urls},
             )
 
@@ -1982,6 +1997,12 @@ class FileClassificationService:
         # Check finding types
         finding_types = {f.get("finding_type") for f in findings}
 
+        if 'ANTIVIRUS_TEST_SIGNATURE' in finding_types:
+            return ('ANTIVIRUS_TEST_FILE', 0.0, SeverityEnum.LOW, 1.0,
+                    'Harmless EICAR test signature detected; this is not evidence of actual malware.')
+        if 'FILE_TYPE_MISMATCH' in finding_types:
+            score += 25.0
+
         # Zip-Slip exploit
         if "PATH_TRAVERSAL_DETECTED" in finding_types:
             return (
@@ -2049,11 +2070,13 @@ class FileClassificationService:
         else:
             if detected_type in ("Generic binary", "Unknown Archive"):
                 classification = "UNKNOWN"
-                severity = SeverityEnum.SAFE
+                severity = SeverityEnum.LOW
+                confidence = 0.0
                 summary = "Unknown format: file structure is not recognized or lacks deterministic parsing rules. (Note: Unknown != Safe)."
             else:
-                classification = "BENIGN_LIKELY"
-                severity = SeverityEnum.SAFE
-                summary = "Benign: standard clean file structure with zero suspicious indicators or evasion markers detected."
+                classification = "UNVERIFIED"
+                severity = SeverityEnum.LOW
+                confidence = 0.0
+                summary = "No suspicious static indicators were observed. These limited checks do not establish file safety or verified decoding."
 
         return classification, final_score, severity, confidence, summary

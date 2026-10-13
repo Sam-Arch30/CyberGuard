@@ -620,7 +620,7 @@ export const UniversalDropZone: React.FC<UniversalDropZoneProps> = ({
                   </div>
                 )}
 
-                {item.warnings && item.warnings.length > 0 && !item.duplicate && (
+                {item.warnings && item.warnings.length > 0 && (
                   <div className="p-2 rounded bg-surface-secondary text-foreground-muted text-[11px] font-mono">
                     {item.warnings.join(' • ')}
                   </div>

@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 63: Asset & Identity Inventory API Client Service.
  */
@@ -21,7 +22,7 @@ export class InventoryService {
    * Fetches overall inventory KPI metrics and health statistics.
    */
   static async getOverviewStats(): Promise<InventoryOverviewStats> {
-    const res = await fetch(`${BASE_URL}/overview`);
+    const res = await apiFetch(`${BASE_URL}/overview`);
     if (!res.ok) {
       throw new Error(`Failed to fetch inventory overview stats: ${res.statusText}`);
     }
@@ -55,7 +56,7 @@ export class InventoryService {
     if (params?.skip !== undefined) query.set('skip', String(params.skip));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
 
-    const res = await fetch(`${BASE_URL}/assets?${query.toString()}`);
+    const res = await apiFetch(`${BASE_URL}/assets?${query.toString()}`);
     if (!res.ok) {
       throw new Error(`Failed to list inventory assets: ${res.statusText}`);
     }
@@ -66,7 +67,7 @@ export class InventoryService {
    * Fetches full progressive disclosure details for a specific asset.
    */
   static async getAssetDetail(id: string): Promise<InventoryAssetDetail> {
-    const res = await fetch(`${BASE_URL}/assets/${id}`);
+    const res = await apiFetch(`${BASE_URL}/assets/${id}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch asset detail for ${id}: ${res.statusText}`);
     }
@@ -77,7 +78,7 @@ export class InventoryService {
    * Updates an asset's classification, criticality, or environment.
    */
   static async updateAsset(id: string, payload: Partial<InventoryAsset>): Promise<InventoryAsset> {
-    const res = await fetch(`${BASE_URL}/assets/${id}`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -95,7 +96,7 @@ export class InventoryService {
     id: string,
     payload: { owner: string; team?: string; department?: string; business_unit?: string; reason?: string }
   ): Promise<InventoryAsset> {
-    const res = await fetch(`${BASE_URL}/assets/${id}/assign-owner`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${id}/assign-owner`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -133,7 +134,7 @@ export class InventoryService {
     if (params?.skip !== undefined) query.set('skip', String(params.skip));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
 
-    const res = await fetch(`${BASE_URL}/identities?${query.toString()}`);
+    const res = await apiFetch(`${BASE_URL}/identities?${query.toString()}`);
     if (!res.ok) {
       throw new Error(`Failed to list inventory identities: ${res.statusText}`);
     }
@@ -144,7 +145,7 @@ export class InventoryService {
    * Fetches full progressive disclosure details for an identity.
    */
   static async getIdentityDetail(id: string): Promise<InventoryIdentityDetail> {
-    const res = await fetch(`${BASE_URL}/identities/${id}`);
+    const res = await apiFetch(`${BASE_URL}/identities/${id}`);
     if (!res.ok) {
       throw new Error(`Failed to fetch identity detail for ${id}: ${res.statusText}`);
     }
@@ -155,7 +156,7 @@ export class InventoryService {
    * Lists registered authoritative sources.
    */
   static async listSources(): Promise<InventorySource[]> {
-    const res = await fetch(`${BASE_URL}/sources`);
+    const res = await apiFetch(`${BASE_URL}/sources`);
     if (!res.ok) {
       throw new Error(`Failed to list inventory sources: ${res.statusText}`);
     }
@@ -172,7 +173,7 @@ export class InventoryService {
     sync_interval_seconds?: number;
     capabilities?: string[];
   }): Promise<InventorySource> {
-    const res = await fetch(`${BASE_URL}/sources`, {
+    const res = await apiFetch(`${BASE_URL}/sources`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -187,7 +188,7 @@ export class InventoryService {
    * Deletes an inventory source.
    */
   static async deleteSource(id: string): Promise<void> {
-    const res = await fetch(`${BASE_URL}/sources/${id}`, {
+    const res = await apiFetch(`${BASE_URL}/sources/${id}`, {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -210,7 +211,7 @@ export class InventoryService {
     if (params?.skip !== undefined) query.set('skip', String(params.skip));
     if (params?.limit !== undefined) query.set('limit', String(params.limit));
 
-    const res = await fetch(`${BASE_URL}/conflicts?${query.toString()}`);
+    const res = await apiFetch(`${BASE_URL}/conflicts?${query.toString()}`);
     if (!res.ok) {
       throw new Error(`Failed to list inventory conflicts: ${res.statusText}`);
     }
@@ -224,7 +225,7 @@ export class InventoryService {
     id: string,
     payload: { selected_value: string; selected_source?: string; resolution_reason: string }
   ): Promise<InventoryConflict> {
-    const res = await fetch(`${BASE_URL}/conflicts/${id}/resolve`, {
+    const res = await apiFetch(`${BASE_URL}/conflicts/${id}/resolve`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -243,7 +244,7 @@ export class InventoryService {
     sync_identities?: boolean;
     sync_telemetry?: boolean;
   }): Promise<InventorySyncResponse> {
-    const res = await fetch(`${BASE_URL}/sync`, {
+    const res = await apiFetch(`${BASE_URL}/sync`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(params || {}),
@@ -258,7 +259,7 @@ export class InventoryService {
    * Runs an on-demand full reconciliation sweep.
    */
   static async runReconciliation(): Promise<InventoryReconciliationReport> {
-    const res = await fetch(`${BASE_URL}/reconcile`, {
+    const res = await apiFetch(`${BASE_URL}/reconcile`, {
       method: 'POST',
     });
     if (!res.ok) {

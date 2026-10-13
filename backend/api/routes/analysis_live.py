@@ -69,7 +69,8 @@ def _build_live_response(run: AnalysisRunModel, db: Session) -> AnalysisRunLiveR
         AnalysisTaskModel.analysis_run_id == run.id
     ).order_by(AnalysisTaskModel.created_at).all()
 
-    if not tasks:
+    completed_media = bool(artifact and artifact.artifact_type.upper() in ('IMAGE', 'AUDIO', 'VIDEO') and run.status in ('COMPLETED', 'PARTIAL'))
+    if not tasks and not completed_media:
         tasks = AnalysisOrchestrator.initialize_run_dag(db, run.id)
 
     events = db.query(AnalysisEventModel).filter(
@@ -163,7 +164,7 @@ def _build_live_response(run: AnalysisRunModel, db: Session) -> AnalysisRunLiveR
             finding_type=f.finding_type,
             title=f.title,
             severity=f.severity,
-            confidence=f.confidence or 1.0,
+            confidence=f.confidence if f.confidence is not None else 0.0,
             risk_contribution=f.risk_contribution or 0.0,
         )
         for f in findings
@@ -188,7 +189,7 @@ def _build_live_response(run: AnalysisRunModel, db: Session) -> AnalysisRunLiveR
         evidence_id=evidence_id,
         artifact_name=artifact.name if artifact else "unknown",
         artifact_type=artifact.artifact_type if artifact else "FILE",
-        artifact_size=artifact.size if artifact else 0,
+        artifact_size=(artifact.size or 0) if artifact else 0,
         artifact_sha256=artifact.sha256 if artifact else None,
         artifact_source=artifact.source if artifact else "UNKNOWN",
         status=run.status,
@@ -330,7 +331,7 @@ async def stream_live_analysis(
     artifact = db.query(ArtifactModel).filter(ArtifactModel.id == run.artifact_id).first()
     if artifact:
         art_ws = getattr(artifact, "workspace_id", None)
-        if not art_ws and artifact.metadata_json:
+        if art_ws in (None, "default") and artifact.metadata_json:
             try:
                 meta = json.loads(artifact.metadata_json)
                 art_ws = meta.get("workspace_id")

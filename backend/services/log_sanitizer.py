@@ -5,8 +5,8 @@ from typing import Any
 
 # Sensitive regex patterns to redact in server logs
 SENSITIVE_PATTERNS = [
-    (re.compile(r'Authorization\s*:\s*Bearer\s+[^\r\n\s,]+', re.IGNORECASE), 'Authorization: Bearer [REDACTED]'),
-    (re.compile(r'Authorization\s*:\s*Basic\s+[^\r\n\s,]+', re.IGNORECASE), 'Authorization: Basic [REDACTED]'),
+    (re.compile(r'Authorization\s*:\s*Bearer\s+[^\r\n\s,]+', re.IGNORECASE), 'Authorization: [REDACTED]'),
+    (re.compile(r'Authorization\s*:\s*Basic\s+[^\r\n\s,]+', re.IGNORECASE), 'Authorization: [REDACTED]'),
     (re.compile(r'Bearer\s+[a-zA-Z0-9_\-\.]{8,}', re.IGNORECASE), 'Bearer [REDACTED]'),
     (re.compile(r'(?:api_key|apikey|x-api-key|key)\s*[:=]\s*["\']?[a-zA-Z0-9_\-]{8,}["\']?', re.IGNORECASE), 'api_key=[REDACTED]'),
     (re.compile(r'(?:password|secret|token|passwd|pwd)\s*[:=]\s*["\']?[^"\'\s,]+["\']?', re.IGNORECASE), 'password=[REDACTED]'),

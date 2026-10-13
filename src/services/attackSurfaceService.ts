@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 62: Attack Surface Intelligence Service.
  * REST client for assets, actionable exposures, unknown asset review, discovery, and diffs.
@@ -24,7 +25,7 @@ export class AttackSurfaceService {
    */
   static async getOverview(workspaceId: string = 'default'): Promise<AttackSurfaceOverviewStats> {
     const url = apiUrl('/api/v1/attack-surface/overview');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -64,7 +65,7 @@ export class AttackSurfaceService {
     if (params.offset !== undefined) qParams.set('offset', String(params.offset));
 
     const url = apiUrl(`/api/v1/attack-surface/assets?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -84,7 +85,7 @@ export class AttackSurfaceService {
    */
   static async createAsset(payload: Record<string, any>, workspaceId: string = 'default'): Promise<Asset> {
     const url = apiUrl('/api/v1/attack-surface/assets');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -105,7 +106,7 @@ export class AttackSurfaceService {
    */
   static async getAssetDetail(assetId: string, workspaceId: string = 'default'): Promise<AssetDetail> {
     const url = apiUrl(`/api/v1/attack-surface/assets/${encodeURIComponent(assetId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -129,7 +130,7 @@ export class AttackSurfaceService {
     workspaceId: string = 'default'
   ): Promise<Asset> {
     const url = apiUrl(`/api/v1/attack-surface/assets/${encodeURIComponent(assetId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -150,7 +151,7 @@ export class AttackSurfaceService {
    */
   static async getAssetTimeline(assetId: string, workspaceId: string = 'default'): Promise<AssetTimelineItem[]> {
     const url = apiUrl(`/api/v1/attack-surface/assets/${encodeURIComponent(assetId)}/timeline`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -188,7 +189,7 @@ export class AttackSurfaceService {
     if (params.offset !== undefined) qParams.set('offset', String(params.offset));
 
     const url = apiUrl(`/api/v1/attack-surface/exposures?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -213,7 +214,7 @@ export class AttackSurfaceService {
     workspaceId: string = 'default'
   ): Promise<Exposure> {
     const url = apiUrl(`/api/v1/attack-surface/exposures/${encodeURIComponent(exposureId)}/resolve`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -238,7 +239,7 @@ export class AttackSurfaceService {
     workspaceId: string = 'default'
   ): Promise<{ items: UnknownAssetQueueItem[]; total: number; limit: number; offset: number }> {
     const url = apiUrl(`/api/v1/attack-surface/unknown-queue?limit=${limit}&offset=${offset}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -262,7 +263,7 @@ export class AttackSurfaceService {
     workspaceId: string = 'default'
   ): Promise<Asset> {
     const url = apiUrl(`/api/v1/attack-surface/unknown-queue/${encodeURIComponent(assetId)}/review`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -283,7 +284,7 @@ export class AttackSurfaceService {
    */
   static async listScopes(workspaceId: string = 'default'): Promise<AttackSurfaceScope[]> {
     const url = apiUrl('/api/v1/attack-surface/scopes');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -306,7 +307,7 @@ export class AttackSurfaceService {
     workspaceId: string = 'default'
   ): Promise<AttackSurfaceScope> {
     const url = apiUrl('/api/v1/attack-surface/scopes');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -327,7 +328,7 @@ export class AttackSurfaceService {
    */
   static async deleteScope(scopeId: string, workspaceId: string = 'default'): Promise<boolean> {
     const url = apiUrl(`/api/v1/attack-surface/scopes/${encodeURIComponent(scopeId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -355,7 +356,7 @@ export class AttackSurfaceService {
     workspaceId: string = 'default'
   ): Promise<AttackSurfaceDiscoveryResponse> {
     const url = apiUrl('/api/v1/attack-surface/discover');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -376,7 +377,7 @@ export class AttackSurfaceService {
    */
   static async getDiff(workspaceId: string = 'default'): Promise<AttackSurfaceDiffResponse> {
     const url = apiUrl('/api/v1/attack-surface/diff');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

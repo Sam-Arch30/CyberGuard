@@ -839,7 +839,7 @@ class ModelVersionModel(Base):
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
 
     __table_args__ = (
-        Index("ix_model_versions_name_version", "model_name", "version", unique=True),
+        Index("ix_model_versions_name_version", "workspace_id", "model_name", "version", unique=True),
     )
 
     findings = relationship("FindingModel", back_populates="model_version")
@@ -942,7 +942,7 @@ class IndicatorModel(Base):
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
     __table_args__ = (
-        Index("ix_indicators_type_norm", "indicator_type", "normalized_value", unique=True),
+        Index("ix_indicators_type_norm", "workspace_id", "indicator_type", "normalized_value", unique=True),
     )
 
 
@@ -1088,28 +1088,28 @@ class IncidentModel(Base):
     created_at = Column(DateTime, default=get_utc_now, nullable=False)
     updated_at = Column(DateTime, default=get_utc_now, onupdate=get_utc_now, nullable=False)
 
-    threat_events = relationship("ThreatEventModel", back_populates="incident", lazy="selectin")
-    response_actions = relationship("ResponseActionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    attack_paths = relationship("AttackPathModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    attack_hypotheses = relationship("AttackHypothesisModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    security_events = relationship("SecurityEventModel", back_populates="incident", lazy="selectin")
-    temporal_sequences = relationship("TemporalSequenceCandidateModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    attack_technique_mappings = relationship("AttackTechniqueMappingModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    infrastructure_attributions = relationship("InfrastructureAttributionModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    infrastructure_clusters = relationship("InfrastructureClusterModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    behavioral_deviations = relationship("BehavioralDeviationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    novelty_assessments = relationship("NoveltyAssessmentModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
-    emerging_patterns = relationship("EmergingPatternCandidateModel", back_populates="incident", lazy="selectin")
-    threat_memory_observations = relationship("ThreatMemoryObservationModel", back_populates="incident", lazy="selectin")
-    risk_assessments = relationship("RiskAssessmentModel", back_populates="incident", foreign_keys="RiskAssessmentModel.incident_id", cascade="all, delete-orphan", lazy="selectin")
-    device_correlations = relationship("DeviceIncidentCorrelationModel", back_populates="incident", cascade="all, delete-orphan", lazy="selectin")
+    threat_events = relationship("ThreatEventModel", back_populates="incident", lazy="select")
+    response_actions = relationship("ResponseActionModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    attack_paths = relationship("AttackPathModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    attack_hypotheses = relationship("AttackHypothesisModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    security_events = relationship("SecurityEventModel", back_populates="incident", lazy="select")
+    temporal_sequences = relationship("TemporalSequenceCandidateModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    attack_technique_mappings = relationship("AttackTechniqueMappingModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    infrastructure_attributions = relationship("InfrastructureAttributionModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    infrastructure_clusters = relationship("InfrastructureClusterModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    behavioral_deviations = relationship("BehavioralDeviationModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    novelty_assessments = relationship("NoveltyAssessmentModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
+    emerging_patterns = relationship("EmergingPatternCandidateModel", back_populates="incident", lazy="select")
+    threat_memory_observations = relationship("ThreatMemoryObservationModel", back_populates="incident", lazy="select")
+    risk_assessments = relationship("RiskAssessmentModel", back_populates="incident", foreign_keys="RiskAssessmentModel.incident_id", cascade="all, delete-orphan", lazy="select")
+    device_correlations = relationship("DeviceIncidentCorrelationModel", back_populates="incident", cascade="all, delete-orphan", lazy="select")
 
-    timeline_events = relationship("IncidentTimelineEventModel", back_populates="incident", cascade="all, delete-orphan", order_by="asc(IncidentTimelineEventModel.timestamp)", lazy="selectin")
-    notes = relationship("IncidentNoteModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentNoteModel.created_at)", lazy="selectin")
-    duplicate_of = relationship("IncidentModel", remote_side=[id], foreign_keys=[duplicate_of_id], lazy="selectin")
-    sla_state = relationship("IncidentSLAStateModel", back_populates="incident", uselist=False, cascade="all, delete-orphan", lazy="selectin")
-    workflow_executions = relationship("IncidentWorkflowExecutionModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentWorkflowExecutionModel.executed_at)", lazy="selectin")
-    sla_pause_logs = relationship("IncidentSLAPauseLogModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentSLAPauseLogModel.timestamp)", lazy="selectin")
+    timeline_events = relationship("IncidentTimelineEventModel", back_populates="incident", cascade="all, delete-orphan", order_by="asc(IncidentTimelineEventModel.timestamp)", lazy="select")
+    notes = relationship("IncidentNoteModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentNoteModel.created_at)", lazy="select")
+    duplicate_of = relationship("IncidentModel", remote_side=[id], foreign_keys=[duplicate_of_id], lazy="select")
+    sla_state = relationship("IncidentSLAStateModel", back_populates="incident", uselist=False, cascade="all, delete-orphan", lazy="select")
+    workflow_executions = relationship("IncidentWorkflowExecutionModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentWorkflowExecutionModel.executed_at)", lazy="select")
+    sla_pause_logs = relationship("IncidentSLAPauseLogModel", back_populates="incident", cascade="all, delete-orphan", order_by="desc(IncidentSLAPauseLogModel.timestamp)", lazy="select")
 
     __table_args__ = (
         Index("ix_incidents_workspace_status", "workspace_id", "status"),

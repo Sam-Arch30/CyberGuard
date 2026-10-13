@@ -25,7 +25,7 @@ export const Reports: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
 
   // Tab State
-  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'executive' | 'standard'>('executive');
+  const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'executive' | 'standard'>('standard');
 
   // State
   const [reportsList, setReportsList] = useState<ReportListItem[]>([]);
@@ -169,10 +169,10 @@ export const Reports: React.FC = () => {
             <span>FORENSIC EVIDENCE & REPRODUCIBLE REPORTING REPOSITORY</span>
           </div>
           <h1 className="text-xl sm:text-2xl font-bold text-foreground font-sans tracking-tight">
-            Forensic Incident Reports
+            Report library
           </h1>
           <p className="text-xs text-foreground-muted font-mono mt-1">
-            Immutable, evidence-backed security reports compiled across investigations with cryptographic bitstream verification and vector PDF archives.
+            Review saved findings, evidence and limitations. Export a clear record of each investigation.
           </p>
         </div>
 
@@ -283,7 +283,7 @@ export const Reports: React.FC = () => {
             ) : (
               filteredReports.map((rep) => {
                 const isSelected = selectedReportId === rep.id;
-                const sizeKb = rep.file_size_bytes ? `${Math.round(rep.file_size_bytes / 1024)} KB` : 'Vector PDF';
+                const sizeKb = rep.file_size_bytes ? `${Math.round(rep.file_size_bytes / 1024)} KB` : 'PDF';
                 return (
                   <div
                     key={rep.id}
@@ -384,7 +384,7 @@ export const Reports: React.FC = () => {
                     ) : (
                       <Download className="w-3.5 h-3.5" />
                     )}
-                    <span>Vector PDF</span>
+                    <span>Download PDF</span>
                   </button>
 
                   {/* Export JSON Bundle */}

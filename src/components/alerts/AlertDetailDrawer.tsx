@@ -118,7 +118,7 @@ export const AlertDetailDrawer: React.FC<AlertDetailDrawerProps> = ({
 
   // Section 46 real-time update handler: refresh if current alert updated
   useRealtimeSubscription({
-    url: isOpen && alertId ? `/api/events/stream` : null,
+    url: isOpen && alertId ? `/api/jobs/stream` : null,
     onEvent: (event: RealtimeEvent) => {
       const isTargetAlert =
         event.resource_id === alertId ||

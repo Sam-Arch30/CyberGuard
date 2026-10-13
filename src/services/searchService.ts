@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Frontend client service for Section 43: History & Search.
  * Interacts with /api/search and /api/investigations endpoints.
@@ -82,7 +83,7 @@ export const searchService = {
     if (opts.limit !== undefined) params.set('limit', String(opts.limit));
     if (opts.offset !== undefined) params.set('offset', String(opts.offset));
 
-    const res = await fetch(apiUrl(`/api/search?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`/api/search?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Search failed (${res.status})`);
@@ -95,7 +96,7 @@ export const searchService = {
    * Performs deep cross-investigation lookup for any indicator with Threat Memory and provenance.
    */
   async lookupIndicator(value: string): Promise<CrossInvestigationIndicatorResponse> {
-    const res = await fetch(apiUrl(`/api/search/indicator/${encodeURIComponent(value)}`));
+    const res = await apiFetch(apiUrl(`/api/search/indicator/${encodeURIComponent(value)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Indicator lookup failed (${res.status})`);
@@ -164,7 +165,7 @@ export const searchService = {
     params.set('limit', String(pageSize));
     params.set('offset', String(offset));
 
-    const res = await fetch(apiUrl(`/api/investigations?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`/api/investigations?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch investigations (${res.status})`);

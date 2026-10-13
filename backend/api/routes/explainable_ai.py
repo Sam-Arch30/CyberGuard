@@ -92,9 +92,13 @@ def get_explanation(
             force_refresh=force_refresh,
         )
         return ExplanationComposer.to_response_model(expl_model, db)
+    except HTTPException:
+        raise
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         logger.error(f"Error composing explanation for {scope_type}/{scope_id}: {exc}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get("/{scope_type}/{scope_id}/layers/{layer_level}", summary="Retrieve explanation at specified progressive disclosure depth")

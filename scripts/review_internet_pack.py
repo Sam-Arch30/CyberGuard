@@ -1,0 +1,58 @@
+"""Review actual receipts; transport acceptance is never relabelled detection success."""
+from pathlib import Path
+import csv,html,json
+from collections import Counter
+ROOT=Path('C:/Users/bipin/Downloads/CyberGuard-Detection-Samples-2026-10-12');OUT=ROOT/'test-results'
+raw=json.loads((OUT/'results.json').read_text());rows=raw['results'];manifest={r['file']:r for r in json.loads((ROOT/'manifest.json').read_text())}
+annotated=[]
+for index,row in enumerate(rows,1):
+ item=dict(row);receipt=OUT/'responses'/f'{index:04d}.json'
+ if receipt.exists():
+  response=json.loads(receipt.read_text())
+  if item.get('risk') is None:item['risk']=response.get('overall_score',response.get('overall_risk_score',response.get('risk_score')))
+  item['response_file']=str(receipt.relative_to(ROOT))
+ annotated.append(item)
+media=[r for r in rows if r['stage']=='Media'];by_label={}
+for label,description in [('FAKE','50 provider-labelled fake face images'),('REAL','50 provider-labelled real face images'),('REAL_PUBLIC_NASA_PHOTO','One real NASA portrait'),('PUBLISHER_DEEPFAKE','Five publisher-labelled deepfake videos')]:
+ subset=[r for r in media if manifest.get(r['sample'],{}).get('label')==label]
+ if label in ('FAKE','REAL'):subset=[r for r in subset if r['sample'].startswith('06-media-images/')]
+ by_label[label]={'total':len(subset),'predictions':dict(Counter(r.get('trained_prediction') or r.get('trained_status') or 'NO_RESULT' for r in subset)),'description':description}
+criteria=[]
+def criterion(name,passed,evidence):criteria.append({'criterion':name,'status':'PASS' if passed else 'FAIL','evidence':evidence})
+def find(stage,suffix):return next(r for r in rows if r['stage']==stage and r['sample'].endswith(suffix))
+normal=find('Authentication','normal-auth.json');spray=find('Authentication','password-spray.json');jsonl=find('Authentication','authentication-events.jsonl')
+criterion('Normal authentication negative control',normal['http']==200 and normal['risk']==0 and normal['finding_count']==0,str(normal))
+criterion('24-event synthetic password-spray detection',spray['risk']>0 and spray['finding_count']>0,str(spray))
+criterion('Synthetic JSON/JSONL equivalent risk and classification',all(spray.get(k)==jsonl.get(k) for k in ['risk','classification','finding_count']),f'JSON {spray["risk"]}, JSONL {jsonl["risk"]}')
+azjson=find('Authentication','azure_ad_distributed_spray.json');azjsonl=find('Authentication','azure_ad_distributed_spray.jsonl')
+criterion('Public Azure authentication threat findings',azjson['http']==200 and azjson['risk']>0 and azjson['finding_count']>0,str(azjson))
+criterion('Azure JSON/JSONL equivalent risk and classification',all(azjson.get(k)==azjsonl.get(k) for k in ['risk','classification','finding_count']),f'Both risk {azjson["risk"]}')
+malformed=find('Authentication','malformed.json');criterion('Malformed structured authentication rejection',malformed['http']==422,str(malformed))
+trusted=find('Identity control','local-identity-trusted');suspicious=find('Identity control','local-identity-suspicious')
+criterion('Controlled impersonation scores above trusted sender',trusted['risk']<suspicious['risk'] and suspicious['finding_count']>0,f'Trusted {trusted["risk"]}, suspicious {suspicious["risk"]}')
+for suffix in ['lab-2.json','lab-3.json']:
+ case=find('Identity',suffix);criterion('Public identity claim recognition: '+suffix,case['risk']>0 and case['finding_count']>0,'Matching Microsoft/PayPal trusted domain reference supplied; '+str(case))
+for suffix in ['empty.txt','broken.pdf','jpeg-with-pdf-extension.pdf']:
+ case=find('Static file',suffix);criterion('Static analysis does not claim SAFE on invalid/mismatched '+suffix,case['http']>=400 or case['classification'] not in ('BENIGN_LIKELY','SAFE'),str(case))
+eicar=find('Static file','eicar-antivirus-test.txt');criterion('Recognize harmless standard EICAR test signature',eicar['finding_count']>0,'Not real malware; current static engine returned '+str(eicar))
+url_rows=[r for r in rows if r['stage']=='Passive URL'];criterion('Passive URL requests avoid internal-server errors',not any(r['http']>=500 for r in url_rows),str([(r['sample'],r['http']) for r in url_rows if r['http']>=500]))
+pdfs=[r for r in rows if r['stage']=='PDF download'];criterion('Generated PDF downloads valid',all(r['transport']=='OK' for r in pdfs),f'{len(pdfs)} PDF signatures verified; this does not verify cryptographic sealing or every report claim.')
+snapshot=json.loads((OUT/'ui-api-snapshot.json').read_text());projection_errors=[path for path,item in snapshot.items() if item['status']>=500]
+summary={'date':'2026-10-12','input_catalog_files':len(manifest),'tested_file_inputs':len({r['sample'] for r in rows if r['stage']=='Intake'}),'documentation_files_skipped':1,'primary_api_checks':len(rows),'http_counts':dict(Counter(str(r['http']) for r in rows)),'transport_counts':dict(Counter(r['transport'] for r in rows)),'semantic_criteria_counts':dict(Counter(c['status'] for c in criteria)),'model_reference_comparison':by_label,'snapshot_projection_errors':projection_errors,'live_integrity':'Verified unchanged by two isolated runners','notes':['These are small exploratory samples; not an independent held-out accuracy benchmark.','All files share one fresh temporary workspace; repeated authentication batches can influence stored history.','Active HTTP inspection disabled on the 50 submitted URLs; DNS/RDAP lookups and normal email enrichment were used.','Screenshots use the real compiled UI displaying exact recorded test API responses; no new live analysis happens in the read-only viewer.','A 2xx HTTP response is acceptance, not a correct threat decision.']}
+(OUT/'review-summary.json').write_text(json.dumps(summary,indent=2),encoding='utf-8');(OUT/'semantic-checks.json').write_text(json.dumps(criteria,indent=2),encoding='utf-8')
+(OUT/'results-reviewed.json').write_text(json.dumps({**raw,'results':annotated},indent=2),encoding='utf-8')
+keys=['sample','stage','http','transport','risk','classification','finding_count','trained_status','trained_prediction','deepfake_score','seconds','detail','response_file']
+with (OUT/'results.csv').open('w',encoding='utf-8-sig',newline='') as f:
+ writer=csv.DictWriter(f,fieldnames=keys,extrasaction='ignore');writer.writeheader();writer.writerows(annotated)
+lines=['# CyberGuard internet sample audit','','Date: 12 October 2026','',f'193 file inputs tested (one source-card document skipped), 50 individual URL indicators analyzed, **{len(rows)} primary API checks**. HTTP outcomes: **446 accepted, 6 rejected, 3 internal-server errors**. These are transport outcomes, not a 98% detection accuracy claim.','',f'Explicit semantic checks: **{sum(c["status"]=="PASS" for c in criteria)} PASS**, **{sum(c["status"]=="FAIL" for c in criteria)} FAIL**.','', '## Verdict','','**Partially working; not ready to claim reliable detection across all threat types.** Authentication patterns and controlled impersonation work. Public identity claims, deepfake classification, invalid-file conclusions and some URL/report endpoints need further development.','','## What worked','','- Public Azure log: 31 accounts, 30 IPs, 31 failures, risk 55, distributed credential-testing finding.','- Synthetic spray: 24 events, 8 accounts, 1 IP, risk 65, T1110.003 password-spray finding. Normal login control: risk 0 and no findings.','- JSON versus JSONL: matched observed risk, classification and finding counts for both supplied authentication batches.','- Synthetic trusted identity: risk 0; suspicious sender/reply-to: risk 60 with two supporting findings.','- Public email samples raised observed risks 16, 50, 62, 38 and 60. Provider email-lab labels are not independently established phishing ground truth.','- Eight report PDFs generated and downloaded with valid PDF signatures.','','## Failures and limitations','','- Public Microsoft and PayPal identity claims returned risk 0 / NO_IMPERSONATION_EVIDENCE despite supplied matching brand references. Three other identity cases lacked correctly established brand references and are not counted as proven detection misses.','- Static file API marked empty text, truncated PDF and JPEG-with-PDF-extension BENIGN_LIKELY / SAFE / 85% confidence. These are misleading conclusions; intake rejection or warnings do not repair the separate static-analysis result.','- The harmless EICAR test signature was marked BENIGN_LIKELY / SAFE. The app is not a complete antivirus engine.','- 3 of 50 passive URL calls returned HTTP 500. See exact receipt rows; these remain failures.','- Snapshot projection endpoints returned HTTP 500 for: '+', '.join(projection_errors)+'. These GET checks are additional to the 455 primary checks.','- Email-focused and generic investigation risk differed (lab-2: 50 versus 25). Investigation panels included high confidence and domain-age/TLS counterevidence whose independent verification was not established. SHA-256/PDF checks do not establish digital signatures or justify all report language.','','## Trained media results against provider labels','','| Reference | Inputs | Model outputs |','| --- | ---: | --- |']
+for label,item in by_label.items():lines.append(f'| {item["description"]} | {item["total"]} | {item["predictions"]} |')
+lines+=['','**No sampled labelled fake face image or deepfake video received DEEPFAKE_LIKELY.** 35 fake faces were marked REAL_LIKELY, and 35 real faces were marked DEEPFAKE_LIKELY. Investigate class/label alignment, face preprocessing and model suitability; do not simply flip labels or adjust thresholds to make this dataset pass.','', 'Audio produced an explicit unsupported trained-media state, not a trained authenticity judgment. Cases without eligible faces have no model verdict. Heuristic scores and model probabilities are separate outputs. Dataset train split and small public previews cannot support general accuracy claims.','','## Test boundaries','','Fresh temporary database and temporary EML/evidence/report/benchmark/candidate storage; no test writes to live data. Installed model read locally; live data/model integrity verified. Server-code TestClient calls are real. Model states were not mocked. Threat-intelligence/LLM provider integrations were disabled; normal DNS/RDAP/WHOIS enrichment retained. Browser pictures are authentic prototype UI renders of recorded responses, explicitly labelled read-only, not screenshots of a new browser upload.','','## Semantic criteria','','| Criterion | Outcome |','| --- | --- |']
+lines += [f'| {c["criterion"]} | {c["status"]} |' for c in criteria]
+lines+=['','## Every primary request','','| Sample | Stage | HTTP | Transport | Risk | Classification/model |','| --- | --- | --- | --- | --- | --- |']
+for row in annotated:lines.append('| '+' | '.join(str(v if v is not None else '—').replace('|','/').replace('\n',' ') for v in [row['sample'],row['stage'],row['http'],row['transport'],row.get('risk'),row.get('trained_prediction') or row.get('classification') or row.get('trained_status') or '—'])+' |')
+(OUT/'report.md').write_text('\n'.join(lines)+'\n',encoding='utf-8')
+page=['<!doctype html><meta charset="utf-8"><title>CyberGuard sample audit</title><style>body{font:15px system-ui;max-width:1400px;margin:40px auto;padding:0 20px;color:#172317;background:#f6f8f2}pre{white-space:pre-wrap;line-height:1.5}a{color:#315b24}</style><h1>CyberGuard sample audit</h1><p>Actual results; successes and failures preserved. <a href="ppt-screenshots/CAPTIONS.md">PPT picture guide</a></p><pre>',html.escape('\n'.join(lines)),'</pre>'];(OUT/'report.html').write_text('\n'.join(page),encoding='utf-8')
+print(json.dumps(summary,indent=2))
+
+import sys
+sys.exit(1 if any(c['status']=='FAIL' for c in criteria) else 0)

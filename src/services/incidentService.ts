@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 50: Incident Management & Case Lifecycle Client Service.
  * Provides typed methods for incident queue listing, metrics, lifecycle state mutation,
@@ -57,7 +58,7 @@ export class IncidentService {
     if (params?.sort_by) qp.append('sort_by', params.sort_by);
 
     const url = `${apiUrl('/api/incidents')}?${qp.toString()}`;
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -81,7 +82,7 @@ export class IncidentService {
     workspaceId: string = 'default'
   ): Promise<IncidentDetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -102,7 +103,7 @@ export class IncidentService {
    */
   static async getMetrics(workspaceId: string = 'default'): Promise<IncidentMetrics> {
     const url = apiUrl('/api/incidents/metrics');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -127,7 +128,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl('/api/incidents');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -154,7 +155,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl('/api/incidents/promote-alert');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -181,7 +182,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl('/api/incidents/promote-cluster');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -209,7 +210,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/status`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -237,7 +238,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/assign`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -266,7 +267,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/resolve`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -297,7 +298,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/close`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -327,7 +328,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentItem> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/reopen`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -355,7 +356,7 @@ export class IncidentService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentNote> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/notes`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -381,7 +382,7 @@ export class IncidentService {
     workspaceId: string = 'default'
   ): Promise<IncidentTimelineEvent[]> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/history`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

@@ -228,7 +228,7 @@ def create_playbook(
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         logger.error(f"Failed to create playbook: {e}")
-        raise HTTPException(status_code=500, detail=f"Playbook creation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail='Playbook creation failed.')
 
 
 @router.post("/from-recommendation/{recommendation_id}", response_model=ResponsePlaybookResponse)
@@ -251,7 +251,7 @@ def create_from_recommendation(
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as e:
         logger.error(f"Failed to convert recommendation to playbook: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal operation failed.")
 
 
 @router.get("/executions", response_model=List[ResponsePlaybookExecutionResponse])
@@ -334,7 +334,7 @@ def approve_execution(
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as e:
         logger.error(f"Approval error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal operation failed.")
 
 
 @router.get("/executions/{execution_id}/audit")
@@ -417,7 +417,7 @@ def simulate_playbook(
         raise HTTPException(status_code=404, detail=str(ve))
     except Exception as e:
         logger.error(f"Simulation error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail="Internal operation failed.")
 
 
 @router.post("/{playbook_id}/activate", response_model=ResponsePlaybookResponse)
@@ -459,4 +459,4 @@ def execute_playbook(
         raise HTTPException(status_code=409, detail=str(re))
     except Exception as e:
         logger.error(f"Execution failed: {e}")
-        raise HTTPException(status_code=500, detail=f"Execution error: {str(e)}")
+        raise HTTPException(status_code=500, detail='Execution error.')

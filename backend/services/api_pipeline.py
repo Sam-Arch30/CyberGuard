@@ -118,6 +118,8 @@ class APISecurityPipeline:
         for raw in raw_events:
             try:
                 adapter = self.adapter_registry.get_adapter(provider_hint, raw)
+                if not adapter.can_handle(raw):
+                    raise ValueError("API event lacks supported request fields.")
                 ev = adapter.normalize(raw)
                 normalized_events.append(ev)
             except Exception as e:

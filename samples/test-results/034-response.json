@@ -1,0 +1,80 @@
+{
+  "ingestion_id": "ee22f1d9-e26a-4670-8a92-e337a288a43f",
+  "artifact_id": "bbe671f0-cf3d-48a5-abb1-c6ec90aa0805",
+  "artifact_type": "FILE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "benign-bundle.tar.gz",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "157827d580ea1ae090c851f02e0a8eb083b42c3cb21ec139acd7ffd895f186db",
+  "size": 253,
+  "mime_type": "application/octet-stream",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "FILE",
+    "detected_mime": "application/octet-stream",
+    "reported_mime": "application/x-tar",
+    "confidence": 0.95,
+    "detector": "archive_signature",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Archive file detected. Automatic recursive decompression is deferred to controlled sandboxing."
+    ],
+    "candidate_analyzers": [
+      "attachment_intelligence",
+      "file_metadata",
+      "file_security_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 253,
+      "original_filename": "benign-bundle.tar.gz",
+      "is_archive": true,
+      "archive_format": "gz"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/15/157827d580ea1ae090c851f02e0a8eb083b42c3cb21ec139acd7ffd895f186db/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "attachment_intelligence",
+    "file_metadata",
+    "file_security_analyzer"
+  ],
+  "warnings": [
+    "Archive file detected. Automatic recursive decompression is deferred to controlled sandboxing."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "benign-bundle.tar.gz",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "FILE",
+      "detected_mime": "application/octet-stream",
+      "reported_mime": "application/x-tar",
+      "confidence": 0.95,
+      "detector": "archive_signature",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Archive file detected. Automatic recursive decompression is deferred to controlled sandboxing."
+      ],
+      "candidate_analyzers": [
+        "attachment_intelligence",
+        "file_metadata",
+        "file_security_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 253,
+        "original_filename": "benign-bundle.tar.gz",
+        "is_archive": true,
+        "archive_format": "gz"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:38.151379",
+  "evidence_id": "EVD-157827D580",
+  "investigation_id": "82a8a330-b21d-4f46-b385-d88f38851cc6",
+  "analysis_run_id": "d8035fc4-4738-4ee8-8ae9-a394cb6000bd",
+  "duplicate": false
+}

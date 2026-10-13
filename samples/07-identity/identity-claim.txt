@@ -1,0 +1,6 @@
+Protected profile: Example Finance
+Claimed name: Example Finance
+Sender: finance@lookalike-example.test
+Reply-to: collector@untrusted.example
+Subject: Urgent payment approval
+Message: Send the transfer immediately and keep this confidential.

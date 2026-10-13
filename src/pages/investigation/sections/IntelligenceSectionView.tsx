@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState } from 'react';
 import {
   Server,
@@ -81,10 +82,10 @@ export const IntelligenceSectionView: React.FC<IntelligenceSectionViewProps> = (
       const q = queryInput.trim();
       const isIp = /^(\d{1,3}\.){3}\d{1,3}$/.test(q);
       const url = isIp
-        ? `/api/emails/lookup-ip/${encodeURIComponent(q)}`
+          ? `/api/emails/lookup/${encodeURIComponent(q)}`
         : `/api/emails/lookup-domain/${encodeURIComponent(q)}`;
 
-      const res = await fetch(url);
+      const res = await apiFetch(url);
       if (!res.ok) throw new Error(`Lookup returned HTTP ${res.status}`);
       const data = await res.json();
       setQueryResult(data);

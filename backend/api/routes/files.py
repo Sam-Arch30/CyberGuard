@@ -3,6 +3,7 @@ File Security & Attachment Static Analyzer API Routes (Section 8).
 Provides endpoints for safe, zero-execution static file analysis,
 durable artifact re-analysis, and capability inspection.
 """
+from backend.services.upload_security import UploadSecurityService
 import logging
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -39,7 +40,7 @@ async def analyze_file(
     8. Canonical persistence across Artifacts, AnalysisRuns, Findings, Evidence, Indicators, and Relationships
     """
     try:
-        payload = await file.read()
+        payload = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
         filename = file.filename or "uploaded_file.bin"
         reported_mime = file.content_type
 
@@ -53,11 +54,13 @@ async def analyze_file(
     except ValueError as ve:
         logger.warning(f"File analysis validation error: {ve}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"Error during file analysis: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"File analysis error: {str(exc)}",
+            detail='File analysis error.',
         )
 
 
@@ -80,11 +83,13 @@ async def analyze_artifact(
     except ValueError as ve:
         logger.warning(f"Artifact re-analysis validation error: {ve}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error(f"Error during artifact re-analysis: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Artifact re-analysis error: {str(exc)}",
+            detail='Artifact re-analysis error.',
         )
 
 

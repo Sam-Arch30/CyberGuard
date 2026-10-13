@@ -113,7 +113,7 @@ def reconstruct_incident_endpoint(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to reconstruct incident: {str(e)}"
+            detail='Failed to reconstruct incident.'
         )
 
 

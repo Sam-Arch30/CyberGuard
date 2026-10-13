@@ -46,7 +46,7 @@ def analyze_cross_email_correlations_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to execute cross-email correlation analysis: {str(exc)}"
+            detail='Failed to execute cross-email correlation analysis.'
         )
 
 
@@ -79,7 +79,7 @@ def compare_emails_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate email comparison matrix: {str(exc)}"
+            detail='Failed to generate email comparison matrix.'
         )
 
 
@@ -100,7 +100,7 @@ def get_cross_email_graph_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate cross-email investigation graph: {str(exc)}"
+            detail='Failed to generate cross-email investigation graph.'
         )
 
 
@@ -128,7 +128,7 @@ def record_analyst_decision_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to record analyst decision: {str(exc)}"
+            detail='Failed to record analyst decision.'
         )
 
 
@@ -147,5 +147,5 @@ def list_analyst_decisions_endpoint(
     except Exception as exc:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to list analyst decisions: {str(exc)}"
+            detail='Failed to list analyst decisions.'
         )

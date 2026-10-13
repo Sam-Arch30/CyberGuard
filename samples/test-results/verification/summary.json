@@ -1,0 +1,112 @@
+{
+  "date": "2026-10-12",
+  "working_directory": "C:\\Users\\bipin\\Downloads\\Berum CodeBases\\CyberGuard",
+  "checks": [
+    {
+      "name": "Focused regressions",
+      "command": "backend/venv/Scripts/python.exe -m pytest backend/tests/test_docker_resilience.py backend/tests/test_universal_ingestion.py backend/tests/test_sample_audit_regressions.py backend/tests/test_multimedia_authenticity.py backend/tests/test_digital_impersonation.py backend/tests/test_security_boundaries.py -q --tb=short",
+      "exit_code": 0,
+      "passed": 142,
+      "failed": 0,
+      "skipped": 0,
+      "warnings": 575,
+      "seconds": 23.47,
+      "log": "focused.log"
+    },
+    {
+      "name": "Full backend",
+      "command": "backend/venv/Scripts/python.exe -m pytest backend/tests -q --tb=short",
+      "exit_code": 0,
+      "passed": 1552,
+      "failed": 0,
+      "skipped": 1,
+      "warnings": 6245,
+      "seconds": 297.45,
+      "log": "full-backend.log"
+    },
+    {
+      "name": "Reconstruction",
+      "command": "backend/venv/Scripts/python.exe -m pytest backend/tests/test_attack_reconstruction.py backend/tests/test_reconstruction_performance.py -q -s --tb=short",
+      "exit_code": 0,
+      "passed": 18,
+      "failed": 0,
+      "skipped": 0,
+      "warnings": 77,
+      "seconds": 7.3,
+      "benchmark_ms": 25.22,
+      "log": "reconstruction.log"
+    },
+    {
+      "name": "Frontend build",
+      "command": "npm run build",
+      "exit_code": 0,
+      "warnings": "Large bundle: 3408.05 kB JavaScript, 739.14 kB gzip",
+      "log": "build.log"
+    },
+    {
+      "name": "Frontend lint",
+      "command": "npm run lint",
+      "exit_code": 0,
+      "warnings": 179,
+      "errors": 0,
+      "log": "lint.log"
+    },
+    {
+      "name": "Npm audit",
+      "command": "npm audit",
+      "exit_code": 0,
+      "vulnerabilities": 0,
+      "log": "npm-audit.log"
+    },
+    {
+      "name": "Sample routes",
+      "command": "backend/venv/Scripts/python.exe scripts/test_sample_pack.py",
+      "exit_code": 0,
+      "passed": 79,
+      "failed": 0,
+      "warnings": 4,
+      "checks": 83,
+      "log": "sample-routes.log"
+    },
+    {
+      "name": "Sample detection review",
+      "command": "backend/venv/Scripts/python.exe scripts/review_sample_results.py",
+      "exit_code": 0,
+      "passed": 91,
+      "failed": 0,
+      "warnings": 5,
+      "checks": 96,
+      "log": "sample-review.log"
+    }
+  ],
+  "earlier_failures": [
+    {
+      "log": "initial-full-failures.log",
+      "passed": 1545,
+      "failed": 3,
+      "skipped": 1,
+      "warnings": 6229,
+      "seconds": 303.12,
+      "exit_code": 1
+    },
+    {
+      "log": "full-before-reconstruction-optimization.log",
+      "passed": 1551,
+      "failed": 1,
+      "skipped": 1,
+      "warnings": 6245,
+      "seconds": 282.17,
+      "exit_code": 1
+    }
+  ],
+  "remaining_failures": [],
+  "remaining_limitations": [
+    "Deepfake and real-world threat accuracy/calibration not established.",
+    "C2PA cryptographic verification not implemented.",
+    "Browser visual/accessibility/interaction checks unverified; access denied earlier.",
+    "Live production/staging and PostgreSQL deployment unverified.",
+    "Background jobs/external providers not covered by sample audit.",
+    "Hostile codec sandboxing and broad load/performance stability unverified.",
+    "Local running backend must restart to load source changes."
+  ]
+}

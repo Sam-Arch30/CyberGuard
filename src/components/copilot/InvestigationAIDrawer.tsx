@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Sparkles,
@@ -187,7 +188,7 @@ export const InvestigationAIDrawer: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await fetch(apiUrl('/api/copilot/query'), {
+      const response = await apiFetch(apiUrl('/api/copilot/query'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -335,7 +336,7 @@ export const InvestigationAIDrawer: React.FC = () => {
 
   const handleAddToReport = async (msgId: string, response: CopilotQueryResponse) => {
     try {
-      await fetch(apiUrl('/api/copilot/add-to-report'), {
+      await apiFetch(apiUrl('/api/copilot/add-to-report'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

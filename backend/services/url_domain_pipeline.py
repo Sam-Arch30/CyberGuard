@@ -398,7 +398,7 @@ class URLDomainIntelligencePipeline:
     def _compute_overall_risk(self, findings: List[Dict[str, Any]]) -> Tuple[float, str, float]:
         """Calculates normalized threat score (0-100), severity enum string, and confidence."""
         if not findings:
-            return 0.0, SeverityEnum.SAFE.value, 1.0
+            return 0.0, SeverityEnum.LOW.value, 0.0
 
         score = 0.0
         severities = [f.get("severity") for f in findings]
@@ -611,9 +611,12 @@ class URLDomainIntelligencePipeline:
                 event_type=te_type,
                 timestamp=get_utc_now(),
                 severity=overall_sev,
-                source="url_domain_pipeline",
-                description=f"{te_type} detected for target {artifact.name}.",
-                artifact_id=artifact.id,
+                summary=f"{te_type} detected for target {artifact.name}.",
+                source_artifact_id=artifact.id,
+                analysis_run_id=analysis_run.id,
+                risk_score=overall_score,
+                confidence=confidence,
+                metadata_json=json.dumps({"analyzer": "url_domain_pipeline"}),
                 created_at=get_utc_now(),
             )
             db.add(threat_event)
@@ -622,7 +625,7 @@ class URLDomainIntelligencePipeline:
         # Finalize AnalysisRun record
         analysis_run.status = AnalysisStatusEnum.COMPLETED.value
         analysis_run.completed_at = get_utc_now()
-        analysis_run.overall_score = overall_score
+        analysis_run.overall_risk_score = overall_score
         analysis_run.overall_severity = overall_sev
         analysis_run.confidence = confidence
 

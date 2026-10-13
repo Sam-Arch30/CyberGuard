@@ -1,0 +1,3 @@
+{
+  "detail": "No cryptographic Content Credentials found; analysis relies on structural heuristics.; Authenticity assessments represent scientific evidentiary hypotheses, not legal certification.; CyberGuard does not perform unconstrained facial or biometric surveillance.; No supported media signature was identified.; Calibrated authenticity confidence is unavailable (confidence=0); configured detector scores and thresholds are heuristic, not learned deepfake probabilities.; Risk scores reflect heuristic signals, not a calibrated probability of deepfake content. A zero score does not establish authenticity."
+}

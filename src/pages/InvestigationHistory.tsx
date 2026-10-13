@@ -1,3 +1,5 @@
+import { apiDownload } from '../utils/apiClient';
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -192,7 +194,7 @@ export const InvestigationHistory: React.FC = () => {
       let url = `/api/dashboard/emails?skip=${skip}&limit=${pageSize}`;
       let res: Response;
       try {
-        res = await fetch(apiUrl(url));
+        res = await apiFetch(apiUrl(url));
       } catch (err: unknown) {
         throw new Error(`Failed to connect to API: ${err instanceof Error ? err.message : 'Network error'}`);
       }
@@ -358,9 +360,9 @@ export const InvestigationHistory: React.FC = () => {
     try {
       let res: Response;
       try {
-        res = await fetch(apiUrl(`/api/emails/${lookupId}/analysis`));
+        res = await apiFetch(apiUrl(`/api/emails/${lookupId}/analysis`));
       } catch {
-        res = await fetch(apiUrl(`/api/emails/${lookupId}/analysis`));
+        res = await apiFetch(apiUrl(`/api/emails/${lookupId}/analysis`));
       }
 
       if (res.ok) {
@@ -447,7 +449,7 @@ export const InvestigationHistory: React.FC = () => {
   /* ── Download Stored .EML File ─── */
   const handleDownloadEml = (id: string, _filename?: string) => {
     const cleanId = encodeURIComponent(id);
-    window.open(apiUrl(`/api/emails/${cleanId}/download`), '_blank');
+    void apiDownload(apiUrl(`/api/emails/${cleanId}/download`)).catch(error => window.alert(error.message));
   };
 
   /* ── Correlate Ingested Email across Campaigns ─── */

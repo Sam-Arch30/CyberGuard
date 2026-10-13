@@ -269,7 +269,7 @@ def evaluate_risk(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
     except Exception as exc:
         logger.error(f"Error evaluating risk: {exc}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.post("/reassess/{assessment_id}", response_model=RiskAssessmentResponse, summary="Trigger deterministic reassessment with new evidence")
@@ -295,7 +295,7 @@ def reassess_risk(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(exc))
     except Exception as exc:
         logger.error(f"Error reassessing risk: {exc}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 # ============================================================================

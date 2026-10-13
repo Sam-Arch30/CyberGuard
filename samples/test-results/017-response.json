@@ -1,0 +1,78 @@
+{
+  "ingestion_id": "9a011c90-9445-4241-91a6-0c57c0bdccd8",
+  "artifact_id": "fedd7bec-a65b-428e-baa3-9d58c0f06022",
+  "artifact_type": "AUDIO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-tone.wav",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "0d8d4504a20d2f34cfa00f50915bcc83ffa1a9e1557efd1c5e017f753241d333",
+  "size": 64044,
+  "mime_type": "audio/wav",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "AUDIO",
+    "detected_mime": "audio/wav",
+    "reported_mime": "audio/wav",
+    "confidence": 0.9,
+    "detector": "audio_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 64044,
+      "original_filename": "synthetic-tone.wav",
+      "format": "WAV"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/0d/0d8d4504a20d2f34cfa00f50915bcc83ffa1a9e1557efd1c5e017f753241d333/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-tone.wav",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "AUDIO",
+      "detected_mime": "audio/wav",
+      "reported_mime": "audio/wav",
+      "confidence": 0.9,
+      "detector": "audio_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 64044,
+        "original_filename": "synthetic-tone.wav",
+        "format": "WAV"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:36.757230",
+  "evidence_id": "EVD-0D8D4504A2",
+  "investigation_id": "c46f89c1-7061-49a7-9357-08a130ad4623",
+  "analysis_run_id": "94a5726f-ba9f-4b45-9ce1-4caa92f055c3",
+  "duplicate": false
+}

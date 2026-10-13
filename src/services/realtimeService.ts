@@ -1,3 +1,4 @@
+import { getAuthToken } from '../utils/apiClient';
 /**
  * Section 46: Central Real-Time Event Subscription & Transport Service.
  * Manages Server-Sent Events (SSE) connections, automatic reconnection with Last-Event-ID,
@@ -110,6 +111,7 @@ export class RealtimeService {
     // Establishes SSE connection with Last-Event-ID parameter
     const connectSSE = () => {
       if (closed) return;
+      if (getAuthToken()) { startPollingFallback(); return; }
 
       try {
         let streamUrl = options.url.startsWith('http') ? options.url : apiUrl(options.url);

@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { useState } from 'react';
 import {
   Link2,
@@ -9,19 +10,21 @@ import {
   Search,
 } from 'lucide-react';
 import { apiUrl } from '../utils/apiClient';
+import { adaptUrlAnalysis } from '../utils/urlAnalysisContract';
+import { UrlBatchPanel } from '../components/analysis/UrlBatchPanel';
 
 interface UrlAnalysisResult {
   url: string;
   normalized_url: string;
   domain: string;
   overall_risk_score: number;
-  overall_severity: 'SAFE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+  overall_severity: string;
   is_lookalike: boolean;
   targeted_brand?: string;
   is_punycode: boolean;
   domain_age_days?: number;
   is_newly_registered: boolean;
-  redirect_hops_count: number;
+  redirect_hops_count: number | null;
   final_url?: string;
   findings: Array<{
     finding_type: string;
@@ -49,9 +52,9 @@ const PRESET_URLS = {
     description: 'Direct numeric IP address bypass link with non-standard HTTP port.',
   },
   clean: {
-    name: 'Clean Authentic Corporate Domain',
+    name: 'Established-domain control',
     url: 'https://github.com/Sam-Arch30/CyberGuard',
-    description: 'Legitimate HTTPS domain with established domain age and zero lookalike heuristics.',
+    description: 'Reference URL for comparison; findings depend on the available checks.',
   }
 };
 
@@ -61,6 +64,7 @@ export const UrlSecurityView: React.FC = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [result, setResult] = useState<UrlAnalysisResult | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [activeInspection, setActiveInspection] = useState(false);
 
   const handleSelectPreset = (key: keyof typeof PRESET_URLS) => {
     setSelectedKey(key);
@@ -73,10 +77,10 @@ export const UrlSecurityView: React.FC = () => {
     setIsAnalyzing(true);
     setErrorMsg(null);
     try {
-      const res = await fetch(apiUrl('/api/urls/analyze'), {
+      const res = await apiFetch(apiUrl('/api/urls/analyze'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: inputUrl }),
+        body: JSON.stringify({ url: inputUrl, active_analysis_enabled: activeInspection }),
       });
 
       if (!res.ok) {
@@ -84,7 +88,7 @@ export const UrlSecurityView: React.FC = () => {
         throw new Error(errData.detail || `URL analysis failed with status ${res.status}`);
       }
 
-      const data: UrlAnalysisResult = await res.json();
+      const data: UrlAnalysisResult = adaptUrlAnalysis(await res.json());
       setResult(data);
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during URL intelligence analysis.');
@@ -119,10 +123,10 @@ export const UrlSecurityView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                URL, Domain & Website Intelligence Engine
+                URL & domain analysis
               </h1>
               <p className="text-xs text-foreground-muted font-mono">
-                Section 7 — Homoglyphs, Lookalikes, Domain Age, Redirect Chains & Safe Static Website Triage
+                Inspect URL structure and available domain evidence. Enable website inspection only when needed.
               </p>
             </div>
           </div>
@@ -133,7 +137,7 @@ export const UrlSecurityView: React.FC = () => {
             SSRF Protection Guard
           </span>
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-badge bg-primary/10 border border-primary/30 text-primary font-semibold">
-            Section 7 Operational
+            Review required
           </span>
         </div>
       </div>
@@ -173,6 +177,7 @@ export const UrlSecurityView: React.FC = () => {
       {/* URL Input Form */}
       <div className="bg-surface rounded-card border border-border p-4 space-y-3">
         <label className="text-xs font-mono text-foreground-muted block">Target URL or Domain</label>
+        <label className="flex items-center gap-2 text-xs text-foreground-muted"><input type="checkbox" checked={activeInspection} onChange={e => setActiveInspection(e.target.checked)} />Enable controlled website inspection (makes network requests)</label>
         <div className="flex items-center gap-2">
           <input
             type="text"
@@ -199,6 +204,8 @@ export const UrlSecurityView: React.FC = () => {
         </div>
       </div>
 
+      <UrlBatchPanel onInspect={url => {setInputUrl(url); setResult(null); setErrorMsg(null);}} />
+
       {/* Error */}
       {errorMsg && (
         <div className="p-3.5 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-xs flex items-center gap-2">
@@ -215,7 +222,7 @@ export const UrlSecurityView: React.FC = () => {
             <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
               <span className="text-[10px] font-mono text-foreground-muted uppercase">Overall Severity</span>
               <div className={`text-xs font-bold px-2 py-0.5 rounded border inline-block ${getSeverityBadgeClass(result.overall_severity)}`}>
-                {result.overall_severity}
+                {result.overall_risk_score === 0 ? 'No signals found' : result.overall_severity}
               </div>
             </div>
 
@@ -236,7 +243,7 @@ export const UrlSecurityView: React.FC = () => {
             <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
               <span className="text-[10px] font-mono text-foreground-muted uppercase">Lookalike Attack</span>
               <div className={`text-xs font-bold font-mono ${result.is_lookalike ? 'text-red-400' : 'text-emerald-400'}`}>
-                {result.is_lookalike ? `YES (${result.targeted_brand})` : 'NO'}
+                {result.is_lookalike ? 'Indicator found' : 'No indicator found'}
               </div>
             </div>
 
@@ -262,7 +269,7 @@ export const UrlSecurityView: React.FC = () => {
               <div>
                 <div className="font-bold text-sm">Targeted Brand Lookalike Impersonation Detected</div>
                 <div className="text-xs opacity-90 mt-0.5">
-                  Domain matches impersonation patterns targeting <strong className="underline uppercase">{result.targeted_brand}</strong> using typo-squatting, homoglyphs, or lookalike token permutation.
+                  The analyzer found domain impersonation indicators. Review the findings and reference evidence before confirming impersonation.
                 </div>
               </div>
             </div>
@@ -277,7 +284,7 @@ export const UrlSecurityView: React.FC = () => {
 
             {result.findings.length === 0 ? (
               <div className="p-6 text-center text-xs text-foreground-muted bg-surface-secondary/50 rounded-lg">
-                No deceptive patterns, punycode tricks, or malicious infrastructure signals detected.
+                No suspicious findings were returned by the available checks. This does not establish website safety.
               </div>
             ) : (
               <div className="space-y-2.5">

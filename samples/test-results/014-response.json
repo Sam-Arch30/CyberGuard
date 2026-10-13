@@ -1,0 +1,75 @@
+{
+  "ingestion_id": "99a46b4b-9446-40dc-a68f-d0f5cbd8aedb",
+  "artifact_id": "5bddec0b-b9fd-4eaf-9a9f-44a93c8f40c9",
+  "artifact_type": "IMAGE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-card.gif",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "1891f700637eff4dda4cc65f5f635061507389b480804b4b4aee4926a11bb668",
+  "size": 4179,
+  "mime_type": "image/gif",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "IMAGE",
+    "detected_mime": "image/gif",
+    "reported_mime": "image/gif",
+    "confidence": 0.96,
+    "detector": "image_signature",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 4179,
+      "original_filename": "synthetic-card.gif",
+      "format": "GIF"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/18/1891f700637eff4dda4cc65f5f635061507389b480804b4b4aee4926a11bb668/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-card.gif",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "IMAGE",
+      "detected_mime": "image/gif",
+      "reported_mime": "image/gif",
+      "confidence": 0.96,
+      "detector": "image_signature",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 4179,
+        "original_filename": "synthetic-card.gif",
+        "format": "GIF"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:36.517941",
+  "evidence_id": "EVD-1891F70063",
+  "investigation_id": "8c3a6f15-d7e9-4e5a-8e2e-9a4b0cc36a90",
+  "analysis_run_id": "fce28fd6-37e0-47f0-8583-a2631cf05757",
+  "duplicate": false
+}

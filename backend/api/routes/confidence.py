@@ -101,5 +101,5 @@ def get_email_confidence_endpoint(
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(status_code=404, detail=f"Email record '{clean_id}' not found: {str(e)}")
+        raise HTTPException(status_code=404, detail="Email record '{clean_id}' not found.")
 

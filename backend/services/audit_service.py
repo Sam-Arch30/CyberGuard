@@ -92,7 +92,11 @@ class AuditService:
         if existing:
             return existing
 
-        evidence_id = f"EVD-{clean_sha256[:10].upper()}"
+        from backend.db.session import request_workspace
+        import hashlib
+        workspace = request_workspace.get() or 'default'
+        prefix = '' if workspace == 'default' else hashlib.sha256(workspace.encode()).hexdigest()[:8].upper() + '-'
+        evidence_id = f"EVD-{prefix}{clean_sha256[:10].upper()}"
 
         evidence = EvidenceModel(
             id=str(uuid.uuid4()),

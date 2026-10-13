@@ -205,7 +205,7 @@ class ReportProjectionService:
             else (run.overall_risk_score if (run and run.overall_risk_score is not None) else 0.0)
         )
         confidence = float(
-            incident.confidence if incident
+            incident.confidence if (incident and incident.confidence is not None)
             else (run.confidence if (run and run.confidence is not None) else 1.0)
         )
         confidence_level = (
@@ -232,13 +232,13 @@ class ReportProjectionService:
                 "ref_id": ref_id,
                 "evidence_id": item.id,
                 "name": item.name,
-                "type": "ORIGINAL" if item.evidence_type == "ORIGINAL_FILE" else "DERIVED",
+                "type": "ORIGINAL" if item.is_original else "DERIVED",
                 "source": item.source,
-                "mime_type": item.mime_type or "application/octet-stream",
+                "mime_type": item.details.get("mime_type") or "application/octet-stream",
                 "size_str": f"{round(item.size_bytes / 1024, 1)} KB" if item.size_bytes else "N/A",
                 "sha256": item.sha256 or "UNCOMPUTED",
                 "analysis_run_ref": f"Run #{run.id[:8]}" if run else "Run #1",
-                "extracted_at": item.extracted_at.strftime("%Y-%m-%d %H:%M:%S") if item.extracted_at else None,
+                "extracted_at": item.observed_at.strftime("%Y-%m-%d %H:%M:%S") if item.observed_at else None,
             }
             evidence_table.append(ev_entry)
             evidence_index.append({
@@ -367,19 +367,13 @@ class ReportProjectionService:
         }
         if results and results.indicators_summary:
             ind = results.indicators_summary
-            for item in ind.malicious_items:
-                itype = (item.get("type") or "").upper()
-                val = item.get("value")
-                if not val:
-                    continue
-                if itype in {"IP", "IPV4", "IPV6"}:
-                    iocs["ips"].append({"value": val, "origin": "OBSERVED", "reputation": "SUSPICIOUS"})
-                elif itype in {"DOMAIN", "LOOKALIKE_DOMAIN"}:
-                    iocs["domains"].append({"value": val, "origin": "OBSERVED", "reputation": "SUSPICIOUS"})
-                elif itype in {"URL"}:
-                    iocs["urls"].append({"value": val, "origin": "OBSERVED", "reputation": "SUSPICIOUS"})
-                elif itype in {"EMAIL", "SENDER"}:
-                    iocs["emails"].append({"value": val, "origin": "OBSERVED", "reputation": "SUSPICIOUS"})
+            for group in ("ips", "domains", "urls", "emails"):
+                for indicator in getattr(ind, group):
+                    iocs[group].append({
+                        "value": indicator.value,
+                        "origin": "OBSERVED",
+                        "reputation": getattr(indicator, "reputation", None) or "UNVERIFIED",
+                    })
 
         # Infrastructure attribution
         infra_observed = [ip["value"] for ip in iocs["ips"][:5]]
@@ -623,7 +617,7 @@ class ReportProjectionService:
                     "Risk score is not a mathematical probability."
                 ),
                 "primary_signals": [f["title"] for f in findings_list[:4]],
-                "counter_evidence": ["No contradicting baseline authentication failures recorded"],
+                "counter_evidence": [item.title for item in results.counter_evidence] if results else [],
             },
             "timeline": timeline_list,
             "attack_path": {
@@ -648,8 +642,8 @@ class ReportProjectionService:
             "infrastructure_intelligence": {
                 "observed_infrastructure": infra_observed,
                 "associated_domains": infra_domains,
-                "probable_origin_asn": "AS64512",
-                "probable_origin_country": "Multiple Relays",
+                "probable_origin_asn": None,
+                "probable_origin_country": None,
                 "attribution_boundary_note": (
                     "Infrastructure records indicate observed telemetry endpoints only. "
                     "Attribution boundaries avoid individual human operator naming."
@@ -661,8 +655,8 @@ class ReportProjectionService:
                     "Security Finding Generation -> Threat Signal Normalization",
                     "Attack Path Graph Reconstruction -> Unified Risk Scoring",
                 ],
-                "counter_evidence": ["Absence of persistent malware signatures in payload scan"],
-                "contradictions": [],
+                "counter_evidence": [item.title for item in results.counter_evidence] if results else [],
+                "contradictions": [item.model_dump(mode="json") for item in results.contradictions] if results else [],
                 "what_would_change_assessment": [
                     "Host-level endpoint telemetry confirming process execution",
                     "Subsequent external authentication logs from verified corporate device",

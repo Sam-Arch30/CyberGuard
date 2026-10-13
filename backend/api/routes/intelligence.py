@@ -74,7 +74,7 @@ async def get_indicator_intelligence(
         logger.error(f"Error enriching indicator '{clean_val}': {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Internal error enriching indicator: {str(exc)}",
+            detail='Internal error enriching indicator.',
         )
 
 

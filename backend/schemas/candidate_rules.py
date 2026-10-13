@@ -156,6 +156,15 @@ class RuleCondition(BaseModel):
     case_sensitive: bool = Field(default=False, description="Case sensitivity for string operations")
     time_window_seconds: Optional[int] = Field(default=None, ge=1, le=86400 * 30, description="Temporal window if applicable")
 
+    @field_validator("operator", mode="before")
+    @classmethod
+    def normalize_operator(cls, value):
+        raw = value.value if isinstance(value, DslOperator) else str(value)
+        aliases = {'eq':'EQUALS','neq':'NOT_EQUALS','gt':'GREATER_THAN','gte':'GREATER_THAN_OR_EQUAL','lt':'LESS_THAN','lte':'LESS_THAN_OR_EQUAL'}
+        if raw in aliases: return aliases[raw]
+        uppercase = raw.upper()
+        return uppercase if uppercase in {op.value for op in DslOperator} else raw
+
     @field_validator("field")
     @classmethod
     def validate_field_name(cls, v: str) -> str:

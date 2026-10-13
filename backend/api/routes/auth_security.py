@@ -4,6 +4,7 @@ Provides routes for event ingestion, batch log analysis, artifact re-analysis,
 and detection engine configuration.
 """
 from __future__ import annotations
+from backend.services.upload_security import UploadSecurityService
 
 import json
 import logging
@@ -52,11 +53,13 @@ async def analyze_single_event(
             provider_hint=provider_hint,
         )
         return response
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing single authentication event: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Authentication analysis failed: {str(e)}",
+            detail='Authentication analysis failed.',
         )
 
 
@@ -75,11 +78,13 @@ async def analyze_batch_events(
             provider_hint=batch.provider_hint,
         )
         return response
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing batch authentication events: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Batch authentication analysis failed: {str(e)}",
+            detail='Batch authentication analysis failed.',
         )
 
 
@@ -93,23 +98,9 @@ async def upload_log_file(
     Upload and analyze an authentication log file (JSON array, JSON lines, or Linux syslog format).
     """
     try:
-        content_bytes = await file.read()
-        text_content = content_bytes.decode("utf-8", errors="replace")
-
-        # Try parsing as JSON first
-        raw_events: List[Any] = []
-        try:
-            parsed = json.loads(text_content)
-            if isinstance(parsed, list):
-                raw_events = parsed
-            elif isinstance(parsed, dict) and "events" in parsed and isinstance(parsed["events"], list):
-                raw_events = parsed["events"]
-            else:
-                raw_events = [parsed]
-        except Exception:
-            # Fallback: line-by-line
-            lines = text_content.splitlines()
-            raw_events = [line.strip() for line in lines if line.strip()]
+        content_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
+        from backend.services.auth_log_parser import parse_auth_log
+        raw_events = parse_auth_log(content_bytes, file.filename or '', file.content_type or '', provider_hint)
 
         response = await global_auth_pipeline.analyze_events(
             raw_events=raw_events,
@@ -117,11 +108,13 @@ async def upload_log_file(
             provider_hint=provider_hint,
         )
         return response
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error analyzing uploaded authentication log: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Log file analysis failed: {str(e)}",
+            detail='Log file analysis failed.',
         )
 
 
@@ -138,11 +131,13 @@ async def analyze_stored_artifact(
         return await global_auth_pipeline.analyze_artifact(artifact_id=artifact_id, db=db)
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error re-analyzing artifact {artifact_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Artifact re-analysis failed: {str(e)}",
+            detail='Artifact re-analysis failed.',
         )
 
 

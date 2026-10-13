@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 70: Security Operations Automation (SOAR) Client Service.
  */
@@ -27,7 +28,7 @@ export const automationService = {
     if (workflowType && workflowType !== 'ALL') params.set('workflow_type', workflowType);
     if (triggerType && triggerType !== 'ALL') params.set('trigger_type', triggerType);
 
-    const res = await fetch(apiUrl(`${API_BASE}/workflows?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list workflows (${res.status})`);
@@ -36,7 +37,7 @@ export const automationService = {
   },
 
   async getWorkflow(workflowId: string): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch workflow '${workflowId}' (${res.status})`);
@@ -45,7 +46,7 @@ export const automationService = {
   },
 
   async createWorkflow(data: Partial<AutomationWorkflow>): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -58,7 +59,7 @@ export const automationService = {
   },
 
   async updateWorkflow(workflowId: string, data: Partial<AutomationWorkflow>): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -71,7 +72,7 @@ export const automationService = {
   },
 
   async validateWorkflow(workflowId: string): Promise<{ is_valid: boolean; errors: string[] }> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/validate`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/validate`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -82,7 +83,7 @@ export const automationService = {
   },
 
   async activateWorkflow(workflowId: string): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/activate`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/activate`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -93,7 +94,7 @@ export const automationService = {
   },
 
   async pauseWorkflow(workflowId: string): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/pause`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/pause`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -104,7 +105,7 @@ export const automationService = {
   },
 
   async disableWorkflow(workflowId: string): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/disable`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/disable`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -115,7 +116,7 @@ export const automationService = {
   },
 
   async createNewVersion(workflowId: string): Promise<AutomationWorkflow> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/new-version`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/new-version`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -134,7 +135,7 @@ export const automationService = {
       execution_mode?: WorkflowExecutionMode;
     }
   ): Promise<AutomationRun> {
-    const res = await fetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/trigger`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/workflows/${encodeURIComponent(workflowId)}/trigger`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -157,7 +158,7 @@ export const automationService = {
     if (workflowId) params.set('workflow_id', workflowId);
     if (status && status !== 'ALL') params.set('status', status);
 
-    const res = await fetch(apiUrl(`${API_BASE}/runs?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/runs?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list runs (${res.status})`);
@@ -166,7 +167,7 @@ export const automationService = {
   },
 
   async getRun(runId: string): Promise<AutomationRun> {
-    const res = await fetch(apiUrl(`${API_BASE}/runs/${encodeURIComponent(runId)}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/runs/${encodeURIComponent(runId)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch run '${runId}' (${res.status})`);
@@ -175,7 +176,7 @@ export const automationService = {
   },
 
   async cancelRun(runId: string): Promise<AutomationRun> {
-    const res = await fetch(apiUrl(`${API_BASE}/runs/${encodeURIComponent(runId)}/cancel`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/runs/${encodeURIComponent(runId)}/cancel`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -187,7 +188,7 @@ export const automationService = {
 
   // Approvals
   async listPendingApprovals(): Promise<ApprovalRequest[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/approvals`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/approvals`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list approvals (${res.status})`);
@@ -196,7 +197,7 @@ export const automationService = {
   },
 
   async decideApproval(approvalId: string, decision: 'APPROVED' | 'REJECTED', reason?: string): Promise<ApprovalRequest> {
-    const res = await fetch(apiUrl(`${API_BASE}/approvals/${encodeURIComponent(approvalId)}/decide`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/approvals/${encodeURIComponent(approvalId)}/decide`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ decision, reason }),
@@ -210,7 +211,7 @@ export const automationService = {
 
   // Actions & Metrics
   async listRegisteredActions(): Promise<RegisteredActionMeta[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/actions`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/actions`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch registered actions (${res.status})`);
@@ -219,7 +220,7 @@ export const automationService = {
   },
 
   async getMetrics(): Promise<AutomationMetrics> {
-    const res = await fetch(apiUrl(`${API_BASE}/metrics`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/metrics`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch metrics (${res.status})`);

@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import {
@@ -183,7 +184,7 @@ export const CaseDetail: React.FC = () => {
   const fetchCaseReports = useCallback(async (caseId: string) => {
     setLoadingReports(true);
     try {
-      const res = await fetch(apiUrl(`/api/reports?case_id=${caseId}`));
+      const res = await apiFetch(apiUrl(`/api/reports?case_id=${caseId}`));
       if (res.ok) {
         const data = await res.json();
         setReports(data.reports || []);
@@ -200,7 +201,7 @@ export const CaseDetail: React.FC = () => {
     if (!caseData) return;
     setIsDownloadingDossier(true);
     try {
-      const res = await fetch(apiUrl(`/api/reports/case/${caseData.id}`));
+      const res = await apiFetch(apiUrl(`/api/reports/case/${caseData.id}`));
       if (!res.ok) throw new Error(`Dossier generation failed (${res.status})`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -225,7 +226,7 @@ export const CaseDetail: React.FC = () => {
   const handleDownloadReport = async (reportItem: BackendReportItem) => {
     setDownloadingReportId(reportItem.id);
     try {
-      const res = await fetch(apiUrl(`/api/reports/${reportItem.id}/download`));
+      const res = await apiFetch(apiUrl(`/api/reports/${reportItem.id}/download`));
       if (!res.ok) throw new Error(`Report download failed (${res.status})`);
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -249,7 +250,7 @@ export const CaseDetail: React.FC = () => {
   const fetchCaseDetail = useCallback(() => {
     if (!id) return;
     setLoading(true);
-    fetch(apiUrl(`/api/cases/${id}`))
+    apiFetch(apiUrl(`/api/cases/${id}`))
       .then(res => {
         if (!res.ok) throw new Error(`Case not found (${res.status})`);
         return res.json();
@@ -268,7 +269,7 @@ export const CaseDetail: React.FC = () => {
 
     // Fetch related investigations
     setLoadingCorrelations(true);
-    fetch(apiUrl(`/api/cases/${id}/correlation`))
+    apiFetch(apiUrl(`/api/cases/${id}/correlation`))
       .then(res => (res.ok ? res.json() : null))
       .then(corrData => {
         if (corrData) setCorrelations(corrData);
@@ -277,7 +278,7 @@ export const CaseDetail: React.FC = () => {
       .finally(() => setLoadingCorrelations(false));
 
     // Fetch case infrastructure attribution
-    fetch(apiUrl(`/api/cases/${id}/attribution`))
+    apiFetch(apiUrl(`/api/cases/${id}/attribution`))
       .then(res => res.ok ? res.json() : null)
       .then(data => {
         if (data && data.case_attribution) {
@@ -332,7 +333,7 @@ export const CaseDetail: React.FC = () => {
   const handleStatusChange = async (newStatus: CaseStatus) => {
     if (!caseData) return;
     try {
-      const res = await fetch(apiUrl(`/api/cases/${caseData.id}`), {
+      const res = await apiFetch(apiUrl(`/api/cases/${caseData.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })
@@ -350,7 +351,7 @@ export const CaseDetail: React.FC = () => {
   const handleSeverityChange = async (newSeverity: CaseSeverity) => {
     if (!caseData) return;
     try {
-      const res = await fetch(apiUrl(`/api/cases/${caseData.id}`), {
+      const res = await apiFetch(apiUrl(`/api/cases/${caseData.id}`), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ severity: newSeverity })
@@ -370,7 +371,7 @@ export const CaseDetail: React.FC = () => {
     if (!window.confirm('Detach this email from the investigation case?')) return;
 
     try {
-      const res = await fetch(apiUrl(`/api/cases/${caseData.id}/emails/${emailId}`), {
+      const res = await apiFetch(apiUrl(`/api/cases/${caseData.id}/emails/${emailId}`), {
         method: 'DELETE'
       });
       if (res.ok || res.status === 204) {
@@ -392,7 +393,7 @@ export const CaseDetail: React.FC = () => {
         author: noteAuthor.trim() || 'SOC Analyst',
         note_text: noteText.trim()
       };
-      const res = await fetch(apiUrl(`/api/cases/${caseData.id}/notes`), {
+      const res = await apiFetch(apiUrl(`/api/cases/${caseData.id}/notes`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -421,7 +422,7 @@ export const CaseDetail: React.FC = () => {
         description: findingDescription.trim(),
         severity: findingSeverity
       };
-      const res = await fetch(apiUrl(`/api/cases/${caseData.id}/findings`), {
+      const res = await apiFetch(apiUrl(`/api/cases/${caseData.id}/findings`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

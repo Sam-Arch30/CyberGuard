@@ -43,7 +43,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
   const [copiedIndicator, setCopiedIndicator] = useState<string | null>(null);
   const [summaryExpanded, setSummaryExpanded] = useState<boolean>(false);
 
-  const safeEmail = email || ({} as Partial<EmailAnalysis>);
+  const safeEmail = useMemo(() => email || ({} as Partial<EmailAnalysis>), [email]);
 
   const copyToClipboard = (text: string, id: string) => {
     navigator.clipboard.writeText(text);
@@ -62,7 +62,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
   ).toLowerCase();
 
   const isMalicious = score >= 50;
-  const isBenign = score < 20;
+  const isEmailEvidence = Boolean(safeEmail.authentication) || workspaceSummary?.investigation.artifact_type === 'EMAIL';
 
   // Genuine confidence extraction without fabrication
   const genuineConfidence = useMemo(() => {
@@ -72,10 +72,10 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
         : String(safeEmail.threat_score.confidence);
     }
     if (workspaceSummary?.risk?.confidence !== undefined && workspaceSummary?.risk?.confidence !== null) {
-      return `${Math.round(workspaceSummary.risk.confidence * 100)}% (Calibrated)`;
+      return `${Math.round(workspaceSummary.risk.confidence * 100)}%`;
     }
     if (safeEmail.attribution?.confidence_score !== undefined) {
-      return `${safeEmail.attribution.confidence_score}% (${safeEmail.attribution.confidence_level || 'Calibrated'})`;
+      return `${safeEmail.attribution.confidence_score}% (${safeEmail.attribution.confidence_level || 'Reported'})`;
     }
     if (safeEmail.ml_assessment?.confidence) {
       return `${safeEmail.ml_assessment.confidence.toUpperCase()} Confidence`;
@@ -228,44 +228,11 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       });
     }
 
-    // 7. Benign Baseline Findings (For Low Risk / Legitimate Emails)
-    if (list.length === 0 || isBenign) {
-      return [
-        {
-          id: 'clean-auth',
-          severity: 'LOW',
-          title: 'SPF, DKIM, and DMARC alignment verified',
-          description: 'Cryptographic digital signatures verified and originating IP is explicitly authorized in DNS policy.',
-          targetSection: 'email',
-          targetSubTab: 'auth',
-          actionLabel: 'View auth proof'
-        },
-        {
-          id: 'clean-domain',
-          severity: 'LOW',
-          title: 'Sender domain reputation and age verified clean',
-          description: 'Domain exhibits legitimate registration history without lookalike homoglyphs or brand spoofing.',
-          targetSection: 'analysis',
-          targetSubTab: 'lookalike',
-          actionLabel: 'View domain intel'
-        },
-        {
-          id: 'clean-urls',
-          severity: 'LOW',
-          title: 'No malicious links or suspicious payloads observed',
-          description: 'All embedded links point to legitimate domains with clean reputation and zero redirect hops.',
-          targetSection: 'analysis',
-          targetSubTab: 'urls',
-          actionLabel: 'View indicators'
-        }
-      ];
-    }
-
     return list;
-  }, [safeEmail, isMalicious, isBenign, workspaceSummary]);
+  }, [safeEmail, isMalicious, workspaceSummary]);
 
   // ---------------------------------------------------------------------------
-  // SECTION 3: Authentication Snapshot States
+  // SECTION 3: Email authentication States
   // ---------------------------------------------------------------------------
   const auth = safeEmail.authentication;
   const spfState = (auth?.spf?.result || 'NONE').toUpperCase();
@@ -350,18 +317,18 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
     workspaceSummary?.executive_summary ||
     safeEmail.threat_score?.summary ||
     (isMalicious
-      ? 'Automated inspection detected severe indicators of phishing, domain impersonation, and authentication failures. The email exhibits deceptive sender alignment designed to mislead recipients into performing unauthorized actions.'
-      : 'Automated forensic inspection completed. The email adheres to standard enterprise cryptographic authentication, verified sender domains, and exhibits baseline benign characteristics.');
+      ? 'Available automated findings require evidence review before confirming the threat or selecting a response.'
+      : 'No investigation summary is available yet. Review the original evidence and analysis limitations.');
 
   return (
-    <div className="space-y-6 max-w-[1600px] w-full mx-auto animate-fadeIn">
+    <div className="cg-investigation-overview space-y-6 max-w-[1280px] w-full mx-auto animate-fadeIn">
       {/* =======================================================================
           SECTION 1 — THREAT ASSESSMENT (Verdict, Score, Genuine Confidence)
           ======================================================================= */}
-      <section className="bg-surface rounded-card border border-border p-5 relative overflow-hidden">
+      <section className="cg-assessment bg-surface rounded-card border border-border p-5 relative overflow-hidden">
         {/* Subtle status backdrop tint */}
         <div
-          className={`absolute top-0 left-0 right-0 h-1.5 ${
+          className={`absolute top-0 left-0 right-0 h-0.5 ${
             severity === 'critical'
               ? 'bg-danger'
               : severity === 'high'
@@ -400,18 +367,18 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
 
             <h2 className="text-lg sm:text-xl font-bold text-foreground font-sans tracking-tight">
               {severity === 'critical'
-                ? 'High-Confidence Malicious Threat Detected'
+                ? 'Critical-risk indicators detected'
                 : severity === 'high'
-                ? 'High-Risk Phishing & Impersonation Indicators'
+                ? 'High-risk indicators'
                 : severity === 'medium'
-                ? 'Suspicious Delivery with Unverified Signals'
-                : 'Verified Benign Email Baseline'}
+                ? 'Suspicious indicators'
+                : 'Investigation assessment'}
             </h2>
 
             <p className="text-xs font-mono text-foreground-muted max-w-2xl leading-relaxed">
               {isMalicious
-                ? 'Target exhibits active attack indicators requiring immediate containment. Review the key findings below.'
-                : 'All foundational email security criteria satisfied. No anomalous intent or deceptive structures observed.'}
+                ? 'Review the supporting evidence before deciding on containment or response.'
+                : 'Review the available findings and authentication results. A low score does not establish safety.'}
             </p>
           </div>
 
@@ -419,7 +386,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
           <div className="flex items-center space-x-4 self-start md:self-center shrink-0">
             <div className="flex flex-col items-end">
               <span className="text-[10px] font-mono uppercase tracking-wider text-foreground-muted font-semibold">
-                Threat Score
+                Risk score
               </span>
               <div className="flex items-baseline space-x-1">
                 <span
@@ -463,14 +430,15 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
         <div className="flex items-center justify-between">
           <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center space-x-2">
             <Target className="w-3.5 h-3.5 text-primary" />
-            <span>Key Forensic Findings ({findings.length})</span>
+            <span>Findings · {findings.length}</span>
           </h3>
           <span className="text-[11px] font-mono text-foreground-muted">
-            Click any finding to inspect evidence
+            Select a finding to review its evidence
           </span>
         </div>
 
-        <div className="space-y-2.5">
+        <div className="cg-findings-list">
+          {findings.length === 0 && <div className="p-6 text-sm text-foreground-muted">No verified findings available for this investigation. Review the original evidence and analysis limitations.</div>}
           {findings.map((finding) => {
             const isCrit = finding.severity === 'CRITICAL';
             const isHigh = finding.severity === 'HIGH';
@@ -479,8 +447,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
             return (
               <div
                 key={finding.id}
-                onClick={() => setSection(finding.targetSection, finding.targetSubTab)}
-                className="group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl bg-surface border border-border hover:border-primary/50 hover:bg-surface-secondary/50 transition-all cursor-pointer shadow-xs gap-3"
+                className="cg-finding-row group flex flex-col lg:flex-row lg:items-center justify-between p-4 hover:bg-surface-secondary/50 transition-colors gap-4"
               >
                 <div className="flex items-start space-x-3 min-w-0 flex-1">
                   {/* Severity Badge */}
@@ -503,14 +470,14 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
                     <p className="text-xs sm:text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                       {finding.title}
                     </p>
-                    <p className="text-xs font-mono text-foreground-muted line-clamp-2">
+                    <p className="cg-finding-description text-sm text-foreground-muted leading-relaxed break-words">
                       {finding.description}
                     </p>
                   </div>
                 </div>
 
                 {/* Action Buttons: Ask AI & Direct Jump */}
-                <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
+                <div className="cg-finding-actions flex items-center space-x-2 shrink-0 self-end lg:self-center">
                   <button
                     type="button"
                     onClick={(e) => {
@@ -524,11 +491,11 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
                         }
                       );
                     }}
-                    className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/25 text-xs font-mono font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
+                    className="cg-explain-button px-2.5 py-2 rounded-lg text-foreground-muted hover:text-foreground text-xs font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
                     title="Ask AI about this finding"
                   >
                     <Sparkles className="w-3 h-3" />
-                    <span>Ask AI</span>
+                    <span>Explain</span>
                   </button>
 
                   <button
@@ -537,7 +504,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
                       e.stopPropagation();
                       setSection(finding.targetSection, finding.targetSubTab);
                     }}
-                    className="px-3 py-1 rounded-lg bg-surface-secondary group-hover:bg-primary group-hover:text-primary-foreground border border-border text-foreground text-xs font-mono font-medium flex items-center space-x-1.5 transition-all cursor-pointer"
+                    className="px-3 py-2 rounded-lg bg-surface-secondary hover:border-primary border border-border text-foreground text-xs font-medium flex items-center space-x-1.5 transition-colors cursor-pointer"
                   >
                     <span>{finding.actionLabel}</span>
                     <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
@@ -550,19 +517,20 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
       </section>
 
       {/* =======================================================================
-          SECTION 3 & 4 (2-Column Grid): Authentication Snapshot & Key IOCs
+          SECTION 3 & 4 (2-Column Grid): Email authentication & Key IOCs
           ======================================================================= */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-        {/* SECTION 3 — Authentication Snapshot */}
+        {/* SECTION 3 — Email authentication */}
+        {safeEmail.authentication && (
         <section className="bg-surface rounded-card border border-border p-4 space-y-4 flex flex-col justify-between">
           <div className="space-y-3">
             <div className="flex items-center justify-between pb-2 border-b border-border">
               <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-foreground-muted flex items-center space-x-2">
                 <Lock className="w-3.5 h-3.5 text-primary" />
-                <span>Authentication Snapshot</span>
+                <span>Email authentication</span>
               </h3>
               <span className="text-[10px] font-mono text-foreground-muted">
-                RFC 8601 Verification
+                Header results
               </span>
             </div>
 
@@ -619,7 +587,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
               title="Ask AI to explain authentication failures"
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Ask AI</span>
+              <span>Explain</span>
             </button>
 
             <button
@@ -632,6 +600,7 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
             </button>
           </div>
         </section>
+        )}
 
         {/* SECTION 4 — Important Indicators (Highest Priority IOCs) */}
         <section className="bg-surface rounded-card border border-border p-4 space-y-4 flex flex-col justify-between">
@@ -750,7 +719,9 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
         <div className="space-y-0.5">
           <span className="font-semibold text-foreground">Recommended Next Step:</span>
           <p className="text-foreground-muted text-[11px]">
-            {isMalicious
+            {!isEmailEvidence
+              ? 'Review the original evidence, extracted indicators and analysis limitations.'
+              : isMalicious
               ? 'Pivot into lookalike domain and URL redirection evidence to confirm attribution.'
               : 'Inspect original email headers to verify authoritative cryptographic signatures.'}
           </p>
@@ -770,10 +741,10 @@ export const OverviewSectionView: React.FC<OverviewSectionViewProps> = ({ email 
           </button>
           <button
             type="button"
-            onClick={() => setSection(isMalicious ? 'analysis' : 'email')}
+            onClick={() => setSection(!isEmailEvidence ? 'evidence' : isMalicious ? 'analysis' : 'email')}
             className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary-hover text-primary-foreground font-semibold flex items-center space-x-1.5 transition-colors cursor-pointer shadow-xs"
           >
-            <span>{isMalicious ? 'Examine Analysis & IOCs' : 'Inspect Email Headers'}</span>
+            <span>{!isEmailEvidence ? 'Inspect Original Evidence' : isMalicious ? 'Examine Analysis & IOCs' : 'Inspect Email Headers'}</span>
             <ArrowRight className="w-3 h-3" />
           </button>
         </div>

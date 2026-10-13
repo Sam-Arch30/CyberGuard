@@ -61,18 +61,18 @@ export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email 
     icon: React.FC<{ className?: string }>;
     count?: number;
   }[] = [
-    { id: 'results', label: 'Analysis Results', icon: ShieldAlert },
-    { id: 'live', label: 'Live Pipeline DAG', icon: Activity },
-    { id: 'all', label: 'All Sections', icon: Layers },
+    { id: 'results', label: 'Results', icon: ShieldAlert },
+    { id: 'live', label: 'Processing', icon: Activity },
+    { id: 'all', label: 'All details', icon: Layers },
     { id: 'indicators', label: 'Indicators', icon: Target, count: totalIocs },
     { id: 'urls', label: 'URLs', icon: Link2, count: urlCount },
     { id: 'lookalikes', label: 'Domain Similarity', icon: AlertOctagon, count: lookalikeCount },
     { id: 'content', label: 'Content Analysis', icon: BrainCircuit },
-    { id: 'scoring', label: 'Scoring Breakdown', icon: ShieldAlert }
+    { id: 'scoring', label: 'Risk factors', icon: ShieldAlert }
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="cg-analysis-section space-y-6">
       {/* 1. SUBSECTION FILTER BAR */}
       <div className="bg-surface rounded-xl border border-border p-1.5 flex flex-wrap items-center gap-1 shadow-xs">
         {subTabItems.map((tab) => {
@@ -133,7 +133,7 @@ export const AnalysisSectionView: React.FC<AnalysisSectionViewProps> = ({ email 
 
       {/* 5. COLLAPSIBLE FORENSIC SECTIONS */}
       {currentSubTab !== 'live' && currentSubTab !== 'results' && (
-        <div className="space-y-6">
+        <div className="cg-analysis-section space-y-6">
           {/* SECTION 1: INDICATORS */}
           {(currentSubTab === 'all' || currentSubTab === 'indicators') && (
             <div id="section-indicators">

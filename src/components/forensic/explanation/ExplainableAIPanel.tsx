@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldAlert,
@@ -96,27 +97,12 @@ export const ExplainableAIPanel: React.FC<ExplainableAIPanelProps> = ({
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(apiUrl(`/api/v1/explanation/by-scope/${scopeType}/${scopeId}`));
+      const res = await apiFetch(apiUrl(`/api/v1/explanation/${encodeURIComponent(scopeType)}/${encodeURIComponent(scopeId)}?workspace_id=${encodeURIComponent(workspaceId)}`));
       if (res.ok) {
         const data: ExplanationResponse = await res.json();
         setExplanation(data);
       } else if (res.status === 404) {
-        // Attempt compose
-        const composeRes = await fetch(apiUrl('/api/v1/explanation/compose'), {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            scope_type: scopeType,
-            scope_id: scopeId,
-            workspace_id: workspaceId
-          })
-        });
-        if (composeRes.ok) {
-          const composedData: ExplanationResponse = await composeRes.json();
-          setExplanation(composedData);
-        } else {
-          setError('No structured risk assessment found to explain for this item.');
-        }
+        setError('No structured risk assessment is available for this record. Review the source evidence and analysis findings.');
       } else {
         setError(`Failed to retrieve explanation (${res.statusText})`);
       }
@@ -134,16 +120,16 @@ export const ExplainableAIPanel: React.FC<ExplainableAIPanelProps> = ({
   }, [fetchExplanation, explanation, scopeId]);
 
   const handleGenerateNarrative = async () => {
-    if (!explanation) return;
+    if (!explanation || !scopeId) return;
     setNarrativeLoading(true);
     setNarrativeNotice(null);
     try {
-      const res = await fetch(apiUrl('/api/v1/explanation/generate-narrative'), {
+      const res = await apiFetch(apiUrl(`/api/v1/explanation/${encodeURIComponent(scopeType)}/${encodeURIComponent(scopeId)}/generate-narrative?workspace_id=${encodeURIComponent(workspaceId)}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           explanation_id: explanation.id,
-          audience: activeLayer
+          scope_type: scopeType, scope_id: scopeId, detail_level: activeLayer
         })
       });
       if (res.ok) {
@@ -152,11 +138,11 @@ export const ExplainableAIPanel: React.FC<ExplainableAIPanelProps> = ({
           prev
             ? {
                 ...prev,
-                generated_text: data.generated_text,
+                generated_text: data.narrative,
                 executive_summary:
-                  activeLayer === 'EXECUTIVE' ? data.generated_text : prev.executive_summary,
+                  activeLayer === 'EXECUTIVE' ? data.narrative : prev.executive_summary,
                 analyst_summary:
-                  activeLayer === 'ANALYST' ? data.generated_text : prev.analyst_summary
+                  activeLayer === 'ANALYST' ? data.narrative : prev.analyst_summary
               }
             : null
         );
@@ -179,34 +165,38 @@ export const ExplainableAIPanel: React.FC<ExplainableAIPanelProps> = ({
   };
 
   const handleCreateSnapshot = async () => {
-    if (!explanation) return;
+    if (!explanation || !scopeId) return;
     setSnapshotLoading(true);
+    setError(null);
     try {
-      const res = await fetch(apiUrl(`/api/v1/explanation/${explanation.id}/snapshot`), {
+      const res = await apiFetch(apiUrl(`/api/v1/explanation/${encodeURIComponent(scopeType)}/${encodeURIComponent(scopeId)}/snapshots?workspace_id=${encodeURIComponent(workspaceId)}`), {
         method: 'POST'
       });
       if (res.ok) {
         const snap = await res.json();
-        setSnapshotSuccess(`Forensic snapshot #${snap.version} saved.`);
+        setSnapshotSuccess(`Forensic snapshot #${snap.explanation_version} saved.`);
         setTimeout(() => setSnapshotSuccess(null), 4000);
+      } else {
+        setError('Snapshot could not be saved. Retry after checking the explanation service.');
       }
     } catch {
-      // Ignored
+      setError('Unable to reach the explanation service to save this snapshot.');
     } finally {
       setSnapshotLoading(false);
     }
   };
 
   const handleSubmitFeedback = async () => {
-    if (!explanation || !feedbackNotes.trim()) return;
+    if (!explanation || !scopeId || !feedbackNotes.trim()) return;
     setFeedbackSubmitting(true);
+    setError(null);
     try {
       const payload: ExplanationFeedbackCreate = {
         analyst_id: 'current_analyst',
         feedback_type: feedbackType,
         notes: feedbackNotes.trim()
       };
-      const res = await fetch(apiUrl(`/api/v1/explanation/${explanation.id}/feedback`), {
+      const res = await apiFetch(apiUrl(`/api/v1/explanation/${encodeURIComponent(scopeType)}/${encodeURIComponent(scopeId)}/feedback?workspace_id=${encodeURIComponent(workspaceId)}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -216,9 +206,11 @@ export const ExplainableAIPanel: React.FC<ExplainableAIPanelProps> = ({
         setShowFeedbackModal(false);
         setFeedbackNotes('');
         setTimeout(() => setFeedbackSuccess(null), 4000);
+      } else {
+        setError('Feedback could not be recorded. Your notes have been retained for retry.');
       }
     } catch {
-      // Ignored
+      setError('Unable to reach the explanation service. Your feedback notes have been retained.');
     } finally {
       setFeedbackSubmitting(false);
     }
@@ -226,7 +218,7 @@ export const ExplainableAIPanel: React.FC<ExplainableAIPanelProps> = ({
 
   const effectiveScore = explanation?.risk_score ?? riskScore ?? 0;
   const effectiveLevel = (explanation?.risk_level ?? riskLevel ?? 'LOW').toUpperCase();
-  const effectiveConfidence = (explanation?.confidence_level ?? confidence ?? 'MEDIUM').toUpperCase();
+  const effectiveConfidence = (explanation?.confidence_level ?? confidence ?? 'UNAVAILABLE').toUpperCase();
 
   const getScoreColor = (lvl: string) => {
     switch (lvl) {

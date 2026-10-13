@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 66: Advanced Investigation Automation Client Service.
  * Communicates with backend endpoints at /api/investigations/{id}/automation
@@ -24,7 +25,7 @@ export const investigationAutomationService = {
    * Fetches the registered investigation templates.
    */
   async getTemplates(): Promise<AutomationTemplateDefinition[]> {
-    const res = await fetch(apiUrl('/api/investigations/automation/templates'), {
+    const res = await apiFetch(apiUrl('/api/investigations/automation/templates'), {
       headers: defaultHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load investigation templates: ${res.statusText}`);
@@ -35,7 +36,7 @@ export const investigationAutomationService = {
    * Lists historical automation runs for an investigation.
    */
   async listRuns(investigationId: string, limit = 20, workspaceId = 'default'): Promise<InvestigationAutomationRunRead[]> {
-    const res = await fetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/automation/runs?limit=${limit}`), {
+    const res = await apiFetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/automation/runs?limit=${limit}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to list automation runs: ${res.statusText}`);
@@ -49,7 +50,7 @@ export const investigationAutomationService = {
     const endpoint = investigationId
       ? `/api/investigations/${encodeURIComponent(investigationId)}/automation/runs/${runId}`
       : `/api/v1/investigation-automation/runs/${runId}`;
-    const res = await fetch(apiUrl(endpoint), {
+    const res = await apiFetch(apiUrl(endpoint), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch automation run: ${res.statusText}`);
@@ -66,7 +67,7 @@ export const investigationAutomationService = {
     workspaceId = 'default',
     role = 'analyst',
   ): Promise<InvestigationAutomationRunRead> {
-    const res = await fetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/automation/runs?async_exec=${asyncExec}`), {
+    const res = await apiFetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/automation/runs?async_exec=${asyncExec}`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId, role),
       body: JSON.stringify(req),
@@ -92,7 +93,7 @@ export const investigationAutomationService = {
     const endpoint = investigationId
       ? `/api/investigations/${encodeURIComponent(investigationId)}/automation/runs/${runId}/steps/${stepIndex}/approve`
       : `/api/v1/investigation-automation/runs/${runId}/steps/${stepIndex}/approve`;
-    const res = await fetch(apiUrl(endpoint), {
+    const res = await apiFetch(apiUrl(endpoint), {
       method: 'POST',
       headers: defaultHeaders(workspaceId, role),
       body: JSON.stringify(approval),
@@ -111,7 +112,7 @@ export const investigationAutomationService = {
     const endpoint = investigationId
       ? `/api/investigations/${encodeURIComponent(investigationId)}/automation/runs/${runId}/cancel`
       : `/api/v1/investigation-automation/runs/${runId}/cancel`;
-    const res = await fetch(apiUrl(endpoint), {
+    const res = await apiFetch(apiUrl(endpoint), {
       method: 'POST',
       headers: defaultHeaders(workspaceId, role),
     });
@@ -126,7 +127,7 @@ export const investigationAutomationService = {
     const endpoint = investigationId
       ? `/api/investigations/${encodeURIComponent(investigationId)}/automation/runs/${runId}/resume`
       : `/api/v1/investigation-automation/runs/${runId}/resume`;
-    const res = await fetch(apiUrl(endpoint), {
+    const res = await apiFetch(apiUrl(endpoint), {
       method: 'POST',
       headers: defaultHeaders(workspaceId, role),
     });
@@ -141,7 +142,7 @@ export const investigationAutomationService = {
     const endpoint = investigationId
       ? `/api/investigations/${encodeURIComponent(investigationId)}/automation/runs/${runId}/retry`
       : `/api/v1/investigation-automation/runs/${runId}/retry`;
-    const res = await fetch(apiUrl(endpoint), {
+    const res = await apiFetch(apiUrl(endpoint), {
       method: 'POST',
       headers: defaultHeaders(workspaceId, role),
     });
@@ -153,7 +154,7 @@ export const investigationAutomationService = {
    * Fetches all detected investigation gaps for an investigation.
    */
   async getGaps(investigationId: string, workspaceId = 'default'): Promise<InvestigationGapRead[]> {
-    const res = await fetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/automation/gaps`), {
+    const res = await apiFetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/automation/gaps`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch investigation gaps: ${res.statusText}`);
@@ -164,7 +165,7 @@ export const investigationAutomationService = {
    * Lists automation policies.
    */
   async listPolicies(workspaceId = 'default'): Promise<AutomationPolicyRead[]> {
-    const res = await fetch(apiUrl('/api/investigations/automation/policies'), {
+    const res = await apiFetch(apiUrl('/api/investigations/automation/policies'), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to list automation policies: ${res.statusText}`);

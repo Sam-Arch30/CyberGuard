@@ -178,8 +178,8 @@ def test_case_lifecycle_audit():
     audit_res = client.get(f"/api/audit?resource_id={case_id}&action=CASE_STATUS_CHANGED")
     status_logs = audit_res.json()["items"]
     assert len(status_logs) >= 1
-    assert status_logs[0]["metadata"]["old_status"] == "open"
-    assert status_logs[0]["metadata"]["new_status"] == "investigating"
+    assert status_logs[0]["metadata"]["old_status"] == "OPEN"
+    assert status_logs[0]["metadata"]["new_status"] == "IN_PROGRESS"
 
     # 4. Add analyst note
     note_res = client.post(f"/api/cases/{case_id}/notes", json={

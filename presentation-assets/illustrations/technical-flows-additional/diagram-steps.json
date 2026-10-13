@@ -1,0 +1,54 @@
+[
+  [
+    "05-file-attachments",
+    "File & Attachment Detection Flow",
+    [
+      "Upload file / attachment\nBounded input; reject empty/truncated PDF",
+      "FileIdentityAnalyzer + FilenameSecurityAnalyzer\nHashes, magic/MIME, Unicode and extensions",
+      "Run matching static analyzer\nPDF / Office / PE / script / ZIP checks\nInspect entropy and archive entries",
+      "FileIOCAnalyzer + FileReputationAnalyzer\nExtract references; query file-hash reputation",
+      "FileClassificationService.classify\nCombine findings, hash reputation and type",
+      "Persist original / derived evidence\nReturn classification, risk and findings"
+    ],
+    "Focused file API; hash no-match does not establish safety."
+  ],
+  [
+    "06-network-anomalies",
+    "Network Anomaly Detection Flow",
+    [
+      "Submit network event batch\nProvider-specific adapter normalization",
+      "Deduplicate; sort by timestamp\nBuild device baseline profiles",
+      "Check external-destination threat intelligence\nUse available configured lookup results",
+      "Run network rule engines\nConnection scans, periodicity, DNS patterns\nTransfer/exfiltration and destination anomalies",
+      "NetworkPatternAggregator\nCombine findings; calculate overall risk",
+      "Persist events, findings and device profiles\nReturn network classification and risk"
+    ],
+    "Analyzes submitted telemetry; not continuous packet interception."
+  ],
+  [
+    "07-api-abuse",
+    "API Abuse Detection Flow",
+    [
+      "Submit API request telemetry\nAdapter normalization with secret redaction",
+      "Deduplicate; sort by timestamp\nBuild account baseline profiles",
+      "Run API abuse rule engines\nBursts, enumeration, authentication failures\nMethod/privilege, session and scraping signals",
+      "Check cross-module correlations\nExisting authentication and network records",
+      "APIPatternAggregator.aggregate\nCombine findings; score abuse hypotheses",
+      "Persist normalized events and findings\nReturn abuse classification and risk"
+    ],
+    "Rules operate on available telemetry and configuration."
+  ],
+  [
+    "08-audio-spectral",
+    "Audio Spectral Heuristic Flow",
+    [
+      "Upload audio\nIdentify signature; enforce bounded input",
+      "decode_media: local FFmpeg\nUp to 30 s; mono PCM WAV at 44.1 kHz",
+      "AudioSpectralAcousticDetector\nRead samples; select channel; normalize amplitude",
+      "SciPy real FFT\nEnergy above 8 kHz; spectral flatness",
+      "Apply abrupt-band-cutoff rule\nSample rate >= 22050 Hz\nHigh-frequency energy ratio < 0.001",
+      "Return heuristic evidence and limitations\nCalibrated authenticity confidence unavailable"
+    ],
+    "Not a trained voice-clone detector; no verified real/fake verdict."
+  ]
+]

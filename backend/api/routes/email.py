@@ -188,11 +188,13 @@ async def analyze_email(
     uploader_identity = (user or "SOC Analyst").strip()
 
     try:
-        content_bytes = await file.read()
+        content_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Failed to read uploaded file stream: {str(e)}"
+            detail='Failed to read uploaded file stream.'
         )
 
     # Section 20: Validate upload security (file size limit <= 10MB, no executables, RFC-822 structure)
@@ -454,6 +456,8 @@ async def analyze_email(
                     raw_sha256=raw_sha256,
                     content_bytes=content_bytes
                 )
+            except HTTPException:
+                raise
             except Exception as exc:
                 import traceback
                 traceback.print_exc()
@@ -467,6 +471,8 @@ async def analyze_email(
             status_code=status.HTTP_400_BAD_REQUEST,
             content={"detail": f"Malformed email file: {str(e)}", "error_code": "MALFORMED_EMAIL"}
         )
+    except HTTPException:
+        raise
     except Exception as e:
         import traceback
         traceback.print_exc()
@@ -597,8 +603,10 @@ async def analyze_email_artifact_endpoint(
         return legacy_res
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail='Pipeline execution failed.')
 
 
 @router.post(
@@ -618,9 +626,11 @@ async def analyze_email_pipeline_endpoint(
     safe_filename = UploadSecurityService.sanitize_filename(raw_filename)
 
     try:
-        content_bytes = await file.read()
+        content_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to read file stream: {str(e)}")
+        raise HTTPException(status_code=400, detail='Failed to read file stream.')
 
     UploadSecurityService.validate_email_upload(
         filename=safe_filename,
@@ -636,8 +646,10 @@ async def analyze_email_pipeline_endpoint(
             uploader=uploader
         )
         return legacy_res
+    except HTTPException:
+        raise
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+        raise HTTPException(status_code=500, detail='Pipeline execution failed.')
 
 
 

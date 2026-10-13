@@ -1,0 +1,11 @@
+From: Example Team <finance@lookalike-example.test>
+To: analyst@example.test
+Reply-To: payments@untrusted.example
+Return-Path: <finance@lookalike-example.test>
+Subject: Confidential: urgent payment
+Date: Mon, 12 Oct 2026 09:00:00 +0000
+Message-ID: <suspicious-payment-request.eml@example.test>
+MIME-Version: 1.0
+Content-Type: text/plain; charset=utf-8
+
+Please send the urgent wire transfer today. Do not contact anyone else. Reply with the payment confirmation.

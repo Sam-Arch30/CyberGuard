@@ -79,7 +79,7 @@ from backend.services.log_sanitizer import sanitize_log_text
 logger = logging.getLogger("cyberguard.continual_learning")
 
 MODELS_DIR = Path(__file__).resolve().parent.parent / "app" / "ml" / "models"
-CANDIDATES_DIR = MODELS_DIR / "candidates"
+CANDIDATES_DIR = Path(os.getenv("CONTINUAL_LEARNING_CANDIDATES_DIR", str(MODELS_DIR / "candidates")))
 
 
 class ContinualLearningService:

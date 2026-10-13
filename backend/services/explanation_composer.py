@@ -149,6 +149,8 @@ class ExplanationComposer:
 
         # 1. Fetch Authoritative RiskAssessmentModel
         assessment = cls._get_or_create_risk_assessment(db, norm_scope_type, scope_id, workspace_id)
+        if assessment is None:
+            raise ValueError('No authoritative risk assessment is available for this record.')
 
         # 2. Collect contextual entities, findings, and evidence
         context = cls._gather_scope_context(db, norm_scope_type, scope_id, workspace_id, assessment)

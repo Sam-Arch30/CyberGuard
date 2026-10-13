@@ -1,0 +1,953 @@
+{
+  "id": "EVD-2B2F5521DB",
+  "evidence_id": "EVD-2B2F5521DB",
+  "email_sha256": "2b2f5521dbb7919d503dbef628595d627bb6d364a4738fc2c17bd7827f6c6ae6",
+  "original_filename": "suspicious-payment-request.eml",
+  "upload_timestamp": "2026-10-13T01:52:35.648060",
+  "size": 473,
+  "uploader": "SOC Analyst",
+  "authentication": {
+    "verification_type": "observed_header",
+    "verification_notice": "Observed authentication result from supplied headers (unverified by local mail server)",
+    "observed_header": null,
+    "spf": {
+      "result": "none",
+      "details": "No Authentication-Results or Received-SPF header present."
+    },
+    "dkim": {
+      "result": "none",
+      "details": "No Authentication-Results or DKIM-Signature header present."
+    },
+    "dmarc": {
+      "result": "none",
+      "details": "No Authentication-Results header present."
+    },
+    "alignment": {
+      "from_domain": "lookalike-example.test",
+      "reply_to_domain": "untrusted.example",
+      "return_path_domain": "lookalike-example.test",
+      "reply_to_mismatch": true,
+      "return_path_mismatch": false
+    }
+  },
+  "relay_analysis": {
+    "header_order_hops": [],
+    "transmission_order_hops": [],
+    "earliest_observable_node": {
+      "earliest_observable_ip": null,
+      "from_host": null,
+      "confidence": "none",
+      "reason": "No Received headers present in email"
+    },
+    "trust_notice": "Headers nearest the recipient's mail infrastructure provide stronger evidence than upstream headers, which may be forged by prior nodes."
+  },
+  "ip_intelligence": {},
+  "domain_intelligence": {
+    "lookalike-example.test": {
+      "domain": "lookalike-example.test",
+      "punycode": null,
+      "dns": {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "txt": []
+      },
+      "registration": {
+        "registrar": null,
+        "registration_date": null,
+        "expiration_date": null,
+        "nameservers": [],
+        "status": [
+          "Registration date unavailable in RDAP and WHOIS"
+        ],
+        "country": null,
+        "registration_source": "unavailable",
+        "is_redacted": false
+      },
+      "domain_age_days": null,
+      "newly_registered_domain": null,
+      "is_resolvable": false,
+      "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+      "lookalike": null
+    },
+    "untrusted.example": {
+      "domain": "untrusted.example",
+      "punycode": null,
+      "dns": {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "txt": []
+      },
+      "registration": {
+        "registrar": null,
+        "registration_date": null,
+        "expiration_date": null,
+        "nameservers": [],
+        "status": [
+          "Registration date unavailable in RDAP and WHOIS"
+        ],
+        "country": null,
+        "registration_source": "unavailable",
+        "is_redacted": false
+      },
+      "domain_age_days": null,
+      "newly_registered_domain": null,
+      "is_resolvable": false,
+      "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+      "lookalike": null
+    },
+    "example.test": {
+      "domain": "example.test",
+      "punycode": null,
+      "dns": {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "txt": []
+      },
+      "registration": {
+        "registrar": null,
+        "registration_date": null,
+        "expiration_date": null,
+        "nameservers": [],
+        "status": [
+          "Registration date unavailable in RDAP and WHOIS"
+        ],
+        "country": null,
+        "registration_source": "unavailable",
+        "is_redacted": false
+      },
+      "domain_age_days": null,
+      "newly_registered_domain": null,
+      "is_resolvable": false,
+      "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+      "lookalike": null
+    }
+  },
+  "lookalike_domains": [],
+  "url_analysis": [],
+  "threat_score": {
+    "score": 28,
+    "risk_level": "SUSPICIOUS",
+    "severity": "low",
+    "confidence": "HIGH",
+    "positive_contributions": [
+      {
+        "signal_id": "SIG-SEND-001",
+        "category": "sender_identity",
+        "name": "Reply-To Destination Mismatch",
+        "description": "From domain 'lookalike-example.test' differs from Reply-To destination 'untrusted.example'",
+        "why_it_matters": "Redirects victim replies to adversary-controlled inboxes during BEC and credential collection attacks.",
+        "raw_value": "lookalike-example.test != untrusted.example",
+        "normalized_value": 1.0,
+        "weight": 8.0,
+        "contribution": 8,
+        "direction": "increase_risk",
+        "confidence": 1.0,
+        "evidence_reference": "untrusted.example",
+        "source": "Header Alignment Subsystem"
+      },
+      {
+        "signal_id": "SIG-DOMA-002",
+        "category": "domain_intelligence",
+        "name": "DNS Architecture Anomaly",
+        "description": "Domain(s) failed authoritative DNS resolution: lookalike-example.test, untrusted.example, example.test",
+        "why_it_matters": "Indicates ephemeral infrastructure or non-standard routing setup common in disposable attack campaigns.",
+        "raw_value": "unresolvable",
+        "normalized_value": 1.0,
+        "weight": 10.0,
+        "contribution": 10,
+        "direction": "increase_risk",
+        "confidence": 1.0,
+        "evidence_reference": "lookalike-example.test",
+        "source": "DNS Resolver Subsystem"
+      },
+      {
+        "signal_id": "SIG-EMAI-003",
+        "category": "email_content",
+        "name": "Urgent Financial / Wire Request",
+        "description": "Detected urgent financial transfer language: 'wire transfer'",
+        "why_it_matters": "Primary behavioral vector for Business Email Compromise (BEC) and payroll diversion fraud.",
+        "raw_value": "wire transfer",
+        "normalized_value": 1.0,
+        "weight": 10.0,
+        "contribution": 10,
+        "direction": "increase_risk",
+        "confidence": 1.0,
+        "evidence_reference": null,
+        "source": "Content Intent Analyzer"
+      }
+    ],
+    "negative_contributions": [],
+    "top_reasons": [
+      "DNS Architecture Anomaly (+10 pts)",
+      "Urgent Financial / Wire Request (+10 pts)",
+      "Reply-To Destination Mismatch (+8 pts)"
+    ],
+    "reasons": [
+      {
+        "signal": "reply_to_mismatch",
+        "label": "Reply-To header domain mismatch",
+        "points": 8,
+        "evidence": "From domain 'lookalike-example.test' differs from Reply-To destination 'untrusted.example'"
+      },
+      {
+        "signal": "dns_anomaly",
+        "label": "DNS Resolution Failure",
+        "points": 10,
+        "evidence": "Domain(s) failed authoritative DNS resolution: lookalike-example.test, untrusted.example, example.test"
+      },
+      {
+        "signal": "financial_language",
+        "label": "Urgent financial or wire transfer language",
+        "points": 10,
+        "evidence": "Detected pattern: 'wire transfer'"
+      }
+    ],
+    "positive_evidence": [],
+    "summary": "Email risk assessed as Low (28/100) driven by 3 forensic signal(s): Reply-To header domain mismatch (+8), DNS Resolution Failure (+10), Urgent financial or wire transfer language (+10).",
+    "why_flagged": "This email was flagged with a Threat Score of 28/100 (SUSPICIOUS) because it triggered 3 positive threat signal(s) across 3 analytical category(ies). Key forensic drivers: DNS Architecture Anomaly (+10 pts); Urgent Financial / Wire Request (+10 pts); Reply-To Destination Mismatch (+8 pts).",
+    "category_breakdowns": {
+      "authentication": {
+        "category": "authentication",
+        "display_name": "Authentication Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "sender_identity": {
+        "category": "sender_identity",
+        "display_name": "Sender Identity Risk",
+        "risk_score": 8,
+        "positive_signals_count": 1,
+        "mitigating_signals_count": 0,
+        "signals": [
+          {
+            "signal_id": "SIG-SEND-001",
+            "category": "sender_identity",
+            "name": "Reply-To Destination Mismatch",
+            "description": "From domain 'lookalike-example.test' differs from Reply-To destination 'untrusted.example'",
+            "why_it_matters": "Redirects victim replies to adversary-controlled inboxes during BEC and credential collection attacks.",
+            "raw_value": "lookalike-example.test != untrusted.example",
+            "normalized_value": 1.0,
+            "weight": 8.0,
+            "contribution": 8,
+            "direction": "increase_risk",
+            "confidence": 1.0,
+            "evidence_reference": "untrusted.example",
+            "source": "Header Alignment Subsystem"
+          }
+        ]
+      },
+      "domain_intelligence": {
+        "category": "domain_intelligence",
+        "display_name": "Domain Risk",
+        "risk_score": 10,
+        "positive_signals_count": 1,
+        "mitigating_signals_count": 0,
+        "signals": [
+          {
+            "signal_id": "SIG-DOMA-002",
+            "category": "domain_intelligence",
+            "name": "DNS Architecture Anomaly",
+            "description": "Domain(s) failed authoritative DNS resolution: lookalike-example.test, untrusted.example, example.test",
+            "why_it_matters": "Indicates ephemeral infrastructure or non-standard routing setup common in disposable attack campaigns.",
+            "raw_value": "unresolvable",
+            "normalized_value": 1.0,
+            "weight": 10.0,
+            "contribution": 10,
+            "direction": "increase_risk",
+            "confidence": 1.0,
+            "evidence_reference": "lookalike-example.test",
+            "source": "DNS Resolver Subsystem"
+          }
+        ]
+      },
+      "lookalike_detection": {
+        "category": "lookalike_detection",
+        "display_name": "Lookalike Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "url_intelligence": {
+        "category": "url_intelligence",
+        "display_name": "URL Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "infrastructure": {
+        "category": "infrastructure",
+        "display_name": "Infrastructure Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "email_content": {
+        "category": "email_content",
+        "display_name": "Content Risk",
+        "risk_score": 10,
+        "positive_signals_count": 1,
+        "mitigating_signals_count": 0,
+        "signals": [
+          {
+            "signal_id": "SIG-EMAI-003",
+            "category": "email_content",
+            "name": "Urgent Financial / Wire Request",
+            "description": "Detected urgent financial transfer language: 'wire transfer'",
+            "why_it_matters": "Primary behavioral vector for Business Email Compromise (BEC) and payroll diversion fraud.",
+            "raw_value": "wire transfer",
+            "normalized_value": 1.0,
+            "weight": 10.0,
+            "contribution": 10,
+            "direction": "increase_risk",
+            "confidence": 1.0,
+            "evidence_reference": null,
+            "source": "Content Intent Analyzer"
+          }
+        ]
+      },
+      "campaign_intelligence": {
+        "category": "campaign_intelligence",
+        "display_name": "Campaign Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "attachments": {
+        "category": "attachments",
+        "display_name": "Attachment Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      }
+    },
+    "model_version": "v1.0-tfidf-logistic",
+    "scoring_version": "2.0.0-explainable",
+    "audit_metadata": {
+      "scoring_version": "2.0.0-explainable",
+      "weights_snapshot": {
+        "spf_fail": 8,
+        "spf_softfail": 4,
+        "dkim_fail": 8,
+        "dmarc_fail": 12,
+        "display_name_spoof": 14,
+        "reply_to_mismatch": 8,
+        "return_path_mismatch": 6,
+        "brand_impersonation": 18,
+        "url_high_risk": 15,
+        "url_suspicious": 8,
+        "html_link_mismatch": 15,
+        "domain_age_under_7d": 14,
+        "newly_registered_domain": 10,
+        "suspicious_tld": 8,
+        "dns_anomaly": 10,
+        "credential_request": 12,
+        "financial_language": 10,
+        "urgency_language": 8,
+        "suspicious_attachment_extension": 15,
+        "attachment_macro_payload": 18,
+        "executable_disguised_as_document": 25,
+        "pdf_suspicious_actions": 18,
+        "double_extension_detected": 18,
+        "archive_with_hidden_executable": 20,
+        "path_traversal_archive_exploit": 25,
+        "password_protected_suspicious_archive": 15,
+        "unsigned_executable": 12,
+        "embedded_phishing_url_in_attachment": 15,
+        "high_entropy_packed_binary": 10,
+        "suspicious_ip_hosting_or_proxy": 8,
+        "known_campaign_match": 14,
+        "shared_malicious_infrastructure": 12,
+        "ml_phishing_signal": 10,
+        "trusted_sender_history": -5
+      },
+      "thresholds_snapshot": {
+        "low": {
+          "min": 0,
+          "max": 29
+        },
+        "suspicious": {
+          "min": 30,
+          "max": 59
+        },
+        "high": {
+          "min": 60,
+          "max": 79
+        },
+        "critical": {
+          "min": 80,
+          "max": 100
+        }
+      },
+      "timestamp": "2026-10-13T01:52:43.883069+00:00",
+      "evidence_ids": [
+        "SIG-SEND-001",
+        "SIG-DOMA-002",
+        "SIG-EMAI-003"
+      ],
+      "model_version": "v1.0-tfidf-logistic"
+    }
+  },
+  "ml_phishing_probability": 0.5776,
+  "ml_assessment": {
+    "classification": "phishing",
+    "probability": 0.5776,
+    "confidence": "low",
+    "available": true,
+    "top_features": [
+      "wire",
+      "payment",
+      "urgent",
+      "transfer",
+      "wire transfer"
+    ],
+    "model_name": "TF-IDF + Logistic Regression",
+    "notice": null
+  },
+  "ai_analyst": {
+    "summary": "The analyzed email presents characteristics of Business Email Compromise (BEC) / Wire Transfer Fraud with a deterministic threat score of 28/100 (LOW). Key driving indicators include 3 forensic flag(s). Adversary objective is assessed as: Financial payment diversion to fraudulent bank or crypto destination.",
+    "likely_attack_type": "Business Email Compromise (BEC) / Wire Transfer Fraud",
+    "likely_objective": "Financial payment diversion to fraudulent bank or crypto destination",
+    "key_evidence": [
+      "Global threat score evaluated at 28/100 (LOW severity).",
+      "Forensic indicator: Reply-To header domain mismatch",
+      "Forensic indicator: DNS Resolution Failure",
+      "Forensic indicator: Urgent financial or wire transfer language",
+      "NLP text assessment indicates 57% phishing probability."
+    ],
+    "recommended_actions": [
+      "No containment action necessary; message conforms to normal operational profile."
+    ],
+    "limitations": [
+      "Analysis is bounded to static email telemetry and Received header topology.",
+      "Dynamic sandbox detonation was not performed on embedded attachments.",
+      "Attribution is limited to observable IP/DNS infrastructure without external threat actor correlation."
+    ],
+    "available": true,
+    "provider": "mock",
+    "model": "gemini-1.5-flash",
+    "error": null
+  },
+  "investigation_graph": {
+    "nodes": [
+      {
+        "id": "email:EVD-2B2F5521DB",
+        "type": "Email",
+        "label": "Email: Confidential: urgent payment",
+        "metadata": {
+          "subject": "Confidential: urgent payment",
+          "email_sha256": "2b2f5521dbb7919d503dbef628595d627bb6d364a4738fc2c17bd7827f6c6ae6",
+          "date": "Mon, 12 Oct 2026 09:00:00 +0000",
+          "threat_score": 28,
+          "severity": "low",
+          "ml_probability": 0.5776,
+          "from": "Example Team <finance@lookalike-example.test>",
+          "to": "analyst@example.test"
+        }
+      },
+      {
+        "id": "email_addr:finance@lookalike-example.test",
+        "type": "Email Address",
+        "label": "finance@lookalike-example.test",
+        "metadata": {
+          "role": "sender",
+          "raw_header": "Example Team <finance@lookalike-example.test>"
+        }
+      },
+      {
+        "id": "domain:lookalike-example.test",
+        "type": "Domain",
+        "label": "lookalike-example.test",
+        "metadata": {
+          "source": "sender_header",
+          "domain": "lookalike-example.test",
+          "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+          "is_resolvable": false
+        }
+      },
+      {
+        "id": "email_addr:analyst@example.test",
+        "type": "Email Address",
+        "label": "analyst@example.test",
+        "metadata": {
+          "role": "recipient",
+          "raw_header": "analyst@example.test"
+        }
+      },
+      {
+        "id": "email_addr:payments@untrusted.example",
+        "type": "Email Address",
+        "label": "payments@untrusted.example",
+        "metadata": {
+          "role": "reply_to",
+          "raw_header": "payments@untrusted.example"
+        }
+      },
+      {
+        "id": "domain:untrusted.example",
+        "type": "Domain",
+        "label": "untrusted.example",
+        "metadata": {
+          "domain": "untrusted.example",
+          "domain_age_days": null,
+          "newly_registered": null,
+          "registrar": null,
+          "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+          "is_resolvable": false
+        }
+      },
+      {
+        "id": "domain:example.test",
+        "type": "Domain",
+        "label": "example.test",
+        "metadata": {
+          "domain": "example.test",
+          "domain_age_days": null,
+          "newly_registered": null,
+          "registrar": null,
+          "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+          "is_resolvable": false
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:email:EVD-2B2F5521DB->SENT_FROM->email_addr:finance@lookalike-example.test",
+        "source": "email:EVD-2B2F5521DB",
+        "target": "email_addr:finance@lookalike-example.test",
+        "label": "SENT_FROM",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email_addr:finance@lookalike-example.test->BELONGS_TO_DOMAIN->domain:lookalike-example.test",
+        "source": "email_addr:finance@lookalike-example.test",
+        "target": "domain:lookalike-example.test",
+        "label": "BELONGS_TO_DOMAIN",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email:EVD-2B2F5521DB->SENT_TO->email_addr:analyst@example.test",
+        "source": "email:EVD-2B2F5521DB",
+        "target": "email_addr:analyst@example.test",
+        "label": "SENT_TO",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email:EVD-2B2F5521DB->REPLY_TO->email_addr:payments@untrusted.example",
+        "source": "email:EVD-2B2F5521DB",
+        "target": "email_addr:payments@untrusted.example",
+        "label": "REPLY_TO",
+        "metadata": {}
+      }
+    ],
+    "summary": {
+      "total_nodes": 7,
+      "total_edges": 4,
+      "node_type_counts": {
+        "Email": 1,
+        "Email Address": 3,
+        "Domain": 3
+      },
+      "has_high_risk_entities": false
+    }
+  },
+  "attribution": {
+    "attribution_id": "ATTR-3063E729DB",
+    "email_id": "EVD-2B2F5521DB",
+    "case_id": null,
+    "campaign_id": null,
+    "probable_origin_ip": null,
+    "probable_origin_asn": null,
+    "probable_origin_provider": null,
+    "probable_infrastructure_country": null,
+    "confidence_score": 0.0,
+    "confidence_level": "LOW",
+    "supporting_evidence": [],
+    "conflicting_evidence": [
+      {
+        "evidence_type": "MISSING_PUBLIC_ORIGIN_INFRASTRUCTURE",
+        "observation": "No external public sending relay observed in header chain (private or internal network addresses only).",
+        "contribution": -30.0,
+        "source": "SMTP Relay Path Analysis",
+        "timestamp": "2026-10-13T01:52:43.884065+00:00"
+      }
+    ],
+    "related_domains": [
+      "untrusted.example"
+    ],
+    "related_ips": [],
+    "related_campaigns": [],
+    "analysis_timestamp": "2026-10-13T01:52:43.884065+00:00",
+    "disclaimer": "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor."
+  },
+  "forensic_conclusions": [
+    {
+      "conclusion_id": "CONC-THREAT-6CC19ADA",
+      "type": "THREAT_CLASSIFICATION",
+      "statement": "Low overall malicious risk based on observable telemetry",
+      "confidence_score": 16.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [
+        {
+          "evidence_id": "EVD-THREAT-SCORE-MODERATE",
+          "statement": "Global deterministic threat score elevated at 28/100.",
+          "source_module": "ThreatScorerService",
+          "source_quality": 0.8,
+          "reliability": 0.8,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.7,
+          "consistency": 0.8,
+          "raw_contribution": 20.0,
+          "effective_contribution": 15.9,
+          "is_conflicting": false,
+          "evidence_category": "probable_inference",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "conflicting_evidence": [],
+      "limitations": [
+        "Deterministic heuristic assessment based on observable indicators; zero-day or clean-reputation staging domains may initially score low.",
+        "No embedded URLs observed in body content."
+      ],
+      "source_modules": [
+        "ThreatScorerService"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-ATTR-B1ED8882",
+      "type": "INFRASTRUCTURE_ATTRIBUTION",
+      "statement": "Insufficient technical evidence to attribute delivery infrastructure",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-PUBLIC-IP",
+          "statement": "No untrusted public IP observed in relay headers (private RFC-1918 subnets only).",
+          "source_module": "RelayReconstructorService",
+          "source_quality": 0.7,
+          "reliability": 0.9,
+          "independence_cluster": "smtp_routing_path",
+          "recency_days": null,
+          "specificity": 0.9,
+          "consistency": 0.5,
+          "raw_contribution": -30.0,
+          "effective_contribution": -23.4,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "limitations": [
+        "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor."
+      ],
+      "source_modules": [
+        "AttributionEngine",
+        "RelayReconstructorService",
+        "IPIntelligenceService"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-CAMP-7165B2F7",
+      "type": "CAMPAIGN_ASSOCIATION",
+      "statement": "Isolated incident: no campaign correlation identified",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-CAMPAIGN-MATCH",
+          "statement": "No historical case overlaps or multi-incident IoC clusters recorded for this sender.",
+          "source_module": "CampaignCorrelator",
+          "source_quality": 0.7,
+          "reliability": 0.8,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.6,
+          "consistency": 0.6,
+          "raw_contribution": -15.0,
+          "effective_contribution": -10.7,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "limitations": [
+        "Campaign clustering reflects observed technical IoC overlap across ingested cases; distinct actors occasionally deploy shared infrastructure."
+      ],
+      "source_modules": [
+        "CampaignCorrelator",
+        "InvestigationGraphService"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-GEO-5F07E458",
+      "type": "GEOLOCATION",
+      "statement": "Geolocation undetermined due to lack of public routing telemetry",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-GEO-UNAVAILABLE",
+          "statement": "Public sending IP geolocation could not be determined from available headers.",
+          "source_module": "IPIntelligenceService",
+          "source_quality": 0.6,
+          "reliability": 0.9,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.9,
+          "consistency": 0.5,
+          "raw_contribution": -30.0,
+          "effective_contribution": -22.8,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "limitations": [
+        "IP geolocation reflects autonomous system routing and data center points of presence, not the physical location of the human operator."
+      ],
+      "source_modules": [
+        "IPIntelligenceService",
+        "DomainIntelligenceService"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-LOOKALIKE-9D5A6F49",
+      "type": "LOOKALIKE_DOMAIN",
+      "statement": "No lookalike or typosquatting domain activity detected",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-LOOKALIKE",
+          "statement": "No brand typosquatting or homoglyph impersonation detected in extracted domains.",
+          "source_module": "LookalikeDetector",
+          "source_quality": 0.8,
+          "reliability": 0.9,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.8,
+          "consistency": 0.8,
+          "raw_contribution": -20.0,
+          "effective_contribution": -16.8,
+          "is_conflicting": true,
+          "evidence_category": "confirmed_evidence",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "limitations": [
+        "Lexical homoglyph and string-distance algorithm; does not consult official trademark registries or legal corporate entity databases."
+      ],
+      "source_modules": [
+        "LookalikeDetector"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-URL-E5262355",
+      "type": "MALICIOUS_URL",
+      "statement": "No high-risk malicious URLs observed",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-URLS",
+          "statement": "No hyperlinks or URL strings extracted from RFC-822 message payload.",
+          "source_module": "URLAnalyzer",
+          "source_quality": 0.8,
+          "reliability": 0.95,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.9,
+          "consistency": 0.9,
+          "raw_contribution": -20.0,
+          "effective_contribution": -17.9,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "limitations": [
+        "Static non-invasive structural inspection; click-time server-side cloaking or credential redirection chains may alter behavior."
+      ],
+      "source_modules": [
+        "URLAnalyzer"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-NLP-640A930A",
+      "type": "NLP_CLASSIFICATION",
+      "statement": "Neutral corporate language without notable social engineering indicators",
+      "confidence_score": 14.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [
+        {
+          "evidence_id": "EVD-NLP-URGENCY-KEYWORD",
+          "statement": "Observed psychological pressure / action urgency trigger keywords: 'urgent'.",
+          "source_module": "NLPClassifierService",
+          "source_quality": 0.6,
+          "reliability": 0.7,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.65,
+          "consistency": 0.75,
+          "raw_contribution": 20.0,
+          "effective_contribution": 14.2,
+          "is_conflicting": false,
+          "evidence_category": "weak_hypothesis",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "conflicting_evidence": [],
+      "limitations": [
+        "Syntactic and psychological urgency cues from plain-text content; benign high-priority business emails may trigger urgency flags."
+      ],
+      "source_modules": [
+        "NLPClassifierService"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-ATT-2DF7C980",
+      "type": "ATTACHMENT_VERDICT",
+      "statement": "No file attachments present in email",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-ATTACHMENTS",
+          "statement": "No binary payloads or email attachments enclosed in RFC-822 message.",
+          "source_module": "AttachmentExtractor",
+          "source_quality": 0.8,
+          "reliability": 1.0,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 1.0,
+          "consistency": 0.9,
+          "raw_contribution": -20.0,
+          "effective_contribution": -18.5,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:43.939786+00:00"
+        }
+      ],
+      "limitations": [
+        "Static file header and hash evaluation; encrypted or password-protected archives without supplied credentials cannot be inspected."
+      ],
+      "source_modules": [
+        "AttachmentExtractor"
+      ],
+      "generated_at": "2026-10-13T01:52:43.939786+00:00",
+      "engine_version": "1.0.0"
+    }
+  ],
+  "indicators": {
+    "ips": [],
+    "domains": [
+      {
+        "value": "lookalike-example.test",
+        "source": "email (header_from)"
+      },
+      {
+        "value": "example.test",
+        "source": "email (header_to)"
+      },
+      {
+        "value": "untrusted.example",
+        "source": "email (header_reply_to)"
+      }
+    ],
+    "urls": [],
+    "email_addresses": [
+      {
+        "value": "finance@lookalike-example.test",
+        "source": "header_from"
+      },
+      {
+        "value": "analyst@example.test",
+        "source": "header_to"
+      },
+      {
+        "value": "payments@untrusted.example",
+        "source": "header_reply_to"
+      }
+    ],
+    "attachments": []
+  },
+  "subject": "Confidential: urgent payment",
+  "from": "Example Team <finance@lookalike-example.test>",
+  "to": "analyst@example.test",
+  "cc": null,
+  "date": "Mon, 12 Oct 2026 09:00:00 +0000",
+  "reply_to": "payments@untrusted.example",
+  "return_path": "<finance@lookalike-example.test>",
+  "message_id": "<suspicious-payment-request.eml@example.test>",
+  "received": [],
+  "authentication_results": null,
+  "plain_text_body": "Please send the urgent wire transfer today. Do not contact anyone else. Reply with the payment confirmation.\r\n",
+  "html_body": null,
+  "raw_email": "From: Example Team <finance@lookalike-example.test>\r\nTo: analyst@example.test\r\nReply-To: payments@untrusted.example\r\nReturn-Path: <finance@lookalike-example.test>\r\nSubject: Confidential: urgent payment\r\nDate: Mon, 12 Oct 2026 09:00:00 +0000\r\nMessage-ID: <suspicious-payment-request.eml@example.test>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nPlease send the urgent wire transfer today. Do not contact anyone else. Reply with the payment confirmation.\r\n",
+  "urls": [],
+  "ips": [],
+  "domains": [
+    "lookalike-example.test",
+    "example.test",
+    "untrusted.example"
+  ],
+  "emails": [
+    "finance@lookalike-example.test",
+    "analyst@example.test",
+    "payments@untrusted.example"
+  ],
+  "attachments": [],
+  "file_info": {
+    "filename": "suspicious-payment-request.eml",
+    "size_bytes": 473
+  },
+  "headers": {
+    "from": "Example Team <finance@lookalike-example.test>",
+    "to": "analyst@example.test",
+    "cc": null,
+    "subject": "Confidential: urgent payment",
+    "date": "Mon, 12 Oct 2026 09:00:00 +0000",
+    "reply_to": "payments@untrusted.example",
+    "return_path": "<finance@lookalike-example.test>",
+    "message_id": "<suspicious-payment-request.eml@example.test>",
+    "received": [],
+    "authentication_results": null
+  },
+  "body": {
+    "plain_text": "Please send the urgent wire transfer today. Do not contact anyone else. Reply with the payment confirmation.\r\n",
+    "html": null
+  }
+}

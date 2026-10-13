@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
@@ -56,7 +57,7 @@ export const ThreatIntelligence: React.FC = () => {
 
     // Fetch actual tracked campaigns
     setLoadingClusters(true);
-    fetch('/api/campaigns')
+    apiFetch('/api/campaigns')
       .then((res) => (res.ok ? res.json() : []))
       .then((data: CampaignCluster[]) => {
         setClusters(data || []);

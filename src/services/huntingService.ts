@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 54: Threat Hunting Workspace & Query Engine API Client.
  */
@@ -31,7 +32,7 @@ const getHeaders = (): Record<string, string> => {
 
 export const huntingService = {
   async getRegistry(): Promise<DataSourceRegistryResponse> {
-    const res = await fetch('/api/hunting/registry', {
+    const res = await apiFetch('/api/hunting/registry', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load data source registry: ${res.statusText}`);
@@ -39,7 +40,7 @@ export const huntingService = {
   },
 
   async validateQuery(query: HuntQueryDefinition): Promise<HuntValidationResponse> {
-    const res = await fetch('/api/hunting/validate', {
+    const res = await apiFetch('/api/hunting/validate', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(query),
@@ -49,7 +50,7 @@ export const huntingService = {
   },
 
   async executeHunt(req: HuntExecutionRequest): Promise<HuntQueryResultResponse> {
-    const res = await fetch('/api/hunting/execute', {
+    const res = await apiFetch('/api/hunting/execute', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -62,7 +63,7 @@ export const huntingService = {
   },
 
   async listSavedHunts(): Promise<SavedHuntListResponse> {
-    const res = await fetch('/api/hunting/saved', {
+    const res = await apiFetch('/api/hunting/saved', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to list saved hunts: ${res.statusText}`);
@@ -70,7 +71,7 @@ export const huntingService = {
   },
 
   async createSavedHunt(req: SavedHuntCreateRequest): Promise<SavedHuntResponse> {
-    const res = await fetch('/api/hunting/saved', {
+    const res = await apiFetch('/api/hunting/saved', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -83,7 +84,7 @@ export const huntingService = {
   },
 
   async updateSavedHunt(huntId: string, req: SavedHuntUpdateRequest): Promise<SavedHuntResponse> {
-    const res = await fetch(`/api/hunting/saved/${huntId}`, {
+    const res = await apiFetch(`/api/hunting/saved/${huntId}`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -93,7 +94,7 @@ export const huntingService = {
   },
 
   async deleteSavedHunt(huntId: string): Promise<void> {
-    const res = await fetch(`/api/hunting/saved/${huntId}`, {
+    const res = await apiFetch(`/api/hunting/saved/${huntId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -102,7 +103,7 @@ export const huntingService = {
 
   async queryAssistant(prompt: string, suggestedSource?: string): Promise<NaturalLanguageHuntResponse> {
     const payload: NaturalLanguageHuntRequest = { prompt, suggested_source: suggestedSource as any };
-    const res = await fetch('/api/hunting/assistant', {
+    const res = await apiFetch('/api/hunting/assistant', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -112,7 +113,7 @@ export const huntingService = {
   },
 
   async handoffInvestigation(req: HuntInvestigationHandoffRequest): Promise<HuntInvestigationHandoffResponse> {
-    const res = await fetch('/api/hunting/handoff/investigation', {
+    const res = await apiFetch('/api/hunting/handoff/investigation', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -125,7 +126,7 @@ export const huntingService = {
   },
 
   async handoffWatchlist(req: HuntWatchlistHandoffRequest): Promise<HuntWatchlistHandoffResponse> {
-    const res = await fetch('/api/hunting/handoff/watchlist', {
+    const res = await apiFetch('/api/hunting/handoff/watchlist', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -138,7 +139,7 @@ export const huntingService = {
   },
 
   async exportResults(executionId: string, format: 'json' | 'csv'): Promise<string> {
-    const res = await fetch('/api/hunting/export', {
+    const res = await apiFetch('/api/hunting/export', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ execution_id: executionId, format }),

@@ -280,8 +280,8 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
   if (loading) {
     return (
       <LoadingState
-        message="Connecting to CyberGuard live analysis engine..."
-        subtext="Verifying pipeline DAG state and event stream"
+        message="Loading analysis…"
+        subtext="Retrieving results and processing status"
         fullHeight
       />
     );
@@ -325,7 +325,7 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
   const sourceMapped = mapArtifactTypeToSource(analysisState.artifact_type);
 
   return (
-    <div className="space-y-6 max-w-6xl mx-auto pb-16">
+    <div className="cg-live-analysis space-y-6 max-w-6xl mx-auto pb-16">
       {/* 1. MINIMAL HEADER CONTEXT */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border">
         <div className="space-y-1">
@@ -489,7 +489,7 @@ export const LiveAnalysisView: React.FC<LiveAnalysisViewProps> = ({
       <div className="bg-surface rounded-xl border border-border p-4 shadow-xs space-y-2">
         <div className="flex items-center justify-between text-xs font-mono">
           <div className="flex items-center space-x-2">
-            <span className="font-semibold text-foreground">Pipeline Execution:</span>
+            <span className="font-semibold text-foreground">Processing progress:</span>
             <span className="text-foreground-muted">
               {analysisState.completed_tasks} of {analysisState.total_tasks} analyzers completed
             </span>

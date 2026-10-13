@@ -1,0 +1,82 @@
+{
+  "ingestion_id": "1fbf3d67-a6c7-4522-b52e-485a820d892d",
+  "artifact_id": "2a0d7e73-5a77-45ee-87b3-3b20e391b67f",
+  "artifact_type": "EMAIL",
+  "input_mode": "FILE_UPLOAD",
+  "name": "suspicious-credential-request.eml",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "85d752c8791e7dabf30ca4b71f8a0aa009995ba3ce6a87bb315dae2fb379efc3",
+  "size": 497,
+  "mime_type": "message/rfc822",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "EMAIL",
+    "detected_mime": "message/rfc822",
+    "reported_mime": "message/rfc822",
+    "confidence": 0.98,
+    "detector": "rfc822_header_tokens",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "email_forensics",
+      "auth_analyzer",
+      "nlp_classifier",
+      "threat_scorer",
+      "attribution_engine",
+      "ai_analyst",
+      "digital_impersonation_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 497,
+      "original_filename": "suspicious-credential-request.eml"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/85/85d752c8791e7dabf30ca4b71f8a0aa009995ba3ce6a87bb315dae2fb379efc3/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "email_forensics",
+    "auth_analyzer",
+    "nlp_classifier",
+    "threat_scorer",
+    "attribution_engine",
+    "ai_analyst",
+    "digital_impersonation_analyzer"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "suspicious-credential-request.eml",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "EMAIL",
+      "detected_mime": "message/rfc822",
+      "reported_mime": "message/rfc822",
+      "confidence": 0.98,
+      "detector": "rfc822_header_tokens",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "email_forensics",
+        "auth_analyzer",
+        "nlp_classifier",
+        "threat_scorer",
+        "attribution_engine",
+        "ai_analyst",
+        "digital_impersonation_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 497,
+        "original_filename": "suspicious-credential-request.eml"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:34.830333",
+  "evidence_id": "EVD-85D752C879",
+  "investigation_id": "569f8c35-a48f-4ed0-9bdf-8159f57b7421",
+  "analysis_run_id": "688e9201-c38f-47f9-b814-4f5af8af106a",
+  "duplicate": false
+}

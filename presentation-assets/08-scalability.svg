@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<rect width="1600" height="900" fill="#101510"/>
+<text x="90" y="115" fill="#e6ecdf" font-family="Arial" font-size="48" font-weight="bold">A modular foundation for growth</text>
+<text x="90" y="175" fill="#a8b29f" font-family="Arial" font-size="25">Architecture direction; production throughput and scaling remain unverified.</text>
+<rect x="90" y="245" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="118" y="296" fill="#d8e9c4" font-family="Arial" font-size="30">Evidence intake</text>
+<text x="118" y="341" fill="#aeb9a5" font-family="Arial" font-size="22">Bounded uploads and separate analysis workflows.</text>
+<rect x="830" y="245" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="858" y="296" fill="#d8e9c4" font-family="Arial" font-size="30">Analysis modules</text>
+<text x="858" y="341" fill="#aeb9a5" font-family="Arial" font-size="22">Independent phishing, identity, access and media engines.</text>
+<rect x="90" y="425" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="118" y="476" fill="#d8e9c4" font-family="Arial" font-size="30">Workspace boundaries</text>
+<text x="118" y="521" fill="#aeb9a5" font-family="Arial" font-size="22">Server-controlled identities and scoped access.</text>
+<rect x="830" y="425" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="858" y="476" fill="#d8e9c4" font-family="Arial" font-size="30">Next scaling steps</text>
+<text x="858" y="521" fill="#aeb9a5" font-family="Arial" font-size="22">Queue workers, object storage and load testing.</text>
+</svg>

@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 49: Alert Correlation & Incident Clustering Client Service.
  * Provides typed methods for cluster listing, forensic detail, alert-to-cluster association,
@@ -31,7 +32,7 @@ export class AlertClusterService {
     if (params?.sort_by) qp.append('sort_by', params.sort_by);
 
     const url = `${apiUrl('/api/alerts/clusters')}?${qp.toString()}`;
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -55,7 +56,7 @@ export class AlertClusterService {
     workspaceId: string = 'default'
   ): Promise<AlertClusterDetail> {
     const url = apiUrl(`/api/alerts/clusters/${encodeURIComponent(clusterId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -79,7 +80,7 @@ export class AlertClusterService {
     workspaceId: string = 'default'
   ): Promise<AlertClusterDetail | null> {
     const url = apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/cluster`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -107,7 +108,7 @@ export class AlertClusterService {
     workspaceId: string = 'default'
   ): Promise<AlertClusterItem> {
     const url = apiUrl(`/api/alerts/clusters/${encodeURIComponent(clusterId)}/status`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -142,7 +143,7 @@ export class AlertClusterService {
     workspaceId: string = 'default'
   ): Promise<AlertClusterItem> {
     const url = apiUrl(`/api/alerts/clusters/${encodeURIComponent(clusterId)}/investigate`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -175,7 +176,7 @@ export class AlertClusterService {
     workspaceId: string = 'default'
   ): Promise<AlertClusterItem> {
     const url = apiUrl(`/api/alerts/clusters/${encodeURIComponent(clusterId)}/merge`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -206,7 +207,7 @@ export class AlertClusterService {
     workspaceId: string = 'default'
   ): Promise<{ status: string; cluster_id?: string; cluster_title?: string; clustered?: boolean }> {
     const url = apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/correlate`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

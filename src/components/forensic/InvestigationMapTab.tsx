@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -50,7 +51,7 @@ export const InvestigationMapTab: React.FC<InvestigationMapTabProps> = ({ email 
     let isMounted = true;
     const fetchStatus = async () => {
       try {
-        const res = await fetch(apiUrl('/api/intelligence/geolocation/status'));
+        const res = await apiFetch(apiUrl('/api/intelligence/geolocation/status'));
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (isMounted) setProviderStatus(data);

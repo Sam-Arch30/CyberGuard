@@ -136,7 +136,7 @@ export const InvestigationSummaryBar: React.FC<InvestigationSummaryBarProps> = (
   };
 
   return (
-    <div className="bg-surface border border-border rounded-xl shadow-xs overflow-visible transition-colors mb-4">
+    <div className="cg-investigation-summary bg-surface border border-border rounded-xl overflow-visible transition-colors mb-4">
       {/* Top Banner: Attention Items if any */}
       {attention_items && attention_items.length > 0 && (
         <div className="bg-warning/10 border-b border-warning/20 px-4 py-2 flex items-center justify-between gap-3 text-xs font-mono text-warning">
@@ -154,25 +154,25 @@ export const InvestigationSummaryBar: React.FC<InvestigationSummaryBarProps> = (
       )}
 
       {/* Main Bar */}
-      <div className="px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+      <div className="px-4 py-3 flex flex-col xl:flex-row xl:items-center justify-between gap-3">
         {/* Left: Score Badge + Incident + Title */}
-        <div className="flex items-center space-x-3.5 min-w-0">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="shrink-0">
             <ThreatScore
-              score={risk?.score ?? investigation?.risk_score ?? null}
+              score={risk ? risk.score : investigation?.risk_score ?? null}
               severity={risk?.severity ?? investigation?.severity}
-              confidenceScore={risk?.confidence ?? investigation?.confidence ?? undefined}
+              confidenceScore={risk ? risk.confidence ?? undefined : investigation?.confidence ?? undefined}
               variant="compact"
               showConfidence={false}
             />
           </div>
 
           <div className="min-w-0">
-            <div className="flex items-center space-x-2">
-              <span className="font-mono text-xs font-bold text-primary tracking-wide">
+            <div className="flex flex-col gap-1 min-w-0">
+              <span className="font-mono text-xs font-bold text-primary tracking-wide break-all">
                 {investigation.incident_number || investigation.investigation_id}
               </span>
-              <span className="text-foreground-muted text-xs">·</span>
+
               <h2
                 className="text-xs sm:text-sm font-semibold text-foreground truncate max-w-[280px] sm:max-w-md lg:max-w-xl font-sans"
                 title={investigation.title}
@@ -181,8 +181,8 @@ export const InvestigationSummaryBar: React.FC<InvestigationSummaryBarProps> = (
               </h2>
             </div>
 
-            <div className="flex items-center space-x-2 text-[11px] font-mono text-foreground-muted mt-0.5">
-              <span>{investigation.artifact_name || 'Evidence Artifact'}</span>
+            <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-foreground-muted mt-0.5">
+              <span className="break-all">{investigation.artifact_name || 'Evidence Artifact'}</span>
               <span>·</span>
               <span className="flex items-center space-x-1">
                 <Clock className="w-3 h-3 text-foreground-muted" />

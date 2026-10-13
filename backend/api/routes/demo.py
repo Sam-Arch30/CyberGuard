@@ -111,7 +111,7 @@ async def execute_demo_scenario(
         logger.error(f"Error executing demo scenario {scenario_id}: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Scenario execution failed: {str(exc)}",
+            detail='Scenario execution failed.',
         )
 
 
@@ -131,7 +131,7 @@ def reset_demo_data(
         logger.error(f"Failed to execute demo reset: {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Demo reset failed: {str(exc)}",
+            detail='Demo reset failed.',
         )
 
 
@@ -146,5 +146,5 @@ def get_demo_status(
         logger.error(f"Failed to fetch demo status: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Demo status check failed: {str(exc)}",
+            detail='Demo status check failed.',
         )

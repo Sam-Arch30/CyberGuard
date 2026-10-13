@@ -1,3 +1,5 @@
+import { DetectorUpload } from '../components/analysis/DetectorUpload';
+import { apiFetch } from '../utils/apiClient';
 import React, { useState } from 'react';
 import {
   KeyRound,
@@ -9,7 +11,7 @@ import {
   Terminal,
   Layers,
 } from 'lucide-react';
-import { apiUrl } from '../utils/apiClient';
+import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 
 interface FindingEvidence {
   key: string;
@@ -34,8 +36,7 @@ interface AuthAnalysisResult {
   analysis_run_id: string;
   events_analyzed_count: number;
   accounts_targeted_count: number;
-  total_failures: number;
-  total_successes: number;
+  unique_source_ips_count: number;
   overall_risk_score: number;
   overall_severity: 'SAFE' | 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
   confidence: number;
@@ -129,10 +130,10 @@ export const AuthSecurityView: React.FC = () => {
         throw new Error(`Invalid JSON syntax in events input: ${err.message}`);
       }
 
-      const res = await fetch(apiUrl('/api/auth-security/analyze-batch'), {
+      const res = await apiFetch(apiUrl('/api/auth-security/analyze-batch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(eventsPayload),
+        body: JSON.stringify({ events: eventsPayload, provider_hint: 'generic' }),
       });
 
       if (!res.ok) {
@@ -149,6 +150,18 @@ export const AuthSecurityView: React.FC = () => {
     }
   };
 
+  const handleUpload = async (file: File) => {
+    setIsAnalyzing(true); setErrorMsg(null); setResult(null);
+    try {
+      const form = new FormData(); form.append('file', file);
+      const response = await apiFetch(apiUrl('/api/auth-security/upload-log'), {method: 'POST', body: form});
+      if (!response.ok) throw new Error(await extractErrorMessage(response));
+      const data: AuthAnalysisResult = await response.json();
+      if (!Number.isFinite(data.overall_risk_score) || !Array.isArray(data.findings)) throw new Error('Incomplete detector response.');
+      setResult(data);
+    } catch (error) {setErrorMsg(error instanceof Error ? error.message : 'Upload analysis failed.');}
+    finally {setIsAnalyzing(false);}
+  };
   const getSeverityBadgeClass = (sev: string) => {
     switch (sev) {
       case 'CRITICAL':
@@ -175,10 +188,10 @@ export const AuthSecurityView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                Authentication & Account-Takeover (ATO) Detection Engine
+                Account & access analysis
               </h1>
               <p className="text-xs text-foreground-muted font-mono">
-                Section 9 — Brute Force, Password Spray, Impossible Travel & Credential Compromise Detection
+                Review authentication events for password attacks and unusual sign-in patterns.
               </p>
             </div>
           </div>
@@ -189,10 +202,12 @@ export const AuthSecurityView: React.FC = () => {
             SecretRedactor: Active
           </span>
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-badge bg-primary/10 border border-primary/30 text-primary font-semibold">
-            Section 9 Operational
+            Rule-based checks
           </span>
         </div>
       </div>
+
+      <DetectorUpload title="Upload authentication logs" description="Submit original telemetry directly to this detector and review the result below." accept=".json,.jsonl,.ndjson,.log,.txt" busy={isAnalyzing} onAnalyze={handleUpload} />
 
       {/* Preset Scenarios */}
       <div className="bg-surface rounded-card border border-border p-4 space-y-3">
@@ -303,16 +318,16 @@ export const AuthSecurityView: React.FC = () => {
             </div>
 
             <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
-              <span className="text-[10px] font-mono text-foreground-muted uppercase">Login Failures</span>
+              <span className="text-[10px] font-mono text-foreground-muted uppercase">Source IPs</span>
               <div className="text-lg font-bold font-mono text-red-400">
-                {result.total_failures}
+                {result.unique_source_ips_count}
               </div>
             </div>
 
             <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
-              <span className="text-[10px] font-mono text-foreground-muted uppercase">Successes</span>
+              <span className="text-[10px] font-mono text-foreground-muted uppercase">Account takeover</span>
               <div className="text-lg font-bold font-mono text-emerald-400">
-                {result.total_successes}
+                {result.ato_suspected ? 'Flagged' : 'Not flagged'}
               </div>
             </div>
           </div>

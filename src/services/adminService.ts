@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 71: Platform Administration & Governance Client Service
  */
@@ -26,7 +27,7 @@ const API_BASE = '/api/admin';
 export const adminService = {
   // Overview & Health
   async getOverview(): Promise<PlatformOverview> {
-    const res = await fetch(apiUrl(`${API_BASE}/overview`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/overview`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch platform overview (${res.status})`);
@@ -35,7 +36,7 @@ export const adminService = {
   },
 
   async getHealth(): Promise<SystemHealthData> {
-    const res = await fetch(apiUrl(`${API_BASE}/health`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/health`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch system health (${res.status})`);
@@ -45,7 +46,7 @@ export const adminService = {
 
   // Roles & Permissions
   async listRoles(): Promise<RoleDefinition[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/roles`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/roles`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list roles (${res.status})`);
@@ -54,7 +55,7 @@ export const adminService = {
   },
 
   async listPermissions(): Promise<PermissionDefinition[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/permissions`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/permissions`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list permissions (${res.status})`);
@@ -77,7 +78,7 @@ export const adminService = {
     if (teamId) params.set('team_id', teamId);
     if (search) params.set('search', search);
 
-    const res = await fetch(apiUrl(`${API_BASE}/users?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/users?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list users (${res.status})`);
@@ -86,7 +87,7 @@ export const adminService = {
   },
 
   async createUser(data: Partial<AdminUser>): Promise<AdminUser> {
-    const res = await fetch(apiUrl(`${API_BASE}/users`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/users`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -99,7 +100,7 @@ export const adminService = {
   },
 
   async updateUser(userId: string, data: Partial<AdminUser>): Promise<AdminUser> {
-    const res = await fetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -112,7 +113,7 @@ export const adminService = {
   },
 
   async changeUserRole(userId: string, newRole: AdminRole, reason: string): Promise<AdminUser> {
-    const res = await fetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}/role`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}/role`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ new_role: newRole, reason }),
@@ -125,7 +126,7 @@ export const adminService = {
   },
 
   async changeUserStatus(userId: string, newStatus: UserStatus, reason: string): Promise<AdminUser> {
-    const res = await fetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}/status?new_status=${encodeURIComponent(newStatus)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}/status?new_status=${encodeURIComponent(newStatus)}`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),
@@ -138,7 +139,7 @@ export const adminService = {
   },
 
   async revokeUserSessions(userId: string): Promise<{ user_id: string; status: string; message: string }> {
-    const res = await fetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}/revoke-sessions`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/users/${encodeURIComponent(userId)}/revoke-sessions`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -150,7 +151,7 @@ export const adminService = {
 
   // Teams
   async listTeams(): Promise<AdminTeam[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/teams`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/teams`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list teams (${res.status})`);
@@ -159,7 +160,7 @@ export const adminService = {
   },
 
   async createTeam(data: Partial<AdminTeam>): Promise<AdminTeam> {
-    const res = await fetch(apiUrl(`${API_BASE}/teams`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/teams`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -172,7 +173,7 @@ export const adminService = {
   },
 
   async updateTeam(teamId: string, data: Partial<AdminTeam>): Promise<AdminTeam> {
-    const res = await fetch(apiUrl(`${API_BASE}/teams/${encodeURIComponent(teamId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/teams/${encodeURIComponent(teamId)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -185,7 +186,7 @@ export const adminService = {
   },
 
   async deleteTeam(teamId: string): Promise<void> {
-    const res = await fetch(apiUrl(`${API_BASE}/teams/${encodeURIComponent(teamId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/teams/${encodeURIComponent(teamId)}`), {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -196,7 +197,7 @@ export const adminService = {
 
   // Tenants
   async listTenants(): Promise<AdminTenant[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/tenants`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/tenants`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list tenants (${res.status})`);
@@ -205,7 +206,7 @@ export const adminService = {
   },
 
   async createTenant(data: Partial<AdminTenant>): Promise<AdminTenant> {
-    const res = await fetch(apiUrl(`${API_BASE}/tenants`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/tenants`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -218,7 +219,7 @@ export const adminService = {
   },
 
   async updateTenant(tenantId: string, data: Partial<AdminTenant>): Promise<AdminTenant> {
-    const res = await fetch(apiUrl(`${API_BASE}/tenants/${encodeURIComponent(tenantId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/tenants/${encodeURIComponent(tenantId)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -235,7 +236,7 @@ export const adminService = {
     const params = new URLSearchParams();
     if (category && category !== 'ALL') params.set('category', category);
 
-    const res = await fetch(apiUrl(`${API_BASE}/settings?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/settings?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list settings (${res.status})`);
@@ -244,7 +245,7 @@ export const adminService = {
   },
 
   async updateSetting(key: string, value: any, scope: string = 'GLOBAL', expectedVersion?: number): Promise<AdminSystemSetting> {
-    const res = await fetch(apiUrl(`${API_BASE}/settings/${encodeURIComponent(key)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/settings/${encodeURIComponent(key)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ value, scope, expected_version: expectedVersion }),
@@ -262,7 +263,7 @@ export const adminService = {
     if (policyType && policyType !== 'ALL') params.set('policy_type', policyType);
     if (statusFilter && statusFilter !== 'ALL') params.set('status_filter', statusFilter);
 
-    const res = await fetch(apiUrl(`${API_BASE}/policies?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/policies?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list security policies (${res.status})`);
@@ -271,7 +272,7 @@ export const adminService = {
   },
 
   async createPolicy(data: Partial<AdminSecurityPolicy>): Promise<AdminSecurityPolicy> {
-    const res = await fetch(apiUrl(`${API_BASE}/policies`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/policies`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -284,7 +285,7 @@ export const adminService = {
   },
 
   async previewPolicyImpact(policyId: string): Promise<PolicyImpactPreview> {
-    const res = await fetch(apiUrl(`${API_BASE}/policies/${encodeURIComponent(policyId)}/preview-impact`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/policies/${encodeURIComponent(policyId)}/preview-impact`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to preview policy impact (${res.status})`);
@@ -293,7 +294,7 @@ export const adminService = {
   },
 
   async activatePolicy(policyId: string, reason: string): Promise<AdminSecurityPolicy> {
-    const res = await fetch(apiUrl(`${API_BASE}/policies/${encodeURIComponent(policyId)}/activate?reason=${encodeURIComponent(reason)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/policies/${encodeURIComponent(policyId)}/activate?reason=${encodeURIComponent(reason)}`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -308,7 +309,7 @@ export const adminService = {
     const params = new URLSearchParams();
     if (category && category !== 'ALL') params.set('category', category);
 
-    const res = await fetch(apiUrl(`${API_BASE}/integrations?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/integrations?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list integrations (${res.status})`);
@@ -317,7 +318,7 @@ export const adminService = {
   },
 
   async updateIntegration(integrationId: string, data: { enabled?: boolean; endpoint_url?: string; api_key_replacement?: string }): Promise<AdminIntegration> {
-    const res = await fetch(apiUrl(`${API_BASE}/integrations/${encodeURIComponent(integrationId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/integrations/${encodeURIComponent(integrationId)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -330,7 +331,7 @@ export const adminService = {
   },
 
   async testIntegration(integrationId: string): Promise<AdminIntegrationTestResult> {
-    const res = await fetch(apiUrl(`${API_BASE}/integrations/${encodeURIComponent(integrationId)}/test`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/integrations/${encodeURIComponent(integrationId)}/test`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -342,7 +343,7 @@ export const adminService = {
 
   // Features
   async listFeatures(): Promise<AdminFeatureControl[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/features`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/features`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list features (${res.status})`);
@@ -351,7 +352,7 @@ export const adminService = {
   },
 
   async updateFeature(featureId: string, enabled: boolean): Promise<AdminFeatureControl> {
-    const res = await fetch(apiUrl(`${API_BASE}/features/${encodeURIComponent(featureId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/features/${encodeURIComponent(featureId)}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ enabled }),
@@ -369,7 +370,7 @@ export const adminService = {
     if (resourceType) params.set('resource_type', resourceType);
     if (action) params.set('action', action);
 
-    const res = await fetch(apiUrl(`${API_BASE}/audit?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/audit?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to query audit trail (${res.status})`);

@@ -1,3 +1,5 @@
+import { DetectorUpload } from '../components/analysis/DetectorUpload';
+import { apiFetch } from '../utils/apiClient';
 import React, { useState } from 'react';
 import {
   ShieldAlert,
@@ -10,7 +12,7 @@ import {
   Terminal,
   Layers,
 } from 'lucide-react';
-import { apiUrl } from '../utils/apiClient';
+import { apiUrl, extractErrorMessage } from '../utils/apiClient';
 
 interface FindingEvidence {
   key: string;
@@ -144,7 +146,7 @@ export const NetworkSecurityView: React.FC = () => {
         throw new Error(`Invalid JSON syntax in events input: ${err.message}`);
       }
 
-      const res = await fetch(apiUrl('/api/network-security/analyze-batch'), {
+      const res = await apiFetch(apiUrl('/api/network-security/analyze-batch'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(eventsPayload),
@@ -164,6 +166,18 @@ export const NetworkSecurityView: React.FC = () => {
     }
   };
 
+  const handleUpload = async (file: File) => {
+    setIsAnalyzing(true); setErrorMsg(null); setResult(null);
+    try {
+      const form = new FormData(); form.append('file', file);
+      const response = await apiFetch(apiUrl('/api/network-security/upload-log'), {method: 'POST', body: form});
+      if (!response.ok) throw new Error(await extractErrorMessage(response));
+      const data: NetworkAnalysisResult = await response.json();
+      if (!Number.isFinite(data.overall_risk_score) || !Array.isArray(data.findings)) throw new Error('Incomplete detector response.');
+      setResult(data);
+    } catch (error) {setErrorMsg(error instanceof Error ? error.message : 'Upload analysis failed.');}
+    finally {setIsAnalyzing(false);}
+  };
   const getSeverityBadgeClass = (sev: string) => {
     switch (sev) {
       case 'CRITICAL':
@@ -190,10 +204,10 @@ export const NetworkSecurityView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                Network & Traffic Anomaly Detection Engine
+                Network activity analysis
               </h1>
               <p className="text-xs text-foreground-muted font-mono">
-                Section 10 — Telemetry Ingestion, Beaconing Jitter Analysis & Threat Infrastructure Matching
+                Review submitted network telemetry for connection patterns and anomaly indicators.
               </p>
             </div>
           </div>
@@ -204,10 +218,12 @@ export const NetworkSecurityView: React.FC = () => {
             Internal CIDRs: RFC1918 + ULA
           </span>
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-badge bg-primary/10 border border-primary/30 text-primary font-semibold">
-            Section 10 Operational
+            Telemetry required
           </span>
         </div>
       </div>
+
+      <DetectorUpload title="Upload network logs" description="Submit original telemetry directly to this detector and review the result below." accept=".json,.jsonl,.ndjson,.csv" busy={isAnalyzing} onAnalyze={handleUpload} />
 
       {/* Preset Scenario Selector */}
       <div className="bg-surface rounded-card border border-border p-4 space-y-3">

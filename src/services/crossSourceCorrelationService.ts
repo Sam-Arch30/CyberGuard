@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 61: Cross-Source Correlation & Unified Entity Correlation Client Service.
  * Connects signals across multiple data sources into explainable, evidence-backed security correlations.
@@ -22,7 +23,7 @@ export class CrossSourceCorrelationService {
    */
   static async getOverview(workspaceId: string = 'default'): Promise<CorrelationOverviewStats> {
     const url = apiUrl('/api/v1/correlations/overview');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -68,7 +69,7 @@ export class CrossSourceCorrelationService {
     if (params.offset !== undefined) qParams.set('offset', String(params.offset));
 
     const url = apiUrl(`/api/v1/correlations?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -91,7 +92,7 @@ export class CrossSourceCorrelationService {
     workspaceId: string = 'default'
   ): Promise<CrossSourceCorrelationDetail> {
     const url = apiUrl(`/api/v1/correlations/${encodeURIComponent(correlationId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -114,7 +115,7 @@ export class CrossSourceCorrelationService {
     workspaceId: string = 'default'
   ): Promise<CorrelationTimelineItem[]> {
     const url = apiUrl(`/api/v1/correlations/${encodeURIComponent(correlationId)}/timeline`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -137,7 +138,7 @@ export class CrossSourceCorrelationService {
     workspaceId: string = 'default'
   ): Promise<WhyCorrelatedExplanation> {
     const url = apiUrl(`/api/v1/correlations/${encodeURIComponent(correlationId)}/explanation`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -160,7 +161,7 @@ export class CrossSourceCorrelationService {
     workspaceId: string = 'default'
   ): Promise<CrossSourceCorrelationItem[]> {
     const url = apiUrl('/api/v1/correlations/evaluate');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -188,7 +189,7 @@ export class CrossSourceCorrelationService {
     workspaceId: string = 'default'
   ): Promise<CrossSourceCorrelationDetail> {
     const url = apiUrl(`/api/v1/correlations/${encodeURIComponent(correlationId)}/disposition`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -212,7 +213,7 @@ export class CrossSourceCorrelationService {
     workspaceId: string = 'default'
   ): Promise<EntityResolutionResult> {
     const url = apiUrl('/api/v1/entities/resolve');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -248,7 +249,7 @@ export class CrossSourceCorrelationService {
     if (params.limit !== undefined) qParams.set('limit', String(params.limit));
 
     const url = apiUrl(`/api/v1/entities/resolution-history?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',

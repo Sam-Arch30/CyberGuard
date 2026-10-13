@@ -117,6 +117,13 @@ class FileSecurityPipeline:
         if len(payload_bytes) > self.MAX_FILE_SIZE:
             raise ValueError(f"Payload size ({len(payload_bytes)} bytes) exceeds maximum file limit ({self.MAX_FILE_SIZE} bytes).")
 
+        if not payload_bytes:
+            raise ValueError('Empty file cannot be analyzed. Supply a nonempty original file.')
+        if payload_bytes.startswith(b'%PDF-'):
+            # Bounded structural validation, not a claim of full PDF decoding.
+            if b'%%EOF' not in payload_bytes[-2048:]:
+                raise ValueError('Invalid or truncated PDF: end-of-file marker is missing. Preserve the original through evidence intake.')
+
         clean_filename = UploadSecurityService.sanitize_filename(filename or "file.bin")
         sha256_hash, sha1_hash, md5_hash = FileIdentityAnalyzer.calculate_streaming_hashes(payload_bytes)
 
@@ -205,6 +212,13 @@ class FileSecurityPipeline:
             filename=clean_filename,
             reported_mime=reported_mime,
         )
+        if sha256_hash == '275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f':
+            res_ident.add_finding(
+                title='Harmless EICAR antivirus test signature',
+                description='Exact standard EICAR test-file hash matched. This is an antivirus test artifact, not actual malware.',
+                finding_type='ANTIVIRUS_TEST_SIGNATURE', category='FILE_STRUCTURE',
+                severity=SeverityEnum.LOW, confidence=1.0,
+            )
         analyzer_results.append(res_ident)
         detected_type = identity_info.detected_file_type
 
@@ -753,6 +767,9 @@ class FileSecurityPipeline:
         # Update AnalysisRun record
         analysis_run.status = AnalysisStatusEnum.COMPLETED.value
         analysis_run.completed_at = get_utc_now()
+        analysis_run.overall_risk_score = overall_score
+        analysis_run.overall_severity = overall_sev
+        analysis_run.confidence = confidence
         analysis_run.summary = summary
         analysis_run.metadata_json = json.dumps({
             "analyzer_name": "file_security_pipeline",

@@ -1,0 +1,78 @@
+{
+  "ingestion_id": "009d5861-4625-4d9c-be2a-06079f820d59",
+  "artifact_id": "091d050c-1985-48fd-bac7-a7e1282c657b",
+  "artifact_type": "VIDEO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-color-bars.mov",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "8ef2ce354edb589bd1e02b828a2251709c61665b77c718a671701ba5f6c3572c",
+  "size": 9354,
+  "mime_type": "video/mp4",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "VIDEO",
+    "detected_mime": "video/mp4",
+    "reported_mime": "video/quicktime",
+    "confidence": 0.9,
+    "detector": "video_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 9354,
+      "original_filename": "synthetic-color-bars.mov",
+      "format": "MP4"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/8e/8ef2ce354edb589bd1e02b828a2251709c61665b77c718a671701ba5f6c3572c/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-color-bars.mov",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "VIDEO",
+      "detected_mime": "video/mp4",
+      "reported_mime": "video/quicktime",
+      "confidence": 0.9,
+      "detector": "video_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 9354,
+        "original_filename": "synthetic-color-bars.mov",
+        "format": "MP4"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.227478",
+  "evidence_id": "EVD-8EF2CE354E",
+  "investigation_id": "80389710-31fd-4801-82dd-0797d5b05979",
+  "analysis_run_id": "32103c47-3ea7-43cf-92e6-2782c6254394",
+  "duplicate": false
+}

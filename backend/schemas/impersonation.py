@@ -9,7 +9,7 @@ import uuid
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field
+from pydantic import model_validator, BaseModel, Field
 
 from backend.schemas.unified import SeverityEnum, ArtifactTypeEnum
 
@@ -203,6 +203,13 @@ class UpdateProtectedIdentityRequest(BaseModel):
 
 
 class ImpersonationAnalysisRequest(BaseModel):
+    @model_validator(mode="after")
+    def validate_claim(self):
+        from backend.services.identity_contract import normalize_email_claim
+        if self.email_data is not None or self.artifact_type == ArtifactTypeEnum.EMAIL:
+            self.email_data = normalize_email_claim(self.email_data or {})
+        return self
+
     artifact_type: ArtifactTypeEnum = ArtifactTypeEnum.EMAIL
     email_data: Optional[Dict[str, Any]] = None
     url_data: Optional[Dict[str, Any]] = None

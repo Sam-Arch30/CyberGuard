@@ -1,0 +1,208 @@
+{
+  "success": true,
+  "artifact_id": "art_med_3ceaec3975d5",
+  "analysis_run_id": "run_med_754bcc3eb380",
+  "media_identity": {
+    "artifact_id": "art_med_3ceaec3975d5",
+    "sha256": "d71399f983986048ca029b7856303eecd20aeea357ce50029a6c732e14a48559",
+    "original_filename": "synthetic-color-bars.avi",
+    "mime_type": "video/x-msvideo",
+    "media_type": "VIDEO",
+    "format": "AVI",
+    "size_bytes": 47926
+  },
+  "assessment": {
+    "artifact_id": "art_med_3ceaec3975d5",
+    "media_type": "VIDEO",
+    "format": "AVI",
+    "processing_status": "COMPLETED",
+    "analysis_scope": "Bounded media heuristics and, when available, pretrained face-image classification. Authenticity is not established.",
+    "trained_detector": {
+      "status": "MODEL_NOT_VALIDATED",
+      "model": "prithivMLmods/Deep-Fake-Detector-v2-Model",
+      "revision": "3a99ae26f52c7ac7c3a53103b6cf3a8b617f7093",
+      "calibrated": false,
+      "limitations": [
+        "This model failed the collected real/fake sample checks and is withheld from normal verdicts. Raw inference requires explicit research mode.",
+        "Face-image classifier applied to at most four face crops; video temporal authenticity and audio are not evaluated.",
+        "Model softmax scores are uncalibrated. Compression, demographics and unseen generators can change performance.",
+        "CyberGuard has not independently measured real-world deepfake accuracy."
+      ],
+      "faces_analyzed": 0
+    },
+    "confidence_basis": "UNAVAILABLE_NOT_CALIBRATED",
+    "classification": "SYNTHETIC_MEDIA_SIGNALS_DETECTED",
+    "confidence": 0.0,
+    "risk_score": 29.0,
+    "summary": "Elevated synthetic-media forensic indicators observed in media stream.",
+    "supporting_findings": [
+      {
+        "finding_type": "DEEPFAKE_FRAME_SIGNAL",
+        "title": "Video Sampled Frame Forensics: Suspicious Characteristics Detected",
+        "description": "Detector 'Video Sampled Frame Forensics' reported elevated manipulation score of 0.85.",
+        "severity": "HIGH",
+        "confidence": 0.0,
+        "risk_contribution": 34.0,
+        "rule_id": "MED_DET_VID_FRAME_01",
+        "category": "VIDEO_DETECTOR",
+        "evidence_items": [
+          {
+            "category": "VIDEO_DETECTOR",
+            "source": "Video Sampled Frame Forensics",
+            "key": "detector_score",
+            "value": 0.85,
+            "confidence": 1.0
+          }
+        ],
+        "limitation": "Only a bounded subset of frames are evaluated to prevent resource exhaustion.",
+        "mitre_attack_ids": []
+      }
+    ],
+    "contradicting_findings": [
+      {
+        "finding_type": "DETECTOR_INCONCLUSIVE_OR_BENIGN",
+        "title": "Video Temporal Consistency Forensics: Natural Characteristics Observed",
+        "description": "Detector 'Video Temporal Consistency Forensics' observed normal characteristics with low manipulation score (0.15).",
+        "severity": "SAFE",
+        "confidence": 0.0,
+        "risk_contribution": -10.0,
+        "rule_id": "MED_OK_VID_TEMP_01",
+        "category": "VIDEO_DETECTOR",
+        "evidence_items": [
+          {
+            "category": "VIDEO_DETECTOR",
+            "source": "Video Temporal Consistency Forensics",
+            "key": "detector_score",
+            "value": 0.15,
+            "confidence": 1.0
+          }
+        ],
+        "limitation": "Absence of detected artifact does not prove absence of manipulation.",
+        "mitre_attack_ids": []
+      }
+    ],
+    "detector_results": [
+      {
+        "detector_id": "vid_frame_01",
+        "detector_name": "Video Sampled Frame Forensics",
+        "detector_version": "1.0.0",
+        "media_type": "VIDEO",
+        "status": "SUCCESS",
+        "score": 0.85,
+        "label": "FRAME_FREQUENCY_ANOMALIES",
+        "confidence": 0.0,
+        "evidence": {
+          "sampled_frame_count": 2,
+          "suspicious_frame_count": 2,
+          "suspicious_regions": [
+            {
+              "frame_index": 0,
+              "timestamp": 0.0,
+              "score": 0.85
+            },
+            {
+              "frame_index": 1,
+              "timestamp": 1.0,
+              "score": 0.85
+            }
+          ],
+          "average_frame_score": 0.85
+        },
+        "metadata": {},
+        "runtime_ms": 1.99,
+        "model_name": "Frame-by-Frame Multi-Spectral Forensics",
+        "model_version": "1.0.0",
+        "limitations": [
+          "Only a bounded subset of frames are evaluated to prevent resource exhaustion."
+        ]
+      },
+      {
+        "detector_id": "vid_temp_01",
+        "detector_name": "Video Temporal Consistency Forensics",
+        "detector_version": "1.0.0",
+        "media_type": "VIDEO",
+        "status": "SUCCESS",
+        "score": 0.15,
+        "label": "TEMPORALLY_CONSISTENT",
+        "confidence": 0.0,
+        "evidence": {
+          "mean_interframe_diff": 7.34,
+          "max_interframe_diff": 7.34,
+          "temporal_anomaly_detected": false
+        },
+        "metadata": {},
+        "runtime_ms": 0.84,
+        "model_name": "Inter-Frame Histogram & Structural Difference",
+        "model_version": "1.0.0",
+        "limitations": [
+          "Scene cuts and rapid motion naturally induce high inter-frame difference."
+        ]
+      }
+    ],
+    "temporal_segments": [
+      {
+        "start_seconds": 0.0,
+        "end_seconds": 0.5,
+        "frame_index": 0,
+        "timestamp_iso": null,
+        "score": 0.85,
+        "label": "SUSPICIOUS_FRAME_REGION",
+        "evidence_detail": "Frame anomaly at index 0"
+      },
+      {
+        "start_seconds": 1.0,
+        "end_seconds": 1.5,
+        "frame_index": 1,
+        "timestamp_iso": null,
+        "score": 0.85,
+        "label": "SUSPICIOUS_FRAME_REGION",
+        "evidence_detail": "Frame anomaly at index 1"
+      }
+    ],
+    "provenance": {
+      "status": "NO_CREDENTIALS_FOUND",
+      "credential_present": false,
+      "signature_valid": null,
+      "issuer": null,
+      "claim_generator": null,
+      "assertions": [],
+      "validation_details": "No verifiable Content Credentials (C2PA/JUMBF) manifest found in media container."
+    },
+    "metadata": {
+      "width": null,
+      "height": null,
+      "color_mode": null,
+      "exif_present": false,
+      "camera_make": null,
+      "camera_model": null,
+      "software": null,
+      "duration_seconds": null,
+      "sample_rate": null,
+      "channels": null,
+      "bitrate": null,
+      "codecs": [],
+      "frame_rate": null,
+      "has_audio_track": false,
+      "has_video_track": false,
+      "container_tags": {
+        "decoded_sample": {
+          "width": 320,
+          "height": 180,
+          "sampled_frame_count": 2,
+          "sampling_rate_hz": 1
+        }
+      }
+    },
+    "limitations": [
+      "No cryptographic Content Credentials found; analysis relies on structural heuristics.",
+      "Authenticity assessments represent scientific evidentiary hypotheses, not legal certification.",
+      "CyberGuard does not perform unconstrained facial or biometric surveillance.",
+      "Heuristic checks only; no validated deepfake model. Analysis uses at most 30 seconds of audio or eight 320-pixel frames at one frame per second; sample metadata and frame timestamps describe decoded sampling output, not exact source-frame provenance or the entire original. Audio may be resampled; codec and resampling artifacts can affect spectral heuristics.",
+      "Calibrated authenticity confidence is unavailable (confidence=0); configured detector scores and thresholds are heuristic, not learned deepfake probabilities.",
+      "Risk scores reflect heuristic signals, not a calibrated probability of deepfake content. A zero score does not establish authenticity."
+    ],
+    "analysis_run_id": "run_med_754bcc3eb380",
+    "created_at": "2026-10-13T01:52:45.049482Z"
+  },
+  "threat_event_id": null
+}

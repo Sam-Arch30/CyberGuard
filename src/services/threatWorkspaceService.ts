@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 65: Threat Actor & Campaign Workspace Client Service.
  */
@@ -43,7 +44,7 @@ export const threatWorkspaceService = {
     if (params?.page) sp.set('page', String(params.page));
     if (params?.page_size) sp.set('page_size', String(params.page_size));
 
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/actors?${sp.toString()}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/actors?${sp.toString()}`), {
       headers: defaultHeaders(params?.workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to list threat actors: ${res.statusText}`);
@@ -51,7 +52,7 @@ export const threatWorkspaceService = {
   },
 
   async getActor(actorId: string, workspaceId = 'default'): Promise<ThreatActor> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch threat actor: ${res.statusText}`);
@@ -59,7 +60,7 @@ export const threatWorkspaceService = {
   },
 
   async createActor(payload: Record<string, any>, workspaceId = 'default'): Promise<ThreatActor> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/actors`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/actors`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -69,7 +70,7 @@ export const threatWorkspaceService = {
   },
 
   async updateActor(actorId: string, payload: Record<string, any>, workspaceId = 'default'): Promise<ThreatActor> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}`), {
       method: 'PATCH',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -83,7 +84,7 @@ export const threatWorkspaceService = {
     payload: Record<string, any>,
     workspaceId = 'default'
   ): Promise<AttributionAssessmentResponse> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}/assessments`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}/assessments`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -96,7 +97,7 @@ export const threatWorkspaceService = {
   },
 
   async getActorAssessments(actorId: string, workspaceId = 'default'): Promise<AttributionAssessmentResponse[]> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}/assessments`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/actors/${actorId}/assessments`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch actor assessments: ${res.statusText}`);
@@ -123,7 +124,7 @@ export const threatWorkspaceService = {
     if (params?.page) sp.set('page', String(params.page));
     if (params?.page_size) sp.set('page_size', String(params.page_size));
 
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns?${sp.toString()}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns?${sp.toString()}`), {
       headers: defaultHeaders(params?.workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to list campaigns: ${res.statusText}`);
@@ -131,7 +132,7 @@ export const threatWorkspaceService = {
   },
 
   async getCampaign(campaignId: string, workspaceId = 'default'): Promise<CampaignWorkspaceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch campaign: ${res.statusText}`);
@@ -139,7 +140,7 @@ export const threatWorkspaceService = {
   },
 
   async createCampaign(payload: Record<string, any>, workspaceId = 'default'): Promise<CampaignWorkspaceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -153,7 +154,7 @@ export const threatWorkspaceService = {
     payload: Record<string, any>,
     workspaceId = 'default'
   ): Promise<CampaignWorkspaceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}`), {
       method: 'PATCH',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -167,7 +168,7 @@ export const threatWorkspaceService = {
     payload: Record<string, any>,
     workspaceId = 'default'
   ): Promise<AttributionAssessmentResponse> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/assessments`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/assessments`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -183,7 +184,7 @@ export const threatWorkspaceService = {
     campaignId: string,
     workspaceId = 'default'
   ): Promise<{ campaign_id: string; events: CampaignTimelineEvent[]; first_seen: string; last_seen: string; activity_state: string }> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/timeline`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/timeline`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch campaign timeline: ${res.statusText}`);
@@ -191,7 +192,7 @@ export const threatWorkspaceService = {
   },
 
   async getCampaignGraph(campaignId: string, maxNodes = 75, workspaceId = 'default'): Promise<any> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/graph?max_nodes=${maxNodes}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/graph?max_nodes=${maxNodes}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch campaign graph: ${res.statusText}`);
@@ -200,7 +201,7 @@ export const threatWorkspaceService = {
 
   // Candidate Workflows
   async getCandidates(workspaceId = 'default'): Promise<CampaignWorkspaceDetail[]> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/candidates`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/candidates`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch candidates: ${res.statusText}`);
@@ -212,7 +213,7 @@ export const threatWorkspaceService = {
     req: CandidateReviewRequest,
     workspaceId = 'default'
   ): Promise<CampaignWorkspaceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/candidates/${candidateId}/review`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/candidates/${candidateId}/review`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(req),
@@ -225,7 +226,7 @@ export const threatWorkspaceService = {
   },
 
   async previewMerge(sourceId: string, targetId: string, workspaceId = 'default'): Promise<CampaignMergePreviewResponse> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/merge-preview`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/merge-preview`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify({ source_campaign_id: sourceId, target_campaign_id: targetId }),
@@ -244,7 +245,7 @@ export const threatWorkspaceService = {
     confirmConflicts = false,
     workspaceId = 'default'
   ): Promise<CampaignWorkspaceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/merge`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/merge`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify({
@@ -266,7 +267,7 @@ export const threatWorkspaceService = {
     payload: { reason: string; new_campaign_name: string; incident_ids_to_move: string[] },
     workspaceId = 'default'
   ): Promise<any> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/split`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/split`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -280,7 +281,7 @@ export const threatWorkspaceService = {
 
   // Hypotheses
   async getHypotheses(subjectId: string, workspaceId = 'default'): Promise<Hypothesis[]> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/hypotheses?subject_id=${subjectId}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/hypotheses?subject_id=${subjectId}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to fetch hypotheses: ${res.statusText}`);
@@ -288,7 +289,7 @@ export const threatWorkspaceService = {
   },
 
   async createHypothesis(payload: Record<string, any>, workspaceId = 'default'): Promise<Hypothesis> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/hypotheses`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/hypotheses`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -298,7 +299,7 @@ export const threatWorkspaceService = {
   },
 
   async updateHypothesis(hypothesisId: string, payload: Record<string, any>, workspaceId = 'default'): Promise<Hypothesis> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/hypotheses/${hypothesisId}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/hypotheses/${hypothesisId}`), {
       method: 'PATCH',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -309,7 +310,7 @@ export const threatWorkspaceService = {
 
   // Handoffs
   async getHuntHandoff(campaignId: string, workspaceId = 'default'): Promise<ThreatHuntHandoff> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/hunt-handoff`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/hunt-handoff`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to generate hunt handoff: ${res.statusText}`);
@@ -317,7 +318,7 @@ export const threatWorkspaceService = {
   },
 
   async getDetectionHandoff(campaignId: string, workspaceId = 'default'): Promise<DetectionHandoff> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/detection-handoff`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/campaigns/${campaignId}/detection-handoff`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) throw new Error(`Failed to generate detection handoff: ${res.statusText}`);
@@ -325,7 +326,7 @@ export const threatWorkspaceService = {
   },
 
   async triggerSync(workspaceId = 'default'): Promise<any> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/sync`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/sync`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
     });

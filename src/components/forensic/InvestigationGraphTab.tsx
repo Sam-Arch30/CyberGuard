@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useEffect, useRef, useState, useMemo } from 'react';
 import cytoscape from 'cytoscape';
 import type { Core, EventObject } from 'cytoscape';
@@ -109,7 +110,7 @@ export const InvestigationGraphTab: React.FC<InvestigationGraphTabProps> = ({ em
     }
 
     setLoading(true);
-    fetch(apiUrl('/api/emails/investigation-graph'), {
+    apiFetch(apiUrl('/api/emails/investigation-graph'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)

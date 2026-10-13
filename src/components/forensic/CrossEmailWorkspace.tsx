@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import cytoscape from 'cytoscape';
 import type { Core } from 'cytoscape';
@@ -104,7 +105,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
       campaign: 'C-042'
     };
 
-    fetch(apiUrl('/api/cross-investigation/analyze'), {
+    apiFetch(apiUrl('/api/cross-investigation/analyze'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
@@ -151,7 +152,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
       });
 
     // Also fetch existing analyst decisions
-    fetch(apiUrl('/api/cross-investigation/decisions'))
+    apiFetch(apiUrl('/api/cross-investigation/decisions'))
       .then(res => (res.ok ? res.json() : []))
       .then(decs => {
         if (isMounted && Array.isArray(decs)) {
@@ -174,7 +175,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
     setLoadingCompare(true);
     setWorkspaceTab('compare');
 
-    fetch(apiUrl('/api/cross-investigation/compare'), {
+    apiFetch(apiUrl('/api/cross-investigation/compare'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -208,7 +209,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
       return;
     }
 
-    fetch(apiUrl('/api/cross-investigation/graph'), {
+    apiFetch(apiUrl('/api/cross-investigation/graph'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -434,7 +435,7 @@ export const CrossEmailWorkspace: React.FC<CrossEmailWorkspaceProps> = ({ email,
     const emailB = targetEmailForAction.id;
 
     try {
-      const res = await fetch(apiUrl('/api/cross-investigation/decision'), {
+      const res = await apiFetch(apiUrl('/api/cross-investigation/decision'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

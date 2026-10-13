@@ -136,7 +136,7 @@ export const AlertWorkspace: React.FC = () => {
 
   // Section 46 real-time update subscription
   const { status: connectionStatus } = useRealtimeSubscription({
-    url: '/api/events/stream',
+    url: '/api/jobs/stream',
     onEvent: (event: RealtimeEvent) => {
       if (
         [

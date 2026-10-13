@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import {
   Laptop,
@@ -63,7 +64,7 @@ export const DeviceIncidentSection: React.FC<DeviceIncidentSectionProps> = ({ in
   const fetchCorrelations = async () => {
     setLoading(true);
     try {
-      const res = await fetch(apiUrl(`/api/v1/incidents/${targetIncidentId}/devices`));
+      const res = await apiFetch(apiUrl(`/api/v1/incidents/${targetIncidentId}/devices`));
       if (res.ok) {
         const data = await res.json();
         setDevices(data.devices || []);
@@ -72,13 +73,13 @@ export const DeviceIncidentSection: React.FC<DeviceIncidentSectionProps> = ({ in
         }
       } else if (res.status === 404) {
         // Fallback: fetch fleet devices if incident not specifically established
-        const fleetRes = await fetch(apiUrl('/api/v1/endpoint/devices'));
+        const fleetRes = await apiFetch(apiUrl('/api/v1/endpoint/devices'));
         if (fleetRes.ok) {
           const fleetData = await fleetRes.json();
           if (fleetData && fleetData.length > 0) {
             // Attempt on-demand correlation for first device
             const firstDev = fleetData[0];
-            const corrRes = await fetch(apiUrl(`/api/v1/devices/${firstDev.id}/correlations`));
+            const corrRes = await apiFetch(apiUrl(`/api/v1/devices/${firstDev.id}/correlations`));
             if (corrRes.ok) {
               const corrs = await corrRes.json();
               setDevices(corrs);
@@ -101,7 +102,7 @@ export const DeviceIncidentSection: React.FC<DeviceIncidentSectionProps> = ({ in
   useEffect(() => {
     if (selectedDevice && activeTab === 'timeline') {
       setLoadingTimeline(true);
-      fetch(apiUrl(`/api/v1/devices/${selectedDevice.device_id}/timeline?limit=50`))
+      apiFetch(apiUrl(`/api/v1/devices/${selectedDevice.device_id}/timeline?limit=50`))
         .then(res => res.ok ? res.json() : null)
         .then(data => {
           if (data && data.timeline) {
@@ -116,7 +117,7 @@ export const DeviceIncidentSection: React.FC<DeviceIncidentSectionProps> = ({ in
     if (!selectedDevice) return;
     setReviewing(true);
     try {
-      const res = await fetch(apiUrl(`/api/v1/correlations/${selectedDevice.correlation_id}/review`), {
+      const res = await apiFetch(apiUrl(`/api/v1/correlations/${selectedDevice.correlation_id}/review`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

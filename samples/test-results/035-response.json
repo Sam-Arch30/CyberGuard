@@ -1,0 +1,70 @@
+{
+  "ingestion_id": "5ec0985d-8c23-404a-bc6d-f8e3c7f287f0",
+  "artifact_id": "6dc5f075-6d13-4aea-8210-ef23c5c5b4e4",
+  "artifact_type": "FILE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "benign-data.bin",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "26f928b4bd254deba6c8b307e683bc1bb9726579a69fac6ae0b63681001a7edb",
+  "size": 1052,
+  "mime_type": "application/octet-stream",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "FILE",
+    "detected_mime": "application/octet-stream",
+    "reported_mime": "application/octet-stream",
+    "confidence": 0.7,
+    "detector": "binary_fallback",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "attachment_intelligence",
+      "file_metadata",
+      "file_security_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 1052,
+      "original_filename": "benign-data.bin"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/26/26f928b4bd254deba6c8b307e683bc1bb9726579a69fac6ae0b63681001a7edb/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "attachment_intelligence",
+    "file_metadata",
+    "file_security_analyzer"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "benign-data.bin",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "FILE",
+      "detected_mime": "application/octet-stream",
+      "reported_mime": "application/octet-stream",
+      "confidence": 0.7,
+      "detector": "binary_fallback",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "attachment_intelligence",
+        "file_metadata",
+        "file_security_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 1052,
+        "original_filename": "benign-data.bin"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:38.230562",
+  "evidence_id": "EVD-26F928B4BD",
+  "investigation_id": "80f3a851-dc80-435f-bdda-dcd0d5bfed57",
+  "analysis_run_id": "ab9e34bf-8f7d-4649-a5fa-c200297cd853",
+  "duplicate": false
+}

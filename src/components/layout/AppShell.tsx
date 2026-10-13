@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
+import { LOCAL_DEMO } from '../../utils/apiClient';
+import { SessionControls } from './SessionControls';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
-import { SIHGuidedTour } from '../demo/SIHGuidedTour';
 import { ErrorState } from '../ui';
 import { cn } from '../../utils/cn';
 
@@ -109,17 +110,18 @@ export const AppShell: React.FC<AppShellProps> = ({ children }) => {
         {/* Main Content Area with Contextual Width */}
         <main
           className={cn(
-            'flex-1 w-full mx-auto p-3 sm:p-5 lg:p-6 transition-all',
+            'cg-app-content flex-1 w-full mx-auto p-3 sm:p-5 lg:p-6 transition-all',
             isInvestigationWorkspace ? 'max-w-none' : 'max-w-[1600px]'
           )}
-        >
+        >{import.meta.env.VITE_PRESENTATION_DEMO === 'true' && <div className="mb-5 text-xs text-foreground-muted border-b border-border pb-3">Synthetic demonstration data · isolated presentation workspace</div>}
+          {!LOCAL_DEMO && <SessionControls />}
           <AppShellErrorBoundary key={location.pathname}>
             <div className="page-enter">{children}</div>
           </AppShellErrorBoundary>
         </main>
 
         {/* SIH Guided Tour HUD */}
-        <SIHGuidedTour />
+
       </div>
     </div>
   );

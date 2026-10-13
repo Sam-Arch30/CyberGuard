@@ -1,0 +1,153 @@
+{
+  "analysis_run_id": "04b6c7d8-62b1-4672-bef0-43d38f6b1326",
+  "artifact_id": "c0bb974d-8a9c-48fa-a510-13b882e8600a",
+  "assessment": {
+    "classification": "IMPERSONATION_SUSPECTED",
+    "confidence": 0.88,
+    "risk_score": 60.0,
+    "target_identity": "Example Finance",
+    "target_identity_id": "675576d9-5f43-44a4-9091-c230748de122",
+    "claims": [
+      {
+        "id": "f97b586f-65e6-47df-84ea-db6198549677",
+        "claim_type": "PERSON",
+        "claimed_name": "Example Finance",
+        "claimed_domain": "lookalike-example.test",
+        "claimed_email": "finance@lookalike-example.test",
+        "claimed_organization": null,
+        "claimed_role": null,
+        "source_artifact_id": null,
+        "analysis_run_id": null,
+        "evidence_reference": null,
+        "confidence": 1.0,
+        "text_span": "From: Example Finance <finance@lookalike-example.test>",
+        "metadata": {
+          "header": "From",
+          "display_name": "Example Finance"
+        }
+      },
+      {
+        "id": "c5b73cdc-3fbe-4c94-bf95-a92efe11f65e",
+        "claim_type": "SERVICE",
+        "claimed_name": "collector@untrusted.example",
+        "claimed_domain": "untrusted.example",
+        "claimed_email": "collector@untrusted.example",
+        "claimed_organization": null,
+        "claimed_role": null,
+        "source_artifact_id": null,
+        "analysis_run_id": null,
+        "evidence_reference": null,
+        "confidence": 1.0,
+        "text_span": "Reply-To: collector@untrusted.example",
+        "metadata": {
+          "header": "Reply-To"
+        }
+      }
+    ],
+    "supporting_findings": [
+      {
+        "finding_type": "DISPLAY_NAME_IMPERSONATION_SIGNAL",
+        "title": "Display Name Impersonation Targeting 'Example Finance'",
+        "description": "Display name 'Example Finance' claims identity of 'Example Finance', but email was sent from unrelated domain 'lookalike-example.test' (finance@lookalike-example.test).",
+        "severity": "HIGH",
+        "confidence": 0.92,
+        "risk_contribution": 35.0,
+        "rule_id": "IMP_NAME_001",
+        "rule_version": "1.0.0",
+        "category": "NAME_IDENTITY",
+        "target_identity_id": "675576d9-5f43-44a4-9091-c230748de122",
+        "target_identity_name": "Example Finance",
+        "evidence_items": [
+          {
+            "category": "NAME_IDENTITY",
+            "source": "EmailHeader",
+            "key": "claimed_display_name",
+            "value": "Example Finance",
+            "confidence": 1.0,
+            "is_contradicting": false,
+            "notes": null
+          },
+          {
+            "category": "EMAIL_IDENTITY",
+            "source": "EmailHeader",
+            "key": "actual_sender_domain",
+            "value": "lookalike-example.test",
+            "confidence": 1.0,
+            "is_contradicting": false,
+            "notes": null
+          },
+          {
+            "category": "DOMAIN_IDENTITY",
+            "source": "ProtectedProfile",
+            "key": "reference_trusted_domains",
+            "value": "example.test",
+            "confidence": 1.0,
+            "is_contradicting": false,
+            "notes": null
+          }
+        ],
+        "limitation": "Free webmail or employee personal communications may use corporate display names without malicious intent.",
+        "mitre_attack_ids": [
+          "T1566.002"
+        ]
+      },
+      {
+        "finding_type": "IDENTITY_REPLY_TO_MISMATCH",
+        "title": "Suspicious Reply-To Redirection on Protected Identity",
+        "description": "Email claiming 'Example Finance' (From: finance@lookalike-example.test) specifies a divergent Reply-To address 'collector@untrusted.example' (untrusted.example) to intercept responses.",
+        "severity": "HIGH",
+        "confidence": 0.9,
+        "risk_contribution": 25.0,
+        "rule_id": "IMP_RT_001",
+        "rule_version": "1.0.0",
+        "category": "EMAIL_IDENTITY",
+        "target_identity_id": "675576d9-5f43-44a4-9091-c230748de122",
+        "target_identity_name": "Example Finance",
+        "evidence_items": [
+          {
+            "category": "EMAIL_IDENTITY",
+            "source": "EmailHeader",
+            "key": "from_address",
+            "value": "finance@lookalike-example.test",
+            "confidence": 1.0,
+            "is_contradicting": false,
+            "notes": null
+          },
+          {
+            "category": "EMAIL_IDENTITY",
+            "source": "EmailHeader",
+            "key": "reply_to_address",
+            "value": "collector@untrusted.example",
+            "confidence": 1.0,
+            "is_contradicting": false,
+            "notes": null
+          }
+        ],
+        "limitation": "Support ticketing platforms or marketing campaigns occasionally utilize separate reply collection endpoints.",
+        "mitre_attack_ids": [
+          "T1566.002"
+        ]
+      }
+    ],
+    "contradicting_findings": [],
+    "limitations": [
+      "Absence of impersonation does not establish that communication is benign (e.g. compromised legitimate accounts).",
+      "Conclusions are evidence-based hypotheses, not definitive legal brand attribution."
+    ],
+    "summary": "Possible digital impersonation patterns observed targeting 'Example Finance'.",
+    "created_at": "2026-10-13T01:52:45.345048Z",
+    "profile_revisions_used": {
+      "675576d9-5f43-44a4-9091-c230748de122": 1
+    }
+  },
+  "entities_created": [
+    "b8ee3b8e-8b9a-4458-b0b5-a0f476873087"
+  ],
+  "relationships_created": [
+    "3dbac1f4-27ab-4d4f-bb92-f389173ef9dc",
+    "b7aac090-b323-4721-ac20-912cc1dd5455"
+  ],
+  "threat_events_created": [
+    "70a17087-9104-4796-898f-ecff87228541"
+  ]
+}

@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Frontend client service for Section 40: Interactive Attack Path.
  * Interacts with /api/investigations/:id/attack-path.
@@ -23,7 +24,7 @@ export const attackPathService = {
     }
 
     const query = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/investigations/${encodeURIComponent(identifier)}/attack-path${query}`)
     );
 

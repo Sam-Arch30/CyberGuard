@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Service client for Section 37 Live Analysis & Task DAG Orchestration.
  */
@@ -10,7 +11,7 @@ export const liveAnalysisService = {
    * Retrieves the live analysis run state by run ID.
    */
   async getLiveAnalysis(runId: string): Promise<AnalysisRunLiveResponse> {
-    const res = await fetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}`));
+    const res = await apiFetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch analysis run (${res.status})`);
@@ -22,7 +23,7 @@ export const liveAnalysisService = {
    * Retrieves the live analysis run state by investigation ID, incident number, or evidence ID.
    */
   async getInvestigationLiveAnalysis(investigationId: string): Promise<AnalysisRunLiveResponse> {
-    const res = await fetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/analysis`));
+    const res = await apiFetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/analysis`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `No analysis run associated with investigation '${investigationId}'`);
@@ -34,7 +35,7 @@ export const liveAnalysisService = {
    * Triggers execution of an initialized/queued AnalysisRun.
    */
   async startLiveAnalysis(runId: string): Promise<AnalysisRunLiveResponse> {
-    const res = await fetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/start`), {
+    const res = await apiFetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/start`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -49,7 +50,7 @@ export const liveAnalysisService = {
    * Cancels an active AnalysisRun.
    */
   async cancelLiveAnalysis(runId: string): Promise<AnalysisRunLiveResponse> {
-    const res = await fetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/cancel`), {
+    const res = await apiFetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/cancel`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });
@@ -64,7 +65,7 @@ export const liveAnalysisService = {
    * Retries an AnalysisRun.
    */
   async retryLiveAnalysis(runId: string): Promise<AnalysisRunLiveResponse> {
-    const res = await fetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/retry`), {
+    const res = await apiFetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/retry`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
     });

@@ -9,6 +9,12 @@ from pydantic import BaseModel, Field, ConfigDict
 
 
 class CaseStatus(str, Enum):
+    @classmethod
+    def _missing_(cls, value):
+        aliases = {'INVESTIGATING':'IN_PROGRESS','ESCALATED':'IN_PROGRESS'}
+        normalized = aliases.get(str(value).upper(), str(value).upper())
+        return next((member for member in cls if member.value == normalized), None)
+
     NEW = "NEW"
     OPEN = "OPEN"
     IN_PROGRESS = "IN_PROGRESS"
@@ -26,6 +32,10 @@ class CaseStatus(str, Enum):
 
 
 class CaseSeverity(str, Enum):
+    @classmethod
+    def _missing_(cls, value):
+        return next((member for member in cls if member.value == str(value).upper()), None)
+
     LOW = "LOW"
     MEDIUM = "MEDIUM"
     HIGH = "HIGH"

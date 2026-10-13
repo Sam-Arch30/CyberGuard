@@ -82,6 +82,7 @@ class ProtectedIdentityManager:
     def __init__(self):
         self._in_memory_profiles: Dict[str, ProtectedIdentityProfile] = {}
         self._seed_default_system_profiles()
+        self._system_profile_ids = frozenset(self._in_memory_profiles)
 
     def _seed_default_system_profiles(self):
         """Seeds trusted default reference profiles for common high-value targets."""
@@ -178,7 +179,7 @@ class ProtectedIdentityManager:
 
     def get_all(self, db: Optional[Session] = None, active_only: bool = True) -> List[ProtectedIdentityProfile]:
         """Returns all reference profiles from database or in-memory fallback, merged by ID."""
-        profiles_dict = dict(self._in_memory_profiles)
+        profiles_dict = {key: value for key, value in self._in_memory_profiles.items() if db is None or key in self._system_profile_ids}
         if db is not None:
             try:
                 query = db.query(ProtectedIdentityModel)
@@ -189,6 +190,7 @@ class ProtectedIdentityManager:
                     profiles_dict[m.id] = self._db_model_to_schema(m)
             except Exception as e:
                 logger.warning(f"Error reading ProtectedIdentityModel from DB: {e}")
+                raise
 
         if active_only:
             return [p for p in profiles_dict.values() if p.is_active]
@@ -203,7 +205,8 @@ class ProtectedIdentityManager:
                     return self._db_model_to_schema(m)
             except Exception as e:
                 logger.warning(f"DB lookup failed for profile {profile_id}: {e}")
-        return self._in_memory_profiles.get(profile_id)
+                raise
+        return self._in_memory_profiles.get(profile_id) if db is None or profile_id in self._system_profile_ids else None
 
     def find_by_domain(self, domain: str, db: Optional[Session] = None) -> Optional[ProtectedIdentityProfile]:
         """Matches a domain against trusted domains or known brand terms of protected profiles."""
@@ -290,7 +293,8 @@ class ProtectedIdentityManager:
             metadata=request.metadata,
         )
 
-        self._in_memory_profiles[prof_id] = profile
+        if db is None:
+            self._in_memory_profiles[prof_id] = profile
 
         if db is not None:
             db_model = ProtectedIdentityModel(
@@ -307,7 +311,7 @@ class ProtectedIdentityManager:
                 known_roles_json=json.dumps(profile.known_roles),
                 known_brand_terms_json=json.dumps(profile.known_brand_terms),
                 authorized_delegated_senders_json=json.dumps(profile.authorized_delegated_senders),
-                metadata_json=json.dumps(profile.metadata),
+                metadata_json=json.dumps({**profile.metadata, "trusted_sender_addresses": profile.trusted_sender_addresses}),
                 created_at=now,
                 updated_at=now,
             )
@@ -373,7 +377,8 @@ class ProtectedIdentityManager:
 
         profile.revision += 1
         profile.updated_at = now
-        self._in_memory_profiles[profile_id] = profile
+        if db is None:
+            self._in_memory_profiles[profile_id] = profile
 
         if db is not None:
             db_model = db.query(ProtectedIdentityModel).filter(ProtectedIdentityModel.id == profile_id).first()
@@ -388,7 +393,7 @@ class ProtectedIdentityManager:
                 db_model.authorized_delegated_senders_json = json.dumps(profile.authorized_delegated_senders)
                 db_model.is_active = profile.is_active
                 db_model.revision = profile.revision
-                db_model.metadata_json = json.dumps(profile.metadata)
+                db_model.metadata_json = json.dumps({**profile.metadata, "trusted_sender_addresses": profile.trusted_sender_addresses})
                 db_model.updated_at = now
 
             # Audit changes
@@ -431,7 +436,8 @@ class ProtectedIdentityManager:
         profile.is_active = False
         profile.revision += 1
         profile.updated_at = datetime.now(timezone.utc)
-        self._in_memory_profiles[profile_id] = profile
+        if db is None:
+            self._in_memory_profiles[profile_id] = profile
 
         if db is not None:
             db_model = db.query(ProtectedIdentityModel).filter(ProtectedIdentityModel.id == profile_id).first()
@@ -459,10 +465,10 @@ class ProtectedIdentityManager:
         return ProtectedIdentityProfile(
             id=m.id,
             display_name=m.display_name,
-            entity_type=IdentityClaimTypeEnum(m.entity_type),
+            entity_type=IdentityClaimTypeEnum.PERSON if m.entity_type == "EXECUTIVE" else IdentityClaimTypeEnum(m.entity_type),
             trusted_domains=json.loads(m.trusted_domains_json or "[]"),
             trusted_email_patterns=json.loads(m.trusted_emails_json or "[]"),
-            trusted_sender_addresses=[],
+            trusted_sender_addresses=json.loads(m.metadata_json or "{}").get("trusted_sender_addresses", []),
             known_names=json.loads(m.known_names_json or "[]"),
             known_roles=json.loads(m.known_roles_json or "[]"),
             known_brand_terms=json.loads(m.known_brand_terms_json or "[]"),
@@ -755,6 +761,15 @@ class IdentityComparisonService:
         if clean_claim == ref_name:
             return ComparisonOutcomeEnum.MATCH, {"matched_name": profile.display_name}
 
+        # Organizational role suffixes are claims of the same protected name,
+        # not new trusted domains or automatic evidence of maliciousness.
+        role_suffixes = {'account team', 'billing department', 'security team',
+                         'support', 'support team', 'customer service', 'team'}
+        if len(ref_name) >= 4 and clean_claim.startswith(ref_name + ' '):
+            suffix = clean_claim[len(ref_name):].strip()
+            if suffix in role_suffixes:
+                return ComparisonOutcomeEnum.PARTIAL_MATCH, {'matched_name': profile.display_name, 'claimed_role': suffix}
+
         # Known names / aliases
         for kn in profile.known_names:
             if kn.lower().strip() == clean_claim:
@@ -802,6 +817,10 @@ class DigitalImpersonationPipeline:
         contradicting_findings: List[ImpersonationFinding] = []
         limitations: List[str] = []
         profiles_used: Dict[str, int] = {}
+
+        if email_data is not None and not email_data.get('from_address'):
+            email_data = None
+            limitations.append('No sender address supplied; email identity evidence is unavailable.')
 
         # 1. Claim Extraction
         if email_data:
@@ -897,6 +916,11 @@ class DigitalImpersonationPipeline:
             limitations=limitations,
             profiles_used=profiles_used,
         )
+
+        if not claims and not supporting_findings and not contradicting_findings:
+            assessment.classification = ImpersonationClassificationEnum.INSUFFICIENT_EVIDENCE
+            assessment.confidence = 0.0
+            assessment.summary = 'No usable identity claim was supplied; identity cannot be assessed.'
 
         # 5. Canonical Persistence
         run_id = generate_uuid()
@@ -1752,6 +1776,7 @@ class DigitalImpersonationPipeline:
         except Exception as e:
             logger.error(f"Error persisting impersonation analysis: {e}", exc_info=True)
             db.rollback()
+            raise
 
 
 global_impersonation_pipeline = DigitalImpersonationPipeline()

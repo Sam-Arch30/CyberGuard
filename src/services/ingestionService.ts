@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Universal Ingestion Service.
  * Centralized API client for submitting files, URLs, text, and security telemetry
@@ -8,7 +9,7 @@
  * Relies strictly on backend SSRF-safe analysis boundaries.
  */
 
-import { apiUrl, extractErrorMessage } from '../utils/apiClient';
+import { apiUrl, extractErrorMessage, getAuthToken, getWorkspaceId } from '../utils/apiClient';
 import type {
   IngestionResult,
   DetectedInput,
@@ -46,6 +47,12 @@ export class IngestionService {
       return new Promise<IngestionResult>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
         xhr.open('POST', apiUrl('/api/ingest'));
+        xhr.setRequestHeader('X-Workspace-ID', getWorkspaceId());
+        const token = getAuthToken();
+        if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+        xhr.timeout = 120000;
+        xhr.ontimeout = () => reject(new Error('Upload processing timed out. Check the backend before retrying.'));
+        xhr.onabort = () => reject(new Error('Upload was cancelled.'));
 
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable) {
@@ -85,7 +92,7 @@ export class IngestionService {
     }
 
     // Standard fetch fallback
-    const res = await fetch(apiUrl('/api/ingest'), {
+    const res = await apiFetch(apiUrl('/api/ingest'), {
       method: 'POST',
       body: formData,
     });
@@ -140,7 +147,7 @@ export class IngestionService {
       }
     }
 
-    const res = await fetch(apiUrl('/api/ingest'), {
+    const res = await apiFetch(apiUrl('/api/ingest'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -161,7 +168,7 @@ export class IngestionService {
    * Used for reactive UI type badge hints before submission.
    */
   static async detectInput(text: string): Promise<DetectedInput> {
-    const res = await fetch(apiUrl('/api/ingest/detect'), {
+    const res = await apiFetch(apiUrl('/api/ingest/detect'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -181,7 +188,7 @@ export class IngestionService {
    * Retrieves platform analyzer capabilities and their operational status.
    */
   static async getCapabilities(): Promise<AnalyzerCapabilityRead[]> {
-    const res = await fetch(apiUrl('/api/ingest/capabilities'));
+    const res = await apiFetch(apiUrl('/api/ingest/capabilities'));
     if (!res.ok) {
       return [];
     }

@@ -33,7 +33,7 @@ async def get_latest_benchmark() -> Dict[str, Any]:
         logger.error(f"Failed to retrieve latest benchmark: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error retrieving benchmark results: {str(exc)}"
+            detail='Error retrieving benchmark results.'
         )
 
 
@@ -51,7 +51,7 @@ async def trigger_live_benchmark() -> Dict[str, Any]:
         logger.error(f"Failed to execute benchmark evaluation: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Benchmark execution error: {str(exc)}"
+            detail='Benchmark execution error.'
         )
 
 
@@ -130,7 +130,7 @@ async def reset_demo_state() -> Dict[str, Any]:
         logger.error(f"Failed to reset demo state: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Demo reset error: {str(exc)}"
+            detail='Demo reset error.'
         )
 
 
@@ -141,6 +141,13 @@ def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
     Wipes all ingested emails, analysis records, cases, and temporary .eml files.
     Returns database to pure zero-evidence clean state.
     """
+    import os
+    if os.getenv('ALLOW_WORKSPACE_RESET', 'false').lower() != 'true':
+        raise HTTPException(403, 'Workspace reset is disabled.')
+    from backend.db.session import request_workspace
+    # Normal API callers cannot execute a global purge of other workspaces.
+    if request_workspace.get() is not None:
+        raise HTTPException(403, 'Global reset is only available in explicit isolated demo mode.')
     try:
         from backend.db.session import engine
         from sqlalchemy import text
@@ -157,7 +164,7 @@ def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 "case_emails", "case_notes", "case_findings", "reports",
                 "campaign_emails", "analyst_decisions", "evidence",
                 "analysis_payloads", "email_analyses", "cases", "campaigns",
-                "copilot_audit_logs", "audit_logs", "email_iocs",
+                "email_iocs",
                 "email_relationships", "emails", "iocs"
             ]:
                 try:
@@ -165,7 +172,8 @@ def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
                 except Exception:
                     pass
 
-        eml_store_dir = Path(__file__).resolve().parent.parent.parent / "data" / "eml_store"
+        from backend.services.eml_storage_service import EML_STORE_DIR
+        eml_store_dir = EML_STORE_DIR
         if eml_store_dir.exists():
             for f in eml_store_dir.glob("*.eml"):
                 try:
@@ -182,5 +190,5 @@ def reset_workspace_state(db: Session = Depends(get_db)) -> Dict[str, Any]:
         logger.error(f"Failed to reset workspace: {exc}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Workspace reset error: {str(exc)}"
+            detail='Workspace reset error.'
         )

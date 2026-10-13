@@ -80,7 +80,7 @@ export interface URLIndicator {
   value: string;
   severity: string;
   first_seen?: string | null;
-  redirect_hops: number;
+  redirect_hops?: number | null;
   is_lookalike: boolean;
   credential_harvesting: boolean;
   reputation?: string | null;
@@ -273,6 +273,7 @@ export interface ArtifactIdentity {
 
 export interface AnalysisResultsResponse {
   run_id: string;
+  media_assessment?: Record<string, unknown> | null;
   investigation_id?: string | null;
   evidence_id?: string | null;
   artifact: ArtifactIdentity;

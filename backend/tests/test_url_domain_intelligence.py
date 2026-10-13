@@ -284,76 +284,54 @@ def test_17_metadata_address_blocking():
         assert not is_safe
 
 
+def _stream_response(status, headers=None, chunks=None, error=None):
+    from contextlib import asynccontextmanager
+    import httpx
+    consumed = []
+    class Body(httpx.AsyncByteStream):
+        async def __aiter__(self):
+            for chunk in chunks or []:
+                consumed.append(chunk)
+                yield chunk
+    @asynccontextmanager
+    async def stream(self, method, url, **kwargs):
+        if error: raise error
+        response = httpx.Response(status, headers=headers, stream=Body(), request=httpx.Request(method, url))
+        try: yield response
+        finally: await response.aclose()
+    return stream, consumed
+
 def test_18_redirect_to_private_ip_blocking():
-    """Verifies that an outbound redirect to a private IP is intercepted and blocked."""
-    client = SafeHttpClient()
-
-    # Mock first hop returning 302 to http://192.168.1.10/admin
-    with patch.object(SafeHttpClient, "resolve_and_verify_destination") as mock_resolve:
-        # First call safe (public host), second call for 192.168.1.10 returns blocked
-        mock_resolve.side_effect = [
-            (True, "Safe public IP", ["93.184.216.34"]),
-            (False, "Private RFC-1918/ULA address prohibited (192.168.1.10)", ["192.168.1.10"]),
-        ]
-
-        with patch("httpx.AsyncClient.request") as mock_request:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 302
-            mock_resp.headers = {"location": "http://192.168.1.10/admin"}
-            mock_request.return_value = mock_resp
-
-            resp = asyncio.run(client.fetch_url("http://example.com/redirect"))
-            assert not resp.is_safe_destination
-            assert "prohibited" in resp.blocked_reason.lower()
-            assert resp.blocked_ip == "192.168.1.10"
-            assert len(resp.redirect_chain) == 1
-
+    stream, _ = _stream_response(302, {'location':'http://192.168.1.10/admin'})
+    with patch.object(SafeHttpClient,'resolve_and_verify_destination',side_effect=[(True,'safe',['93.184.216.34']),(False,'Private address prohibited',['192.168.1.10'])]), patch('httpx.AsyncClient.stream',stream):
+        result = asyncio.run(SafeHttpClient().fetch_url('http://example.com/redirect'))
+    assert not result.is_safe_destination
+    assert 'prohibited' in result.blocked_reason.lower()
+    assert result.blocked_ip == '192.168.1.10'
+    assert len(result.redirect_chain) == 1
 
 def test_19_multi_hop_redirect_limit():
-    """Verifies redirect loop limits are enforced."""
-    client = SafeHttpClient(max_redirects=2)
-
-    with patch.object(SafeHttpClient, "resolve_and_verify_destination", return_value=(True, "Safe", ["93.184.216.34"])):
-        with patch("httpx.AsyncClient.request") as mock_request:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 302
-            mock_resp.headers = {"location": "http://example.com/next"}
-            mock_request.return_value = mock_resp
-
-            resp = asyncio.run(client.fetch_url("http://example.com/hop0"))
-            assert "limit exceeded" in (resp.error or "").lower()
-            assert len(resp.redirect_chain) == 3
-
+    stream, _ = _stream_response(302, {'location':'http://example.com/next'})
+    with patch.object(SafeHttpClient,'resolve_and_verify_destination',return_value=(True,'safe',['93.184.216.34'])), patch('httpx.AsyncClient.stream',stream):
+        result=asyncio.run(SafeHttpClient(max_redirects=2).fetch_url('http://example.com/hop0'))
+    assert 'limit exceeded' in result.error.lower()
+    assert len(result.redirect_chain)==3
 
 def test_20_http_timeout():
-    """Verifies timeout handling without confusing timeout with SAFE."""
-    client = SafeHttpClient(connect_timeout=0.1, read_timeout=0.1, total_timeout=0.2)
-
-    with patch.object(SafeHttpClient, "resolve_and_verify_destination", return_value=(True, "Safe", ["93.184.216.34"])):
-        import httpx
-        with patch("httpx.AsyncClient.request", side_effect=httpx.TimeoutException("Read timeout")):
-            resp = asyncio.run(client.fetch_url("http://example.com/timeout"))
-            assert resp.status_code == 0
-            assert "timed out" in (resp.error or "").lower()
-
+    import httpx
+    stream, _ = _stream_response(200,error=httpx.TimeoutException('Read timeout'))
+    with patch.object(SafeHttpClient,'resolve_and_verify_destination',return_value=(True,'safe',['93.184.216.34'])), patch('httpx.AsyncClient.stream',stream):
+        result=asyncio.run(SafeHttpClient(total_timeout=.2).fetch_url('http://example.com/timeout'))
+    assert result.status_code==0
+    assert 'timed out' in result.error.lower()
 
 def test_21_response_size_limit():
-    """Verifies payload truncation when response exceeds max_size_bytes."""
-    client = SafeHttpClient(max_size_bytes=50)
-
-    with patch.object(SafeHttpClient, "resolve_and_verify_destination", return_value=(True, "Safe", ["93.184.216.34"])):
-        with patch("httpx.AsyncClient.request") as mock_request:
-            mock_resp = MagicMock()
-            mock_resp.status_code = 200
-            mock_resp.headers = {"content-type": "text/html"}
-            mock_resp.encoding = "utf-8"
-            mock_resp.iter_bytes.return_value = [b"A" * 30, b"B" * 40]  # Total 70 bytes > 50
-            mock_request.return_value = mock_resp
-
-            resp = asyncio.run(client.fetch_url("http://example.com/large"))
-            assert resp.is_truncated
-            assert resp.response_size == 50
-
+    stream, consumed = _stream_response(200,{'content-type':'text/html'},[b'A'*30,b'B'*40,b'C'*20])
+    with patch.object(SafeHttpClient,'resolve_and_verify_destination',return_value=(True,'safe',['93.184.216.34'])), patch('httpx.AsyncClient.stream',stream):
+        result=asyncio.run(SafeHttpClient(max_size_bytes=50).fetch_url('http://example.com/large'))
+    assert result.is_truncated
+    assert result.response_size==50
+    assert len(consumed)==2
 
 # ============================================================================
 # 7. TLS CERTIFICATE INSPECTION

@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 64: Risk-Based Asset Prioritization REST Client Service.
  * Provides client methods for prioritized asset listings, structured explanations,
@@ -54,7 +55,7 @@ export class AssetPrioritizationService {
       if (params.offset !== undefined) searchParams.append('offset', String(params.offset));
     }
 
-    const res = await fetch(`${BASE_URL}/assets?${searchParams.toString()}`, {
+    const res = await apiFetch(`${BASE_URL}/assets?${searchParams.toString()}`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to list prioritized assets: ${res.statusText}`);
@@ -62,7 +63,7 @@ export class AssetPrioritizationService {
   }
 
   static async getPrioritizedAsset(assetId: string): Promise<PrioritizedAssetItem> {
-    const res = await fetch(`${BASE_URL}/assets/${assetId}`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${assetId}`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to get prioritized asset: ${res.statusText}`);
@@ -70,7 +71,7 @@ export class AssetPrioritizationService {
   }
 
   static async getPriorityExplanation(assetId: string): Promise<PriorityExplanation> {
-    const res = await fetch(`${BASE_URL}/assets/${assetId}/explanation`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${assetId}/explanation`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to get priority explanation: ${res.statusText}`);
@@ -78,7 +79,7 @@ export class AssetPrioritizationService {
   }
 
   static async getPriorityHistory(assetId: string, limit = 20): Promise<PriorityHistoryResponse> {
-    const res = await fetch(`${BASE_URL}/assets/${assetId}/history?limit=${limit}`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${assetId}/history?limit=${limit}`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to get priority history: ${res.statusText}`);
@@ -96,7 +97,7 @@ export class AssetPrioritizationService {
       reason,
       expires_in_hours: expiresInHours,
     };
-    const res = await fetch(`${BASE_URL}/assets/${assetId}/override`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${assetId}/override`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(payload),
@@ -106,7 +107,7 @@ export class AssetPrioritizationService {
   }
 
   static async removeOverride(assetId: string): Promise<PrioritizedAssetItem> {
-    const res = await fetch(`${BASE_URL}/assets/${assetId}/override`, {
+    const res = await apiFetch(`${BASE_URL}/assets/${assetId}/override`, {
       method: 'DELETE',
       headers: this.getHeaders(),
     });
@@ -115,7 +116,7 @@ export class AssetPrioritizationService {
   }
 
   static async recalculate(assetIds?: string[], force = false): Promise<any> {
-    const res = await fetch(`${BASE_URL}/recalculate`, {
+    const res = await apiFetch(`${BASE_URL}/recalculate`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify({ asset_ids: assetIds, force }),
@@ -125,7 +126,7 @@ export class AssetPrioritizationService {
   }
 
   static async listPolicies(): Promise<PriorityPolicy[]> {
-    const res = await fetch(`${BASE_URL}/policies`, {
+    const res = await apiFetch(`${BASE_URL}/policies`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to list policies: ${res.statusText}`);
@@ -133,7 +134,7 @@ export class AssetPrioritizationService {
   }
 
   static async getActivePolicy(): Promise<PriorityPolicy> {
-    const res = await fetch(`${BASE_URL}/policies/active`, {
+    const res = await apiFetch(`${BASE_URL}/policies/active`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to get active policy: ${res.statusText}`);
@@ -145,7 +146,7 @@ export class AssetPrioritizationService {
     description?: string;
     configuration: Record<string, any>;
   }): Promise<PriorityPolicy> {
-    const res = await fetch(`${BASE_URL}/policies`, {
+    const res = await apiFetch(`${BASE_URL}/policies`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -155,7 +156,7 @@ export class AssetPrioritizationService {
   }
 
   static async activatePolicy(policyId: string): Promise<PriorityPolicy> {
-    const res = await fetch(`${BASE_URL}/policies/${policyId}/activate`, {
+    const res = await apiFetch(`${BASE_URL}/policies/${policyId}/activate`, {
       method: 'POST',
       headers: this.getHeaders(),
     });
@@ -164,7 +165,7 @@ export class AssetPrioritizationService {
   }
 
   static async getOverview(): Promise<PrioritizationOverviewResponse> {
-    const res = await fetch(`${BASE_URL}/overview`, {
+    const res = await apiFetch(`${BASE_URL}/overview`, {
       headers: this.getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to get prioritization overview: ${res.statusText}`);

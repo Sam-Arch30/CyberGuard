@@ -1,3 +1,4 @@
+import { apiFetch } from './apiClient';
 import type { EmailAnalysis } from '../types/forensic';
 import { resolveEmailIndicators, resolveAttribution } from './indicatorHelper';
 import { resolveConfidenceConclusions } from './confidenceResolver';
@@ -182,7 +183,7 @@ export const resetDemoStore = async (): Promise<boolean> => {
 
     // 3. Notify backend demo reset endpoint if reachable
     try {
-      await fetch(apiUrl('/api/benchmark/demo-reset'), { method: 'POST' });
+      await apiFetch(apiUrl('/api/benchmark/demo-reset'), { method: 'POST' });
     } catch {
       // Safe fallback
     }

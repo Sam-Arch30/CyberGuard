@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Frontend client service for Section 42: Report Workspace.
  * Interacts with /api/investigations/:id/report and /api/reports endpoints.
@@ -17,7 +18,7 @@ export const reportService = {
    * Returns latest persisted report or a live draft projection.
    */
   async getInvestigationReport(investigationId: string): Promise<ReportDetail> {
-    const res = await fetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/report`));
+    const res = await apiFetch(apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/report`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch report for investigation '${investigationId}' (${res.status})`);
@@ -32,7 +33,7 @@ export const reportService = {
     investigationId: string,
     req: InvestigationReportGenerateRequest
   ): Promise<ReportDetail> {
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/report/generate`),
       {
         method: 'POST',
@@ -54,7 +55,7 @@ export const reportService = {
     investigationId: string,
     req: InvestigationReportPreviewRequest
   ): Promise<ReportDetail> {
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/report/preview`),
       {
         method: 'POST',
@@ -73,7 +74,7 @@ export const reportService = {
    * Lists all historical report versions (v1, v2...) generated for an investigation.
    */
   async getInvestigationReports(investigationId: string): Promise<ReportListItem[]> {
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/investigations/${encodeURIComponent(investigationId)}/reports`)
     );
     if (!res.ok) {
@@ -94,7 +95,7 @@ export const reportService = {
     if (search) params.set('search', search);
     if (severity) params.set('severity', severity);
 
-    const res = await fetch(apiUrl(`/api/reports?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`/api/reports?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch reports (${res.status})`);
@@ -106,7 +107,7 @@ export const reportService = {
    * Retrieves full details and snapshot of a specific report by ID.
    */
   async getReportById(reportId: string): Promise<ReportDetail> {
-    const res = await fetch(apiUrl(`/api/reports/${encodeURIComponent(reportId)}`));
+    const res = await apiFetch(apiUrl(`/api/reports/${encodeURIComponent(reportId)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch report '${reportId}' (${res.status})`);
@@ -118,7 +119,7 @@ export const reportService = {
    * Downloads official ReportLab vector PDF report.
    */
   async downloadPdf(reportId: string, filename?: string): Promise<void> {
-    const res = await fetch(apiUrl(`/api/reports/${encodeURIComponent(reportId)}/download`));
+    const res = await apiFetch(apiUrl(`/api/reports/${encodeURIComponent(reportId)}/download`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to download PDF for report '${reportId}' (${res.status})`);
@@ -138,7 +139,7 @@ export const reportService = {
    * Downloads authoritative JSON snapshot bundle.
    */
   async downloadJson(reportId: string, filename?: string): Promise<void> {
-    const res = await fetch(apiUrl(`/api/reports/${encodeURIComponent(reportId)}/json`));
+    const res = await apiFetch(apiUrl(`/api/reports/${encodeURIComponent(reportId)}/json`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to download JSON for report '${reportId}' (${res.status})`);
@@ -158,7 +159,7 @@ export const reportService = {
    * Compares two report versions to expose diffs in risk, findings, stages, etc.
    */
   async compareReports(r1Id: string, r2Id: string): Promise<ReportComparison> {
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/reports/${encodeURIComponent(r1Id)}/compare/${encodeURIComponent(r2Id)}`)
     );
     if (!res.ok) {

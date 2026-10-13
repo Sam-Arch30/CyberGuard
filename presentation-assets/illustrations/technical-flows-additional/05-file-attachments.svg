@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="870" viewBox="0 0 640 870">
+<rect width="100%" height="100%" fill="white"/>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 Z" fill="#111"/></marker></defs>
+<text x="320.0" y="56" text-anchor="middle" font-family="Arial,sans-serif" font-size="22" font-weight="bold">File &amp; Attachment Detection Flow</text>
+<rect x="42" y="105" width="556" height="100" fill="#FFF9EC" stroke="#333" stroke-width="1"/>
+<text x="320.0" y="149.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Upload file / attachment</text>
+<text x="320.0" y="171.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">Bounded input; reject empty/truncated PDF</text>
+<line x1="320.0" y1="208" x2="320.0" y2="227" stroke="#111" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="42" y="230" width="556" height="100" fill="#FFF9EC" stroke="#333" stroke-width="1"/>
+<text x="320.0" y="274.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="bold">FileIdentityAnalyzer + FilenameSecurityAnalyzer</text>
+<text x="320.0" y="296.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">Hashes, magic/MIME, Unicode and extensions</text>
+<line x1="320.0" y1="333" x2="320.0" y2="352" stroke="#111" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="42" y="355" width="556" height="100" fill="#FFF9EC" stroke="#333" stroke-width="1"/>
+<text x="320.0" y="388.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Run matching static analyzer</text>
+<text x="320.0" y="410.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">PDF / Office / PE / script / ZIP checks</text>
+<text x="320.0" y="432.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">Inspect entropy and archive entries</text>
+<line x1="320.0" y1="458" x2="320.0" y2="477" stroke="#111" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="42" y="480" width="556" height="100" fill="#FFF9EC" stroke="#333" stroke-width="1"/>
+<text x="320.0" y="524.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="bold">FileIOCAnalyzer + FileReputationAnalyzer</text>
+<text x="320.0" y="546.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">Extract references; query file-hash reputation</text>
+<line x1="320.0" y1="583" x2="320.0" y2="602" stroke="#111" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="42" y="605" width="556" height="100" fill="#FFF9EC" stroke="#333" stroke-width="1"/>
+<text x="320.0" y="649.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="bold">FileClassificationService.classify</text>
+<text x="320.0" y="671.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">Combine findings, hash reputation and type</text>
+<line x1="320.0" y1="708" x2="320.0" y2="727" stroke="#111" stroke-width="1.5" marker-end="url(#arrow)"/>
+<rect x="42" y="730" width="556" height="100" fill="#EFEDF4" stroke="#333" stroke-width="1"/>
+<text x="320.0" y="774.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="bold">Persist original / derived evidence</text>
+<text x="320.0" y="796.0" text-anchor="middle" font-family="Arial,sans-serif" font-size="17" font-weight="normal">Return classification, risk and findings</text>
+<text x="320.0" y="851" text-anchor="middle" font-family="Arial,sans-serif" font-size="12" fill="#555">Focused file API; hash no-match does not establish safety.</text></svg>

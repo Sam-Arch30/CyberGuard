@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Client service for Section 45: Persistent Background Jobs & Asynchronous Orchestration.
  * Handles job submission, status polling, cancellation, manual retries, and metrics inspection.
@@ -22,7 +23,7 @@ export class BackgroundJobService {
     request: JobSubmitRequest,
     workspaceId: string = 'default'
   ): Promise<JobReadResponse> {
-    const res = await fetch(apiUrl('/api/jobs'), {
+    const res = await apiFetch(apiUrl('/api/jobs'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -56,7 +57,7 @@ export class BackgroundJobService {
     if (params?.page) query.set('page', params.page.toString());
     if (params?.page_size) query.set('page_size', params.page_size.toString());
 
-    const res = await fetch(apiUrl(`/api/jobs?${query.toString()}`), {
+    const res = await apiFetch(apiUrl(`/api/jobs?${query.toString()}`), {
       headers: {
         'X-Workspace-ID': params?.workspaceId || 'default',
       },
@@ -73,7 +74,7 @@ export class BackgroundJobService {
    * Fetches detailed job status including latest progress and output references.
    */
   static async getJob(jobId: string, workspaceId: string = 'default'): Promise<JobReadResponse> {
-    const res = await fetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}`), {
+    const res = await apiFetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}`), {
       headers: {
         'X-Workspace-ID': workspaceId,
       },
@@ -90,7 +91,7 @@ export class BackgroundJobService {
    * Fetches chronological execution events emitted by a job.
    */
   static async getJobEvents(jobId: string, workspaceId: string = 'default'): Promise<JobEventRead[]> {
-    const res = await fetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/events`), {
+    const res = await apiFetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/events`), {
       headers: {
         'X-Workspace-ID': workspaceId,
       },
@@ -112,7 +113,7 @@ export class BackgroundJobService {
     workspaceId: string = 'default'
   ): Promise<JobActionResponse> {
     const query = reason ? `?reason=${encodeURIComponent(reason)}` : '';
-    const res = await fetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/cancel${query}`), {
+    const res = await apiFetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/cancel${query}`), {
       method: 'POST',
       headers: {
         'X-Workspace-ID': workspaceId,
@@ -130,7 +131,7 @@ export class BackgroundJobService {
    * Manually retries a failed or dead-lettered job.
    */
   static async retryJob(jobId: string, workspaceId: string = 'default'): Promise<JobActionResponse> {
-    const res = await fetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/retry`), {
+    const res = await apiFetch(apiUrl(`/api/jobs/${encodeURIComponent(jobId)}/retry`), {
       method: 'POST',
       headers: {
         'X-Workspace-ID': workspaceId,
@@ -148,7 +149,7 @@ export class BackgroundJobService {
    * Retrieves operational health and queue metrics summary.
    */
   static async getMetricsSummary(workspaceId: string = 'default'): Promise<JobMetricsSummary> {
-    const res = await fetch(apiUrl('/api/jobs/metrics/summary'), {
+    const res = await apiFetch(apiUrl('/api/jobs/metrics/summary'), {
       headers: {
         'X-Workspace-ID': workspaceId,
       },

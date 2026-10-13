@@ -2006,6 +2006,8 @@ class BackgroundJobWorker:
                 except Exception:
                     pass
 
+        from backend.db.session import request_workspace
+        workspace_context = request_workspace.set(ctx.workspace_id)
         hb_task = asyncio.create_task(_heartbeat_loop())
 
         try:
@@ -2126,6 +2128,7 @@ class BackgroundJobWorker:
                 retry_db.commit()
 
         finally:
+            request_workspace.reset(workspace_context)
             stop_heartbeat.set()
             hb_task.cancel()
             try:

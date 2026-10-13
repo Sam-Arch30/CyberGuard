@@ -1,3 +1,4 @@
+import { MediaAnalysisPanel, type MediaAssessment } from '../../dashboard/MediaAnalysisPanel';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldAlert,
@@ -88,10 +89,10 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
     contradictions: true,
     uncertainty: true,
     whatWouldChange: true,
-    indicators: true,
-    attackPath: true,
-    mitre: true,
-    infrastructure: true,
+    indicators: false,
+    attackPath: false,
+    mitre: false,
+    infrastructure: false,
     behavioral: false,
     provenance: false,
   });
@@ -236,11 +237,16 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
   }
 
   const { risk, artifact } = data;
+  if (['IMAGE', 'AUDIO', 'VIDEO'].includes(artifact.artifact_type)) {
+    return <MediaAnalysisPanel key={data.run_id} artifact={{id: artifact.id, name: artifact.name}}
+      initialAssessment={data.media_assessment as MediaAssessment | null}
+      onAnalysisComplete={newRun => { void loadResults(newRun, true); }}/>
+  }
   const isPartial = data.analysis_completeness === 'PARTIAL' || data.status === 'PARTIAL';
   const isDegraded = data.analysis_completeness === 'DEGRADED';
 
   return (
-    <div className="space-y-6 pb-20 font-sans max-w-7xl mx-auto">
+    <div className="cg-analysis-results space-y-6 pb-20 font-sans max-w-7xl mx-auto">
       {/* =========================================================================
           TOP BANNER: COMPLETENESS / RUN SELECTOR / ACTIONS
       ========================================================================= */}
@@ -350,7 +356,7 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
               onClick={onToggleViewDAG}
               leftIcon={<Activity className="w-3.5 h-3.5 text-primary" />}
             >
-              Pipeline DAG
+              Processing details
             </Button>
           )}
         </div>
@@ -373,7 +379,7 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
           <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
           <div className="text-xs space-y-0.5">
             <span className="font-bold text-foreground block font-mono">
-              Incomplete Analysis Pipeline Warning
+              Analysis limitations
             </span>
             <p className="text-foreground-muted font-sans">
               {data.completeness_message ||
@@ -397,7 +403,7 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
                 Unified Risk Assessment
               </span>
               <span className="text-[10px] font-mono text-foreground-subtle">
-                Sec 26 Engine
+                Analysis result
               </span>
             </div>
 
@@ -460,7 +466,7 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
             {/* CLASSIFICATION HEADER */}
             <div className="space-y-1">
               <span className="text-[11px] font-mono uppercase tracking-wider text-foreground-muted font-bold block">
-                Executive Threat Classification
+                Threat assessment
               </span>
               <h2 className="text-xl font-bold text-foreground tracking-tight flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-primary shrink-0" />
@@ -824,7 +830,7 @@ export const AnalysisResultsWorkstation: React.FC<AnalysisResultsWorkstationProp
                         )}
                       </div>
                       <span className="text-[10px] text-foreground-muted shrink-0">
-                        {u.redirect_hops} hops
+                        {u.redirect_hops == null ? 'Redirects not inspected' : `${u.redirect_hops} hops`}
                       </span>
                     </div>
                   ))}

@@ -116,7 +116,7 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({
   return (
     <span
       className={cn(
-        'inline-flex items-center rounded-badge border font-mono font-medium select-none transition-colors',
+        'inline-flex items-center shrink-0 whitespace-nowrap rounded-badge border font-mono font-medium select-none transition-colors',
         conf.bg,
         conf.text,
         conf.border,

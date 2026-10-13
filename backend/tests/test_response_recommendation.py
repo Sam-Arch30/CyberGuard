@@ -4,6 +4,7 @@ Tests deterministic generation, approval boundaries, applicability filtering,
 capability awareness, dependencies, conflicts, and audit logging.
 """
 
+from typing import Tuple
 import json
 import pytest
 from sqlalchemy import create_engine

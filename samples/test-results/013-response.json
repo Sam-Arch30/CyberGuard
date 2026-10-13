@@ -1,0 +1,75 @@
+{
+  "ingestion_id": "717fb161-806c-4371-9a26-92b37422f5c2",
+  "artifact_id": "646d5549-d70d-4abc-a092-c6d579391af7",
+  "artifact_type": "IMAGE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-card.webp",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "fa50b085b06fe7fcb604795daf2b84daff7ee07dda5cf1b8ed0dc602090b16c7",
+  "size": 2516,
+  "mime_type": "image/webp",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "IMAGE",
+    "detected_mime": "image/webp",
+    "reported_mime": "application/octet-stream",
+    "confidence": 0.96,
+    "detector": "image_signature",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 2516,
+      "original_filename": "synthetic-card.webp",
+      "format": "WEBP"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/fa/fa50b085b06fe7fcb604795daf2b84daff7ee07dda5cf1b8ed0dc602090b16c7/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-card.webp",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "IMAGE",
+      "detected_mime": "image/webp",
+      "reported_mime": "application/octet-stream",
+      "confidence": 0.96,
+      "detector": "image_signature",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 2516,
+        "original_filename": "synthetic-card.webp",
+        "format": "WEBP"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:36.434459",
+  "evidence_id": "EVD-FA50B085B0",
+  "investigation_id": "490b1d86-46fe-48b8-b5ee-6f361eb19143",
+  "analysis_run_id": "a57c4ffe-8675-4447-9b30-5d826d5e5adc",
+  "duplicate": false
+}

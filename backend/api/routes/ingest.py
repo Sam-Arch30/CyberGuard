@@ -5,6 +5,7 @@ Provides canonical endpoints to ingest files, URLs, domains, IPs, text, and stru
 into CyberGuard's persistent forensic architecture.
 """
 from __future__ import annotations
+from backend.services.upload_security import UploadSecurityService
 
 import json
 import logging
@@ -81,7 +82,7 @@ async def ingest_evidence(
                     detail="Multipart form must include a 'file' field."
                 )
 
-            content_bytes = await file_item.read()
+            content_bytes = await UploadSecurityService.read_bounded_upload(file_item, max_bytes=50 * 1024 * 1024)
             raw_filename = getattr(file_item, "filename", None) or "upload.bin"
             file_mime = getattr(file_item, "content_type", None)
 
@@ -108,10 +109,12 @@ async def ingest_evidence(
         elif "application/json" in content_type or not content_type:
             try:
                 body = await request.json()
+            except HTTPException:
+                raise
             except Exception as e:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"Malformed JSON request body: {str(e)}"
+                    detail='Malformed JSON request body.'
                 )
 
             if not isinstance(body, dict):
@@ -179,6 +182,8 @@ async def ingest_evidence(
                 submitted_by=uploader_identity,
             )
 
+    except HTTPException:
+        raise
     except FileTooLargeError as e:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE if hasattr(status, "HTTP_413_REQUEST_ENTITY_TOO_LARGE") else 413,
@@ -190,6 +195,11 @@ async def ingest_evidence(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=e.message)
     except IngestionException as e:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=e.message)
+    except Exception:
+        db.rollback()
+        logger.exception('Ingestion failed while processing evidence')
+        raise HTTPException(500, 'Evidence processing failed. Check the backend logs and database schema.')
+
 
 
 # ============================================================================
@@ -215,7 +225,7 @@ async def ingest_file_endpoint(
 ):
     uploader = (submitted_by or user or "SOC Analyst").strip()
     try:
-        content_bytes = await file.read()
+        content_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
         return UniversalIngestionService.ingest_file(
             db=db,
             content_bytes=content_bytes,

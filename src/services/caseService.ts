@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import { apiUrl } from '../utils/apiClient';
 import type {
   CaseListItem,
@@ -48,7 +49,7 @@ export const caseService = {
     if (params?.skip !== undefined) query.append('skip', String(params.skip));
     if (params?.limit !== undefined) query.append('limit', String(params.limit));
 
-    const res = await fetch(apiUrl(`/api/cases?${query.toString()}`));
+    const res = await apiFetch(apiUrl(`/api/cases?${query.toString()}`));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Failed to list cases');
@@ -57,7 +58,7 @@ export const caseService = {
   },
 
   async getCaseMetrics(): Promise<CaseMetricsSummary> {
-    const res = await fetch(apiUrl('/api/cases/metrics/overview'));
+    const res = await apiFetch(apiUrl('/api/cases/metrics/overview'));
     if (!res.ok) {
       throw new Error('Failed to fetch case metrics');
     }
@@ -65,7 +66,7 @@ export const caseService = {
   },
 
   async getCase(caseId: string): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}`));
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}`));
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `Failed to fetch case ${caseId}`);
@@ -74,7 +75,7 @@ export const caseService = {
   },
 
   async createCase(payload: CaseCreatePayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl('/api/cases'), {
+    const res = await apiFetch(apiUrl('/api/cases'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -87,7 +88,7 @@ export const caseService = {
   },
 
   async updateCase(caseId: string, payload: CaseUpdatePayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -100,7 +101,7 @@ export const caseService = {
   },
 
   async assignCase(caseId: string, payload: CaseAssignPayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/assign`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/assign`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -113,7 +114,7 @@ export const caseService = {
   },
 
   async resolveCase(caseId: string, payload: CaseResolvePayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/resolve`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/resolve`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -126,7 +127,7 @@ export const caseService = {
   },
 
   async closeCase(caseId: string, payload: CaseClosePayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/close`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/close`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -139,7 +140,7 @@ export const caseService = {
   },
 
   async reopenCase(caseId: string, payload: CaseReopenPayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/reopen`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/reopen`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -152,7 +153,7 @@ export const caseService = {
   },
 
   async mergeCases(targetCaseId: string, payload: CaseMergePayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${targetCaseId}/merge`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${targetCaseId}/merge`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -165,7 +166,7 @@ export const caseService = {
   },
 
   async linkEntity(caseId: string, payload: CaseLinkPayload): Promise<CaseDetail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/link`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/link`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -178,7 +179,7 @@ export const caseService = {
   },
 
   async getCaseTimeline(caseId: string): Promise<CaseTimelineEvent[]> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/timeline`));
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/timeline`));
     if (!res.ok) {
       throw new Error('Failed to fetch case timeline');
     }
@@ -186,7 +187,7 @@ export const caseService = {
   },
 
   async createTask(caseId: string, payload: CaseTaskCreatePayload): Promise<CaseTask> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/tasks`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/tasks`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -199,7 +200,7 @@ export const caseService = {
   },
 
   async updateTask(caseId: string, taskId: string, payload: CaseTaskUpdatePayload): Promise<CaseTask> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/tasks/${taskId}`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/tasks/${taskId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -212,7 +213,7 @@ export const caseService = {
   },
 
   async deleteTask(caseId: string, taskId: string): Promise<void> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/tasks/${taskId}`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/tasks/${taskId}`), {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -222,7 +223,7 @@ export const caseService = {
   },
 
   async addNote(caseId: string, payload: CaseNoteCreateRequest): Promise<CaseNote> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/notes`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/notes`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -235,7 +236,7 @@ export const caseService = {
   },
 
   async updateNote(caseId: string, noteId: string, payload: CaseNoteUpdateRequest): Promise<CaseNote> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/notes/${noteId}`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/notes/${noteId}`), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -248,7 +249,7 @@ export const caseService = {
   },
 
   async addFinding(caseId: string, payload: CaseFindingCreateRequest): Promise<CaseFinding> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/findings`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/findings`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -261,7 +262,7 @@ export const caseService = {
   },
 
   async addEmail(caseId: string, payload: Record<string, any>): Promise<CaseEmail> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/emails`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/emails`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -274,7 +275,7 @@ export const caseService = {
   },
 
   async removeEmail(caseId: string, emailId: string): Promise<void> {
-    const res = await fetch(apiUrl(`/api/cases/${caseId}/emails/${emailId}`), {
+    const res = await apiFetch(apiUrl(`/api/cases/${caseId}/emails/${emailId}`), {
       method: 'DELETE',
     });
     if (!res.ok) {

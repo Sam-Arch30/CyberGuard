@@ -1,0 +1,81 @@
+{
+  "ingestion_id": "30f7c4d1-0aef-40f7-9442-ff997c97bf20",
+  "artifact_id": "5f546366-28e7-4261-b42d-74760bbf7f4e",
+  "artifact_type": "IMAGE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "jpeg-with-pdf-extension.pdf",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "cd3297b352785a811b57f092ed48f851ce9d463ea8c930a7b63117d8e701b0e3",
+  "size": 11020,
+  "mime_type": "image/jpeg",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "IMAGE",
+    "detected_mime": "image/jpeg",
+    "reported_mime": "application/pdf",
+    "confidence": 0.96,
+    "detector": "image_signature",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+      "Reported MIME type differs from the detected content signature.",
+      "Invalid or truncated PDF structure, or extension/content mismatch. Original bytes retained; PDF decoding not verified.",
+      "Duplicate artifact: This content has been previously observed and analyzed in CyberGuard."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 11020,
+      "original_filename": "jpeg-with-pdf-extension.pdf",
+      "format": "JPEG"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/cd/cd3297b352785a811b57f092ed48f851ce9d463ea8c930a7b63117d8e701b0e3/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+    "Reported MIME type differs from the detected content signature.",
+    "Invalid or truncated PDF structure, or extension/content mismatch. Original bytes retained; PDF decoding not verified.",
+    "Duplicate artifact: This content has been previously observed and analyzed in CyberGuard."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-card.jpg",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "IMAGE",
+      "detected_mime": "image/jpeg",
+      "reported_mime": "image/jpeg",
+      "confidence": 0.96,
+      "detector": "image_signature",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 11020,
+        "original_filename": "synthetic-card.jpg",
+        "format": "JPEG"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:38.544745",
+  "evidence_id": "EVD-CD3297B352",
+  "investigation_id": "fa94bf9d-5726-4717-8e99-2e2d2a7f07f3",
+  "analysis_run_id": "8ed7f8a8-a8eb-4370-bff3-ed016e19c0c8",
+  "duplicate": true
+}

@@ -103,35 +103,8 @@ class CaseService:
         Generates readable collision-safe sequential case identifiers:
         CG-{YEAR}-{SEQUENCE:06d} (e.g. CG-2026-000001).
         """
-        current_year = datetime.now(timezone.utc).year
-        prefix = f"CG-{current_year}-"
-
-        # Count existing cases across workspace and database
-        last_case = (
-            db.query(CaseModel)
-            .filter(CaseModel.case_number.like(f"{prefix}%"))
-            .order_by(desc(CaseModel.case_number))
-            .first()
-        )
-
-        next_seq = 1
-        if last_case:
-            try:
-                seq_part = last_case.case_number.split("-")[-1]
-                next_seq = int(seq_part) + 1
-            except (ValueError, IndexError):
-                next_seq = db.query(CaseModel).count() + 1
-        else:
-            total_cases = db.query(CaseModel).count()
-            next_seq = total_cases + 1
-
-        # Safeguard against collision
-        candidate = f"{prefix}{next_seq:06d}"
-        while db.query(CaseModel).filter(CaseModel.case_number == candidate).first() is not None:
-            next_seq += 1
-            candidate = f"{prefix}{next_seq:06d}"
-
-        return candidate
+        import uuid
+        return f"CG-{datetime.now(timezone.utc).year}-{uuid.uuid4().hex[:12].upper()}"
 
     @staticmethod
     def _log_audit(

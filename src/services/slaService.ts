@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 51: Incident SLA, Escalation & Analyst Workflow Client Service.
  * Provides typed methods for SLA clocks, pause/resume/exempt actions,
@@ -23,7 +24,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<IncidentSLADetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/sla`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -49,7 +50,7 @@ export class SLAService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentSLADetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/sla/pause`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -77,7 +78,7 @@ export class SLAService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentSLADetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/sla/resume`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -105,7 +106,7 @@ export class SLAService {
     actor: string = 'SOC Lead'
   ): Promise<IncidentSLADetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/sla/exempt`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -139,7 +140,7 @@ export class SLAService {
     actor: string = 'SOC Analyst'
   ): Promise<IncidentSLADetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/escalate`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -165,7 +166,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<IncidentSLADetail> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/sla/evaluate`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -189,7 +190,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<{ incident_id: string; assigned_to: string | null; team_id: string | null; routed: boolean }> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/route`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -213,7 +214,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<WorkflowHistory> {
     const url = apiUrl(`/api/incidents/${encodeURIComponent(incidentId)}/workflow-history`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -235,7 +236,7 @@ export class SLAService {
 
   static async listSLAPolicies(workspaceId: string = 'default'): Promise<{ items: SLAPolicy[]; total: number }> {
     const url = apiUrl('/api/settings/sla-policies');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       headers: { 'X-Workspace-ID': workspaceId },
     });
     if (!res.ok) throw new Error(await extractErrorMessage(res));
@@ -248,7 +249,7 @@ export class SLAService {
     actor: string = 'Admin'
   ): Promise<SLAPolicy> {
     const url = apiUrl('/api/settings/sla-policies');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -269,7 +270,7 @@ export class SLAService {
     actor: string = 'Admin'
   ): Promise<SLAPolicy> {
     const url = apiUrl(`/api/settings/sla-policies/${encodeURIComponent(policyId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -287,7 +288,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<{ items: EscalationPolicy[]; total: number }> {
     const url = apiUrl('/api/settings/escalation-policies');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       headers: { 'X-Workspace-ID': workspaceId },
     });
     if (!res.ok) throw new Error(await extractErrorMessage(res));
@@ -300,7 +301,7 @@ export class SLAService {
     actor: string = 'Admin'
   ): Promise<EscalationPolicy> {
     const url = apiUrl('/api/settings/escalation-policies');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -321,7 +322,7 @@ export class SLAService {
     actor: string = 'Admin'
   ): Promise<EscalationPolicy> {
     const url = apiUrl(`/api/settings/escalation-policies/${encodeURIComponent(policyId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -339,7 +340,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<{ items: RoutingRule[]; total: number }> {
     const url = apiUrl('/api/settings/routing-rules');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       headers: { 'X-Workspace-ID': workspaceId },
     });
     if (!res.ok) throw new Error(await extractErrorMessage(res));
@@ -352,7 +353,7 @@ export class SLAService {
     actor: string = 'Admin'
   ): Promise<RoutingRule> {
     const url = apiUrl('/api/settings/routing-rules');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -373,7 +374,7 @@ export class SLAService {
     actor: string = 'Admin'
   ): Promise<RoutingRule> {
     const url = apiUrl(`/api/settings/routing-rules/${encodeURIComponent(ruleId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -392,7 +393,7 @@ export class SLAService {
     workspaceId: string = 'default'
   ): Promise<PolicySimulationResponse> {
     const url = apiUrl('/api/settings/sla-policies/simulate');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

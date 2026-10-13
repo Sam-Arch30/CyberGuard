@@ -149,7 +149,7 @@ export const ThreatScore: React.FC<ThreatScoreProps> = ({
 
       {/* Subtext info */}
       <div className="flex justify-between text-[10px] font-mono text-foreground-muted">
-        <span>0 (SAFE)</span>
+        <span>0 (No signals)</span>
         <span>50 (ELEVATED)</span>
         <span>100 (CRITICAL)</span>
       </div>

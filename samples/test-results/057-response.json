@@ -1,0 +1,134 @@
+{
+  "success": true,
+  "artifact_id": "art_med_9f07b4fd5e11",
+  "analysis_run_id": "run_med_04cec2fa8556",
+  "media_identity": {
+    "artifact_id": "art_med_9f07b4fd5e11",
+    "sha256": "0d8d4504a20d2f34cfa00f50915bcc83ffa1a9e1557efd1c5e017f753241d333",
+    "original_filename": "synthetic-tone.wav",
+    "mime_type": "audio/wav",
+    "media_type": "AUDIO",
+    "format": "WAV",
+    "size_bytes": 64044
+  },
+  "assessment": {
+    "artifact_id": "art_med_9f07b4fd5e11",
+    "media_type": "AUDIO",
+    "format": "WAV",
+    "processing_status": "COMPLETED",
+    "analysis_scope": "Bounded media heuristics and, when available, pretrained face-image classification. Authenticity is not established.",
+    "trained_detector": {
+      "status": "UNSUPPORTED_MEDIA_TYPE",
+      "model": "prithivMLmods/Deep-Fake-Detector-v2-Model",
+      "revision": "3a99ae26f52c7ac7c3a53103b6cf3a8b617f7093",
+      "calibrated": false,
+      "limitations": [
+        "Face-image classifier applied to at most four face crops; video temporal authenticity and audio are not evaluated.",
+        "Model softmax scores are uncalibrated. Compression, demographics and unseen generators can change performance.",
+        "CyberGuard has not independently measured real-world deepfake accuracy."
+      ],
+      "faces_analyzed": 0
+    },
+    "confidence_basis": "UNAVAILABLE_NOT_CALIBRATED",
+    "classification": "SYNTHETIC_MEDIA_SIGNALS_DETECTED",
+    "confidence": 0.0,
+    "risk_score": 35.2,
+    "summary": "Elevated synthetic-media forensic indicators observed in media stream.",
+    "supporting_findings": [
+      {
+        "finding_type": "SYNTHETIC_SPEECH_SIGNAL",
+        "title": "Audio Spectral & Acoustic Forensics: Suspicious Characteristics Detected",
+        "description": "Detector 'Audio Spectral & Acoustic Forensics' reported elevated manipulation score of 0.88.",
+        "severity": "HIGH",
+        "confidence": 0.0,
+        "risk_contribution": 35.2,
+        "rule_id": "MED_DET_AUD_SPEC_01",
+        "category": "AUDIO_DETECTOR",
+        "evidence_items": [
+          {
+            "category": "AUDIO_DETECTOR",
+            "source": "Audio Spectral & Acoustic Forensics",
+            "key": "detector_score",
+            "value": 0.88,
+            "confidence": 1.0
+          }
+        ],
+        "limitation": "Telephone audio codecs (e.g. G.711) naturally band-limit audio below 3.4kHz.",
+        "mitre_attack_ids": []
+      }
+    ],
+    "contradicting_findings": [],
+    "detector_results": [
+      {
+        "detector_id": "aud_spec_01",
+        "detector_name": "Audio Spectral & Acoustic Forensics",
+        "detector_version": "1.0.0",
+        "media_type": "AUDIO",
+        "status": "SUCCESS",
+        "score": 0.88,
+        "label": "SYNTHETIC_ACOUSTIC_SIGNALS",
+        "confidence": 0.0,
+        "evidence": {
+          "sample_rate": 44100,
+          "hf_energy_ratio": 0.0,
+          "spectral_flatness": 0.0815,
+          "abrupt_high_freq_cutoff": true
+        },
+        "metadata": {},
+        "runtime_ms": 1.29,
+        "model_name": "SciPy Spectral Rolloff & Pitch Stability Analysis",
+        "model_version": "1.0.0",
+        "limitations": [
+          "Telephone audio codecs (e.g. G.711) naturally band-limit audio below 3.4kHz."
+        ]
+      }
+    ],
+    "temporal_segments": [],
+    "provenance": {
+      "status": "NO_CREDENTIALS_FOUND",
+      "credential_present": false,
+      "signature_valid": null,
+      "issuer": null,
+      "claim_generator": null,
+      "assertions": [],
+      "validation_details": "No verifiable Content Credentials (C2PA/JUMBF) manifest found in media container."
+    },
+    "metadata": {
+      "width": null,
+      "height": null,
+      "color_mode": null,
+      "exif_present": false,
+      "camera_make": null,
+      "camera_model": null,
+      "software": null,
+      "duration_seconds": 2.0,
+      "sample_rate": 16000,
+      "channels": 1,
+      "bitrate": null,
+      "codecs": [
+        "PCM_WAV"
+      ],
+      "frame_rate": null,
+      "has_audio_track": true,
+      "has_video_track": false,
+      "container_tags": {
+        "decoded_sample": {
+          "sample_rate": 44100,
+          "channels": 1,
+          "duration_seconds": 2.0
+        }
+      }
+    },
+    "limitations": [
+      "No cryptographic Content Credentials found; analysis relies on structural heuristics.",
+      "Authenticity assessments represent scientific evidentiary hypotheses, not legal certification.",
+      "CyberGuard does not perform unconstrained facial or biometric surveillance.",
+      "Heuristic checks only; no validated deepfake model. Analysis uses at most 30 seconds of audio or eight 320-pixel frames at one frame per second; sample metadata and frame timestamps describe decoded sampling output, not exact source-frame provenance or the entire original. Audio may be resampled; codec and resampling artifacts can affect spectral heuristics.",
+      "Calibrated authenticity confidence is unavailable (confidence=0); configured detector scores and thresholds are heuristic, not learned deepfake probabilities.",
+      "Risk scores reflect heuristic signals, not a calibrated probability of deepfake content. A zero score does not establish authenticity."
+    ],
+    "analysis_run_id": "run_med_04cec2fa8556",
+    "created_at": "2026-10-13T01:52:44.770237Z"
+  },
+  "threat_event_id": null
+}

@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Shield, Mail, Calendar, User, CornerDownLeft, Repeat, Hash, Briefcase, FileText, Loader2, CheckCircle2 } from 'lucide-react';
@@ -19,7 +20,7 @@ export const EmailSummaryHeader: React.FC<EmailSummaryHeaderProps> = ({ email })
   const handleGenerateReport = async () => {
     setIsGeneratingReport(true);
     try {
-      const res = await fetch(apiUrl('/api/reports/generate'), {
+      const res = await apiFetch(apiUrl('/api/reports/generate'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

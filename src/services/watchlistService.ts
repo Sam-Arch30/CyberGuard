@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 53: Watchlist Monitoring & Continuous Threat Intelligence Client Service.
  */
@@ -37,7 +38,7 @@ export class WatchlistService {
     if (params.offset) qParams.set('offset', String(params.offset));
 
     const url = apiUrl(`/api/watchlists?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -61,7 +62,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchlistDetail> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -85,7 +86,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchlistSummary> {
     const url = apiUrl('/api/watchlists');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -111,7 +112,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchlistSummary> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -136,7 +137,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<void> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -158,7 +159,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchlistHealth> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/health`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -182,7 +183,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchlistMonitoringRun[]> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/refresh`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -220,7 +221,7 @@ export class WatchlistService {
     if (params.offset) qParams.set('offset', String(params.offset));
 
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/items?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -245,7 +246,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchedIndicator> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/items`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -271,7 +272,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchedIndicator[]> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/items/bulk`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -297,7 +298,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<void> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/items/${encodeURIComponent(itemId)}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -319,7 +320,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchedIndicator> {
     const url = apiUrl(`/api/watchlists/items/${encodeURIComponent(itemId)}/refresh`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -350,7 +351,7 @@ export class WatchlistService {
     if (params.offset) qParams.set('offset', String(params.offset));
 
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/changes?${qParams.toString()}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -375,7 +376,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<{ items: WatchlistMonitoringRun[]; total: number }> {
     const url = apiUrl(`/api/watchlists/${encodeURIComponent(watchlistId)}/runs?limit=${limit}`);
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -399,7 +400,7 @@ export class WatchlistService {
     workspaceId: string = 'default'
   ): Promise<WatchedIndicator> {
     const url = apiUrl('/api/watchlists/quick-watch');
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

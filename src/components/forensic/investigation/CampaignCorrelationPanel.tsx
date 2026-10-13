@@ -1,3 +1,5 @@
+import { apiDownload } from '../../../utils/apiClient';
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Network,
@@ -90,7 +92,7 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
           urls: currentUrls,
           subject: email.subject || ''
         };
-        const res = await fetch(apiUrl('/api/correlation/email?min_score=0.10'), {
+        const res = await apiFetch(apiUrl('/api/correlation/email?min_score=0.10'), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -352,7 +354,7 @@ export const CampaignCorrelationPanel: React.FC<CampaignCorrelationPanelProps> =
                     <div className="flex items-center space-x-2">
                       <button
                         type="button"
-                        onClick={() => window.open(apiUrl(`/api/emails/${encodeURIComponent(activeMatch.id)}/download`), '_blank')}
+                        onClick={() => void apiDownload(apiUrl(`/api/emails/${encodeURIComponent(activeMatch.id)}/download`)).catch(error => window.alert(error.message))}
                         className="px-2.5 py-1 rounded-lg bg-surface-secondary hover:bg-surface border border-border text-foreground hover:text-primary text-[11px] font-mono transition-colors flex items-center space-x-1 cursor-pointer"
                         title="Download Stored RFC-822 .EML Evidence"
                       >

@@ -54,7 +54,7 @@ def unified_search(
     except Exception as exc:
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Unified search execution failed: {str(exc)}",
+            detail='Unified search execution failed.',
         )
 
 
@@ -80,5 +80,5 @@ def indicator_lookup(
     except Exception as exc:
         raise HTTPException(
             status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Cross-investigation indicator lookup failed: {str(exc)}",
+            detail='Cross-investigation indicator lookup failed.',
         )

@@ -1,0 +1,79 @@
+{
+  "ingestion_id": "c31bf747-6d21-401d-9c0b-5b8f4f044e0d",
+  "artifact_id": "fa4204e5-6a32-4095-9630-d07ad3925dd8",
+  "artifact_type": "VIDEO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-color-bars.webm",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "69f7fc0581fae6afedb29f359492a7d834f4a3c27144b92ba11911bedad91283",
+  "size": 20766,
+  "mime_type": "video/webm",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "VIDEO",
+    "detected_mime": "video/webm",
+    "reported_mime": "video/webm",
+    "confidence": 0.9,
+    "detector": "video_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+      "Duplicate artifact: This content has been previously observed and analyzed in CyberGuard."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 20766,
+      "original_filename": "synthetic-color-bars.webm",
+      "format": "MKV/WEBM"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/69/69f7fc0581fae6afedb29f359492a7d834f4a3c27144b92ba11911bedad91283/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Video evidence persisted. Validated full-video deepfake detection is NOT_IMPLEMENTED; bounded frame checks and optional pretrained face scoring are available separately, with independent accuracy validation pending.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+    "Duplicate artifact: This content has been previously observed and analyzed in CyberGuard."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-color-bars.webm",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "VIDEO",
+      "detected_mime": "video/webm",
+      "reported_mime": "video/webm",
+      "confidence": 0.9,
+      "detector": "video_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Video evidence persisted. Deepfake facial manipulation analysis is currently NOT_IMPLEMENTED."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 20766,
+        "original_filename": "synthetic-color-bars.webm",
+        "format": "MKV/WEBM"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.381736",
+  "evidence_id": "EVD-69F7FC0581",
+  "investigation_id": "20af9e4c-799d-4b9d-af60-a4a869cdce0a",
+  "analysis_run_id": "ea68bbf3-16c4-4c11-8331-bda347478d8b",
+  "duplicate": true
+}

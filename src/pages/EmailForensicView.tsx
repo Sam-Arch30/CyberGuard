@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import type { EmailAnalysis, ForensicTabType } from '../types/forensic';
@@ -59,7 +60,7 @@ export const EmailForensicView: React.FC = () => {
       if (!hasML) {
         const textToAnalyze = resolved.plain_text_body || (resolved.html_body ? resolved.html_body.replace(/<[^>]+>/g, ' ') : '');
         if (resolved.subject || textToAnalyze) {
-          fetch('/api/emails/ml-classify', {
+          apiFetch('/api/emails/ml-classify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -88,7 +89,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch AI Analyst assessment if not already cached
       if (!resolved.ai_analyst) {
-        fetch('/api/emails/ai-analyst', {
+        apiFetch('/api/emails/ai-analyst', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -112,7 +113,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch Attribution if not already cached
       if (!resolved.attribution) {
-        fetch('/api/emails/attribution', {
+        apiFetch('/api/emails/attribution', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -136,7 +137,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch Investigation Graph if not already cached
       if (!resolved.investigation_graph) {
-        fetch('/api/emails/investigation-graph', {
+        apiFetch('/api/emails/investigation-graph', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -160,7 +161,7 @@ export const EmailForensicView: React.FC = () => {
 
       // Dynamically fetch Explainable Threat Score if not already cached with audit metadata
       if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
-        fetch('/api/emails/calculate-threat-score', {
+        apiFetch('/api/emails/calculate-threat-score', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(resolved)
@@ -183,7 +184,7 @@ export const EmailForensicView: React.FC = () => {
       }
       setLoading(false);
     } else if (targetId && targetId !== 'latest') {
-      fetch(`/api/emails/${targetId}/analysis`)
+      apiFetch(`/api/emails/${targetId}/analysis`)
         .then(res => {
           if (!res.ok) throw new Error('Not found');
           return res.json();

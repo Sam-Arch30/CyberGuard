@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 55: Threat Hunting & Investigation Pivots API Client.
  */
@@ -29,7 +30,7 @@ const getHeaders = (): Record<string, string> => {
 
 export const pivotService = {
   async getRegistry(): Promise<PivotRegistryResponse> {
-    const res = await fetch('/api/hunting/pivots/registry', {
+    const res = await apiFetch('/api/hunting/pivots/registry', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load pivot registry: ${res.statusText}`);
@@ -37,7 +38,7 @@ export const pivotService = {
   },
 
   async executePivot(req: PivotRequest): Promise<PivotResponse> {
-    const res = await fetch('/api/hunting/pivots/execute', {
+    const res = await apiFetch('/api/hunting/pivots/execute', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -54,7 +55,7 @@ export const pivotService = {
       source_type: sourceType,
       source_value: sourceValue,
     });
-    const res = await fetch(`/api/hunting/pivots/frequency?${params.toString()}`, {
+    const res = await apiFetch(`/api/hunting/pivots/frequency?${params.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) {
@@ -69,7 +70,7 @@ export const pivotService = {
       source_type: sourceType,
       source_value: sourceValue,
     });
-    const res = await fetch(`/api/hunting/pivots/recommendations?${params.toString()}`, {
+    const res = await apiFetch(`/api/hunting/pivots/recommendations?${params.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) {
@@ -80,7 +81,7 @@ export const pivotService = {
   },
 
   async recordHypothesis(req: HypothesisRecordRequest): Promise<HypothesisResponse> {
-    const res = await fetch('/api/hunting/pivots/hypotheses', {
+    const res = await apiFetch('/api/hunting/pivots/hypotheses', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -98,7 +99,7 @@ export const pivotService = {
     if (sourceObservable) params.append('source_observable', sourceObservable);
     const qs = params.toString() ? `?${params.toString()}` : '';
 
-    const res = await fetch(`/api/hunting/pivots/hypotheses${qs}`, {
+    const res = await apiFetch(`/api/hunting/pivots/hypotheses${qs}`, {
       headers: getHeaders(),
     });
     if (!res.ok) {
@@ -109,7 +110,7 @@ export const pivotService = {
   },
 
   async promoteToInvestigation(req: PromoteToInvestigationRequest): Promise<PromoteToInvestigationResponse> {
-    const res = await fetch('/api/hunting/pivots/promote/investigation', {
+    const res = await apiFetch('/api/hunting/pivots/promote/investigation', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -122,7 +123,7 @@ export const pivotService = {
   },
 
   async promoteToWatchlist(req: PromoteToWatchlistRequest): Promise<PromoteToWatchlistResponse> {
-    const res = await fetch('/api/hunting/pivots/promote/watchlist', {
+    const res = await apiFetch('/api/hunting/pivots/promote/watchlist', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),
@@ -135,7 +136,7 @@ export const pivotService = {
   },
 
   async pivotToHuntQuery(req: PivotToHuntQueryRequest): Promise<PivotToHuntQueryResponse> {
-    const res = await fetch('/api/hunting/pivots/to-hunt-query', {
+    const res = await apiFetch('/api/hunting/pivots/to-hunt-query', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(req),

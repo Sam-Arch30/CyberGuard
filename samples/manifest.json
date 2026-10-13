@@ -1,0 +1,362 @@
+[
+  {
+    "file": "01-email/benign-meeting.eml",
+    "extension": ".eml",
+    "expected": "EMAIL",
+    "screen": "Phishing & email",
+    "note": "Synthetic; expected findings are signals, not guaranteed verdicts.",
+    "size_bytes": 381,
+    "sha256": "e4fc1eb444a78f86b694de342de71096e9dcfe0d753b669ccc0bf2054cb94ba1"
+  },
+  {
+    "file": "01-email/suspicious-credential-request.eml",
+    "extension": ".eml",
+    "expected": "EMAIL",
+    "screen": "Phishing & email",
+    "note": "Synthetic; expected findings are signals, not guaranteed verdicts.",
+    "size_bytes": 497,
+    "sha256": "85d752c8791e7dabf30ca4b71f8a0aa009995ba3ce6a87bb315dae2fb379efc3"
+  },
+  {
+    "file": "01-email/suspicious-payment-request.eml",
+    "extension": ".eml",
+    "expected": "EMAIL",
+    "screen": "Phishing & email",
+    "note": "Synthetic; expected findings are signals, not guaranteed verdicts.",
+    "size_bytes": 473,
+    "sha256": "2b2f5521dbb7919d503dbef628595d627bb6d364a4738fc2c17bd7827f6c6ae6"
+  },
+  {
+    "file": "02-documents/benign-note.txt",
+    "extension": ".txt",
+    "expected": "TEXT",
+    "screen": "Detection Center",
+    "note": "",
+    "size_bytes": 75,
+    "sha256": "f02f96e2ee850242a3bc0014f7f0eaa88af74a44a80ae362675e82c7f0513010"
+  },
+  {
+    "file": "02-documents/suspicious-message.txt",
+    "extension": ".txt",
+    "expected": "TEXT",
+    "screen": "Detection Center",
+    "note": "",
+    "size_bytes": 95,
+    "sha256": "c0c1ad30cf39494e9d0c027d147182375826500b49012b32e93e216d6dcd2428"
+  },
+  {
+    "file": "02-documents/sample.html",
+    "extension": ".html",
+    "expected": "TEXT / FILE",
+    "screen": "Files & attachments",
+    "note": "",
+    "size_bytes": 176,
+    "sha256": "941f7d680aaa6726350a4c6e237056612a575e116e32baa6eb717e7a20f52327"
+  },
+  {
+    "file": "02-documents/sample.rtf",
+    "extension": ".rtf",
+    "expected": "TEXT / FILE",
+    "screen": "Files & attachments",
+    "note": "",
+    "size_bytes": 68,
+    "sha256": "fb70c2a60e1f042204d9f5d87bf52343f736d7afd00e265a566f26f87e042ec5"
+  },
+  {
+    "file": "02-documents/sample.xml",
+    "extension": ".xml",
+    "expected": "TEXT / FILE",
+    "screen": "Detection Center",
+    "note": "",
+    "size_bytes": 102,
+    "sha256": "ec90b6d69a371e15950654831d5c5c962838ba7df189666c5e71bac35ce31ea0"
+  },
+  {
+    "file": "02-documents/sample.md",
+    "extension": ".md",
+    "expected": "TEXT",
+    "screen": "Detection Center",
+    "note": "",
+    "size_bytes": 77,
+    "sha256": "01550888427134a261f1e6513bd8720001ff43ebb36a4a56ef1e8e18da136043"
+  },
+  {
+    "file": "02-documents/benign-document.pdf",
+    "extension": ".pdf",
+    "expected": "FILE / PDF",
+    "screen": "Files & attachments",
+    "note": "",
+    "size_bytes": 1746,
+    "sha256": "9982d92f6f239841b779f25c123dbdf8f37e8e57c163cc47be60dc2c7559c6c1"
+  },
+  {
+    "file": "03-images/synthetic-card.png",
+    "extension": ".png",
+    "expected": "IMAGE",
+    "screen": "Detection Center",
+    "note": "Generated graphic; not a deepfake accuracy sample.",
+    "size_bytes": 5192,
+    "sha256": "ff45ccb92a97be7cafbcb34cad0c5c83383d034a6c377dd4df54d320db96cc20"
+  },
+  {
+    "file": "03-images/synthetic-card.jpg",
+    "extension": ".jpg",
+    "expected": "IMAGE",
+    "screen": "Detection Center",
+    "note": "Generated graphic; not a deepfake accuracy sample.",
+    "size_bytes": 11020,
+    "sha256": "cd3297b352785a811b57f092ed48f851ce9d463ea8c930a7b63117d8e701b0e3"
+  },
+  {
+    "file": "03-images/synthetic-card.webp",
+    "extension": ".webp",
+    "expected": "IMAGE",
+    "screen": "Detection Center",
+    "note": "Generated graphic; not a deepfake accuracy sample.",
+    "size_bytes": 2516,
+    "sha256": "fa50b085b06fe7fcb604795daf2b84daff7ee07dda5cf1b8ed0dc602090b16c7"
+  },
+  {
+    "file": "03-images/synthetic-card.gif",
+    "extension": ".gif",
+    "expected": "IMAGE",
+    "screen": "Detection Center",
+    "note": "Generated graphic; not a deepfake accuracy sample.",
+    "size_bytes": 4179,
+    "sha256": "1891f700637eff4dda4cc65f5f635061507389b480804b4b4aee4926a11bb668"
+  },
+  {
+    "file": "03-images/synthetic-card.bmp",
+    "extension": ".bmp",
+    "expected": "IMAGE",
+    "screen": "Detection Center",
+    "note": "Generated graphic; not a deepfake accuracy sample.",
+    "size_bytes": 691254,
+    "sha256": "afdd60636e9ccd23a3f85ec36d78d32bd172a9d870d3e803accfbdd076079e89"
+  },
+  {
+    "file": "03-images/synthetic-diagram.svg",
+    "extension": ".svg",
+    "expected": "TEXT / FILE",
+    "screen": "Files & attachments",
+    "note": "SVG classification may differ from raster images.",
+    "size_bytes": 197,
+    "sha256": "878577d909ae30469331511bc93706e64a88bf12942d755ca677cd12f4ccd6dd"
+  },
+  {
+    "file": "04-audio/synthetic-tone.wav",
+    "extension": ".wav",
+    "expected": "AUDIO",
+    "screen": "Detection Center",
+    "note": "Two-second generated tone; no speech or cloned voice.",
+    "size_bytes": 64044,
+    "sha256": "0d8d4504a20d2f34cfa00f50915bcc83ffa1a9e1557efd1c5e017f753241d333"
+  },
+  {
+    "file": "04-audio/synthetic-tone.mp3",
+    "extension": ".mp3",
+    "expected": "AUDIO",
+    "screen": "Detection Center",
+    "note": "Generated tone; codec support may vary by analyzer.",
+    "size_bytes": 6488,
+    "sha256": "d1a692cdfef216dbac4a8d1322e53293945341d1ebc752bdde419d191514436a"
+  },
+  {
+    "file": "04-audio/synthetic-tone.ogg",
+    "extension": ".ogg",
+    "expected": "AUDIO",
+    "screen": "Detection Center",
+    "note": "Generated tone; codec support may vary by analyzer.",
+    "size_bytes": 5152,
+    "sha256": "864b9b38b865c0793bb6f2d9837390cb9ce3ca58efa753f9c301ea27ccdf0374"
+  },
+  {
+    "file": "04-audio/synthetic-tone.flac",
+    "extension": ".flac",
+    "expected": "AUDIO",
+    "screen": "Detection Center",
+    "note": "Generated tone; codec support may vary by analyzer.",
+    "size_bytes": 19346,
+    "sha256": "af7f90bf9836e89262a417c7e97fd809720a4bcc92834048854725a34be33690"
+  },
+  {
+    "file": "05-video/synthetic-color-bars.mp4",
+    "extension": ".mp4",
+    "expected": "VIDEO",
+    "screen": "Detection Center",
+    "note": "Valid two-second generated video; no faces, not a labelled deepfake.",
+    "size_bytes": 9407,
+    "sha256": "34c6a2901111777f24c6efbfcb756203e20fd38d1a1be230e41db5a542f7a117"
+  },
+  {
+    "file": "05-video/synthetic-color-bars.mov",
+    "extension": ".mov",
+    "expected": "VIDEO",
+    "screen": "Detection Center",
+    "note": "Valid two-second generated video; no faces, not a labelled deepfake.",
+    "size_bytes": 9354,
+    "sha256": "8ef2ce354edb589bd1e02b828a2251709c61665b77c718a671701ba5f6c3572c"
+  },
+  {
+    "file": "05-video/synthetic-color-bars.avi",
+    "extension": ".avi",
+    "expected": "VIDEO",
+    "screen": "Detection Center",
+    "note": "Valid two-second generated video; no faces, not a labelled deepfake.",
+    "size_bytes": 47926,
+    "sha256": "d71399f983986048ca029b7856303eecd20aeea357ce50029a6c732e14a48559"
+  },
+  {
+    "file": "05-video/synthetic-color-bars.webm",
+    "extension": ".webm",
+    "expected": "VIDEO",
+    "screen": "Detection Center",
+    "note": "Valid two-second generated video; no faces, not a labelled deepfake.",
+    "size_bytes": 20766,
+    "sha256": "69f7fc0581fae6afedb29f359492a7d834f4a3c27144b92ba11911bedad91283"
+  },
+  {
+    "file": "06-logs/normal-auth.json",
+    "extension": ".json",
+    "expected": "AUTH_LOG (focused route)",
+    "screen": "Account & access",
+    "note": "Upload to the authentication screen; universal detection may classify JSON arrays as text.",
+    "size_bytes": 842,
+    "sha256": "5696f8715ef0fdb900470326c4a21b47bc6945c043ee3dc5a7ea477c11a5f0f5"
+  },
+  {
+    "file": "06-logs/password-spray.json",
+    "extension": ".json",
+    "expected": "AUTH_LOG (focused route)",
+    "screen": "Account & access",
+    "note": "Upload to the authentication screen; universal detection may classify JSON arrays as text.",
+    "size_bytes": 4370,
+    "sha256": "5b154bce68f9499226140e7c5f73be7cd82b7b61bf8749af546c29b8106b26d7"
+  },
+  {
+    "file": "06-logs/authentication-events.jsonl",
+    "extension": ".jsonl",
+    "expected": "TEXT / LOG",
+    "screen": "Account & access",
+    "note": "JSONL support depends on the chosen log parser.",
+    "size_bytes": 3720,
+    "sha256": "70e5f25f1def9a5864ac234a042738c9c9207f5553275488e29ee2eeb535e676"
+  },
+  {
+    "file": "06-logs/network-connections.csv",
+    "extension": ".csv",
+    "expected": "TEXT / NETWORK_LOG",
+    "screen": "Network telemetry",
+    "note": "Documentation IPs only; no real traffic captured.",
+    "size_bytes": 413,
+    "sha256": "963cfd80c0789d7e775d174df227c21b147f53de0c50d9a36a26829cfdf2f4ae"
+  },
+  {
+    "file": "06-logs/sample-access.log",
+    "extension": ".log",
+    "expected": "TEXT / LOG",
+    "screen": "Detection Center",
+    "note": "",
+    "size_bytes": 154,
+    "sha256": "6228d86f3f0c14706172de7ad02ea66292b29104477bb57580f0773fbb667e39"
+  },
+  {
+    "file": "06-logs/api-events.json",
+    "extension": ".json",
+    "expected": "API_LOG (focused route)",
+    "screen": "API log analyzer",
+    "note": "Synthetic repeated denied requests.",
+    "size_bytes": 1910,
+    "sha256": "925b06d865cf87d3a0456c1076831643bb153eb7a192f8612f164acca0cb402c"
+  },
+  {
+    "file": "07-identity/trusted-profile.json",
+    "extension": ".json",
+    "expected": "PROFILE REFERENCE",
+    "screen": "Identity impersonation",
+    "note": "Use these values in the protected profile form; not an automatic profile importer.",
+    "size_bytes": 150,
+    "sha256": "a42ad15f1a17ce7b979736fdfbe6c97f14f3888da797bf05f4168aa6bbead24a"
+  },
+  {
+    "file": "07-identity/identity-claim.txt",
+    "extension": ".txt",
+    "expected": "MANUAL FORM REFERENCE",
+    "screen": "Identity impersonation",
+    "note": "",
+    "size_bytes": 242,
+    "sha256": "01e5372da9855319ac010f7e0d3b49edfca9f6bb4884312ec6ad0b2d97b3952b"
+  },
+  {
+    "file": "08-archives/benign-bundle.zip",
+    "extension": ".zip",
+    "expected": "FILE / ARCHIVE",
+    "screen": "Files & attachments",
+    "note": "",
+    "size_bytes": 373,
+    "sha256": "28d2c5c550052093b4c3bea5946edfd950401a711c9ecee96fd766a8791074a9"
+  },
+  {
+    "file": "08-archives/benign-bundle.tar.gz",
+    "extension": ".gz",
+    "expected": "FILE / ARCHIVE",
+    "screen": "Files & attachments",
+    "note": "",
+    "size_bytes": 253,
+    "sha256": "157827d580ea1ae090c851f02e0a8eb083b42c3cb21ec139acd7ffd895f186db"
+  },
+  {
+    "file": "09-binary/benign-data.bin",
+    "extension": ".bin",
+    "expected": "FILE",
+    "screen": "Files & attachments",
+    "note": "Arbitrary inert bytes; not executable or malware.",
+    "size_bytes": 1052,
+    "sha256": "26f928b4bd254deba6c8b307e683bc1bb9726579a69fac6ae0b63681001a7edb"
+  },
+  {
+    "file": "10-invalid/empty.txt",
+    "extension": ".txt",
+    "expected": "EXPECT REJECTION",
+    "screen": "Detection Center",
+    "note": "Intentionally empty.",
+    "size_bytes": 0,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  {
+    "file": "10-invalid/malformed.json",
+    "extension": ".json",
+    "expected": "EXPECT ERROR / TEXT FALLBACK",
+    "screen": "Account & access",
+    "note": "Intentionally invalid JSON.",
+    "size_bytes": 12,
+    "sha256": "3d8f6847e9e4d24f66ed3f8d785039990d6b602960b8ce264f4f8d00a80dad88"
+  },
+  {
+    "file": "10-invalid/broken.pdf",
+    "extension": ".pdf",
+    "expected": "EXPECT PARSER LIMITATION",
+    "screen": "Files & attachments",
+    "note": "Not a valid PDF.",
+    "size_bytes": 33,
+    "sha256": "bbabedbea838f980c6693cee207eadd7f5247dadcb6de89b8bc347e354a494cb"
+  },
+  {
+    "file": "10-invalid/broken.mp4",
+    "extension": ".mp4",
+    "expected": "EXPECT FORMAT LIMITATION",
+    "screen": "Detection Center",
+    "note": "MP4 extension with invalid bytes.",
+    "size_bytes": 11,
+    "sha256": "f8a69ede5e62175fdb7dabb3dc7ef0b22d72e608aa5c3b836f2b18e1b86e1297"
+  },
+  {
+    "file": "10-invalid/jpeg-with-pdf-extension.pdf",
+    "extension": ".pdf",
+    "expected": "EXPECT MIME MISMATCH",
+    "screen": "Detection Center",
+    "note": "Valid JPEG deliberately named PDF.",
+    "size_bytes": 11020,
+    "sha256": "cd3297b352785a811b57f092ed48f851ce9d463ea8c930a7b63117d8e701b0e3"
+  }
+]

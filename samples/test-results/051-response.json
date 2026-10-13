@@ -1,0 +1,196 @@
+{
+  "success": true,
+  "artifact_id": "art_med_fd15db75736a",
+  "analysis_run_id": "run_med_f87de8c10dfd",
+  "media_identity": {
+    "artifact_id": "art_med_fd15db75736a",
+    "sha256": "ff45ccb92a97be7cafbcb34cad0c5c83383d034a6c377dd4df54d320db96cc20",
+    "original_filename": "synthetic-card.png",
+    "mime_type": "image/png",
+    "media_type": "IMAGE",
+    "format": "PNG",
+    "size_bytes": 5192
+  },
+  "assessment": {
+    "artifact_id": "art_med_fd15db75736a",
+    "media_type": "IMAGE",
+    "format": "PNG",
+    "processing_status": "COMPLETED",
+    "analysis_scope": "Bounded media heuristics and, when available, pretrained face-image classification. Authenticity is not established.",
+    "trained_detector": {
+      "status": "MODEL_NOT_VALIDATED",
+      "model": "prithivMLmods/Deep-Fake-Detector-v2-Model",
+      "revision": "3a99ae26f52c7ac7c3a53103b6cf3a8b617f7093",
+      "calibrated": false,
+      "limitations": [
+        "This model failed the collected real/fake sample checks and is withheld from normal verdicts. Raw inference requires explicit research mode.",
+        "Face-image classifier applied to at most four face crops; video temporal authenticity and audio are not evaluated.",
+        "Model softmax scores are uncalibrated. Compression, demographics and unseen generators can change performance.",
+        "CyberGuard has not independently measured real-world deepfake accuracy."
+      ],
+      "faces_analyzed": 0
+    },
+    "confidence_basis": "UNAVAILABLE_NOT_CALIBRATED",
+    "classification": "SYNTHETIC_MEDIA_SIGNALS_DETECTED",
+    "confidence": 0.0,
+    "risk_score": 29.0,
+    "summary": "Elevated synthetic-media forensic indicators observed in media stream.",
+    "supporting_findings": [
+      {
+        "finding_type": "IMAGE_AI_GENERATION_SIGNAL",
+        "title": "Image Frequency Spectral Forensics: Suspicious Characteristics Detected",
+        "description": "Detector 'Image Frequency Spectral Forensics' reported elevated manipulation score of 0.85.",
+        "severity": "HIGH",
+        "confidence": 0.0,
+        "risk_contribution": 34.0,
+        "rule_id": "MED_DET_IMG_FREQ_01",
+        "category": "IMAGE_DETECTOR",
+        "evidence_items": [
+          {
+            "category": "IMAGE_DETECTOR",
+            "source": "Image Frequency Spectral Forensics",
+            "key": "detector_score",
+            "value": 0.85,
+            "confidence": 1.0
+          }
+        ],
+        "limitation": "Extreme JPEG recompression or sharpening filters can alter high-frequency spectrum.",
+        "mitre_attack_ids": []
+      }
+    ],
+    "contradicting_findings": [
+      {
+        "finding_type": "DETECTOR_INCONCLUSIVE_OR_BENIGN",
+        "title": "Error Level Analysis (ELA) Splicing Detector: Natural Characteristics Observed",
+        "description": "Detector 'Error Level Analysis (ELA) Splicing Detector' observed normal characteristics with low manipulation score (0.12).",
+        "severity": "SAFE",
+        "confidence": 0.0,
+        "risk_contribution": -10.0,
+        "rule_id": "MED_OK_IMG_ELA_01",
+        "category": "IMAGE_DETECTOR",
+        "evidence_items": [
+          {
+            "category": "IMAGE_DETECTOR",
+            "source": "Error Level Analysis (ELA) Splicing Detector",
+            "key": "detector_score",
+            "value": 0.12,
+            "confidence": 1.0
+          }
+        ],
+        "limitation": "Absence of detected artifact does not prove absence of manipulation.",
+        "mitre_attack_ids": []
+      }
+    ],
+    "detector_results": [
+      {
+        "detector_id": "img_meta_01",
+        "detector_name": "Image Metadata & Provenance Analyzer",
+        "detector_version": "1.0.0",
+        "media_type": "IMAGE",
+        "status": "SUCCESS",
+        "score": 0.4,
+        "label": "NO_METADATA_ANOMALY",
+        "confidence": 0.0,
+        "evidence": {
+          "camera_present": false
+        },
+        "metadata": {},
+        "runtime_ms": 0.0,
+        "model_name": "Deterministic Heuristic Rules",
+        "model_version": "1.0.0",
+        "limitations": [
+          "Missing EXIF does not prove an image is synthetic."
+        ]
+      },
+      {
+        "detector_id": "img_freq_01",
+        "detector_name": "Image Frequency Spectral Forensics",
+        "detector_version": "1.0.0",
+        "media_type": "IMAGE",
+        "status": "SUCCESS",
+        "score": 0.85,
+        "label": "FREQUENCY_ARTIFACTS_DETECTED",
+        "confidence": 0.0,
+        "evidence": {
+          "high_frequency_ratio": 0.0666,
+          "spectral_peak_count": 122,
+          "hf_std": 1.08,
+          "is_anomalous_spectrum": true
+        },
+        "metadata": {},
+        "runtime_ms": 1.4,
+        "model_name": "SciPy 2D-DCT & Radial Spectral Analysis",
+        "model_version": "1.0.0",
+        "limitations": [
+          "Extreme JPEG recompression or sharpening filters can alter high-frequency spectrum."
+        ]
+      },
+      {
+        "detector_id": "img_ela_01",
+        "detector_name": "Error Level Analysis (ELA) Splicing Detector",
+        "detector_version": "1.0.0",
+        "media_type": "IMAGE",
+        "status": "SUCCESS",
+        "score": 0.12,
+        "label": "UNIFORM_COMPRESSION",
+        "confidence": 0.0,
+        "evidence": {
+          "mean_error_level": 0.42,
+          "max_quadrant_discrepancy": 0.21,
+          "quadrant_means": [
+            0.53,
+            0.32,
+            0.41,
+            0.41
+          ],
+          "inconsistent_compression": false
+        },
+        "metadata": {},
+        "runtime_ms": 3.34,
+        "model_name": "Pillow JPEG Resave Difference & Quadrant Variance",
+        "model_version": "1.0.0",
+        "limitations": [
+          "Text overlays and solid borders naturally exhibit higher ELA response."
+        ]
+      }
+    ],
+    "temporal_segments": [],
+    "provenance": {
+      "status": "NO_CREDENTIALS_FOUND",
+      "credential_present": false,
+      "signature_valid": null,
+      "issuer": null,
+      "claim_generator": null,
+      "assertions": [],
+      "validation_details": "No verifiable Content Credentials (C2PA/JUMBF) manifest found in media container."
+    },
+    "metadata": {
+      "width": 640,
+      "height": 360,
+      "color_mode": "RGB",
+      "exif_present": false,
+      "camera_make": null,
+      "camera_model": null,
+      "software": null,
+      "duration_seconds": null,
+      "sample_rate": null,
+      "channels": null,
+      "bitrate": null,
+      "codecs": [],
+      "frame_rate": null,
+      "has_audio_track": false,
+      "has_video_track": false,
+      "container_tags": {}
+    },
+    "limitations": [
+      "No cryptographic Content Credentials found; analysis relies on structural heuristics.",
+      "Authenticity assessments represent scientific evidentiary hypotheses, not legal certification.",
+      "CyberGuard does not perform unconstrained facial or biometric surveillance.",
+      "Calibrated authenticity confidence is unavailable (confidence=0); configured detector scores and thresholds are heuristic, not learned deepfake probabilities.",
+      "Risk scores reflect heuristic signals, not a calibrated probability of deepfake content. A zero score does not establish authenticity."
+    ],
+    "analysis_run_id": "run_med_f87de8c10dfd",
+    "created_at": "2026-10-13T01:52:44.283392Z"
+  },
+  "threat_event_id": null
+}

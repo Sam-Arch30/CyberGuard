@@ -343,7 +343,14 @@ class SafeHttpClient:
                 error_message=str(e),
             )
 
-    async def fetch_url(
+    async def fetch_url(self, url, method="GET", inspect_certificate=True):
+        try:
+            return await asyncio.wait_for(self._fetch_url(url, method, inspect_certificate), timeout=self.total_timeout)
+        except asyncio.TimeoutError:
+            return SafeHttpResponse(url=url, final_url=url, status_code=0,
+                is_safe_destination=False, error="HTTP request timed out: overall deadline exceeded.")
+
+    async def _fetch_url(
         self,
         url: str,
         method: str = "GET",
@@ -378,7 +385,7 @@ class SafeHttpClient:
             port = parsed.port or (443 if parsed.scheme == "https" else 80)
 
             # 2. Pre-flight SSRF Validation (DNS & Destination IP Verification)
-            is_safe, ssrf_msg, resolved_ips = self.resolve_and_verify_destination(hostname, port)
+            is_safe, ssrf_msg, resolved_ips = await asyncio.to_thread(self.resolve_and_verify_destination, hostname, port)
             if not is_safe:
                 blocked_ip = resolved_ips[0] if resolved_ips else None
                 latency = (time.perf_counter() - start_time) * 1000
@@ -423,98 +430,111 @@ class SafeHttpClient:
                 "Accept-Language": "en-US,en;q=0.5",
             }
 
+            from httpcore._backends.anyio import AnyIOBackend
+            target_ip = resolved_ips[0] if resolved_ips else None
+            if not target_ip:
+                return SafeHttpResponse(url=url, final_url=current_url, status_code=0,
+                    is_safe_destination=False, error="DNS pinning failed: missing destination")
+            class PinnedBackend(AnyIOBackend):
+                async def connect_tcp(self, host, port, timeout=None, local_address=None, socket_options=None):
+                    if host.lower().rstrip('.') != hostname.lower().rstrip('.'):
+                        raise httpx.ConnectError("Unvalidated connection destination")
+                    return await super().connect_tcp(host=target_ip, port=port, timeout=timeout,
+                        local_address=local_address, socket_options=socket_options)
+            try:
+                transport = httpx.AsyncHTTPTransport(verify=ssl.create_default_context(cafile=certifi.where()))
+                transport._pool._network_backend = PinnedBackend()
+            except Exception:
+                return SafeHttpResponse(url=url, final_url=current_url, status_code=0,
+                    is_safe_destination=False, error="DNS pinning transport initialization failed.")
             try:
                 async with httpx.AsyncClient(
-                    verify=certifi.where(),
+                    transport=transport,
                     timeout=client_timeout,
                     follow_redirects=False,  # CRITICAL: Manual step-by-step redirect control
                 ) as client:
-                    resp = await client.request(
-                        method=method,
-                        url=current_url,
-                        headers=headers,
-                    )
+                    async with client.stream(method=method, url=current_url, headers=headers) as resp:
 
-                    status = resp.status_code
-                    resp_headers = dict(resp.headers)
-                    content_type = resp.headers.get("content-type", "")
+                        status = resp.status_code
+                        resp_headers = dict(resp.headers)
+                        content_type = resp.headers.get("content-type", "")
 
-                    # 5. Check if response is a redirect
-                    if status in (301, 302, 303, 307, 308) and "location" in resp.headers:
-                        location_raw = resp.headers["location"]
-                        next_url = urljoin(current_url, location_raw)
+                        # 5. Check if response is a redirect
+                        if status in (301, 302, 303, 307, 308) and "location" in resp.headers:
+                            location_raw = resp.headers["location"]
+                            next_url = urljoin(current_url, location_raw)
 
-                        source_dom = urlsplit(current_url).hostname or ""
-                        dest_dom = urlsplit(next_url).hostname or ""
-                        is_cross = (source_dom.lower() != dest_dom.lower())
+                            source_dom = urlsplit(current_url).hostname or ""
+                            dest_dom = urlsplit(next_url).hostname or ""
+                            is_cross = (source_dom.lower() != dest_dom.lower())
 
-                        hop = RedirectHop(
-                            hop_index=hop_idx + 1,
-                            source_url=current_url,
-                            destination_url=next_url,
-                            status_code=status,
-                            timestamp=datetime.now(timezone.utc).isoformat(),
-                            is_cross_domain=is_cross,
-                            source_domain=source_dom,
-                            destination_domain=dest_dom,
-                        )
-                        redirect_chain.append(hop)
-
-                        if hop_idx >= self.max_redirects:
-                            latency = (time.perf_counter() - start_time) * 1000
-                            return SafeHttpResponse(
-                                url=url,
-                                final_url=current_url,
+                            hop = RedirectHop(
+                                hop_index=hop_idx + 1,
+                                source_url=current_url,
+                                destination_url=next_url,
                                 status_code=status,
-                                headers=resp_headers,
-                                content_type=content_type,
-                                redirect_chain=redirect_chain,
-                                is_safe_destination=True,
-                                latency_ms=latency,
-                                error=f"Redirect chain limit exceeded ({self.max_redirects} hops)",
+                                timestamp=datetime.now(timezone.utc).isoformat(),
+                                is_cross_domain=is_cross,
+                                source_domain=source_dom,
+                                destination_domain=dest_dom,
                             )
+                            redirect_chain.append(hop)
 
-                        # Advance to next redirect URL and repeat SSRF validation loop
-                        current_url = next_url
-                        continue
+                            if hop_idx >= self.max_redirects:
+                                latency = (time.perf_counter() - start_time) * 1000
+                                return SafeHttpResponse(
+                                    url=url,
+                                    final_url=current_url,
+                                    status_code=status,
+                                    headers=resp_headers,
+                                    content_type=content_type,
+                                    redirect_chain=redirect_chain,
+                                    is_safe_destination=True,
+                                    latency_ms=latency,
+                                    error=f"Redirect chain limit exceeded ({self.max_redirects} hops)",
+                                )
 
-                    # 6. Stream content up to max_size_bytes
-                    raw_content = bytearray()
-                    is_truncated = False
-                    for chunk in resp.iter_bytes():
-                        remaining = self.max_size_bytes - len(raw_content)
-                        if remaining <= 0:
-                            is_truncated = True
-                            break
-                        if len(chunk) > remaining:
-                            raw_content.extend(chunk[:remaining])
-                            is_truncated = True
-                            break
-                        raw_content.extend(chunk)
+                            # Advance to next redirect URL and repeat SSRF validation loop
+                            current_url = next_url
+                            continue
 
-                    content_bytes = bytes(raw_content)
-                    try:
-                        content_text = content_bytes.decode(resp.encoding or "utf-8", errors="replace")
-                    except Exception:
-                        content_text = content_bytes.decode("latin-1", errors="replace")
+                        # 6. Stream content up to max_size_bytes
+                        raw_content = bytearray()
+                        is_truncated = False
+                        async for chunk in resp.aiter_bytes():
+                            remaining = self.max_size_bytes - len(raw_content)
+                            if remaining <= 0:
+                                is_truncated = True
+                                break
+                            if len(chunk) > remaining:
+                                raw_content.extend(chunk[:remaining])
+                                is_truncated = True
+                                break
+                            raw_content.extend(chunk)
 
-                    latency = (time.perf_counter() - start_time) * 1000
+                        content_bytes = bytes(raw_content)
+                        try:
+                            content_text = content_bytes.decode(resp.encoding or "utf-8", errors="replace")
+                        except Exception:
+                            content_text = content_bytes.decode("latin-1", errors="replace")
 
-                    return SafeHttpResponse(
-                        url=url,
-                        final_url=current_url,
-                        status_code=status,
-                        headers=resp_headers,
-                        content_bytes=content_bytes,
-                        content_text=content_text,
-                        content_type=content_type,
-                        response_size=len(content_bytes),
-                        is_truncated=is_truncated,
-                        redirect_chain=redirect_chain,
-                        tls=tls_result,
-                        is_safe_destination=True,
-                        latency_ms=latency,
-                    )
+                        latency = (time.perf_counter() - start_time) * 1000
+
+                        return SafeHttpResponse(
+                            url=url,
+                            final_url=current_url,
+                            status_code=status,
+                            headers=resp_headers,
+                            content_bytes=content_bytes,
+                            content_text=content_text,
+                            content_type=content_type,
+                            response_size=len(content_bytes),
+                            is_truncated=is_truncated,
+                            redirect_chain=redirect_chain,
+                            tls=tls_result,
+                            is_safe_destination=True,
+                            latency_ms=latency,
+                        )
 
             except (httpx.ConnectTimeout, httpx.ReadTimeout, httpx.TimeoutException) as e:
                 latency = (time.perf_counter() - start_time) * 1000

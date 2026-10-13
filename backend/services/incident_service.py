@@ -129,30 +129,8 @@ class IncidentService:
 
     @classmethod
     def generate_incident_number(cls, db: Session) -> str:
-        """
-        Generates readable sequential identifiers: INC-{YEAR}-{SEQUENCE:05d}.
-        E.g. INC-2026-00001, INC-2026-00042.
-        """
-        current_year = datetime.now(timezone.utc).year
-        prefix = f"INC-{current_year}-"
-
-        last_inc = (
-            db.query(IncidentModel)
-            .filter(IncidentModel.incident_number.like(f"{prefix}%"))
-            .order_by(IncidentModel.incident_number.desc())
-            .first()
-        )
-
-        if last_inc:
-            try:
-                last_seq = int(last_inc.incident_number.split("-")[-1])
-                next_seq = last_seq + 1
-            except (ValueError, IndexError):
-                next_seq = int(uuid.uuid4().hex[:5], 16) % 90000 + 10000
-        else:
-            next_seq = 1
-
-        return f"{prefix}{next_seq:05d}"
+        """Readable identifiers remain unique across isolated workspaces and concurrent intake."""
+        return f"INC-{datetime.now(timezone.utc).year}-{uuid.uuid4().hex[:12].upper()}"
 
     @classmethod
     def calculate_priority(

@@ -156,11 +156,11 @@ def test_production_does_not_import_test_or_demo_fixtures():
     for p in (root / 'backend').rglob('*.py'):
         if any(part in ('tests', 'venv', '__pycache__') for part in p.parts):
             continue
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         assert 'from backend.tests' not in text, p
         assert 'import backend.tests' not in text, p
     for p in (root / 'src').rglob('*.tsx'):
-        text = p.read_text()
+        text = p.read_text(encoding="utf-8")
         assert 'mockData' not in text and 'buildFallback' not in text, p
         assert 'Math.random' not in text, p
         if '/data/demo/' in text:

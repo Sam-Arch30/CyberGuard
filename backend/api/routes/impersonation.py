@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, UploadFile, File, Form
 from sqlalchemy.orm import Session
 
 from backend.db.session import get_db
@@ -53,7 +53,7 @@ def create_protected_identity(
         logger.error(f"Failed to create protected identity profile: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Could not create protected identity profile: {str(e)}",
+            detail='Could not create protected identity profile.',
         )
 
 
@@ -103,6 +103,64 @@ def delete_protected_identity(
     return None
 
 
+@router.post('/upload', response_model=ImpersonationAnalysisResponse)
+async def upload_identity_evidence(
+    file: UploadFile = File(...),
+    target_identity_hint: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """Analyze an original EML or JSON sender claim; retain its bytes and hash."""
+    from email import policy
+    from email.parser import BytesParser
+    from pydantic import ValidationError
+    from backend.services.upload_security import UploadSecurityService
+    import uuid
+    raw = await UploadSecurityService.read_bounded_upload(file, max_bytes=1024 * 1024)
+    filename = UploadSecurityService.sanitize_filename(file.filename)
+    if target_identity_hint and not global_protected_identity_manager.get_by_id(target_identity_hint, db=db):
+        raise HTTPException(404, 'The selected trusted profile is unavailable in this workspace.')
+    try:
+        if not raw:
+            raise ValueError('Identity evidence is empty.')
+        if filename.lower().endswith('.json'):
+            data = json.loads(raw.decode('utf-8-sig'))
+            if not isinstance(data, dict):
+                raise ValueError('Provide one JSON sender claim, not a list.')
+            claim = data.get('email_data', data)
+            if not isinstance(claim, dict):
+                raise ValueError('email_data must be a JSON object.')
+        elif filename.lower().endswith('.eml'):
+            message = BytesParser(policy=policy.default).parsebytes(raw)
+            if len(message.get_all('From', [])) != 1:
+                raise ValueError('The EML must contain exactly one From header.')
+            part = message.get_body(preferencelist=('plain', 'html'))
+            claim = {'from_address': str(message.get('From', '')),
+                     'reply_to_address': str(message.get('Reply-To', '')),
+                     'subject': str(message.get('Subject', '')),
+                     'body_text': part.get_content() if part else ''}
+        else:
+            raise ValueError('Upload .eml email evidence or a .json sender claim.')
+        request = ImpersonationAnalysisRequest(email_data=claim, target_identity_hint=target_identity_hint)
+    except ValidationError as exc:
+        raise HTTPException(422, f"Invalid identity evidence: {exc.errors()[0]['msg']}") from exc
+    except (ValueError, UnicodeError, LookupError) as exc:
+        raise HTTPException(422, f'Invalid identity evidence: {exc}') from exc
+    try:
+        stored = evidence_storage.store_bytes(raw, original_filename=filename, mime_type=file.content_type)
+        artifact = ArtifactModel(id=str(uuid.uuid4()), artifact_type='EMAIL', name=filename,
+            source='IDENTITY_UPLOAD', mime_type=file.content_type, size=len(raw),
+            sha256=stored.sha256, storage_reference=stored.storage_key,
+            metadata_json=json.dumps({'email_data': request.email_data}))
+        db.add(artifact); db.commit()
+        request.artifact_id = artifact.id
+        return analyze_impersonation(request, db)
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception('Identity upload analysis failed')
+        raise HTTPException(500, 'Identity upload analysis failed. Please retry.')
+
+
 @router.post("/analyze", response_model=ImpersonationAnalysisResponse)
 def analyze_impersonation(
     request: ImpersonationAnalysisRequest,
@@ -111,6 +169,19 @@ def analyze_impersonation(
     """
     Analyzes an email, URL, website, or cross-channel bundle for digital impersonation.
     """
+    if request.artifact_id:
+        artifact = db.get(ArtifactModel, request.artifact_id)
+        if not artifact: raise HTTPException(404, 'Artifact not found.')
+    else:
+        import hashlib
+        import uuid
+        raw = request.model_dump_json().encode()
+        artifact = ArtifactModel(id=str(uuid.uuid4()), artifact_type=request.artifact_type.value,
+            name='Identity claim assessment', source='API', mime_type='application/json',
+            sha256=hashlib.sha256(raw).hexdigest(), size=len(raw),
+            metadata_json=json.dumps({'claim':request.model_dump(mode='json')}))
+        db.add(artifact); db.commit()
+        request.artifact_id = artifact.id
     try:
         return global_impersonation_pipeline.analyze(
             artifact_type=request.artifact_type,
@@ -126,7 +197,7 @@ def analyze_impersonation(
         logger.error(f"Impersonation analysis failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Impersonation analysis error: {str(e)}",
+            detail='Impersonation analysis error.',
         )
 
 
@@ -152,7 +223,7 @@ def reanalyze_impersonation(
     except Exception:
         pass
 
-    email_data = meta.get("email_data")
+    email_data = meta.get("email_data") or meta.get("claim", {}).get("email_data")
     url_data = meta.get("url_data")
     website_data = meta.get("website_data")
 

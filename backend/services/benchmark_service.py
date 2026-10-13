@@ -1,11 +1,12 @@
 """
 Benchmark Evaluation Service for MailTraceAI.
-Executes genuine forensic parsing, indicator extraction, authentication inspection,
+Evaluates synthetic input features, indicator extraction, authentication signals,
 and explainable threat scoring across a labelled SAFE synthetic dataset.
 Calculates authentic Detection Performance (Precision, Recall, F1, FPR, FNR)
 and System Performance Latencies (Mean, Median P50, P95).
 Never hard-codes benchmark results.
 """
+import os
 import json
 import time
 import statistics
@@ -24,7 +25,7 @@ logger = logging.getLogger("benchmark_service")
 
 class BenchmarkService:
     DATASET_PATH = Path(__file__).resolve().parent.parent / "data" / "benchmark_dataset.json"
-    RESULTS_PATH = Path(__file__).resolve().parent.parent / "data" / "benchmark_results.json"
+    RESULTS_PATH = Path(os.getenv("BENCHMARK_RESULTS_PATH", str(Path(__file__).resolve().parent.parent / "data" / "benchmark_results.json")))
 
     MODEL_VERSION = "v4.2-explainable"
     NLP_MODEL_VERSION = "TF-IDF + Logistic Regression v1.0.0"
@@ -57,7 +58,7 @@ class BenchmarkService:
 
     def run_benchmark(self) -> Dict[str, Any]:
         """
-        Executes genuine end-to-end evaluation run over the labelled dataset.
+        Executes feature-pipeline evaluation over the labelled synthetic dataset.
         Measures real execution wall-clock time for each stage and computes genuine metrics.
         """
         if not self.DATASET_PATH.exists():
@@ -115,48 +116,37 @@ class BenchmarkService:
             nlp_result = global_phishing_classifier.predict(subject=subject, body=body)
             ml_prob = nlp_result.get("probability", 0.0) if isinstance(nlp_result, dict) else 0.0
 
-            # Lookalike domain detection
-            lookalikes = []
-            if sample.get("ground_truth") == "malicious":
-                lk = self.lookalike_detector.detect_lookalike(sample.get("sender_domain", ""))
-                if lk:
-                    lookalikes.append(lk)
-
-            # Attachment extraction
-            attachments = []
-            if sample.get("category") == "malware_delivery":
-                for word in body.split():
-                    for ext in [".exe", ".zip", ".docm", ".rar", ".js"]:
-                        if ext in word.lower():
-                            att_fn = word.strip(".,;:()\"'")
-                            attachments.append({
-                                "filename": att_fn,
-                                "size": 185000,
-                                "mime_type": "application/x-dosexec" if ".exe" in att_fn else "application/zip",
-                                "static_analysis": {
-                                    "is_executable": True if (".exe" in att_fn or ".js" in att_fn) else False,
-                                    "contains_macros": True if ".docm" in att_fn else False,
-                                    "mismatch_detected": True if ".pdf.exe" in att_fn else False
-                                }
-                            })
-
+            # Extract features only from sample inputs; labels are used solely for evaluation.
+            lk = self.lookalike_detector.detect_lookalike(sample.get('sender_domain',''))
+            lookalikes = [lk] if lk else []
+            attachments = sample.get('attachments') or []
+            from email.parser import Parser
+            from email.utils import parseaddr
+            headers = Parser().parsestr(sample.get('raw_headers',''))
+            return_path = sample.get('return_path') or headers.get('Return-Path','')
+            reply_to = sample.get('reply_to') or headers.get('Reply-To','')
+            def domain(address):
+                parsed = parseaddr(address)[1]
+                return parsed.rsplit('@',1)[-1].lower() if '@' in parsed else ''
+            return_domain, reply_domain = domain(return_path), domain(reply_to)
+            sender_domain = sample.get('sender_domain','').lower()
             # Construct mock analysis structure for ThreatScorerService
             mock_analysis = {
                 "subject": subject,
                 "from_header": from_hdr,
                 "sender": sample.get("sender_email", ""),
-                "return_path": "bounce@attacker-dropzone.test" if sample.get("ground_truth") == "malicious" else f"service@{sample.get('sender_domain')}",
-                "reply_to": "collector@attacker-dropzone.test" if sample.get("ground_truth") == "malicious" else f"service@{sample.get('sender_domain')}",
+                "return_path": return_path,
+                "reply_to": reply_to,
                 "authentication": {
                     "spf": {"result": auth_spf},
                     "dkim": {"result": auth_dkim},
                     "dmarc": {"result": auth_dmarc},
                     "alignment": {
                         "from_domain": sample.get("sender_domain", "example.com"),
-                        "reply_to_domain": "attacker-dropzone.test" if sample.get("ground_truth") == "malicious" else sample.get("sender_domain", "example.com"),
-                        "return_path_domain": "attacker-dropzone.test" if sample.get("ground_truth") == "malicious" else sample.get("sender_domain", "example.com"),
-                        "reply_to_mismatch": sample.get("ground_truth") == "malicious",
-                        "return_path_mismatch": sample.get("ground_truth") == "malicious"
+                        "reply_to_domain": reply_domain,
+                        "return_path_domain": return_domain,
+                        "reply_to_mismatch": bool(reply_domain and reply_domain != sender_domain),
+                        "return_path_mismatch": bool(return_domain and return_domain != sender_domain)
                     }
                 },
                 "plain_text_body": body,
@@ -168,6 +158,8 @@ class BenchmarkService:
                 "ml_phishing_probability": ml_prob
             }
 
+            from backend.services.url_analyzer import URLAnalyzerService
+            mock_analysis['url_analysis'] = [URLAnalyzerService().analyze_url(url).model_dump() for url in urls]
             score_res = self.scorer.calculate_score(mock_analysis)
             final_threat_score = getattr(score_res, "score", 0.0)
             scoring_time = (time.perf_counter() - t2) * 1000.0
@@ -241,6 +233,7 @@ class BenchmarkService:
             "model_version": self.MODEL_VERSION,
             "nlp_model_version": self.NLP_MODEL_VERSION,
             "dataset_version": self.DATASET_VERSION,
+            "evaluation_scope": "Synthetic feature benchmark; not held-out accuracy or raw-email endpoint latency.",
             "total_samples": total_samples,
             "legitimate_count": sum(1 for s in dataset if s.get("ground_truth") == "legitimate"),
             "malicious_count": sum(1 for s in dataset if s.get("ground_truth") == "malicious"),

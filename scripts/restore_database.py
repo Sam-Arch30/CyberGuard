@@ -4,6 +4,7 @@ Section 74: Verified Database Restore Utility.
 Restores database from cryptographic backup archive with pre-flight integrity verification,
 automatic pre-restore safety snapshot, and post-restore schema validation.
 """
+from typing import Optional
 import argparse
 import gzip
 import hashlib

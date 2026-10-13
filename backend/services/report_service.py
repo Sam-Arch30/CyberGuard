@@ -73,7 +73,7 @@ class ReportService:
     evidentiary integrity, deterministic forensics, and non-attribution standards.
     """
 
-    REPORTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "reports")
+    REPORTS_DIR = os.getenv("CYBERGUARD_REPORTS_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data", "reports"))
 
     @classmethod
     def ensure_reports_dir(cls):

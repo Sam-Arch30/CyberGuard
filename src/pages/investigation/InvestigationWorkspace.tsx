@@ -130,7 +130,7 @@ export const InvestigationWorkspace: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4 pb-16 page-enter relative">
+    <div className="cg-investigation-workspace space-y-4 pb-16 page-enter relative">
       {/* 1. PERSISTENT ACTIVE INVESTIGATION CONTEXT HEADER (Forensic Telemetry) */}
       {activeEmail && <ActiveInvestigationHeader />}
 

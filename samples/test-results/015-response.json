@@ -1,0 +1,75 @@
+{
+  "ingestion_id": "a47a2e88-0bf7-4543-ae3e-7de8cc00e1f0",
+  "artifact_id": "974635b9-d385-4829-8195-5898cbe13b64",
+  "artifact_type": "IMAGE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-card.bmp",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "afdd60636e9ccd23a3f85ec36d78d32bd172a9d870d3e803accfbdd076079e89",
+  "size": 691254,
+  "mime_type": "image/bmp",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "IMAGE",
+    "detected_mime": "image/bmp",
+    "reported_mime": "image/bmp",
+    "confidence": 0.96,
+    "detector": "image_signature",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 691254,
+      "original_filename": "synthetic-card.bmp",
+      "format": "BMP"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/af/afdd60636e9ccd23a3f85ec36d78d32bd172a9d870d3e803accfbdd076079e89/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-card.bmp",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "IMAGE",
+      "detected_mime": "image/bmp",
+      "reported_mime": "image/bmp",
+      "confidence": 0.96,
+      "detector": "image_signature",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 691254,
+        "original_filename": "synthetic-card.bmp",
+        "format": "BMP"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:36.598183",
+  "evidence_id": "EVD-AFDD60636E",
+  "investigation_id": "c2675386-7b61-4b28-888e-72a57d2c1eb5",
+  "analysis_run_id": "9a716527-b8cf-40d2-93ea-c2b301beb7bb",
+  "duplicate": false
+}

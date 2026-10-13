@@ -127,9 +127,9 @@ export const InvestigationNav: React.FC<InvestigationNavProps> = ({
   return (
     <nav
       aria-label="Investigation Workspace Navigation"
-      className="bg-surface border border-border rounded-xl px-2 py-1.5 shadow-xs overflow-x-auto scrollbar-none mb-6"
+      className="cg-workspace-tabs border-b border-border mb-6"
     >
-      <div className="flex items-center space-x-1 min-w-max">
+      <div className="flex flex-wrap items-center gap-1">
         {WORKSPACE_TABS.map(tab => {
           const isActive = activeSection === tab.id;
           const Icon = tab.icon;
@@ -139,14 +139,14 @@ export const InvestigationNav: React.FC<InvestigationNavProps> = ({
             <button
               key={tab.id}
               type="button"
-              role="tab"
-              aria-selected={isActive}
+              aria-current={isActive ? "page" : undefined}
+              
               onClick={() => handleTabClick(tab.id)}
               title={tab.description}
               className={`flex items-center space-x-2 px-3 py-2 rounded-control text-xs font-mono font-medium transition-all cursor-pointer select-none focus:outline-hidden focus:ring-1 focus:ring-primary ${
                 isActive
-                  ? 'bg-primary/12 text-primary font-bold border border-primary/30 shadow-xs'
-                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary border border-transparent'
+                  ? 'cg-tab-active text-foreground font-semibold'
+                  : 'text-foreground-muted hover:text-foreground hover:bg-surface-secondary'
               }`}
             >
               <Icon className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-primary' : 'text-foreground-muted'}`} />

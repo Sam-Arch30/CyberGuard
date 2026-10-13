@@ -32,6 +32,9 @@ class MediaFormatEnum(str, Enum):
     BMP = "BMP"
     WAV = "WAV"
     MP3 = "MP3"
+    OGG = "OGG"
+    FLAC = "FLAC"
+    AVI = "AVI"
     MP4 = "MP4"
     MOV = "MOV"
     WEBM = "WEBM"
@@ -67,6 +70,7 @@ class MediaEvidenceCategoryEnum(str, Enum):
 
 class ProvenanceStatusEnum(str, Enum):
     VALID_CREDENTIALS = "VALID_CREDENTIALS"
+    UNVERIFIED_CREDENTIALS = "UNVERIFIED_CREDENTIALS"
     INVALID_CREDENTIALS = "INVALID_CREDENTIALS"
     NO_CREDENTIALS_FOUND = "NO_CREDENTIALS_FOUND"
     UNSUPPORTED_CONTAINER = "UNSUPPORTED_CONTAINER"
@@ -192,6 +196,10 @@ class MediaAuthenticityAssessment(BaseModel):
     artifact_id: str
     media_type: MediaTypeEnum
     format: MediaFormatEnum
+    processing_status: str = "INSUFFICIENT_EVIDENCE"
+    analysis_scope: str = "Bounded heuristic analysis; authenticity is not established."
+    trained_detector: Optional[Dict[str, Any]] = None
+    confidence_basis: str = "UNAVAILABLE_NOT_CALIBRATED"
     classification: AuthenticityClassificationEnum
     confidence: float
     risk_score: float

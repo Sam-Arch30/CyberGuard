@@ -239,7 +239,7 @@ class PassiveURLAnalyzer(BaseURLDomainAnalyzer):
     supported_artifact_types = [ArtifactTypeEnum.URL]
 
     def __init__(self):
-        self.tld_extractor = tldextract.TLDExtract(cache_dir=None)
+        self.tld_extractor = tldextract.TLDExtract(cache_dir=None, suffix_list_urls=())
 
     async def analyze(self, raw_input: str, context: Dict[str, Any]) -> AnalyzerExecutionResult:
         result = AnalyzerExecutionResult(self.name, self.version)

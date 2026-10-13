@@ -119,15 +119,15 @@ Your account access is suspended. Click http://login-secure-auth.target-verify.c
     assert "hashes" in indicators
     assert indicators["total_count"] >= 1
 
-    # Counter-evidence must exist to prevent confirmation bias
-    assert len(data["counter_evidence"]) >= 1
-    for ce in data["counter_evidence"]:
-        assert ce["title"]
-        assert ce["description"]
-        assert "impact" in ce
+    # This fixture contains no observed counter-evidence; do not invent it.
+    assert data["counter_evidence"] == []
 
-    # Uncertainty & gaps must be explicitly stated
-    assert len(data["uncertainty_and_gaps"]) >= 1
+    # Gaps must match observed failed tasks, not an invented sender baseline.
+    failed_tasks = db_session.query(AnalysisTaskModel).filter(
+        AnalysisTaskModel.analysis_run_id == run_id,
+        AnalysisTaskModel.status == 'FAILED',
+    ).all()
+    assert {gap['topic'] for gap in data['uncertainty_and_gaps']} == {task.title for task in failed_tasks}
 
     # What would change assessment
     assert len(data["what_would_change_assessment"]) >= 1

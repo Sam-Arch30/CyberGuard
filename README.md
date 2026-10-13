@@ -1,15 +1,17 @@
 # CyberGuard — AI-Powered Cyber Threat, Phishing & Digital Impersonation Detection and Response System
 
-[![Build & Test Status](https://img.shields.io/badge/tests-80%2F80%20passed-brightgreen.svg)]()
+[Current validation and limitations](docs/development-progress.md)
 [![Backend](https://img.shields.io/badge/backend-FastAPI%20%2F%20Python%203.11-blue.svg)]()
 [![Frontend](https://img.shields.io/badge/frontend-React%2019%20%2F%20TypeScript%20%2F%20Vite-61dafb.svg)]()
-[![Security](https://img.shields.io/badge/forensics-Air--Gapped%20%2F%20Zero--Trust-orange.svg)]()
+
 [![Status](https://img.shields.io/badge/roadmap-Section%2075%20Final%20Integration-success.svg)]()
 
 > **CyberGuard** is a unified, air-gapped-ready Cyber Threat, Phishing, and Digital Impersonation Detection and Response Platform for Security Operations Centers (SOCs).
 > It provides an end-to-end security lifecycle: ingests multi-vector security artifacts (emails, files, URLs, domains, endpoint telemetry), runs deterministic static forensic inspection, correlates cross-source infrastructure, produces server-authoritative risk assessments, generates explainable ATT&CK-mapped attack paths, and coordinates human-governed remediation playbooks backed by cryptographic chains of custody.
 
 ---
+
+For the repaired local prototype and new detection/reporting UI, use [the startup guide](README.PROTOTYPE.md).
 
 ## Table of Contents
 

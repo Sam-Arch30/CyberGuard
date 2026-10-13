@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Service client for Section 38 Analysis Results & Progressive Disclosure.
  * Communicates with consolidated aggregation and forensic detail endpoints.
@@ -13,7 +14,7 @@ export const analysisResultsService = {
    * Retrieves aggregated 4-tier analysis results by AnalysisRun ID.
    */
   async getAnalysisResults(runId: string): Promise<AnalysisResultsResponse> {
-    const res = await fetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/results`));
+    const res = await apiFetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/results`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch analysis results for run '${runId}' (${res.status})`);
@@ -25,7 +26,7 @@ export const analysisResultsService = {
    * Retrieves aggregated 4-tier analysis results by investigation ID, incident number, or evidence ID.
    */
   async getInvestigationAnalysisResults(identifier: string): Promise<AnalysisResultsResponse> {
-    const res = await fetch(apiUrl(`/api/investigations/${encodeURIComponent(identifier)}/analysis/results`));
+    const res = await apiFetch(apiUrl(`/api/investigations/${encodeURIComponent(identifier)}/analysis/results`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch analysis results for investigation '${identifier}' (${res.status})`);
@@ -37,7 +38,7 @@ export const analysisResultsService = {
    * Lazy-loads redacted forensic details for a single evidence item.
    */
   async getEvidenceDetail(runId: string, evidenceId: string): Promise<EvidenceDetailResponse> {
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/analysis/${encodeURIComponent(runId)}/evidence/${encodeURIComponent(evidenceId)}`)
     );
     if (!res.ok) {
@@ -51,7 +52,7 @@ export const analysisResultsService = {
    * Requests a versioned risk reassessment for an analysis run.
    */
   async reassessAnalysis(runId: string, reason: string = 'Manual investigator reassessment request'): Promise<AnalysisResultsResponse> {
-    const res = await fetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/reassess`), {
+    const res = await apiFetch(apiUrl(`/api/analysis/${encodeURIComponent(runId)}/reassess`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reason }),

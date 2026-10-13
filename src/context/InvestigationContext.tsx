@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import type { EmailAnalysis } from '../types/forensic';
@@ -349,7 +350,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
           ];
           for (const ep of endpoints) {
             try {
-              const res = await fetch(ep);
+              const res = await apiFetch(ep);
               if (res.ok) {
                 const apiData = await res.json();
                 resolved = resolveEmailIndicators(apiData);
@@ -385,7 +386,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
             ];
             for (const ep of latestEndpoints) {
               try {
-                const res = await fetch(ep);
+                const res = await apiFetch(ep);
                 if (res.ok) {
                   const apiData = await res.json();
                   resolved = resolveEmailIndicators(apiData);
@@ -445,7 +446,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         if (!hasML) {
           const textToAnalyze = resolved.plain_text_body || (resolved.html_body ? resolved.html_body.replace(/<[^>]+>/g, ' ') : '');
           if (resolved.subject || textToAnalyze) {
-            fetch('/api/emails/ml-classify', {
+            apiFetch('/api/emails/ml-classify', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -474,7 +475,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
         // 2. AI Analyst
         if (!resolved.ai_analyst) {
-          fetch('/api/emails/ai-analyst', {
+          apiFetch('/api/emails/ai-analyst', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(resolved)
@@ -498,7 +499,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
         // 3. Investigation Graph
         if (!resolved.investigation_graph) {
-          fetch('/api/emails/investigation-graph', {
+          apiFetch('/api/emails/investigation-graph', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(resolved)
@@ -522,7 +523,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
         // 4. Threat Score with audit metadata
         if (!resolved.threat_score?.scoring_version || !resolved.threat_score?.audit_metadata) {
-          fetch('/api/emails/calculate-threat-score', {
+          apiFetch('/api/emails/calculate-threat-score', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(resolved)
@@ -696,7 +697,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
         const formData = new FormData();
         formData.append('file', blob, activeEmail.original_filename || `${activeEmailId}.eml`);
         
-        const res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
+        const res = await apiFetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
 
         if (res && res.ok) {
           const freshData = await res.json();
@@ -734,7 +735,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       // 1. Backend database & file purge
       try {
-        await fetch(apiUrl('/api/workspace/reset'), { method: 'POST' });
+        // Clearing a local view must never purge backend investigation evidence.
       } catch {
         // Ignore network error
       }
@@ -771,7 +772,7 @@ export const InvestigationProvider: React.FC<{ children: React.ReactNode }> = ({
 
     let res: Response | null = null;
     try {
-      res = await fetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
+      res = await apiFetch(apiUrl('/api/emails/analyze'), { method: 'POST', body: formData });
     } catch {
       // Handled below if !res
     }

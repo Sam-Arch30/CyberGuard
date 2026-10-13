@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<rect width="1600" height="900" fill="#101510"/>
+<text x="90" y="115" fill="#e6ecdf" font-family="Arial" font-size="48" font-weight="bold">From evidence to a clearer decision</text>
+<text x="90" y="175" fill="#a8b29f" font-family="Arial" font-size="25">Intended benefits; time savings and accuracy have not been measured.</text>
+<rect x="90" y="245" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="118" y="296" fill="#d8e9c4" font-family="Arial" font-size="30">One investigation workspace</text>
+<text x="118" y="341" fill="#aeb9a5" font-family="Arial" font-size="22">Bring phishing, identity and access evidence together.</text>
+<rect x="830" y="245" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="858" y="296" fill="#d8e9c4" font-family="Arial" font-size="30">Explainable observations</text>
+<text x="858" y="341" fill="#aeb9a5" font-family="Arial" font-size="22">Review findings and limitations before acting.</text>
+<rect x="90" y="425" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="118" y="476" fill="#d8e9c4" font-family="Arial" font-size="30">Evidence integrity</text>
+<text x="118" y="521" fill="#aeb9a5" font-family="Arial" font-size="22">Preserve original bytes and SHA-256 hashes.</text>
+<rect x="830" y="425" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="858" y="476" fill="#d8e9c4" font-family="Arial" font-size="30">Clear reporting</text>
+<text x="858" y="521" fill="#aeb9a5" font-family="Arial" font-size="22">Create a reviewable record of an investigation.</text>
+</svg>

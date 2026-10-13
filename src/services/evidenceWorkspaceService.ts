@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 68: Evidence & Forensics Workspace Client Service.
  * Provides typed HTTP communication with backend forensic APIs:
@@ -55,7 +56,7 @@ export const evidenceWorkspaceService = {
     if (params?.page_size) sp.set('page_size', String(params.page_size));
 
     const queryStr = sp.toString() ? `?${sp.toString()}` : '';
-    const res = await fetch(apiUrl(`${BASE_PREFIX}${queryStr}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}${queryStr}`), {
       headers: defaultHeaders(params?.workspaceId),
     });
     if (!res.ok) {
@@ -69,7 +70,7 @@ export const evidenceWorkspaceService = {
    * Retrieves aggregate metrics for evidence distribution, verification and preservation.
    */
   async getMetrics(workspaceId = 'default'): Promise<EvidenceMetrics> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/metrics/summary`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/metrics/summary`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) {
@@ -83,7 +84,7 @@ export const evidenceWorkspaceService = {
    * Retrieves authoritative detail of a specific evidence record.
    */
   async getDetail(evidenceId: string, workspaceId = 'default'): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) {
@@ -97,7 +98,7 @@ export const evidenceWorkspaceService = {
    * Safely previews evidence content without risk of browser execution.
    */
   async getPreview(evidenceId: string, maxBytes = 8192, workspaceId = 'default'): Promise<EvidencePreviewResponse> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/preview?max_bytes=${maxBytes}`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/preview?max_bytes=${maxBytes}`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) {
@@ -111,7 +112,7 @@ export const evidenceWorkspaceService = {
    * Triggers cryptographic hash reverification on demand.
    */
   async verifyIntegrity(evidenceId: string, workspaceId = 'default'): Promise<EvidenceIntegrityVerificationResponse> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/verify`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/verify`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
     });
@@ -130,7 +131,7 @@ export const evidenceWorkspaceService = {
     payload: { preservation_status: 'NORMAL' | 'PRESERVED' | 'ON_HOLD'; reason: string; notes?: string },
     workspaceId = 'default'
   ): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/preserve`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/preserve`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -156,7 +157,7 @@ export const evidenceWorkspaceService = {
     },
     workspaceId = 'default'
   ): Promise<any> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/custody`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/custody`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -176,7 +177,7 @@ export const evidenceWorkspaceService = {
     payload: { case_id?: string; investigation_id?: string; reason?: string },
     workspaceId = 'default'
   ): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/link`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/link`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -196,7 +197,7 @@ export const evidenceWorkspaceService = {
     payload: { note_text: string; category?: string },
     workspaceId = 'default'
   ): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/notes`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/notes`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -216,7 +217,7 @@ export const evidenceWorkspaceService = {
     payload: EvidenceDerivationPayload,
     workspaceId = 'default'
   ): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/derive`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/derive`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -232,7 +233,7 @@ export const evidenceWorkspaceService = {
    * Generates a signed legal/forensic export manifest package.
    */
   async exportManifest(evidenceId: string, workspaceId = 'default'): Promise<EvidenceExportManifestResponse> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/export-manifest`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/${encodeURIComponent(evidenceId)}/export-manifest`), {
       headers: defaultHeaders(workspaceId),
     });
     if (!res.ok) {
@@ -246,7 +247,7 @@ export const evidenceWorkspaceService = {
    * Registers evidence via JSON payload.
    */
   async registerJson(payload: EvidenceRegistrationPayload, workspaceId = 'default'): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/register`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/register`), {
       method: 'POST',
       headers: defaultHeaders(workspaceId),
       body: JSON.stringify(payload),
@@ -262,7 +263,7 @@ export const evidenceWorkspaceService = {
    * Uploads an artifact file directly via multipart form-data.
    */
   async uploadFile(formData: FormData, workspaceId = 'default'): Promise<EvidenceDetail> {
-    const res = await fetch(apiUrl(`${BASE_PREFIX}/upload`), {
+    const res = await apiFetch(apiUrl(`${BASE_PREFIX}/upload`), {
       method: 'POST',
       headers: {
         'X-Workspace-Id': workspaceId,

@@ -109,6 +109,10 @@ app = FastAPI(
 )
 
 # Section 20: Register HTTP Security Hardening Middleware
+from backend.api.middleware.authentication import AuthenticationMiddleware
+app.add_middleware(AuthenticationMiddleware)
+from backend.api.middleware.request_size import RequestSizeMiddleware
+app.add_middleware(RequestSizeMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(RateLimiterMiddleware)
 
@@ -144,6 +148,7 @@ app.include_router(cases_router)
 app.include_router(incidents_router)
 app.include_router(sla_router)
 app.include_router(watchlists_router)
+app.include_router(watchlists_router, prefix="/api")
 app.include_router(threat_hunting_router)
 app.include_router(threat_hunting_router, prefix="/api")
 app.include_router(investigation_pivots_router)
@@ -168,6 +173,8 @@ app.include_router(evidence_workspace_router)
 app.include_router(executive_reports_router)
 app.include_router(automation_router)
 app.include_router(platform_admin_router)
+# Register literal /api/campaigns/candidates before the legacy campaign-ID route.
+app.include_router(cross_incident_router)
 app.include_router(correlation_router)
 app.include_router(reports_router)
 app.include_router(audit_router)
@@ -189,7 +196,6 @@ app.include_router(api_security_router)
 app.include_router(impersonation_router)
 app.include_router(multimedia_router)
 app.include_router(knowledge_graph_router)
-app.include_router(cross_incident_router)
 app.include_router(temporal_correlation_router)
 app.include_router(attack_reconstruction_router)
 app.include_router(attack_confidence_router)
@@ -227,10 +233,18 @@ app.add_api_route("/api/workspace/reset", reset_workspace_state, methods=["POST"
 async def global_exception_handler(request: Request, exc: Exception):
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": f"Internal Server Error: {str(exc)}", "error_code": "INTERNAL_SERVER_ERROR"}
+        content={"detail": "Internal analysis error. Retry or inspect the server logs.", "error_code": "INTERNAL_SERVER_ERROR"}
     )
 
 
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run("backend.main:app", host="0.0.0.0", port=8000, reload=True)
+
+
+@app.get('/api/session')
+def session_info(request: Request):
+    actor = getattr(request.state, 'actor', None)
+    if actor is None:
+        return {'actor_id':'explicit-demo','role':'demo','workspaces':['default']}
+    return {'actor_id':actor['actor_id'],'role':actor['role'],'workspaces':actor['workspaces']}

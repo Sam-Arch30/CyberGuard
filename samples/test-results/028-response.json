@@ -1,0 +1,66 @@
+{
+  "ingestion_id": "8b8c72b7-e726-4840-8118-1f3d2d13e8f6",
+  "artifact_id": "a3977d31-5222-403e-b2ef-382a22117e92",
+  "artifact_type": "TEXT",
+  "input_mode": "FILE_UPLOAD",
+  "name": "network-connections.csv",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "963cfd80c0789d7e775d174df227c21b147f53de0c50d9a36a26829cfdf2f4ae",
+  "size": 413,
+  "mime_type": "text/plain",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "TEXT",
+    "detected_mime": "text/plain",
+    "reported_mime": "application/vnd.ms-excel",
+    "confidence": 0.85,
+    "detector": "plain_text_utf8",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "nlp_classifier"
+    ],
+    "metadata": {
+      "size_bytes": 413,
+      "original_filename": "network-connections.csv",
+      "char_count": 413
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/96/963cfd80c0789d7e775d174df227c21b147f53de0c50d9a36a26829cfdf2f4ae/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "nlp_classifier"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "network-connections.csv",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "TEXT",
+      "detected_mime": "text/plain",
+      "reported_mime": "application/vnd.ms-excel",
+      "confidence": 0.85,
+      "detector": "plain_text_utf8",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "nlp_classifier"
+      ],
+      "metadata": {
+        "size_bytes": 413,
+        "original_filename": "network-connections.csv",
+        "char_count": 413
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.670840",
+  "evidence_id": "EVD-963CFD80C0",
+  "investigation_id": "b6acaa88-2bce-40e9-8c2a-f9e825c76ac4",
+  "analysis_run_id": "92c12bb4-9944-4c56-90ba-fb4ee9bab337",
+  "duplicate": false
+}

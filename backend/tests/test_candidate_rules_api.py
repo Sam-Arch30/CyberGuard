@@ -176,7 +176,7 @@ def test_api_04_full_lifecycle_and_evaluation(client, clean_db):
     assert app_resp.json()["status"] == "APPROVED"
 
     # 2. Stage in shadow mode
-    stage_resp = client.post(f"/api/v1/rules/{rule_id}/stage", json=action_body, headers={"X-Role": "admin"})
+    stage_resp = client.post(f"/api/v1/candidate-rules/{rule_id}/stage", json=action_body, headers={"X-Role": "admin"})
     assert stage_resp.status_code == 200
     assert stage_resp.json()["status"] == "STAGED"
 
@@ -186,26 +186,26 @@ def test_api_04_full_lifecycle_and_evaluation(client, clean_db):
         "target_payload": {"indicator_code": "CR_FLOW_TEST", "event_id": "evt-01"},
         "include_staged_shadow": True,
     }
-    eval_resp = client.post("/api/v1/rules/evaluate", json=eval_payload, headers={"X-Role": "analyst"})
+    eval_resp = client.post("/api/v1/candidate-rules/evaluate", json=eval_payload, headers={"X-Role": "analyst"})
     assert eval_resp.status_code == 200
     results = eval_resp.json()
     assert len(results) == 1
     assert results[0]["matched"] is True
 
     # 4. Activate in production
-    act_resp = client.post(f"/api/v1/rules/{rule_id}/activate", json=action_body, headers={"X-Role": "admin"})
+    act_resp = client.post(f"/api/v1/candidate-rules/{rule_id}/activate", json=action_body, headers={"X-Role": "admin"})
     assert act_resp.status_code == 200
     assert act_resp.json()["status"] == "ACTIVE"
 
     # 5. List versions
-    ver_resp = client.get(f"/api/v1/rules/{rule_id}/versions?workspace_id=ws-flow", headers={"X-Role": "analyst"})
+    ver_resp = client.get(f"/api/v1/candidate-rules/{rule_id}/versions?workspace_id=ws-flow", headers={"X-Role": "analyst"})
     assert ver_resp.status_code == 200
     versions = ver_resp.json()
     assert len(versions) >= 1
     assert versions[0]["version"] == "v1"
 
     # 6. Dashboard stats
-    stats_resp = client.get("/api/v1/rules/dashboard/stats?workspace_id=ws-flow", headers={"X-Role": "analyst"})
+    stats_resp = client.get("/api/v1/candidate-rules/dashboard/stats?workspace_id=ws-flow", headers={"X-Role": "analyst"})
     assert stats_resp.status_code == 200
     stats = stats_resp.json()
     assert stats["total_candidate_rules"] >= 1

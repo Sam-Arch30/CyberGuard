@@ -30,6 +30,21 @@ class DomainAnalyzeRequest(BaseModel):
     uploader: str = Field("ANALYST", description="Identity or system submitting the domain")
 
 
+class URLBatchRequest(BaseModel):
+    text: str = Field(..., min_length=1, max_length=210000)
+
+
+@router.post("/analyze-batch", summary="Offline structural screening of up to 50 URLs")
+async def analyze_url_batch(req: URLBatchRequest):
+    from backend.services.url_batch_analysis import analyze_url_lines
+    try:
+        return await analyze_url_lines(req.text)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except TimeoutError:
+        raise HTTPException(status_code=408, detail='URL batch assessment exceeded the 15-second processing deadline.')
+
+
 class URLConfigResponse(BaseModel):
     active_analysis_enabled: bool
     allowed_schemes: List[str]
@@ -68,7 +83,7 @@ async def analyze_url(
         logger.error(f"Error analyzing URL '{req.url}': {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error analyzing URL: {str(exc)}",
+            detail='Error analyzing URL.',
         )
 
 
@@ -97,7 +112,7 @@ async def analyze_domain(
         logger.error(f"Error analyzing domain '{req.domain}': {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error analyzing domain: {str(exc)}",
+            detail='Error analyzing domain.',
         )
 
 
@@ -124,7 +139,7 @@ async def analyze_artifact(
         logger.error(f"Error re-analyzing artifact '{artifact_id}': {exc}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Error analyzing artifact: {str(exc)}",
+            detail='Error analyzing artifact.',
         )
 
 

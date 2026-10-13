@@ -156,14 +156,11 @@ def get_registry(
 ) -> Dict[str, Any]:
     """Returns the controlled data source registry, supported fields, types, and operators."""
     registry_data = {}
-    for source, fields in DATA_SOURCE_FIELD_REGISTRY.items():
-        registry_data[source.value] = {
-            field: {
-                "type": info["type"].value,
-                "operators": [op.value for op in info["operators"]],
-                "description": info.get("desc", ""),
-            }
-            for field, info in fields.items()
+    for field, definition in DATA_SOURCE_FIELD_REGISTRY.items():
+        registry_data.setdefault(definition.data_source.value, {})[field] = {
+            "type": definition.field_type.value,
+            "operators": [op.value for op in definition.allowed_operators],
+            "description": definition.description,
         }
 
     return {
@@ -174,6 +171,11 @@ def get_registry(
         "cost_classes": [c.value for c in RuleCostClass],
         "provenance_types": [p.value for p in RuleProvenanceType],
     }
+
+
+@router.get("/registry/fields", summary="Return typed fields used by the rule editor")
+def get_registry_fields(_role: str = Depends(verify_analyst_or_admin)) -> List[Dict[str, Any]]:
+    return [definition.model_dump(mode="json") for definition in DATA_SOURCE_FIELD_REGISTRY.values()]
 
 
 @router.post(
@@ -792,6 +794,17 @@ def evaluate_event(
 ) -> List[Dict[str, Any]]:
     """Evaluates telemetry event against active rules and integrates matches with FindingModel."""
     eff_workspace = x_workspace_id or workspace_id
+    if isinstance(event_payload.get('target_payload'), dict):
+        from backend.schemas.candidate_rules import RuleEvaluationRequest
+        from backend.services.candidate_rule_service import CandidateRuleService
+        from backend.db.session import request_workspace
+        payload = RuleEvaluationRequest(**event_payload)
+        selected = request_workspace.get()
+        if selected is not None and payload.workspace_id != selected:
+            raise HTTPException(403, 'Conflicting workspace selection.')
+        results = CandidateRuleService.evaluate_rules_for_event(db, workspace_id=payload.workspace_id,
+            context=payload.target_payload, include_staged=payload.include_staged_shadow)
+        return [result.model_dump() for result in results]
     actual_event = event_payload.get("event_payload") if (isinstance(event_payload, dict) and isinstance(event_payload.get("event_payload"), dict)) else event_payload
     matches = DetectionRuleLifecycleService.evaluate_event(
         db=db,

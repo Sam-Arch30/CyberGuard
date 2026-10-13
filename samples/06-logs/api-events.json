@@ -1,0 +1,86 @@
+[
+  {
+    "timestamp": "2026-10-12T09:00:00+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:01+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:02+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:03+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:04+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:05+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:06+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:07+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:08+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:09+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:10+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  },
+  {
+    "timestamp": "2026-10-12T09:00:11+00:00",
+    "method": "GET",
+    "path": "/api/users",
+    "status_code": 403,
+    "source_ip": "198.51.100.20"
+  }
+]

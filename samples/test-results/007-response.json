@@ -1,0 +1,66 @@
+{
+  "ingestion_id": "05a5ce9c-cb3c-48bf-8003-39c508d6ed57",
+  "artifact_id": "ed6550cb-b724-49f5-8ce4-4565ae677763",
+  "artifact_type": "TEXT",
+  "input_mode": "FILE_UPLOAD",
+  "name": "sample.rtf",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "fb70c2a60e1f042204d9f5d87bf52343f736d7afd00e265a566f26f87e042ec5",
+  "size": 68,
+  "mime_type": "text/plain",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "TEXT",
+    "detected_mime": "text/plain",
+    "reported_mime": "application/msword",
+    "confidence": 0.85,
+    "detector": "plain_text_utf8",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "nlp_classifier"
+    ],
+    "metadata": {
+      "size_bytes": 68,
+      "original_filename": "sample.rtf",
+      "char_count": 68
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/fb/fb70c2a60e1f042204d9f5d87bf52343f736d7afd00e265a566f26f87e042ec5/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "nlp_classifier"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "sample.rtf",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "TEXT",
+      "detected_mime": "text/plain",
+      "reported_mime": "application/msword",
+      "confidence": 0.85,
+      "detector": "plain_text_utf8",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "nlp_classifier"
+      ],
+      "metadata": {
+        "size_bytes": 68,
+        "original_filename": "sample.rtf",
+        "char_count": 68
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:35.966004",
+  "evidence_id": "EVD-FB70C2A60E",
+  "investigation_id": "29fff9c7-7553-4028-a014-6b51e0f4b86c",
+  "analysis_run_id": "dc081bee-82dc-428c-a474-e234b8dc0fa2",
+  "duplicate": false
+}

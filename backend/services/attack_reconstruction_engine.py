@@ -1103,7 +1103,9 @@ class AttackReconstructionEngine:
             )
             db.add(hm)
 
-        db.commit()
+        # Build the response before commit expires the loaded telemetry and path.
+        # Reading path attributes after commit otherwise reloads eager collections.
+        # No response is returned unless the final transaction commits successfully.
 
         # Build schema response
         path_schema = AttackPathSchema(
@@ -1151,7 +1153,7 @@ class AttackReconstructionEngine:
             configuration_version=cls.RULE_VERSION
         )
 
-        return AttackReconstructionResponse(
+        response = AttackReconstructionResponse(
             attack_path=path_schema,
             stages=stages,
             transitions=transitions,
@@ -1164,6 +1166,8 @@ class AttackReconstructionEngine:
             limitations=path_schema.limitations,
             context=ctx_summary
         )
+        db.commit()
+        return response
 
     # ------------------------------------------------------------------------
     # 7. RESPONSE HYDRATION FROM DATABASE

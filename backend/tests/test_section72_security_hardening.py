@@ -201,7 +201,7 @@ def test_08_log_sanitizer_secret_redaction():
     raw_log = "Error in auth: Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.secret.token with password='superSecretPassword123' and api_key=abc12345678"
     sanitized = sanitize_log_text(raw_log)
     assert "superSecretPassword123" not in sanitized
-    assert "Authorization: Bearer [REDACTED]" in sanitized
+    assert "Authorization: [REDACTED]" in sanitized
     assert "password=[REDACTED]" in sanitized
     assert "api_key=[REDACTED]" in sanitized
 

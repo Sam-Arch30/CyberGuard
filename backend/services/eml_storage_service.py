@@ -5,7 +5,7 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime, timezone
 
 # Root directory for raw .eml storage
-EML_STORE_DIR = Path(__file__).resolve().parent.parent / "data" / "eml_store"
+EML_STORE_DIR = Path(os.getenv("CYBERGUARD_EML_STORE", str(Path(__file__).resolve().parent.parent / "data" / "eml_store")))
 
 
 class EMLStorageService:
@@ -16,8 +16,12 @@ class EMLStorageService:
 
     @classmethod
     def _ensure_dir(cls) -> Path:
-        EML_STORE_DIR.mkdir(parents=True, exist_ok=True)
-        return EML_STORE_DIR
+        from backend.db.session import request_workspace
+        import hashlib
+        workspace = request_workspace.get() or 'default'
+        directory = EML_STORE_DIR if workspace == 'default' else EML_STORE_DIR / hashlib.sha256(workspace.encode()).hexdigest()[:24]
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
 
     @classmethod
     def save_eml(

@@ -512,13 +512,19 @@ async def stream_investigation_events(
                     if queue_run:
                         tasks.append(asyncio.create_task(queue_run.get()))
 
-                    done, pending = await asyncio.wait(
-                        tasks,
-                        timeout=15.0,
-                        return_when=asyncio.FIRST_COMPLETED,
-                    )
-                    for p in pending:
-                        p.cancel()
+                    try:
+                        done, pending = await asyncio.wait(
+                            tasks,
+                            timeout=15.0,
+                            return_when=asyncio.FIRST_COMPLETED,
+                        )
+                    finally:
+                        # A browser disconnect can cancel wait() before it returns.
+                        # Always cancel and drain queue readers before unsubscribing.
+                        for task in tasks:
+                            if not task.done():
+                                task.cancel()
+                        await asyncio.gather(*tasks, return_exceptions=True)
 
                     if not done:
                         # Timeout - send keepalive
@@ -534,8 +540,8 @@ async def stream_investigation_events(
 
                 except asyncio.CancelledError:
                     break
-                except Exception as e:
-                    yield f": error {str(e)}\n\n"
+                except Exception:
+                    yield ": stream unavailable\n\n"
                     break
 
         finally:

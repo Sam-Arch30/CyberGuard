@@ -924,6 +924,10 @@ class ThreatIntelligenceService:
     async def lookup_domain(self, domain: str) -> List[ThreatIntelResult]:
         """Queries configured threat intel sources for a domain with backward compatibility."""
         clean_dom = domain.strip().lower()
+        if self.rate_limit_simulated:
+            return [ThreatIntelResult(provider="cyberguard_threat_intel", query=clean_dom,
+                indicator_type="DOMAIN", is_malicious=False, verdict="RATE_LIMITED",
+                is_rate_limited=True, confidence=0.0, details="Threat intelligence provider rate limit exceeded")]
         provider = "cyberguard_threat_intel"
 
         cached = self.cache.get(provider, "DOMAIN", clean_dom)
@@ -967,6 +971,10 @@ class ThreatIntelligenceService:
     ) -> List[ThreatIntelResult]:
         """Queries configured threat intel sources for a cryptographic file hash."""
         clean_sha256 = sha256.strip().lower()
+        if self.rate_limit_simulated:
+            return [ThreatIntelResult(provider="cyberguard_threat_intel", query=clean_sha256,
+                indicator_type="HASH", is_malicious=False, verdict="RATE_LIMITED",
+                is_rate_limited=True, confidence=0.0, details="Threat intelligence provider rate limit exceeded")]
         provider = "cyberguard_threat_intel"
 
         cached = self.cache.get(provider, "HASH", clean_sha256)

@@ -1,0 +1,89 @@
+{
+  "artifact_id": "27853425-4245-4d17-97ec-a67c2f848fa0",
+  "analysis_run_id": "8b617131-e4f9-4b4d-92ab-1a032d9a0756",
+  "pipeline_version": "2.0.0",
+  "classification": "UNVERIFIED",
+  "risk_score": 0.0,
+  "severity": "LOW",
+  "confidence": 0.0,
+  "summary": "No suspicious static indicators were observed. These limited checks do not establish file safety or verified decoding.",
+  "identity": {
+    "sha256": "9982d92f6f239841b779f25c123dbdf8f37e8e57c163cc47be60dc2c7559c6c1",
+    "sha1": "440e48c5b6187580012bf7158050d4fe7dc78f6b",
+    "md5": "7e20c44aab339ea9467f920415538601",
+    "size_bytes": 1746,
+    "original_filename": "benign-document.pdf",
+    "safe_display_name": "benign-document.pdf",
+    "claimed_extension": ".pdf",
+    "reported_mime": "application/pdf",
+    "detected_mime": "application/pdf",
+    "detected_file_type": "PDF document",
+    "is_polyglot": false
+  },
+  "filename_analysis": {
+    "is_double_extension": false,
+    "is_deceptive": false,
+    "has_unicode_deception": false,
+    "detected_control_characters": [],
+    "signals": []
+  },
+  "entropy": {
+    "entropy": 5.63,
+    "level": "normal",
+    "description": "Evaluated entropy",
+    "is_high_entropy": false
+  },
+  "pe_metadata": null,
+  "pdf_metadata": {
+    "is_pdf": true,
+    "pdf_version": "1.3",
+    "has_javascript": false,
+    "javascript_snippets": [],
+    "has_open_action": false,
+    "has_launch_action": false,
+    "has_embedded_files": false,
+    "embedded_file_names": [],
+    "has_submit_form": false,
+    "has_external_uri": false,
+    "external_uris": [],
+    "is_encrypted": false,
+    "suspicious_elements": [],
+    "metadata": {
+      "Title": "CyberGuard synthetic sample",
+      "Author": "anonymous",
+      "Creator": "anonymous",
+      "Producer": "ReportLab PDF Library - \\(opensource\\",
+      "CreationDate": "D:20261012075322+05'00'",
+      "ModDate": "D:20261012075322+05'00'"
+    },
+    "warnings": []
+  },
+  "office_metadata": null,
+  "script_metadata": null,
+  "archive_metadata": null,
+  "image_metadata": null,
+  "reputation": {
+    "provider": "cyberguard_threat_intel",
+    "sha256_queried": "9982d92f6f239841b779f25c123dbdf8f37e8e57c163cc47be60dc2c7559c6c1",
+    "verdict": "UNKNOWN",
+    "is_malicious": false,
+    "threat_types": [],
+    "confidence": 0.0,
+    "details": "No external threat intelligence match found for hash (Note: No Match != Safe)",
+    "retrieved_at": "2026-10-13T01:52:44.240607+00:00"
+  },
+  "extracted_urls": [],
+  "extracted_domains": [],
+  "extracted_ips": [],
+  "extracted_emails": [],
+  "extracted_hashes": [
+    "f1e6aef9a72c8fb99cbb199b75445c4a"
+  ],
+  "derived_artifacts": [],
+  "findings_count": 0,
+  "findings": [],
+  "indicators_count": 170,
+  "relationships_count": 2,
+  "status": "COMPLETED",
+  "created_at": "2026-10-13T01:52:44.250619+00:00"
+}

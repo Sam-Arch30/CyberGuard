@@ -4,9 +4,12 @@ Provides REST endpoints for media forensics, deepfake detection, detector regist
 and re-analysis.
 """
 from __future__ import annotations
+from backend.services.upload_security import UploadSecurityService
 
 import base64
 import logging
+from threading import BoundedSemaphore
+from starlette.concurrency import run_in_threadpool
 from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form, status
 from sqlalchemy.orm import Session
@@ -32,6 +35,39 @@ logger = logging.getLogger("cyberguard.api.multimedia")
 
 router = APIRouter(prefix="/api/multimedia", tags=["Multimedia Forensics"])
 global_multimedia_pipeline = MultimediaPipeline()
+
+
+_analysis_slots = BoundedSemaphore(2)
+
+
+def _analyze(**kwargs):
+    if not _analysis_slots.acquire(blocking=False):
+        raise HTTPException(429, 'Media analysis is busy; retry after the current analysis finishes.')
+    try:
+        assessment = global_multimedia_pipeline.analyze_media(**kwargs)
+        if assessment.processing_status in ('INVALID_CONTENT', 'UNSUPPORTED_FORMAT', 'RESOURCE_LIMIT'):
+            raise HTTPException(422, '; '.join(assessment.limitations))
+        return assessment
+    except HTTPException:
+        raise
+    except ValueError:
+        raise HTTPException(422, 'Invalid media content or media exceeds the analysis limit.')
+    except Exception:
+        logger.exception('Media analysis failed')
+        raise HTTPException(500, 'Media analysis failed. Original evidence remains available through ingestion.')
+    finally:
+        _analysis_slots.release()
+
+
+def _retrieve_media(artifact):
+    try:
+        with evidence_storage.retrieve_stream(artifact.storage_reference or artifact.sha256) as stream:
+            raw = stream.read(MAX_MEDIA_BYTES + 1)
+    except (FileNotFoundError, OSError, ValueError):
+        raise HTTPException(422, 'Original media bytes are unavailable. Preserve the original file through ingestion and retry.')
+    if len(raw) > MAX_MEDIA_BYTES:
+        raise HTTPException(413, 'Stored media exceeds the 50 MB analysis limit.')
+    return raw
 
 
 @router.get("/detectors", response_model=List[Dict[str, Any]])
@@ -68,11 +104,13 @@ def analyze_media_payload(
 
     if request.media_bytes_b64:
         try:
-            media_bytes = base64.b64decode(request.media_bytes_b64)
+            media_bytes = base64.b64decode(request.media_bytes_b64, validate=True)
+        except HTTPException:
+            raise
         except Exception as e:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid base64 media payload: {str(e)}",
+                detail='Invalid base64 media payload.',
             )
     elif request.artifact_id:
         art = db.query(ArtifactModel).filter(ArtifactModel.id == request.artifact_id).first()
@@ -81,9 +119,9 @@ def analyze_media_payload(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Artifact '{request.artifact_id}' not found.",
             )
-        filename = art.source_uri or filename
+        filename = art.name or filename
         # Attempt to read from evidence storage
-        raw = evidence_storage.retrieve(request.artifact_id)
+        raw = _retrieve_media(art)
         if raw is not None:
             media_bytes = raw
         else:
@@ -104,7 +142,7 @@ def analyze_media_payload(
         )
 
     try:
-        assessment = global_multimedia_pipeline.analyze_media(
+        assessment = _analyze(
             data=media_bytes,
             original_filename=filename,
             artifact_id=request.artifact_id,
@@ -138,9 +176,11 @@ def analyze_media_payload(
 
     except ValueError as ve:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
+    except HTTPException:
+        raise
     except Exception as e:
         logger.exception("Error executing multimedia analysis")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Analysis failed: {str(e)}")
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail='Analysis failed.')
 
 
 @router.post("/upload", response_model=MediaAnalysisResponse)
@@ -150,7 +190,7 @@ async def upload_and_analyze_media(
     db: Session = Depends(get_db),
 ) -> MediaAnalysisResponse:
     """Uploads a media file directly for comprehensive authenticity and deepfake analysis."""
-    media_bytes = await file.read()
+    media_bytes = await UploadSecurityService.read_bounded_upload(file, max_bytes=50 * 1024 * 1024)
 
     if len(media_bytes) > MAX_MEDIA_BYTES:
         raise HTTPException(
@@ -160,7 +200,7 @@ async def upload_and_analyze_media(
 
     filename = file.filename or "uploaded_media"
 
-    assessment = global_multimedia_pipeline.analyze_media(
+    assessment = await run_in_threadpool(_analyze,
         data=media_bytes,
         original_filename=filename,
         context_claimed_identity_id=context_claimed_identity_id,
@@ -204,29 +244,29 @@ def reanalyze_media_artifact(
     if not art:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Artifact '{artifact_id}' not found.")
 
-    raw = evidence_storage.retrieve(artifact_id)
+    raw = _retrieve_media(art)
     if raw is None:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Binary payload for artifact '{artifact_id}' is not in persistent storage.",
         )
 
-    assessment = global_multimedia_pipeline.analyze_media(
+    assessment = _analyze(
         data=raw,
-        original_filename=art.source_uri or "stored_media",
+        original_filename=art.name or "stored_media",
         artifact_id=artifact_id,
         trigger=AnalysisTriggerEnum.REANALYSIS,
         db=db,
     )
 
-    media_type, media_format, mime_type = MediaFormatIdentifier.identify(raw, art.source_uri or "")
+    media_type, media_format, mime_type = MediaFormatIdentifier.identify(raw, art.name or "")
     import hashlib
     sha256 = hashlib.sha256(raw).hexdigest()
 
     identity = MediaIdentity(
         artifact_id=artifact_id,
         sha256=sha256,
-        original_filename=art.source_uri or "stored_media",
+        original_filename=art.name or "stored_media",
         mime_type=mime_type,
         media_type=media_type,
         format=media_format,

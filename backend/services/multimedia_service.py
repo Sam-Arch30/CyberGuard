@@ -130,18 +130,12 @@ class MediaFormatIdentifier:
                 return MediaTypeEnum.VIDEO, MediaFormatEnum.WEBM, "video/webm"
             return MediaTypeEnum.VIDEO, MediaFormatEnum.WEBM, "video/x-matroska"
 
-        # Extension fallback with safe validation
-        lower_name = original_filename.lower()
-        if lower_name.endswith((".jpg", ".jpeg")):
-            return MediaTypeEnum.IMAGE, MediaFormatEnum.JPEG, "image/jpeg"
-        if lower_name.endswith(".png"):
-            return MediaTypeEnum.IMAGE, MediaFormatEnum.PNG, "image/png"
-        if lower_name.endswith(".wav"):
-            return MediaTypeEnum.AUDIO, MediaFormatEnum.WAV, "audio/wav"
-        if lower_name.endswith(".mp3"):
-            return MediaTypeEnum.AUDIO, MediaFormatEnum.MP3, "audio/mpeg"
-        if lower_name.endswith(".mp4"):
-            return MediaTypeEnum.VIDEO, MediaFormatEnum.MP4, "video/mp4"
+        if head.startswith(b'OggS'):
+            return MediaTypeEnum.AUDIO, MediaFormatEnum.OGG, 'audio/ogg'
+        if head.startswith(b'fLaC'):
+            return MediaTypeEnum.AUDIO, MediaFormatEnum.FLAC, 'audio/flac'
+        if head.startswith(b'RIFF') and data[8:12] == b'AVI ':
+            return MediaTypeEnum.VIDEO, MediaFormatEnum.AVI, 'video/x-msvideo'
 
         return MediaTypeEnum.UNKNOWN_MEDIA, MediaFormatEnum.UNKNOWN, "application/octet-stream"
 
@@ -259,11 +253,9 @@ class MediaMetadataExtractor:
 
         if has_jumb or has_app11:
             provenance.credential_present = True
-            provenance.status = ProvenanceStatusEnum.VALID_CREDENTIALS
-            provenance.signature_valid = True
-            provenance.issuer = "C2PA-Compliant Issuer Manifest"
-            provenance.claim_generator = "Verified Content Credential Container"
-            provenance.validation_details = "Cryptographic C2PA provenance manifest box detected in container."
+            provenance.status = ProvenanceStatusEnum.UNVERIFIED_CREDENTIALS
+            provenance.signature_valid = None
+            provenance.validation_details = "Possible C2PA/JUMBF marker present. Signature and trust chain have not been verified; markers alone establish no provenance."
         else:
             provenance.credential_present = False
             provenance.status = ProvenanceStatusEnum.NO_CREDENTIALS_FOUND
@@ -822,8 +814,8 @@ class VideoFrameSampler:
     Records exact frame timestamps and indexes for explainable temporal provenance.
     """
 
-    @staticmethod
-    def sample_frames(data: bytes, fmt: MediaFormatEnum, max_frames: int = MAX_FRAME_SAMPLES) -> List[Tuple[int, float, bytes]]:
+    @classmethod
+    def sample_frames(cls, data: bytes, fmt: MediaFormatEnum, max_frames: int = MAX_FRAME_SAMPLES) -> List[Tuple[int, float, bytes]]:
         """
         Samples frames returning (frame_index, timestamp_seconds, frame_jpeg_bytes).
         """
@@ -849,11 +841,9 @@ class VideoFrameSampler:
             except Exception:
                 pass
 
-        # For MP4 / MOV containers, extract keyframe image data if embedded or generate surrogate frames
-        elif fmt in (MediaFormatEnum.MP4, MediaFormatEnum.MOV, MediaFormatEnum.WEBM):
-            # Check for embedded JPEG / thumbnail frames in container
-            # Fallback to bounded synthetic sampling for video container validation
-            sampled = cls._sample_isobmff_frames(data, max_frames)
+        elif fmt in (MediaFormatEnum.MP4, MediaFormatEnum.MOV, MediaFormatEnum.WEBM, MediaFormatEnum.AVI):
+            from backend.services.media_decoder import decode_media
+            sampled = decode_media(data, 'VIDEO', fmt.value)['frames'][:max_frames]
 
         return sampled
 
@@ -900,7 +890,7 @@ class VideoFrameForensicsDetector(MediaDetector):
     def analyze(self, data: bytes, metadata: MediaMetadata, context: Dict[str, Any]) -> DetectorResult:
         start_t = time.perf_counter()
         fmt = context.get("format", MediaFormatEnum.MP4)
-        frames = self.sampler.sample_frames(data, fmt, max_frames=10)
+        frames = context["decoded_frames"][:10] if "decoded_frames" in context else self.sampler.sample_frames(data, fmt, max_frames=10)
 
         if not frames:
             return DetectorResult(
@@ -908,10 +898,10 @@ class VideoFrameForensicsDetector(MediaDetector):
                 detector_name=self.detector_name,
                 detector_version=self.detector_version,
                 media_type=MediaTypeEnum.VIDEO,
-                status=DetectorStatusEnum.SUCCESS,
-                score=0.10,
-                label="NO_SUSPICIOUS_FRAMES",
-                confidence=0.75,
+                status=DetectorStatusEnum.INVALID_INPUT,
+                score=None,
+                label="NO_DECODED_FRAMES",
+                confidence=0.0,
                 evidence={"sampled_frame_count": 0, "reason": "No accessible frames in container."},
                 runtime_ms=round((time.perf_counter() - start_t) * 1000, 2),
                 model_name=self.model_name,
@@ -947,7 +937,7 @@ class VideoFrameForensicsDetector(MediaDetector):
             media_type=MediaTypeEnum.VIDEO,
             status=DetectorStatusEnum.SUCCESS,
             score=round(avg_score, 3),
-            label="DEEPFAKE_FRAME_ANOMALIES_DETECTED" if has_anomalous_frames else "FRAMES_CONSISTENT",
+            label="FRAME_FREQUENCY_ANOMALIES" if has_anomalous_frames else "FRAMES_CONSISTENT",
             confidence=0.84,
             evidence=evidence,
             runtime_ms=runtime_ms,
@@ -977,7 +967,7 @@ class VideoTemporalConsistencyDetector(MediaDetector):
     def analyze(self, data: bytes, metadata: MediaMetadata, context: Dict[str, Any]) -> DetectorResult:
         start_t = time.perf_counter()
         fmt = context.get("format", MediaFormatEnum.MP4)
-        frames = self.sampler.sample_frames(data, fmt, max_frames=8)
+        frames = context["decoded_frames"][:8] if "decoded_frames" in context else self.sampler.sample_frames(data, fmt, max_frames=8)
 
         if len(frames) < 2:
             return DetectorResult(
@@ -985,10 +975,10 @@ class VideoTemporalConsistencyDetector(MediaDetector):
                 detector_name=self.detector_name,
                 detector_version=self.detector_version,
                 media_type=MediaTypeEnum.VIDEO,
-                status=DetectorStatusEnum.SUCCESS,
-                score=0.10,
+                status=DetectorStatusEnum.INVALID_INPUT,
+                score=None,
                 label="INSUFFICIENT_FRAMES_FOR_TEMPORAL",
-                confidence=0.70,
+                confidence=0.0,
                 evidence={"frame_count": len(frames)},
                 runtime_ms=round((time.perf_counter() - start_t) * 1000, 2),
                 model_name=self.model_name,
@@ -1346,11 +1336,12 @@ class MultimediaPipeline:
         context_claimed_identity_id: Optional[str] = None,
         trigger: AnalysisTriggerEnum = AnalysisTriggerEnum.USER,
         db: Optional[Session] = None,
+        analysis_run_id: Optional[str] = None,
     ) -> MediaAuthenticityAssessment:
         """
         Executes complete multimedia authenticity analysis pipeline.
         """
-        run_id = f"run_med_{uuid.uuid4().hex[:12]}"
+        run_id = analysis_run_id or f"run_med_{uuid.uuid4().hex[:12]}"
         art_id = artifact_id or f"art_med_{uuid.uuid4().hex[:12]}"
 
         # 1. Safety validation & Bounded checks
@@ -1360,8 +1351,12 @@ class MultimediaPipeline:
         # 2. Format & MIME Identification
         media_type, media_format, mime_type = MediaFormatIdentifier.identify(data, original_filename)
 
+        from backend.services.media_decoder import decode_media
+        decoded = decode_media(data, media_type.value, media_format.value)
         # 3. Structural Metadata & Provenance Extraction
-        if media_type == MediaTypeEnum.IMAGE:
+        if decoded["status"] != "COMPLETED":
+            metadata, provenance = MediaMetadata(), ProvenanceRecord()
+        elif media_type == MediaTypeEnum.IMAGE:
             metadata, provenance = MediaMetadataExtractor.extract_image_metadata(data)
         elif media_type == MediaTypeEnum.AUDIO:
             metadata, provenance = MediaMetadataExtractor.extract_audio_metadata(data, media_format)
@@ -1371,19 +1366,23 @@ class MultimediaPipeline:
             metadata = MediaMetadata()
             provenance = ProvenanceRecord()
 
+        analysis_data = decoded['audio'] or data
+        if decoded['metadata']:
+            metadata.container_tags['decoded_sample'] = decoded['metadata']
         # 4. Dispatch Configured Detectors
-        detectors = self.registry.get_detectors_for_type(media_type)
+        detectors = self.registry.get_detectors_for_type(media_type) if decoded["status"] == "COMPLETED" else []
         detector_results: List[DetectorResult] = []
 
         context: Dict[str, Any] = {
             "original_filename": original_filename,
             "format": media_format,
             "claimed_identity_id": context_claimed_identity_id,
+            "decoded_frames": decoded["frames"],
         }
 
         for detector in detectors:
             try:
-                res = detector.analyze(data, metadata, context)
+                res = detector.analyze(analysis_data, metadata, context)
                 detector_results.append(res)
             except Exception as e:
                 detector_results.append(DetectorResult(
@@ -1407,6 +1406,30 @@ class MultimediaPipeline:
             detector_results=detector_results,
             analysis_run_id=run_id,
         )
+
+        # The configured heuristics have no calibration dataset. Zero marks unavailable
+        # confidence, never certainty that the content is benign.
+        assessment.confidence = 0.0
+        for result in assessment.detector_results:
+            result.confidence = 0.0
+        for finding in assessment.supporting_findings + assessment.contradicting_findings:
+            finding.confidence = 0.0
+        assessment.processing_status = decoded['status']
+        assessment.limitations.extend(decoded['limitations'])
+        assessment.limitations.append('Calibrated authenticity confidence is unavailable (confidence=0); configured detector scores and thresholds are heuristic, not learned deepfake probabilities.')
+        if provenance.credential_present and provenance.signature_valid is not True:
+            assessment.limitations.append('Possible content-credential markers were found, but cryptographic provenance is unverified.')
+        assessment.limitations.append('Risk scores reflect heuristic signals, not a calibrated probability of deepfake content. A zero score does not establish authenticity.')
+        if decoded['status'] != 'COMPLETED':
+            assessment.classification = AuthenticityClassificationEnum.INSUFFICIENT_EVIDENCE
+            assessment.confidence = 0.0
+            assessment.summary = 'Analysis incomplete: ' + decoded['status'].replace('_', ' ').lower() + '. Authenticity cannot be determined.'
+        elif not any(r.status == DetectorStatusEnum.SUCCESS for r in detector_results):
+            assessment.processing_status = 'INSUFFICIENT_EVIDENCE'
+
+        from backend.services.deepfake_detector import predict_faces
+        assessment.trained_detector = predict_faces(data, media_type.value, decoded['frames']) if decoded['status'] == 'COMPLETED' else {'status': 'NOT_ANALYZED', 'limitations': ['Media decoding did not complete.']}
+        assessment.analysis_scope = 'Bounded media heuristics and, when available, pretrained face-image classification. Authenticity is not established.'
 
         # 6. Section 12 Impersonation Handshake & Persistence
         if db is not None:
@@ -1446,11 +1469,14 @@ class MultimediaPipeline:
             # Ensure ArtifactModel exists
             art = db.query(ArtifactModel).filter(ArtifactModel.id == artifact_id).first()
             if not art:
+                from backend.services.evidence_storage import evidence_storage
+                stored = evidence_storage.store_bytes(data=data, original_filename=original_filename, mime_type=mime_type)
                 art = ArtifactModel(
                     id=artifact_id,
                     artifact_type=media_type.value,
                     name=original_filename,
                     source="UPLOAD",
+                    storage_reference=stored.storage_key,
                     mime_type=mime_type,
                     sha256=sha256,
                     size=len(data),
@@ -1458,19 +1484,19 @@ class MultimediaPipeline:
                 db.add(art)
                 db.flush()
 
-            # Create AnalysisRunModel
-            run = AnalysisRunModel(
-                id=run_id,
-                artifact_id=artifact_id,
-                status=AnalysisStatusEnum.COMPLETED.value,
-                trigger=trigger.value,
-                pipeline_version="1.0.0",
-                overall_risk_score=assessment.risk_score,
-                overall_severity=SeverityEnum.HIGH.value if assessment.risk_score >= 60.0 else SeverityEnum.LOW.value,
-                confidence=assessment.confidence,
-                metadata_json=f'{{"summary": "{assessment.summary}"}}',
-            )
-            db.add(run)
+            run = db.get(AnalysisRunModel, run_id)
+            if run is not None and (run.artifact_id != artifact_id or run.status not in ('QUEUED', 'RUNNING')):
+                raise ValueError('A media run can only complete its own queued/running artifact; reanalysis requires a new run.')
+            if run is None:
+                run = AnalysisRunModel(id=run_id, artifact_id=artifact_id, trigger=trigger.value, pipeline_version='media-1.1.0')
+                db.add(run)
+            run.status = (AnalysisStatusEnum.COMPLETED if assessment.processing_status == 'COMPLETED' else AnalysisStatusEnum.PARTIAL).value
+            run.overall_risk_score = assessment.risk_score
+            run.overall_severity = SeverityEnum.HIGH.value if assessment.risk_score >= 60.0 else SeverityEnum.LOW.value
+            run.confidence = assessment.confidence
+            run.completed_at = datetime.now(timezone.utc)
+            previous = __import__('json').loads(run.metadata_json or '{}')
+            run.metadata_json = __import__('json').dumps({**previous, **assessment.model_dump(mode='json')})
             db.flush()
 
             # Persist Findings & Evidence
@@ -1574,5 +1600,4 @@ class MultimediaPipeline:
 
         except Exception as e:
             db.rollback()
-            # Non-blocking persistence failure isolation
-            print(f"[MultimediaPipeline] Persistence error: {e}")
+            raise

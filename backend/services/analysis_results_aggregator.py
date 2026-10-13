@@ -184,6 +184,24 @@ class AnalysisResultsAggregator:
         classification, exec_summary = cls._generate_executive_classification(run, artifact, sorted_findings)
         why_bullets = cls._build_why_cyberguard_thinks_this(sorted_findings, run, artifact)
         next_step = cls._build_next_step_recommendation(sorted_findings, run)
+        media_assessment = None
+        if artifact and artifact.artifact_type.upper() in ('IMAGE', 'AUDIO', 'VIDEO'):
+            metadata = json.loads(run.metadata_json or '{}')
+            state = metadata.get('processing_status', 'NOT_ANALYZED')
+            media_assessment = metadata if 'processing_status' in metadata else {
+                'processing_status': state, 'classification': 'INSUFFICIENT_EVIDENCE',
+                'summary': 'No verified media-decoding result exists for this run.',
+                'risk_score': 0, 'limitations': ['Legacy task completion is not proof of media decoding or authenticity.'],
+                'detector_results': [], 'analysis_scope': 'Authenticity is unverified.'}
+            if state != 'COMPLETED':
+                completeness = 'PARTIAL' if completeness != 'IN_PROGRESS' else completeness
+                status = 'PARTIAL' if status == 'COMPLETED' else status
+                completeness_msg = 'Original evidence retained. Media analysis is incomplete: ' + state.replace('_', ' ').lower() + '.'
+            classification = 'Media heuristic checks completed' if state == 'COMPLETED' else 'Media authenticity not assessed'
+            exec_summary = media_assessment.get('summary', 'Authenticity is undetermined.') + ' These are heuristic observations, not a validated real/fake verdict.'
+            next_step = NextStepRecommendation(action_title='Review original media and provenance',
+                action_description='Inspect decoder status, limitations and independent source confirmation. Do not close the investigation from a zero signal score.',
+                priority='REVIEW', target_route='/media-authenticity')
 
         # --------------------------------------------------------------------
         # 2. LEVEL 2: ANALYST FINDINGS & INDICATORS
@@ -229,6 +247,7 @@ class AnalysisResultsAggregator:
             evidence_id=evidence_id,
             artifact=artifact_identity,
             status=status,
+            media_assessment=media_assessment,
             analysis_completeness=completeness,
             completeness_message=completeness_msg,
             total_tasks=total_tasks,
@@ -273,6 +292,15 @@ class AnalysisResultsAggregator:
         Extracts authoritative Section 26 metrics without frontend re-calculation.
         """
         # 1. Check if a formal RiskAssessmentModel exists for this run or investigation
+        artifact = db.get(ArtifactModel, run.artifact_id)
+        if artifact and artifact.artifact_type.upper() in ('IMAGE', 'AUDIO', 'VIDEO'):
+            metadata = json.loads(run.metadata_json or '{}')
+            processed = metadata.get('processing_status') == 'COMPLETED'
+            return RiskHeaderSummary(score=metadata.get('risk_score') if processed else None,
+                level='UNVERIFIED', severity='INFO', confidence=None, confidence_level='UNKNOWN',
+                uncertainty='HIGH', is_pending=status in ('QUEUED', 'RUNNING'),
+                status_label='Heuristic signals only; authenticity undetermined' if processed else 'Media authenticity not assessed')
+
         ra = db.query(RiskAssessmentModel).filter(
             or_(
                 RiskAssessmentModel.analysis_run_id == run.id,
@@ -304,7 +332,7 @@ class AnalysisResultsAggregator:
         if run.overall_risk_score is not None:
             score = float(run.overall_risk_score)
             sev = run.overall_severity.upper() if run.overall_severity else "LOW"
-            conf = run.confidence or 0.85
+            conf = run.confidence if run.confidence is not None else 0.0
 
             if score >= 80:
                 level = "CRITICAL"
@@ -322,14 +350,16 @@ class AnalysisResultsAggregator:
                 level = "SAFE"
                 conf_level = "HIGH"
 
-            status_label = f"{level} Risk ({round(score, 1)} / 100)"
+            if conf == 0:
+                level, conf_level = "UNKNOWN", "UNKNOWN"
+            status_label = "Threat assessment incomplete" if conf == 0 else f"{level} Risk ({round(score, 1)} / 100)"
             return RiskHeaderSummary(
                 score=score,
                 level=level,
                 severity=sev,
                 confidence=conf,
                 confidence_level=conf_level,
-                uncertainty="LOW",
+                uncertainty="HIGH" if conf == 0 else "LOW",
                 is_pending=False,
                 status_label=status_label,
             )
@@ -359,6 +389,11 @@ class AnalysisResultsAggregator:
         Does not ask LLM during rendering; stays deterministic.
         """
         art_type = (artifact.artifact_type if artifact else "FILE").upper()
+        if run.confidence == 0:
+            return (
+                "Threat assessment incomplete",
+                "Available checks may identify references or file properties. These observations do not establish safety or a phishing verdict; assess indicators and review limitations.",
+            )
         finding_types = [f.finding_type.upper() for f in findings]
         titles_lower = " ".join(f.title.lower() for f in findings)
 
@@ -419,18 +454,6 @@ class AnalysisResultsAggregator:
                 )
             )
 
-        if not items:
-            items.append(
-                WhyCyberGuardThinksThisItem(
-                    id="REASON-1",
-                    claim="Baseline forensic checks verified valid structure and absence of active exploits.",
-                    support_level="HIGH",
-                    confidence=0.90,
-                    evidence_count=1,
-                    evidence_refs=[],
-                )
-            )
-
         return items
 
     @classmethod
@@ -442,6 +465,12 @@ class AnalysisResultsAggregator:
         """
         Synthesizes the single most urgent, actionable next step for Level 1.
         """
+        if run.confidence == 0:
+            return NextStepRecommendation(
+                action_title="Assess extracted indicators before resolving",
+                action_description="URL references are observations, not phishing verdicts. Analyze destinations using the URL workflow and review unavailable analyzers.",
+                priority="LOW", target_route="/detect",
+            )
         sev = (run.overall_severity or "LOW").upper()
         top_sev = findings[0].severity.upper() if findings else sev
 
@@ -553,7 +582,7 @@ class AnalysisResultsAggregator:
                                 value=v,
                                 severity=f.severity,
                                 first_seen=ev.timestamp,
-                                redirect_hops=3 if "redirect" in f.title.lower() else 0,
+                                redirect_hops=None,
                                 is_lookalike="lookalike" in f.title.lower(),
                                 credential_harvesting="credential" in f.title.lower(),
                             )
@@ -566,8 +595,8 @@ class AnalysisResultsAggregator:
                                 value=v,
                                 severity=f.severity,
                                 first_seen=ev.timestamp,
-                                country="United States" if v.startswith("192.") or v.startswith("10.") else "External",
-                                asn="AS15169" if "google" in v.lower() else "AS-TRANSIT",
+                                country=None,
+                                asn=None,
                             )
                         )
                 elif "email" in k or "@" in v and not v.startswith("http"):
@@ -633,28 +662,6 @@ class AnalysisResultsAggregator:
             except Exception:
                 pass
 
-        if not items and (artifact and artifact.artifact_type == "EMAIL"):
-            items.append(
-                CounterEvidenceResultItem(
-                    id="CE-1",
-                    title="Domain registration age exceeds 5 years",
-                    description="The originating primary domain has extensive established operational history.",
-                    source="WHOIS Analyzer",
-                    strength="MODERATE",
-                    impact="Demonstrates domain is not newly registered or ephemeral",
-                )
-            )
-            items.append(
-                CounterEvidenceResultItem(
-                    id="CE-2",
-                    title="Valid TLS cryptographic certificate",
-                    description="Mail exchange servers negotiated verified TLS transport encryption.",
-                    source="Network Protocol Analyzer",
-                    strength="WEAK",
-                    impact="Validates encrypted transport integrity",
-                )
-            )
-
         return items
 
     @classmethod
@@ -704,18 +711,9 @@ class AnalysisResultsAggregator:
                     UncertaintyAndGapsItem(
                         topic=t.title,
                         description=f"External provider or inspection routine was unavailable ({t.error or 'timeout'}).",
-                        impact="Downstream heuristics operated with degraded external intelligence.",
+                        impact="This processing stage did not complete; review its limitation before relying on the assessment.",
                     )
                 )
-
-        if not items:
-            items.append(
-                UncertaintyAndGapsItem(
-                    topic="Historical User Baseline",
-                    description="Historical communication volume for this specific sender pair is limited to < 30 days.",
-                    impact="Baseline deviation score confidence is moderate.",
-                )
-            )
 
         return items
 
@@ -728,11 +726,8 @@ class AnalysisResultsAggregator:
         """
         Actionable conditions derived from Explainable AI layer.
         """
-        conditions = [
-            "Verified organizational authorization confirming sending domain ownership and delegate privileges.",
-            "Independent out-of-band confirmation from claimed sender verifying communication intent.",
-            "Direct sandbox detonation demonstrating benign execution of linked web landing pages.",
-        ]
+        conditions = [f"Complete the unavailable check: {gap.topic}." for gap in gaps]
+        conditions.extend(f"Independently verify the source evidence for: {finding.title}." for finding in findings[:3])
         return conditions
 
     @classmethod
@@ -1170,6 +1165,12 @@ class AnalysisResultsAggregator:
         run = db.query(AnalysisRunModel).filter(AnalysisRunModel.id == run_id).first()
         if not run:
             return None
+
+        artifact = db.get(ArtifactModel, run.artifact_id)
+        if artifact and artifact.artifact_type.upper() in ('IMAGE', 'AUDIO', 'VIDEO'):
+            # Re-scoring absent findings cannot verify media. Preserve the run and
+            # direct the analyst to a new versioned decode rather than invent confidence.
+            return cls.get_results_for_run(db, run.id, workspace_id)
 
         findings = db.query(FindingModel).filter(FindingModel.analysis_run_id == run.id).all()
         new_score = min(100.0, sum(f.risk_contribution for f in findings))

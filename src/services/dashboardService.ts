@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Dashboard & Operational Telemetry Service.
  * Consumes real backend operational data:
@@ -31,7 +32,7 @@ export class DashboardService {
    */
   static async getSummary(days: number = 30, recentLimit: number = 10): Promise<DashboardSummary | null> {
     try {
-      const res = await fetch(apiUrl(`/api/dashboard/summary?days=${days}&recent_limit=${recentLimit}`));
+      const res = await apiFetch(apiUrl(`/api/dashboard/summary?days=${days}&recent_limit=${recentLimit}`));
       if (!res.ok) {
         return null;
       }
@@ -46,7 +47,7 @@ export class DashboardService {
    */
   static async listEmails(skip: number = 0, limit: number = 20): Promise<{ items: DashboardEmailItem[]; total: number }> {
     try {
-      const res = await fetch(apiUrl(`/api/dashboard/emails?skip=${skip}&limit=${limit}`));
+      const res = await apiFetch(apiUrl(`/api/dashboard/emails?skip=${skip}&limit=${limit}`));
       if (!res.ok) {
         return { items: [], total: 0 };
       }
@@ -65,7 +66,7 @@ export class DashboardService {
    */
   static async getHealth(): Promise<SystemHealthStatus> {
     try {
-      const res = await fetch(apiUrl('/api/health'));
+      const res = await apiFetch(apiUrl('/api/health'));
       if (!res.ok) {
         return {
           status: 'degraded',
@@ -93,7 +94,7 @@ export class DashboardService {
    */
   static async getEnrolledAgents(): Promise<EnrolledAgentSummary[]> {
     try {
-      const res = await fetch(apiUrl('/api/v1/endpoint/agents'));
+      const res = await apiFetch(apiUrl('/api/v1/endpoint/agents'));
       if (!res.ok) {
         return [];
       }

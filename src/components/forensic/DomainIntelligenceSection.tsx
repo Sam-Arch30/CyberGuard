@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import { Globe, Server, Calendar, Shield, Clock, Info, AlertTriangle, ShieldAlert } from 'lucide-react';
 import type { EmailAnalysis, DomainIntelligence } from '../../types/forensic';
@@ -43,7 +44,7 @@ export const DomainIntelligenceSection: React.FC<DomainIntelligenceSectionProps>
       const existing = initialMap[dom];
       if (!existing || existing.domain_age_days === undefined || !existing.registration?.registration_date) {
         try {
-          const resp = await fetch(apiUrl(`/api/emails/lookup-domain/${encodeURIComponent(dom)}`));
+          const resp = await apiFetch(apiUrl(`/api/emails/lookup-domain/${encodeURIComponent(dom)}`));
           if (resp.ok && isMounted) {
             const data: DomainIntelligence = await resp.json();
             setLiveDomainIntel(prev => {

@@ -1,0 +1,9 @@
+{
+  "display_name": "Example Finance",
+  "trusted_domains": [
+    "example.test"
+  ],
+  "trusted_sender_addresses": [
+    "finance@example.test"
+  ]
+}

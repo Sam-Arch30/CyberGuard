@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900">
+<rect width="1600" height="900" fill="#101510"/>
+<text x="90" y="115" fill="#e6ecdf" font-family="Arial" font-size="48" font-weight="bold">Expand coverage. Validate every claim.</text>
+<text x="90" y="175" fill="#a8b29f" font-family="Arial" font-size="25">Planned expansion beyond the current prototype.</text>
+<rect x="90" y="245" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="118" y="296" fill="#d8e9c4" font-family="Arial" font-size="30">Independent model evaluation</text>
+<text x="118" y="341" fill="#aeb9a5" font-family="Arial" font-size="22">Measure false positives across unseen generators.</text>
+<rect x="830" y="245" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="858" y="296" fill="#d8e9c4" font-family="Arial" font-size="30">Audio authenticity</text>
+<text x="858" y="341" fill="#aeb9a5" font-family="Arial" font-size="22">Add a separately trained and evaluated voice model.</text>
+<rect x="90" y="425" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="118" y="476" fill="#d8e9c4" font-family="Arial" font-size="30">Operational integrations</text>
+<text x="118" y="521" fill="#aeb9a5" font-family="Arial" font-size="22">Connect enterprise telemetry and review workflows.</text>
+<rect x="830" y="425" width="680" height="145" rx="16" fill="#1c241b" stroke="#3f5035"/>
+<text x="858" y="476" fill="#d8e9c4" font-family="Arial" font-size="30">Production readiness</text>
+<text x="858" y="521" fill="#aeb9a5" font-family="Arial" font-size="22">Validate monitoring, resilience and deployment scale.</text>
+</svg>

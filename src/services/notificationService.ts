@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Client service for Section 47: Notifications & Alert Center.
  * Handles listing, fast unread counts, marking as read, and acknowledging security alerts.
@@ -28,7 +29,7 @@ export class NotificationClientService {
     if (filters?.offset) params.append('offset', String(filters.offset));
 
     const url = `${apiUrl('/api/notifications')}?${params.toString()}`;
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -50,7 +51,7 @@ export class NotificationClientService {
   static async getUnreadCount(
     workspaceId: string = 'default'
   ): Promise<NotificationUnreadCountResponse> {
-    const res = await fetch(apiUrl('/api/notifications/unread-count'), {
+    const res = await apiFetch(apiUrl('/api/notifications/unread-count'), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -73,7 +74,7 @@ export class NotificationClientService {
     notificationId: string,
     workspaceId: string = 'default'
   ): Promise<NotificationItem> {
-    const res = await fetch(apiUrl(`/api/notifications/${encodeURIComponent(notificationId)}/read`), {
+    const res = await apiFetch(apiUrl(`/api/notifications/${encodeURIComponent(notificationId)}/read`), {
       method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
@@ -100,7 +101,7 @@ export class NotificationClientService {
     if (category) params.append('category', category);
 
     const url = `${apiUrl('/api/notifications/read-all')}?${params.toString()}`;
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -125,7 +126,7 @@ export class NotificationClientService {
     note?: string,
     workspaceId: string = 'default'
   ): Promise<NotificationItem> {
-    const res = await fetch(
+    const res = await apiFetch(
       apiUrl(`/api/notifications/${encodeURIComponent(notificationId)}/acknowledge`),
       {
         method: 'PATCH',

@@ -1,0 +1,117 @@
+{
+  "artifact_id": "e1823902-55cb-4a0e-b905-84824a6078c2",
+  "analysis_run_id": "ffb9ac4a-5d65-42f4-ad32-b922479bfbea",
+  "pipeline_version": "2.0.0",
+  "classification": "UNVERIFIED",
+  "risk_score": 0.0,
+  "severity": "LOW",
+  "confidence": 0.0,
+  "summary": "No suspicious static indicators were observed. These limited checks do not establish file safety or verified decoding.",
+  "identity": {
+    "sha256": "28d2c5c550052093b4c3bea5946edfd950401a711c9ecee96fd766a8791074a9",
+    "sha1": "b9ab70d5b9cb1bae373485751b5992ddb8b9c5f8",
+    "md5": "ffc1832238b6c1bc11476b86fc711ab4",
+    "size_bytes": 373,
+    "original_filename": "benign-bundle.zip",
+    "safe_display_name": "benign-bundle.zip",
+    "claimed_extension": ".zip",
+    "reported_mime": "application/x-zip-compressed",
+    "detected_mime": "application/zip",
+    "detected_file_type": "ZIP Archive",
+    "is_polyglot": false
+  },
+  "filename_analysis": {
+    "is_double_extension": false,
+    "is_deceptive": false,
+    "has_unicode_deception": false,
+    "detected_control_characters": [],
+    "signals": []
+  },
+  "entropy": {
+    "entropy": 5.81,
+    "level": "normal",
+    "description": "Evaluated entropy",
+    "is_high_entropy": false
+  },
+  "pe_metadata": null,
+  "pdf_metadata": null,
+  "office_metadata": null,
+  "script_metadata": null,
+  "archive_metadata": {
+    "is_archive": true,
+    "archive_type": "ZIP",
+    "total_files": 2,
+    "uncompressed_size": 133,
+    "compression_ratio": 0.36,
+    "is_encrypted": false,
+    "has_nested_archives": false,
+    "has_path_traversal": false,
+    "has_hidden_executables": false,
+    "suspicious_entries": [],
+    "entries": [
+      {
+        "filename": "README.txt",
+        "uncompressed_size": 58,
+        "compressed_size": 58,
+        "is_encrypted": false,
+        "is_suspicious_extension": false,
+        "is_nested_archive": false,
+        "is_path_traversal": false
+      },
+      {
+        "filename": "documents/benign-note.txt",
+        "uncompressed_size": 75,
+        "compressed_size": 71,
+        "is_encrypted": false,
+        "is_suspicious_extension": false,
+        "is_nested_archive": false,
+        "is_path_traversal": false
+      }
+    ],
+    "safety_violations": []
+  },
+  "image_metadata": null,
+  "reputation": {
+    "provider": "cyberguard_threat_intel",
+    "sha256_queried": "28d2c5c550052093b4c3bea5946edfd950401a711c9ecee96fd766a8791074a9",
+    "verdict": "UNKNOWN",
+    "is_malicious": false,
+    "threat_types": [],
+    "confidence": 0.0,
+    "details": "No external threat intelligence match found for hash (Note: No Match != Safe)",
+    "retrieved_at": "2026-10-13T01:52:45.116525+00:00"
+  },
+  "extracted_urls": [],
+  "extracted_domains": [],
+  "extracted_ips": [],
+  "extracted_emails": [],
+  "extracted_hashes": [],
+  "derived_artifacts": [
+    {
+      "artifact_id": "32fc0707-0bf6-41c2-840f-8dfa93308a5a",
+      "name": "README.txt",
+      "artifact_type": "ATTACHMENT",
+      "mime_type": "text/plain",
+      "size_bytes": 58,
+      "sha256": "4d42368024e6cc25d28dba54e5e4f5ac35a2448d5f94287fbed2c37cc2b8a922",
+      "source": "ARCHIVE_EXTRACTION",
+      "relationship_type": "CONTAINS"
+    },
+    {
+      "artifact_id": "db8261b5-a083-4e1c-a0ba-5e9b2f360b41",
+      "name": "benign-note.txt",
+      "artifact_type": "ATTACHMENT",
+      "mime_type": "text/plain",
+      "size_bytes": 75,
+      "sha256": "f02f96e2ee850242a3bc0014f7f0eaa88af74a44a80ae362675e82c7f0513010",
+      "source": "ARCHIVE_EXTRACTION",
+      "relationship_type": "CONTAINS"
+    }
+  ],
+  "findings_count": 0,
+  "findings": [],
+  "indicators_count": 174,
+  "relationships_count": 4,
+  "status": "COMPLETED",
+  "created_at": "2026-10-13T01:52:45.131859+00:00"
+}

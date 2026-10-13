@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   Fingerprint,
@@ -90,7 +91,7 @@ export const EvidenceIntegritySection: React.FC<EvidenceIntegritySectionProps> =
         try {
           const controller = new AbortController();
           const timeoutId = setTimeout(() => controller.abort(), 3500);
-          const res = await fetch(url, { signal: controller.signal });
+          const res = await apiFetch(url, { signal: controller.signal });
           clearTimeout(timeoutId);
 
           if (res.ok) {

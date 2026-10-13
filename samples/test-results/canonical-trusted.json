@@ -1,0 +1,50 @@
+{
+  "analysis_run_id": "104f2b49-79c5-4ba2-a2d1-0da8971e5660",
+  "artifact_id": "c2948356-de8e-4bb6-97b5-045c3e3dc62f",
+  "assessment": {
+    "classification": "NO_IMPERSONATION_EVIDENCE",
+    "confidence": 0.95,
+    "risk_score": 0.0,
+    "target_identity": "Example Finance",
+    "target_identity_id": "675576d9-5f43-44a4-9091-c230748de122",
+    "claims": [
+      {
+        "id": "cb719eac-3939-4643-b848-2c33684a81d4",
+        "claim_type": "PERSON",
+        "claimed_name": "Example Finance",
+        "claimed_domain": "example.test",
+        "claimed_email": "finance@example.test",
+        "claimed_organization": null,
+        "claimed_role": null,
+        "source_artifact_id": null,
+        "analysis_run_id": null,
+        "evidence_reference": null,
+        "confidence": 1.0,
+        "text_span": "From: Example Finance <finance@example.test>",
+        "metadata": {
+          "header": "From",
+          "display_name": "Example Finance"
+        }
+      }
+    ],
+    "supporting_findings": [],
+    "contradicting_findings": [],
+    "limitations": [
+      "Absence of impersonation does not establish that communication is benign (e.g. compromised legitimate accounts).",
+      "Conclusions are evidence-based hypotheses, not definitive legal brand attribution."
+    ],
+    "summary": "No deceptive discrepancies identified against reference identity 'Example Finance'.",
+    "created_at": "2026-10-13T01:53:23.862884Z",
+    "profile_revisions_used": {
+      "675576d9-5f43-44a4-9091-c230748de122": 1
+    }
+  },
+  "entities_created": [
+    "294bb156-f8b2-418d-be05-6cace057677e"
+  ],
+  "relationships_created": [
+    "cd347fc2-198f-4b98-910c-378dec90e6e3",
+    "bbb7bce7-391e-4b99-8dff-1aff6cc6da19"
+  ],
+  "threat_events_created": []
+}

@@ -1,0 +1,68 @@
+{
+  "full_backend": {
+    "command": "backend/venv/Scripts/python.exe -m pytest backend/tests -q --tb=short",
+    "exit_code": 0,
+    "passed": 1561,
+    "failed": 0,
+    "skipped": 1,
+    "warnings": 6281
+  },
+  "focused_media": {
+    "exit_code": 0,
+    "passed": 88,
+    "warnings": 358
+  },
+  "model_states": {
+    "exit_code": 0,
+    "passed": 6,
+    "warnings": 24
+  },
+  "ingestion_and_model": {
+    "exit_code": 0,
+    "passed": 35,
+    "warnings": 147
+  },
+  "build": {
+    "command": "npm run build",
+    "exit_code": 0,
+    "warnings": [
+      "Large JavaScript chunk: 3414.75 kB"
+    ]
+  },
+  "lint": {
+    "command": "npm run lint",
+    "exit_code": 0,
+    "warnings": 179
+  },
+  "npm_audit": {
+    "command": "npm audit --json",
+    "exit_code": 0,
+    "vulnerabilities": 0
+  },
+  "trained_api_smoke": {
+    "command": "backend/venv/Scripts/python.exe scripts/smoke_trained_media.py",
+    "exit_code": 0,
+    "png_http": 200,
+    "mp4_http": 200,
+    "known_false_positive": "Real-source NASA portrait MP4 classified DEEPFAKE_LIKELY, score 0.7584"
+  },
+  "unverified": [
+    "Independent model accuracy and calibration",
+    "Updated live browser integration and screenshots",
+    "Trained audio authenticity",
+    "Production scalability"
+  ],
+  "screenshots": {
+    "count": 5,
+    "version": "Already-open previous application; not updated model UI"
+  },
+  "presentation_graphics": 3,
+  "initial_full_suite": {
+    "exit_code": 1,
+    "passed": 1558,
+    "failed": 1,
+    "skipped": 1,
+    "warnings": 6273,
+    "resolution": "Restored explicit unimplemented full-video validation warning; original assertions retained"
+  }
+}

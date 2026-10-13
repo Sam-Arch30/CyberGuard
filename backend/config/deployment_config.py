@@ -77,7 +77,7 @@ class AuthSecurityConfig:
     @classmethod
     def from_env(cls, env: EnvironmentEnum) -> AuthSecurityConfig:
         secret = os.getenv("CYBERGUARD_AUTH_SECRET", os.getenv("JWT_SECRET", "")).strip()
-        insecure_defaults = {"", "secret", "changeme", "default_secret", "admin", "123456"}
+        insecure_defaults = {"", "secret", "changeme", "default_secret", "admin", "123456", "dev_insecure_ephemeral_jwt_secret_key_32chars_min"}
 
         if env in (EnvironmentEnum.PRODUCTION, EnvironmentEnum.STAGING):
             if not secret or secret.lower() in insecure_defaults or len(secret) < 32:

@@ -1,0 +1,66 @@
+{
+  "ingestion_id": "f9c5b61d-2299-4011-88ad-0b958c8a5c0d",
+  "artifact_id": "8768bebf-1434-4031-ac17-b064a6cbea5d",
+  "artifact_type": "TEXT",
+  "input_mode": "FILE_UPLOAD",
+  "name": "api-events.json",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "925b06d865cf87d3a0456c1076831643bb153eb7a192f8612f164acca0cb402c",
+  "size": 1910,
+  "mime_type": "text/plain",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "TEXT",
+    "detected_mime": "text/plain",
+    "reported_mime": "application/json",
+    "confidence": 0.85,
+    "detector": "plain_text_utf8",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [
+      "nlp_classifier"
+    ],
+    "metadata": {
+      "size_bytes": 1910,
+      "original_filename": "api-events.json",
+      "char_count": 1910
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/92/925b06d865cf87d3a0456c1076831643bb153eb7a192f8612f164acca0cb402c/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "nlp_classifier"
+  ],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "api-events.json",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "TEXT",
+      "detected_mime": "text/plain",
+      "reported_mime": "application/json",
+      "confidence": 0.85,
+      "detector": "plain_text_utf8",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [
+        "nlp_classifier"
+      ],
+      "metadata": {
+        "size_bytes": 1910,
+        "original_filename": "api-events.json",
+        "char_count": 1910
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.831161",
+  "evidence_id": "EVD-925B06D865",
+  "investigation_id": "52e79c52-07b8-482d-b3c9-d298cf3d9a8b",
+  "analysis_run_id": "40295518-9cb0-44aa-ae9a-5cea8f84cda5",
+  "duplicate": false
+}

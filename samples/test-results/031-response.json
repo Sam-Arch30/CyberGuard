@@ -1,0 +1,68 @@
+{
+  "ingestion_id": "a4a0bec0-339e-42db-8073-701bccfb7baa",
+  "artifact_id": "aed4cc22-f963-4b52-a2c5-c6988876c414",
+  "artifact_type": "SYSTEM_LOG",
+  "input_mode": "FILE_UPLOAD",
+  "name": "trusted-profile.json",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "a42ad15f1a17ce7b979736fdfbe6c97f14f3888da797bf05f4168aa6bbead24a",
+  "size": 150,
+  "mime_type": "application/json",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "SYSTEM_LOG",
+    "detected_mime": "application/json",
+    "reported_mime": "application/json",
+    "confidence": 0.92,
+    "detector": "structured_event_schema",
+    "support_status": "SUPPORTED",
+    "warnings": [],
+    "candidate_analyzers": [],
+    "metadata": {
+      "event_keys": [
+        "display_name",
+        "trusted_domains",
+        "trusted_sender_addresses"
+      ],
+      "size_bytes": 150,
+      "original_filename": "trusted-profile.json"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/a4/a42ad15f1a17ce7b979736fdfbe6c97f14f3888da797bf05f4168aa6bbead24a/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [],
+  "warnings": [],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "trusted-profile.json",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "SYSTEM_LOG",
+      "detected_mime": "application/json",
+      "reported_mime": "application/json",
+      "confidence": 0.92,
+      "detector": "structured_event_schema",
+      "support_status": "SUPPORTED",
+      "warnings": [],
+      "candidate_analyzers": [],
+      "metadata": {
+        "event_keys": [
+          "display_name",
+          "trusted_domains",
+          "trusted_sender_addresses"
+        ],
+        "size_bytes": 150,
+        "original_filename": "trusted-profile.json"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.907953",
+  "evidence_id": "EVD-A42AD15F1A",
+  "investigation_id": "53b79c06-6320-45a3-8f5b-9fd9a5a041f2",
+  "analysis_run_id": "a3dfda53-5566-4e48-a917-a76d624825a0",
+  "duplicate": false
+}

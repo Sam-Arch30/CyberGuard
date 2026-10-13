@@ -1,0 +1,37 @@
+[
+  {
+    "timestamp": "2026-10-12T09:00:00+00:00",
+    "user": "analyst@example.test",
+    "status": "success",
+    "ip": "192.0.2.10",
+    "mfa_result": "success"
+  },
+  {
+    "timestamp": "2026-10-12T09:01:00+00:00",
+    "user": "analyst@example.test",
+    "status": "success",
+    "ip": "192.0.2.10",
+    "mfa_result": "success"
+  },
+  {
+    "timestamp": "2026-10-12T09:02:00+00:00",
+    "user": "analyst@example.test",
+    "status": "success",
+    "ip": "192.0.2.10",
+    "mfa_result": "success"
+  },
+  {
+    "timestamp": "2026-10-12T09:03:00+00:00",
+    "user": "analyst@example.test",
+    "status": "success",
+    "ip": "192.0.2.10",
+    "mfa_result": "success"
+  },
+  {
+    "timestamp": "2026-10-12T09:04:00+00:00",
+    "user": "analyst@example.test",
+    "status": "success",
+    "ip": "192.0.2.10",
+    "mfa_result": "success"
+  }
+]

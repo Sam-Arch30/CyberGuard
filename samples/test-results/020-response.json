@@ -1,0 +1,81 @@
+{
+  "ingestion_id": "fa2f88c3-dd0d-4f4b-b5e3-d08fbae8e376",
+  "artifact_id": "36087934-307f-46e1-b6b0-21edb65d9a33",
+  "artifact_type": "AUDIO",
+  "input_mode": "FILE_UPLOAD",
+  "name": "synthetic-tone.flac",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "af7f90bf9836e89262a417c7e97fd809720a4bcc92834048854725a34be33690",
+  "size": 19346,
+  "mime_type": "audio/flac",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "AUDIO",
+    "detected_mime": "audio/flac",
+    "reported_mime": "audio/x-flac",
+    "confidence": 0.9,
+    "detector": "audio_signature",
+    "support_status": "PARTIALLY_SUPPORTED",
+    "warnings": [
+      "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+      "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+      "Reported MIME type differs from the detected content signature."
+    ],
+    "candidate_analyzers": [
+      "file_metadata",
+      "multimedia_authenticity_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 19346,
+      "original_filename": "synthetic-tone.flac",
+      "format": "FLAC"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/af/af7f90bf9836e89262a417c7e97fd809720a4bcc92834048854725a34be33690/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "file_metadata",
+    "multimedia_authenticity_analyzer"
+  ],
+  "warnings": [
+    "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+    "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+    "Reported MIME type differs from the detected content signature."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "synthetic-tone.flac",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "AUDIO",
+      "detected_mime": "audio/flac",
+      "reported_mime": "audio/x-flac",
+      "confidence": 0.9,
+      "detector": "audio_signature",
+      "support_status": "PARTIALLY_SUPPORTED",
+      "warnings": [
+        "Audio evidence persisted. Bounded heuristic analysis is available separately; validated deepfake voice-clone detection is NOT_IMPLEMENTED.",
+        "Original media retained; decoding and authenticity analysis have not run. Use focused media analysis.",
+        "Reported MIME type differs from the detected content signature."
+      ],
+      "candidate_analyzers": [
+        "file_metadata",
+        "multimedia_authenticity_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 19346,
+        "original_filename": "synthetic-tone.flac",
+        "format": "FLAC"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:37.066360",
+  "evidence_id": "EVD-AF7F90BF98",
+  "investigation_id": "81f7be41-d9cd-424a-9af4-8965444f5e47",
+  "analysis_run_id": "6d3aa7c7-f59f-483d-a645-10e7d113c9bf",
+  "duplicate": false
+}

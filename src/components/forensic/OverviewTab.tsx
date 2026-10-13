@@ -1,3 +1,4 @@
+import { apiFetch } from '../../utils/apiClient';
 import React, { useState, useEffect } from 'react';
 import type { EmailAnalysis } from '../../types/forensic';
 import { MetadataRow } from './MetadataRow';
@@ -42,7 +43,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
   useEffect(() => {
     if (!emailKey || !email) return;
     setLoadingCorrelations(true);
-    fetch(apiUrl('/api/correlation/email?min_score=0.15'), {
+    apiFetch(apiUrl('/api/correlation/email?min_score=0.15'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)
@@ -55,7 +56,7 @@ export const OverviewTab: React.FC<OverviewTabProps> = ({ email, onFocusGraphNod
       .finally(() => setLoadingCorrelations(false));
 
     // Proactive Campaign Detection Alert
-    fetch(apiUrl('/api/campaigns/detect-alert?threshold=0.45'), {
+    apiFetch(apiUrl('/api/campaigns/detect-alert?threshold=0.45'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(email)

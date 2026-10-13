@@ -222,7 +222,7 @@ def test_priority_queue_deterministic_ranking(client, db_session):
     assert queue[0]["id"] == "INC-CRIT-P0"
     assert queue[0]["urgency"] == "P0"
     assert queue[0]["severity"] == "CRITICAL"
-    assert queue[0]["navigation_target"] == "/investigations/INC-CRIT-P0/overview"
+    assert queue[0]["navigation_target"] == "/incidents/INC-CRIT-P0"
 
     assert queue[1]["id"] == "INC-HIGH-P1"
     assert queue[1]["urgency"] == "P1"

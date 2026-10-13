@@ -1,0 +1,61 @@
+{
+  ".png": {
+    "http_status": 200,
+    "processing_status": "COMPLETED",
+    "trained_detector": {
+      "status": "COMPLETED",
+      "model": "prithivMLmods/Deep-Fake-Detector-v2-Model",
+      "revision": "3a99ae26f52c7ac7c3a53103b6cf3a8b617f7093",
+      "calibrated": false,
+      "limitations": [
+        "Face-image classifier applied to at most four face crops; video temporal authenticity and audio are not evaluated.",
+        "Model softmax scores are uncalibrated. Compression, demographics and unseen generators can change performance.",
+        "CyberGuard has not independently measured real-world deepfake accuracy."
+      ],
+      "faces_analyzed": 1,
+      "prediction": "UNCERTAIN",
+      "deepfake_score": 0.6878221035003662,
+      "face_scores": [
+        0.6878221035003662
+      ],
+      "sample_locations": [
+        {
+          "frame_index": 0,
+          "timestamp_seconds": 0.0
+        }
+      ]
+    }
+  },
+  ".mp4": {
+    "http_status": 200,
+    "processing_status": "COMPLETED",
+    "trained_detector": {
+      "status": "COMPLETED",
+      "model": "prithivMLmods/Deep-Fake-Detector-v2-Model",
+      "revision": "3a99ae26f52c7ac7c3a53103b6cf3a8b617f7093",
+      "calibrated": false,
+      "limitations": [
+        "Face-image classifier applied to at most four face crops; video temporal authenticity and audio are not evaluated.",
+        "Model softmax scores are uncalibrated. Compression, demographics and unseen generators can change performance.",
+        "CyberGuard has not independently measured real-world deepfake accuracy."
+      ],
+      "faces_analyzed": 2,
+      "prediction": "DEEPFAKE_LIKELY",
+      "deepfake_score": 0.7583626806735992,
+      "face_scores": [
+        0.7555609345436096,
+        0.7611644268035889
+      ],
+      "sample_locations": [
+        {
+          "frame_index": 0,
+          "timestamp_seconds": 0.0
+        },
+        {
+          "frame_index": 1,
+          "timestamp_seconds": 1.0
+        }
+      ]
+    }
+  }
+}

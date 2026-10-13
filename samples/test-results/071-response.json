@@ -1,0 +1,79 @@
+{
+  "analysis_run_id": "4f42b744-2aeb-48a4-a67c-6a4dd9b76b1a",
+  "artifact_id": null,
+  "events_analyzed_count": 5,
+  "devices_observed_count": 1,
+  "unique_destinations_count": 1,
+  "total_bytes_sent": 15360,
+  "total_bytes_received": 0,
+  "overall_risk_score": 40.0,
+  "overall_severity": "MEDIUM",
+  "confidence": 0.82,
+  "classification": "ANOMALOUS_NETWORK_TRAFFIC",
+  "findings": [
+    {
+      "finding_type": "PERIODIC_CONNECTION_PATTERN",
+      "title": "Beacon-like periodic communication to 203.0.113.15 from 192.0.2.10",
+      "description": "Source 192.0.2.10 established 5 connections to 203.0.113.15 with highly regular intervals (mean: 20.0s, median: 20.0s, jitter CV: 0.00). Limitation: Periodic communication is common in legitimate software, cloud agents, telemetry, and health checks. Periodicity alone does not establish command-and-control activity.",
+      "severity": "MEDIUM",
+      "confidence": 0.82,
+      "risk_contribution": 40.0,
+      "method": "STATISTICAL",
+      "rule_id": "NET_RULE_BEACON_PERIODICITY",
+      "category": "CONNECTION_PATTERN",
+      "target_device": "192.0.2.10",
+      "target_destination": "203.0.113.15",
+      "evidence_items": [
+        {
+          "key": "destination",
+          "value": "203.0.113.15",
+          "source": "PeriodicityEngine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:20Z"
+        },
+        {
+          "key": "connection_count",
+          "value": "5",
+          "source": "PeriodicityEngine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:20Z"
+        },
+        {
+          "key": "median_interval_seconds",
+          "value": "20.00",
+          "source": "PeriodicityEngine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:20Z"
+        },
+        {
+          "key": "coefficient_of_variation",
+          "value": "0.000",
+          "source": "PeriodicityEngine",
+          "confidence": 1.0,
+          "timestamp": "2026-10-12T09:01:20Z"
+        }
+      ],
+      "mitre_attack_ids": [
+        "T1071",
+        "T1573"
+      ]
+    }
+  ],
+  "corroborated_threat_events": [],
+  "device_profiles": {
+    "192.0.2.10": {
+      "device_id": "192.0.2.10",
+      "total_connections_observed": 0,
+      "first_seen": "2026-10-12T09:00:00Z",
+      "last_seen": "2026-10-12T09:00:00Z",
+      "known_destinations": [],
+      "known_ports": [],
+      "known_domains": [],
+      "total_bytes_sent": 0,
+      "total_bytes_received": 0
+    }
+  },
+  "suspicious_communication_detected": false,
+  "possible_exfiltration_detected": false,
+  "created_at": "2026-10-13T01:52:45.270986Z"
+}

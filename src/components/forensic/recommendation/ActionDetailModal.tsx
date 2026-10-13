@@ -1,3 +1,4 @@
+import { apiFetch } from '../../../utils/apiClient';
 import React, { useState } from 'react';
 import {
   X,
@@ -39,7 +40,7 @@ export const ActionDetailModal: React.FC<ActionDetailModalProps> = ({
     setSubmitError(null);
     try {
       const endpoint = disposition.toLowerCase();
-      const res = await fetch(apiUrl(`/api/v1/recommendations/${recommendation.id}/${endpoint}`), {
+      const res = await apiFetch(apiUrl(`/api/v1/recommendations/${recommendation.id}/${endpoint}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

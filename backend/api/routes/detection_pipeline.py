@@ -132,7 +132,7 @@ def ingest_event(
         logger.exception("Failed to process event through detection pipeline: %s", exc)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Pipeline processing error: {str(exc)}",
+            detail='Pipeline processing error.',
         )
 
 
@@ -683,5 +683,5 @@ def retry_dead_letter(
         db.commit()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Retry attempt failed: {str(exc)}",
+            detail='Retry attempt failed.',
         )

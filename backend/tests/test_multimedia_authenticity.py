@@ -238,13 +238,14 @@ def test_09_video_duration_and_streams():
     assert "AAC" in meta.codecs
 
 
-def test_10_c2pa_provenance_detection_present():
+def test_10_c2pa_marker_does_not_verify_signature():
     # Injected C2PA marker box
     raw = create_synthetic_jpeg() + b"jumbc2pa_manifest_block_data"
     _, prov = MediaMetadataExtractor.extract_image_metadata(raw)
     assert prov.credential_present is True
-    assert prov.status == ProvenanceStatusEnum.VALID_CREDENTIALS
-    assert prov.signature_valid is True
+    assert prov.status == ProvenanceStatusEnum.UNVERIFIED_CREDENTIALS
+    assert prov.signature_valid is None
+    assert prov.issuer is None
 
 
 # ============================================================================

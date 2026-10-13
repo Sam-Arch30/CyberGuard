@@ -287,7 +287,7 @@ class AnalysisOrchestrator:
                     "analyzer_id": "forensic_analyzer",
                     "task_type": "FORENSIC_INSPECTION",
                     "title": "Payload & Manipulation Detection",
-                    "description": "Decodes embedded QR codes, scans for steganographic payloads, and detects synthetic generation anomalies.",
+                    "description": "Runs bounded image, audio or sampled-frame heuristics. Deepfake accuracy is not established.",
                     "dependencies": ["metadata_extractor"],
                     "version": "1.0.0",
                 },
@@ -490,6 +490,130 @@ class AnalysisOrchestrator:
         return evt
 
     @classmethod
+    async def _execute_media_run(cls, db, run, artifact, tasks):
+        """Media tasks use the real bounded decoder, never generic-success fallbacks."""
+        from backend.services.multimedia_service import MultimediaPipeline, MAX_MEDIA_BYTES
+        from starlette.concurrency import run_in_threadpool
+        run.status = 'RUNNING'
+        run.started_at = get_utc_now()
+        db.commit()
+        try:
+            with evidence_storage.retrieve_stream(artifact.storage_reference or artifact.sha256) as stream:
+                raw = stream.read(MAX_MEDIA_BYTES + 1)
+            if len(raw) > MAX_MEDIA_BYTES:
+                raise ValueError('Stored media exceeds the bounded analysis limit.')
+            if artifact.sha256 and hashlib.sha256(raw).hexdigest() != artifact.sha256:
+                raise ValueError('Original evidence hash verification failed.')
+            # This worker owns the session for the call; no concurrent ORM operation.
+            assessment = await run_in_threadpool(MultimediaPipeline().analyze_media,
+                data=raw, original_filename=artifact.name, artifact_id=artifact.id,
+                db=db, analysis_run_id=run.id)
+            completed = assessment.processing_status == 'COMPLETED'
+            for task in tasks:
+                task.started_at = run.started_at
+                task.completed_at = get_utc_now()
+                task.status = 'COMPLETED' if completed else 'FAILED'
+                task.result_count = len(assessment.detector_results) if task.analyzer_id == 'forensic_analyzer' else 0
+                task.message = ('Bounded heuristic checks completed. Authenticity is not verified.' if completed else
+                                'Media checks incomplete: ' + assessment.processing_status)
+                task.error = None if completed else task.message
+            db.commit()
+            cls.emit_event(db=db, run_id=run.id, event_type='ANALYSIS_COMPLETED' if completed else 'ANALYSIS_PARTIAL',
+                message='Media heuristic checks completed; authenticity unverified.' if completed else 'Media evidence preserved; analysis incomplete.',
+                result_count=len(assessment.detector_results))
+        except Exception:
+            logger.exception('Bounded media execution could not complete')
+            db.rollback()
+            run.status = 'PARTIAL'
+            run.confidence = 0.0
+            run.overall_risk_score = None
+            run.overall_severity = 'INFO'
+            run.error = 'Original media could not be verified or decoded. Preserve evidence and review the media limitations.'
+            run.completed_at = get_utc_now()
+            for task in tasks:
+                task.status = 'FAILED'; task.error = run.error; task.message = run.error
+            db.commit()
+        return run
+
+    @classmethod
+    async def _execute_telemetry_run(cls, db, run, artifact, tasks):
+        """Use the existing log pipelines and preserve their canonical lineage."""
+        run.status = 'RUNNING'
+        run.started_at = get_utc_now()
+        db.commit()
+        try:
+            with evidence_storage.retrieve_stream(artifact.storage_reference or artifact.sha256) as stream:
+                raw = stream.read(50 * 1024 * 1024 + 1)
+            if not raw or len(raw) > 50 * 1024 * 1024:
+                raise ValueError('Stored telemetry is empty or exceeds the 50 MB processing limit.')
+            if artifact.sha256 and hashlib.sha256(raw).hexdigest() != artifact.sha256:
+                raise ValueError('Original telemetry hash verification failed.')
+            if artifact.artifact_type == 'AUTH_LOG':
+                from backend.services.auth_log_parser import parse_auth_log
+                from backend.services.authentication_pipeline import global_auth_pipeline
+                events = parse_auth_log(raw, artifact.name or '', artifact.mime_type or '')
+                pipeline = global_auth_pipeline
+            else:
+                try:
+                    if (artifact.name or '').lower().endswith('.jsonl'):
+                        events = [json.loads(line) for line in raw.decode('utf-8').splitlines() if line.strip()]
+                    else:
+                        parsed = json.loads(raw.decode('utf-8'))
+                        events = parsed if isinstance(parsed, list) else parsed.get('events', [parsed])
+                except (ValueError, UnicodeError, AttributeError) as exc:
+                    raise ValueError('Use a JSON/JSONL batch of structured telemetry events.') from exc
+                if artifact.artifact_type == 'NETWORK_LOG':
+                    from backend.services.network_pipeline import global_network_pipeline as pipeline
+                else:
+                    from backend.services.api_pipeline import global_api_pipeline as pipeline
+            if not events or not all(isinstance(event, dict) for event in events):
+                raise ValueError('Telemetry contains no usable structured events.')
+            response = await asyncio.wait_for(pipeline.analyze_events(raw_events=events, db=db, artifact_id=artifact.id), timeout=45)
+            if response.events_analyzed_count == 0:
+                raise ValueError('No events could be normalized; check the telemetry fields and provider format.')
+            canonical = db.get(AnalysisRunModel, response.analysis_run_id)
+            if canonical is None or canonical.artifact_id != artifact.id:
+                raise ValueError('Canonical telemetry result did not preserve its source artifact.')
+            canonical_findings = db.query(FindingModel).filter_by(analysis_run_id=canonical.id).all()
+            for observed in canonical_findings:
+                copied = db.query(FindingModel).filter_by(analysis_run_id=run.id, analyzer=observed.analyzer, finding_type=observed.finding_type, title=observed.title).first()
+                if copied is None:
+                    values = {column.name: getattr(observed, column.name) for column in FindingModel.__table__.columns if column.name not in ('id', 'analysis_run_id')}
+                    copied = FindingModel(id=generate_uuid(), analysis_run_id=run.id, **values)
+                    db.add(copied)
+                    db.flush()
+                for evidence in observed.evidence_items:
+                    if db.query(FindingEvidenceModel).filter_by(finding_id=copied.id, key=evidence.key, value=evidence.value).first() is None:
+                        values = {column.name: getattr(evidence, column.name) for column in FindingEvidenceModel.__table__.columns if column.name not in ('id', 'finding_id')}
+                        db.add(FindingEvidenceModel(id=generate_uuid(), finding_id=copied.id, **values))
+            run.overall_risk_score = response.overall_risk_score
+            run.overall_severity = getattr(response.overall_severity, 'value', response.overall_severity)
+            run.confidence = response.confidence
+            metadata = json.loads(run.metadata_json or '{}')
+            metadata['canonical_pipeline_run_id'] = canonical.id
+            run.metadata_json = json.dumps(metadata)
+            run.status = 'COMPLETED'
+            for task in tasks:
+                task.status = 'COMPLETED'
+                task.started_at = run.started_at
+                task.completed_at = get_utc_now()
+                task.result_count = len(canonical_findings) if task.task_type == 'RISK_ASSESSMENT' else 0
+                task.message = f'Executed by {pipeline.__class__.__name__}; {response.events_analyzed_count} normalized events. Canonical run: {canonical.id}'
+            cls.emit_event(db, run.id, event_type='ANALYSIS_COMPLETED', message=f'{pipeline.__class__.__name__} analyzed {response.events_analyzed_count} events and produced {len(canonical_findings)} findings.')
+        except Exception:
+            logger.exception('Canonical telemetry workflow failed for %s', run.id)
+            db.rollback()
+            run = db.get(AnalysisRunModel, run.id)
+            run.status = 'FAILED'
+            run.error = 'Telemetry analysis could not complete. Verify event format and consult server logs.'
+            for task in tasks:
+                task.status = 'FAILED'
+                task.error = run.error
+        run.completed_at = get_utc_now()
+        db.commit()
+        return run
+
+    @classmethod
     async def execute_run(cls, db: Session, run_id: str) -> AnalysisRunModel:
         """
         Executes the analysis run DAG deterministically.
@@ -505,6 +629,16 @@ class AnalysisOrchestrator:
         # Ensure DAG exists
         tasks = cls.initialize_run_dag(db, run_id)
         artifact = db.query(ArtifactModel).filter(ArtifactModel.id == run.artifact_id).first()
+
+        if artifact and artifact.artifact_type.upper() in ('IMAGE', 'AUDIO', 'VIDEO'):
+            return await cls._execute_media_run(db, run, artifact, tasks)
+
+        if artifact and artifact.artifact_type.upper() in ('AUTH_LOG', 'NETWORK_LOG', 'API_LOG'):
+            return await cls._execute_telemetry_run(db, run, artifact, tasks)
+
+        if artifact and artifact.artifact_type.upper() in ('FILE', 'TEXT', 'ATTACHMENT', 'URL', 'DOMAIN'):
+            from backend.services.canonical_pipeline_bridge import execute_focused_artifact
+            return await execute_focused_artifact(db, run, artifact, tasks)
 
         # Update run status to RUNNING
         run.status = "RUNNING"
@@ -539,6 +673,7 @@ class AnalysisOrchestrator:
             except Exception:
                 pass
 
+        workspace_id = getattr(artifact, "workspace_id", None) or workspace_id
         completed_tasks_count = 0
         failed_tasks_count = 0
 
@@ -835,6 +970,43 @@ class AnalysisOrchestrator:
                             },
                         )
 
+                elif art_type in ("FILE", "TEXT", "ATTACHMENT") and task.task_type in ("FORMAT_INSPECTION", "IOC_EXTRACTION", "REPUTATION_LOOKUP"):
+                    from backend.services.file_security_analyzers import FileIdentityAnalyzer, FileIOCAnalyzer, FileReputationAnalyzer
+                    if task.task_type == "FORMAT_INSPECTION":
+                        execution, identity = FileIdentityAnalyzer().analyze(raw_bytes, artifact.name)
+                        task.message = f"Header/identity checks performed: {identity.detected_file_type}. Full content safety is not established."
+                        result_count = len(execution.findings)
+                    elif task.task_type == "IOC_EXTRACTION":
+                        execution, observables = FileIOCAnalyzer().analyze(raw_bytes)
+                        result_count = sum(len(values) for values in observables.values())
+                        task.message = f"Extracted {len(observables['urls'])} URL references; URLs require separate threat assessment. No destinations visited."
+                        for group, kind in (("urls", "URL"), ("domains", "DOMAIN"), ("ips", "IP"), ("emails", "EMAIL_ADDRESS")):
+                            for value in observables[group]:
+                                indicator = db.query(IndicatorModel).filter_by(workspace_id=workspace_id, indicator_type=kind, normalized_value=value).first()
+                                if indicator is None:
+                                    indicator = IndicatorModel(id=generate_uuid(), workspace_id=workspace_id, indicator_type=kind, value=value, normalized_value=value, reputation="UNVERIFIED")
+                                    db.add(indicator)
+                                    db.flush()
+                                existing = db.query(RelationshipModel).filter_by(source_id=artifact.id, target_id=indicator.id, analysis_run_id=run.id).first()
+                                if existing is None:
+                                    db.add(RelationshipModel(id=generate_uuid(), source_type="ARTIFACT", source_id=artifact.id, relationship_type="CONTAINS", target_type="INDICATOR", target_id=indicator.id, analysis_run_id=run.id, workspace_id=workspace_id, origin="OBSERVED"))
+                    else:
+                        execution, reputation = await asyncio.wait_for(FileReputationAnalyzer().analyze(artifact.sha256), timeout=15)
+                        result_count = len(execution.findings)
+                        task.message = f"Hash reputation: {reputation.verdict}. A missing match does not establish safety."
+                    for observed in execution.findings:
+                        finding = db.query(FindingModel).filter_by(analysis_run_id=run.id, analyzer=execution.analyzer_name, finding_type=observed["finding_type"], title=observed["title"]).first()
+                        if finding is None:
+                            finding = FindingModel(id=generate_uuid(), analysis_run_id=run.id, analyzer=execution.analyzer_name,
+                            finding_type=observed['finding_type'], title=observed['title'], description=observed['description'],
+                            severity=getattr(observed['severity'], 'value', observed['severity']), confidence=observed['confidence'],
+                            risk_contribution=(25.0 if observed["finding_type"] == "FILE_TYPE_MISMATCH" else 65.0 if getattr(observed["severity"], "value", observed["severity"]) in ("HIGH", "CRITICAL") else 0.0), method="RULE", metadata_json=json.dumps(observed['metadata']))
+                            db.add(finding)
+                            db.flush()
+                        for url in observed["metadata"].get("urls", []):
+                            if db.query(FindingEvidenceModel).filter_by(finding_id=finding.id, key="url", value=url).first() is None:
+                                db.add(FindingEvidenceModel(id=generate_uuid(), finding_id=finding.id, artifact_id=artifact.id, evidence_type="URL", source="BOUNDED_FILE_STRING_EXTRACTION", key="url", value=url, confidence=1.0, metadata_json=json.dumps({"assessment": "UNVERIFIED", "source_sha256": artifact.sha256})))
+
                 elif task.task_type == "RISK_ASSESSMENT":
                     # Aggregate findings for this run
                     findings = db.query(FindingModel).filter(FindingModel.analysis_run_id == run.id).all()
@@ -849,7 +1021,7 @@ class AnalysisOrchestrator:
                         if ts:
                             score = float(ts.score or 0.0)
 
-                    sev = "SAFE"
+                    sev = "LOW"
                     if score >= 80:
                         sev = "CRITICAL"
                     elif score >= 60:
@@ -861,7 +1033,7 @@ class AnalysisOrchestrator:
 
                     run.overall_risk_score = score
                     run.overall_severity = sev
-                    run.confidence = 0.95 if findings else 0.85
+                    run.confidence = 0.0 if score == 0 else min((f.confidence for f in findings), default=0.0)
                     result_count = len(findings)
                     task.message = f"Risk assessment finalized: {score:.0f}/100 ({sev})"
 
@@ -875,9 +1047,7 @@ class AnalysisOrchestrator:
                     )
 
                 else:
-                    # General / Fallback task execution
-                    result_count = 1
-                    task.message = f"{task.title} completed successfully"
+                    raise NotImplementedError(f"Analyzer {task.analyzer_id} is not implemented for {art_type}; analysis is incomplete.")
 
             except Exception as exc:
                 logger.error("Task %s failed: %s", task.id, exc, exc_info=True)

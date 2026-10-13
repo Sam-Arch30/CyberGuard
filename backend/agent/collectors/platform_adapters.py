@@ -426,7 +426,21 @@ class WindowsAdapter(PlatformAdapter):
         return sys.platform == "win32"
 
     def get_running_processes(self, max_count: int = 100) -> List[Dict[str, Any]]:
-        return []
+        if not self.is_supported(): return []
+        import csv
+        import io
+        try:
+            result = subprocess.run(['tasklist','/FO','CSV','/NH'], capture_output=True,
+                text=True, timeout=5, creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
+            if result.returncode != 0: return []
+            rows = []
+            for row in csv.reader(io.StringIO(result.stdout)):
+                if len(row)>1 and row[1].isdigit():
+                    rows.append({'process_id':int(row[1]),'process_name':row[0],
+                        'parent_process_id':None,'command_line':None,'executable_path':None,'username':None})
+                if len(rows)>=max_count: break
+            return rows
+        except (OSError, subprocess.TimeoutExpired): return []
 
     def get_network_connections(self, max_count: int = 100) -> List[Dict[str, Any]]:
         return []

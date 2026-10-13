@@ -256,7 +256,7 @@ def build_dataset(
     except Exception as exc:
         db.rollback()
         logger.error(f"Dataset build failed: {exc}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get(
@@ -332,7 +332,7 @@ def launch_training_job(
     except Exception as exc:
         db.rollback()
         logger.error(f"Training job execution failed: {exc}")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(exc))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Internal operation failed.")
 
 
 @router.get(

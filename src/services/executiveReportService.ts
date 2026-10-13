@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 69: Executive Reporting & Intelligence Dissemination Client Service.
  */
@@ -17,7 +18,7 @@ export const executiveReportService = {
   // Templates
   async listTemplates(reportType?: string): Promise<{ items: ReportTemplate[]; total: number }> {
     const query = reportType ? `?report_type=${encodeURIComponent(reportType)}` : '';
-    const res = await fetch(apiUrl(`${API_BASE}/templates${query}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/templates${query}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list templates (${res.status})`);
@@ -26,7 +27,7 @@ export const executiveReportService = {
   },
 
   async getTemplate(templateId: string): Promise<ReportTemplate> {
-    const res = await fetch(apiUrl(`${API_BASE}/templates/${encodeURIComponent(templateId)}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/templates/${encodeURIComponent(templateId)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch template '${templateId}' (${res.status})`);
@@ -35,7 +36,7 @@ export const executiveReportService = {
   },
 
   async createTemplate(data: Partial<ReportTemplate>): Promise<ReportTemplate> {
-    const res = await fetch(apiUrl(`${API_BASE}/templates`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/templates`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -48,7 +49,7 @@ export const executiveReportService = {
   },
 
   async updateTemplate(templateId: string, data: Partial<ReportTemplate>): Promise<ReportTemplate> {
-    const res = await fetch(apiUrl(`${API_BASE}/templates/${encodeURIComponent(templateId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/templates/${encodeURIComponent(templateId)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -61,7 +62,7 @@ export const executiveReportService = {
   },
 
   async deleteTemplate(templateId: string): Promise<void> {
-    const res = await fetch(apiUrl(`${API_BASE}/templates/${encodeURIComponent(templateId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/templates/${encodeURIComponent(templateId)}`), {
       method: 'DELETE',
     });
     if (!res.ok) {
@@ -86,7 +87,7 @@ export const executiveReportService = {
     if (reportType && reportType !== 'ALL') params.set('report_type', reportType);
     if (severity && severity !== 'ALL') params.set('severity', severity);
 
-    const res = await fetch(apiUrl(`${API_BASE}/reports?${params.toString()}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports?${params.toString()}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list reports (${res.status})`);
@@ -95,7 +96,7 @@ export const executiveReportService = {
   },
 
   async getReport(reportId: string): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch report '${reportId}' (${res.status})`);
@@ -113,7 +114,7 @@ export const executiveReportService = {
     redaction_level?: string;
     summary?: string;
   }): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -126,7 +127,7 @@ export const executiveReportService = {
   },
 
   async updateReport(reportId: string, data: Partial<ExecutiveReportDetail>): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}`), {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -140,7 +141,7 @@ export const executiveReportService = {
 
   async getReportPreviewHtml(reportId: string, redactionLevel?: string): Promise<string> {
     const query = redactionLevel ? `?redaction_level=${encodeURIComponent(redactionLevel)}` : '';
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/preview${query}`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/preview${query}`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch preview for '${reportId}' (${res.status})`);
@@ -149,7 +150,7 @@ export const executiveReportService = {
   },
 
   async getReportSnapshots(reportId: string): Promise<ReportSnapshot[]> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/snapshots`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/snapshots`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch snapshots for '${reportId}' (${res.status})`);
@@ -158,7 +159,7 @@ export const executiveReportService = {
   },
 
   async requestReview(reportId: string, reviewers: string[], note?: string): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/review`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/review`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ reviewers, note }),
@@ -171,7 +172,7 @@ export const executiveReportService = {
   },
 
   async addReviewNote(reportId: string, note: string, statusText: string = 'COMMENT'): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/review-note`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/review-note`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ note, status: statusText }),
@@ -184,7 +185,7 @@ export const executiveReportService = {
   },
 
   async approveReport(reportId: string, approvalNotes?: string): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/approve`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/approve`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ approval_notes: approvalNotes }),
@@ -197,7 +198,7 @@ export const executiveReportService = {
   },
 
   async finalizeReport(reportId: string, finalizationNotes?: string): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/finalize`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/finalize`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ finalization_notes: finalizationNotes }),
@@ -210,7 +211,7 @@ export const executiveReportService = {
   },
 
   async createVersion(reportId: string): Promise<ExecutiveReportDetail> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/version`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/version`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -222,7 +223,7 @@ export const executiveReportService = {
 
   // Share Links
   async listShareLinks(reportId: string): Promise<{ items: ReportShareLink[]; total: number }> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/share-links`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/share-links`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to list share links for '${reportId}' (${res.status})`);
@@ -240,7 +241,7 @@ export const executiveReportService = {
       max_uses?: number;
     }
   ): Promise<ReportShareLink> {
-    const res = await fetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/share-links`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/reports/${encodeURIComponent(reportId)}/share-links`), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data),
@@ -253,7 +254,7 @@ export const executiveReportService = {
   },
 
   async revokeShareLink(linkId: string): Promise<ReportShareLink> {
-    const res = await fetch(apiUrl(`${API_BASE}/share-links/${encodeURIComponent(linkId)}/revoke`), {
+    const res = await apiFetch(apiUrl(`${API_BASE}/share-links/${encodeURIComponent(linkId)}/revoke`), {
       method: 'POST',
     });
     if (!res.ok) {
@@ -265,7 +266,7 @@ export const executiveReportService = {
 
   // Metrics
   async getMetrics(): Promise<ExecutiveReportMetrics> {
-    const res = await fetch(apiUrl(`${API_BASE}/metrics`));
+    const res = await apiFetch(apiUrl(`${API_BASE}/metrics`));
     if (!res.ok) {
       const err = await extractErrorMessage(res);
       throw new Error(err || `Failed to fetch report metrics (${res.status})`);

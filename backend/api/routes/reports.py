@@ -29,26 +29,7 @@ router = APIRouter(prefix="/api/reports", tags=["Forensic Reports"])
 
 def _generate_report_number(db: Session) -> str:
     """Generates sequential report number: RPT-2026-000001."""
-    current_year = datetime.now(timezone.utc).year
-    prefix = f"RPT-{current_year}-"
-
-    last_rpt = (
-        db.query(ReportModel)
-        .filter(ReportModel.report_number.like(f"{prefix}%"))
-        .order_by(ReportModel.report_number.desc())
-        .first()
-    )
-
-    if last_rpt:
-        try:
-            last_seq = int(last_rpt.report_number.split("-")[-1])
-            next_seq = last_seq + 1
-        except (ValueError, IndexError):
-            next_seq = 1
-    else:
-        next_seq = 1
-
-    return f"{prefix}{next_seq:06d}"
+    return f"RPT-{datetime.now(timezone.utc).year}-{uuid.uuid4().hex[:12].upper()}"
 
 
 def _serialize_report_item(r: ReportModel, is_stale: bool = False) -> ReportListItemResponse:
@@ -64,7 +45,7 @@ def _serialize_report_item(r: ReportModel, is_stale: bool = False) -> ReportList
         email_sha256=r.email_sha256,
         threat_score=r.threat_score or 0.0,
         severity=r.severity or "low",
-        confidence=r.confidence or 1.0,
+        confidence=r.confidence if r.confidence is not None else 1.0,
         report_type=r.report_type or "ANALYST",
         status=r.status or "READY",
         report_version=r.report_version or 1,
@@ -97,7 +78,7 @@ def _serialize_report_detail(r: ReportModel, is_stale: bool = False) -> ReportDe
         email_sha256=r.email_sha256,
         threat_score=r.threat_score or 0.0,
         severity=r.severity or "low",
-        confidence=r.confidence or 1.0,
+        confidence=r.confidence if r.confidence is not None else 1.0,
         report_type=r.report_type or "ANALYST",
         status=r.status or "READY",
         report_version=r.report_version or 1,
@@ -179,17 +160,18 @@ def generate_investigation_report_endpoint(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to compile vector PDF report: {str(e)}"
+            detail="Report operation failed."
         )
 
     # 4. Save PDF to disk and storage abstraction
     pdf_filename = f"{report_id}.pdf"
+    ReportService.ensure_reports_dir()
     pdf_path = os.path.join(ReportService.REPORTS_DIR, pdf_filename)
     try:
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(500, "Unable to persist report evidence.") from exc
 
     try:
         evidence_storage.store_bytes(
@@ -198,8 +180,8 @@ def generate_investigation_report_endpoint(
             mime_type="application/pdf",
             custom_key=f"reports/{report_id}.pdf"
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(500, "Unable to persist report evidence.") from exc
 
     pdf_sha = hashlib.sha256(pdf_bytes).hexdigest().lower()
 
@@ -489,7 +471,7 @@ def download_report(
             except Exception as e:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                    detail=f"Unable to re-render report PDF: {str(e)}"
+                    detail="Report operation failed."
                 )
         else:
             raise HTTPException(
@@ -623,11 +605,9 @@ def generate_forensic_report(
     email_id = analysis.get("id") or analysis.get("evidence_id")
     if email_id:
         from backend.services.analysis_repository import load_analysis
-        try:
-            stored_analysis = load_analysis(db, email_id)
-            analysis = stored_analysis
-        except Exception:
-            pass
+        analysis = load_analysis(db, email_id)
+    else:
+        raise HTTPException(422, 'A stored analysis identifier is required.')
 
     subject = analysis.get("subject") or "Suspicious Email Investigation"
     sha256 = analysis.get("email_sha256") or analysis.get("id") or "UNCOMPUTED_HASH"
@@ -648,21 +628,22 @@ def generate_forensic_report(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate forensic PDF report: {str(e)}"
+            detail="Report operation failed."
         )
 
     # 2. Persist PDF to disk and database record
     report_number = _generate_report_number(db)
     report_id = str(uuid.uuid4())
     pdf_filename = f"{report_id}.pdf"
+    ReportService.ensure_reports_dir()
     pdf_path = os.path.join(ReportService.REPORTS_DIR, pdf_filename)
 
     report_sha = hashlib.sha256(pdf_bytes).hexdigest().lower()
     try:
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(500, "Unable to persist report evidence.") from exc
 
     try:
         evidence_storage.store_bytes(
@@ -671,8 +652,8 @@ def generate_forensic_report(
             mime_type="application/pdf",
             custom_key=f"reports/{report_id}.pdf"
         )
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(500, "Unable to persist report evidence.") from exc
 
     art = db.query(ArtifactModel).filter(
         (ArtifactModel.sha256 == sha256.lower()) |
@@ -759,7 +740,7 @@ def generate_case_dossier_endpoint(
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to generate case dossier: {str(e)}"
+            detail="Report operation failed."
         )
 
     case = db.query(CaseModel).filter(CaseModel.id == case_id).first()
@@ -768,12 +749,13 @@ def generate_case_dossier_endpoint(
     report_num = _generate_report_number(db)
     report_id = str(uuid.uuid4())
     pdf_filename = f"{report_id}.pdf"
+    ReportService.ensure_reports_dir()
     pdf_path = os.path.join(ReportService.REPORTS_DIR, pdf_filename)
     try:
         with open(pdf_path, "wb") as f:
             f.write(pdf_bytes)
-    except Exception:
-        pass
+    except Exception as exc:
+        raise HTTPException(500, "Unable to persist report evidence.") from exc
 
     report_record = ReportModel(
         id=report_id,

@@ -1,0 +1,72 @@
+{
+  "ingestion_id": "82b66ca7-09fd-470d-8da8-3dcf20185582",
+  "artifact_id": "5f3eb35e-43a7-4224-961d-51403474f876",
+  "artifact_type": "TEXT",
+  "input_mode": "FILE_UPLOAD",
+  "name": "malformed.json",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "3d8f6847e9e4d24f66ed3f8d785039990d6b602960b8ce264f4f8d00a80dad88",
+  "size": 12,
+  "mime_type": "text/plain",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "TEXT",
+    "detected_mime": "text/plain",
+    "reported_mime": "application/json",
+    "confidence": 0.85,
+    "detector": "plain_text_utf8",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Invalid structured log content; retained as original evidence, not parsed events."
+    ],
+    "candidate_analyzers": [
+      "nlp_classifier"
+    ],
+    "metadata": {
+      "size_bytes": 12,
+      "original_filename": "malformed.json",
+      "char_count": 12
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/3d/3d8f6847e9e4d24f66ed3f8d785039990d6b602960b8ce264f4f8d00a80dad88/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "nlp_classifier"
+  ],
+  "warnings": [
+    "Invalid structured log content; retained as original evidence, not parsed events."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "malformed.json",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "TEXT",
+      "detected_mime": "text/plain",
+      "reported_mime": "application/json",
+      "confidence": 0.85,
+      "detector": "plain_text_utf8",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Invalid structured log content; retained as original evidence, not parsed events."
+      ],
+      "candidate_analyzers": [
+        "nlp_classifier"
+      ],
+      "metadata": {
+        "size_bytes": 12,
+        "original_filename": "malformed.json",
+        "char_count": 12
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:38.315577",
+  "evidence_id": "EVD-3D8F6847E9",
+  "investigation_id": "ebe90125-b075-46c2-8884-f1d60a6a091c",
+  "analysis_run_id": "69cb1b80-81a5-47ec-b084-8ba4258a0fdc",
+  "duplicate": false
+}

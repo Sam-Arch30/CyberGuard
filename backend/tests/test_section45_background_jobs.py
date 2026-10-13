@@ -367,6 +367,7 @@ def test_artifact_analysis_handler_execution(db_session: Session):
     # Create test artifact and AnalysisRunModel
     artifact = ArtifactModel(
         artifact_type="EMAIL",
+        workspace_id=ws,
         name="phishing_evidence.eml",
         size=1024,
         sha256="aabbccddeeff00112233445566778899aabbccddeeff00112233445566778899",
@@ -376,6 +377,7 @@ def test_artifact_analysis_handler_execution(db_session: Session):
 
     run = AnalysisRunModel(
         artifact_id=artifact.id,
+        workspace_id=ws,
         status="QUEUED",
         trigger="USER",
     )

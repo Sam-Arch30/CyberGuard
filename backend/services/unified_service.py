@@ -794,13 +794,8 @@ class IncidentService:
         now = get_utc_now()
         year = now.strftime("%Y")
 
-        count = db.query(IncidentModel).count() + 1
-        incident_number = f"INC-{year}-{count:06d}"
-
-        # Guarantee unique incident_number if collisions occur
-        while db.query(IncidentModel).filter(IncidentModel.incident_number == incident_number).first():
-            count += 1
-            incident_number = f"INC-{year}-{count:06d}"
+        # Workspace-filtered counts cannot allocate globally unique identifiers.
+        incident_number = f"INC-{year}-{generate_uuid().replace('-', '')[:12].upper()}"
 
         status_str = status.value if isinstance(status, IncidentStatusEnum) else str(status).upper()
 

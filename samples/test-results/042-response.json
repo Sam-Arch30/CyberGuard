@@ -1,0 +1,1073 @@
+{
+  "id": "EVD-85D752C879",
+  "evidence_id": "EVD-85D752C879",
+  "email_sha256": "85d752c8791e7dabf30ca4b71f8a0aa009995ba3ce6a87bb315dae2fb379efc3",
+  "original_filename": "suspicious-credential-request.eml",
+  "upload_timestamp": "2026-10-13T01:52:34.835335",
+  "size": 497,
+  "uploader": "SOC Analyst",
+  "authentication": {
+    "verification_type": "observed_header",
+    "verification_notice": "Observed authentication result from supplied headers (unverified by local mail server)",
+    "observed_header": null,
+    "spf": {
+      "result": "none",
+      "details": "No Authentication-Results or Received-SPF header present."
+    },
+    "dkim": {
+      "result": "none",
+      "details": "No Authentication-Results or DKIM-Signature header present."
+    },
+    "dmarc": {
+      "result": "none",
+      "details": "No Authentication-Results header present."
+    },
+    "alignment": {
+      "from_domain": "account-verification.example",
+      "reply_to_domain": "untrusted.example",
+      "return_path_domain": "account-verification.example",
+      "reply_to_mismatch": true,
+      "return_path_mismatch": false
+    }
+  },
+  "relay_analysis": {
+    "header_order_hops": [],
+    "transmission_order_hops": [],
+    "earliest_observable_node": {
+      "earliest_observable_ip": null,
+      "from_host": null,
+      "confidence": "none",
+      "reason": "No Received headers present in email"
+    },
+    "trust_notice": "Headers nearest the recipient's mail infrastructure provide stronger evidence than upstream headers, which may be forged by prior nodes."
+  },
+  "ip_intelligence": {},
+  "domain_intelligence": {
+    "untrusted.example": {
+      "domain": "untrusted.example",
+      "punycode": null,
+      "dns": {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "txt": []
+      },
+      "registration": {
+        "registrar": null,
+        "registration_date": null,
+        "expiration_date": null,
+        "nameservers": [],
+        "status": [
+          "Registration date unavailable in RDAP and WHOIS"
+        ],
+        "country": null,
+        "registration_source": "unavailable",
+        "is_redacted": false
+      },
+      "domain_age_days": null,
+      "newly_registered_domain": null,
+      "is_resolvable": false,
+      "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+      "lookalike": null
+    },
+    "account-verification.example": {
+      "domain": "account-verification.example",
+      "punycode": null,
+      "dns": {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "txt": []
+      },
+      "registration": {
+        "registrar": null,
+        "registration_date": null,
+        "expiration_date": null,
+        "nameservers": [],
+        "status": [
+          "Registration date unavailable in RDAP and WHOIS"
+        ],
+        "country": null,
+        "registration_source": "unavailable",
+        "is_redacted": false
+      },
+      "domain_age_days": null,
+      "newly_registered_domain": null,
+      "is_resolvable": false,
+      "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+      "lookalike": null
+    },
+    "example.test": {
+      "domain": "example.test",
+      "punycode": null,
+      "dns": {
+        "a": [],
+        "aaaa": [],
+        "mx": [],
+        "ns": [],
+        "txt": []
+      },
+      "registration": {
+        "registrar": null,
+        "registration_date": null,
+        "expiration_date": null,
+        "nameservers": [],
+        "status": [
+          "Registration date unavailable in RDAP and WHOIS"
+        ],
+        "country": null,
+        "registration_source": "unavailable",
+        "is_redacted": false
+      },
+      "domain_age_days": null,
+      "newly_registered_domain": null,
+      "is_resolvable": false,
+      "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+      "lookalike": null
+    }
+  },
+  "lookalike_domains": [],
+  "url_analysis": [
+    {
+      "url": "https://account-verification.example/login",
+      "domain": "example",
+      "features": {
+        "scheme": "https",
+        "hostname": "account-verification.example",
+        "registered_domain": "example",
+        "subdomain": "account-verification",
+        "subdomain_count": 1,
+        "port": null,
+        "has_non_standard_port": false,
+        "path": "/login",
+        "path_length": 6,
+        "query": "",
+        "query_length": 0,
+        "total_length": 42,
+        "is_ip_host": false,
+        "ip_version": null,
+        "is_punycode": false,
+        "excessive_subdomains": false,
+        "has_credentials": false,
+        "suspicious_keywords": [
+          "login",
+          "account"
+        ],
+        "has_percent_encoding": false,
+        "percent_encoding_count": 0,
+        "unusual_char_density": false,
+        "is_shortener": false,
+        "display_link_mismatch": false,
+        "visible_text": null,
+        "visible_text_domain": null,
+        "lookalike": null
+      },
+      "observations": [
+        "Suspicious security/authentication keywords found: login, account"
+      ],
+      "suspicion_score": 10,
+      "suspicion_level": "low",
+      "score_reasons": [
+        "Suspicious keywords (login, account) (+10)"
+      ]
+    }
+  ],
+  "threat_score": {
+    "score": 30,
+    "risk_level": "SUSPICIOUS",
+    "severity": "suspicious",
+    "confidence": "HIGH",
+    "positive_contributions": [
+      {
+        "signal_id": "SIG-SEND-001",
+        "category": "sender_identity",
+        "name": "Reply-To Destination Mismatch",
+        "description": "From domain 'account-verification.example' differs from Reply-To destination 'untrusted.example'",
+        "why_it_matters": "Redirects victim replies to adversary-controlled inboxes during BEC and credential collection attacks.",
+        "raw_value": "account-verification.example != untrusted.example",
+        "normalized_value": 1.0,
+        "weight": 8.0,
+        "contribution": 8,
+        "direction": "increase_risk",
+        "confidence": 1.0,
+        "evidence_reference": "untrusted.example",
+        "source": "Header Alignment Subsystem"
+      },
+      {
+        "signal_id": "SIG-DOMA-003",
+        "category": "domain_intelligence",
+        "name": "DNS Architecture Anomaly",
+        "description": "Domain(s) failed authoritative DNS resolution: untrusted.example, account-verification.example, example.test",
+        "why_it_matters": "Indicates ephemeral infrastructure or non-standard routing setup common in disposable attack campaigns.",
+        "raw_value": "unresolvable",
+        "normalized_value": 1.0,
+        "weight": 10.0,
+        "contribution": 10,
+        "direction": "increase_risk",
+        "confidence": 1.0,
+        "evidence_reference": "untrusted.example",
+        "source": "DNS Resolver Subsystem"
+      },
+      {
+        "signal_id": "SIG-EMAI-004",
+        "category": "email_content",
+        "name": "Credential Harvesting Language",
+        "description": "Detected credential harvesting language: 'password'",
+        "why_it_matters": "Primary behavioral indicator of account takeover and credential theft campaigns.",
+        "raw_value": "password",
+        "normalized_value": 1.0,
+        "weight": 12.0,
+        "contribution": 12,
+        "direction": "increase_risk",
+        "confidence": 1.0,
+        "evidence_reference": null,
+        "source": "Content Intent Analyzer"
+      }
+    ],
+    "negative_contributions": [
+      {
+        "signal_id": "SIG-MIT-002",
+        "category": "url_intelligence",
+        "name": "Extracted URLs Exhibit Normal Baseline",
+        "description": "1 URL(s) inspected without anomalies",
+        "why_it_matters": "Absence of suspicious link structures reduces likelihood of credential harvesting destination.",
+        "raw_value": 1,
+        "normalized_value": 0.0,
+        "weight": 0.0,
+        "contribution": 0,
+        "direction": "decrease_risk",
+        "confidence": 1.0,
+        "evidence_reference": null,
+        "source": "Static URL Analyzer"
+      }
+    ],
+    "top_reasons": [
+      "Credential Harvesting Language (+12 pts)",
+      "DNS Architecture Anomaly (+10 pts)",
+      "Reply-To Destination Mismatch (+8 pts)"
+    ],
+    "reasons": [
+      {
+        "signal": "reply_to_mismatch",
+        "label": "Reply-To header domain mismatch",
+        "points": 8,
+        "evidence": "From domain 'account-verification.example' differs from Reply-To destination 'untrusted.example'"
+      },
+      {
+        "signal": "dns_anomaly",
+        "label": "DNS Resolution Failure",
+        "points": 10,
+        "evidence": "Domain(s) failed authoritative DNS resolution: untrusted.example, account-verification.example, example.test"
+      },
+      {
+        "signal": "credential_request",
+        "label": "Credential harvesting or urgent security language",
+        "points": 12,
+        "evidence": "Detected pattern: 'password'"
+      }
+    ],
+    "positive_evidence": [
+      {
+        "signal": "clean_urls",
+        "label": "Extracted URLs exhibit normal structure",
+        "evidence": "1 URL(s) inspected without anomalies"
+      }
+    ],
+    "summary": "Email risk assessed as Suspicious (30/100) driven by 3 forensic signal(s): Reply-To header domain mismatch (+8), DNS Resolution Failure (+10), Credential harvesting or urgent security language (+12).",
+    "why_flagged": "This email was flagged with a Threat Score of 30/100 (SUSPICIOUS) because it triggered 3 positive threat signal(s) across 3 analytical category(ies). Key forensic drivers: Credential Harvesting Language (+12 pts); DNS Architecture Anomaly (+10 pts); Reply-To Destination Mismatch (+8 pts). Risk was partially mitigated by Extracted URLs Exhibit Normal Baseline (0 pts).",
+    "category_breakdowns": {
+      "authentication": {
+        "category": "authentication",
+        "display_name": "Authentication Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "sender_identity": {
+        "category": "sender_identity",
+        "display_name": "Sender Identity Risk",
+        "risk_score": 8,
+        "positive_signals_count": 1,
+        "mitigating_signals_count": 0,
+        "signals": [
+          {
+            "signal_id": "SIG-SEND-001",
+            "category": "sender_identity",
+            "name": "Reply-To Destination Mismatch",
+            "description": "From domain 'account-verification.example' differs from Reply-To destination 'untrusted.example'",
+            "why_it_matters": "Redirects victim replies to adversary-controlled inboxes during BEC and credential collection attacks.",
+            "raw_value": "account-verification.example != untrusted.example",
+            "normalized_value": 1.0,
+            "weight": 8.0,
+            "contribution": 8,
+            "direction": "increase_risk",
+            "confidence": 1.0,
+            "evidence_reference": "untrusted.example",
+            "source": "Header Alignment Subsystem"
+          }
+        ]
+      },
+      "domain_intelligence": {
+        "category": "domain_intelligence",
+        "display_name": "Domain Risk",
+        "risk_score": 10,
+        "positive_signals_count": 1,
+        "mitigating_signals_count": 0,
+        "signals": [
+          {
+            "signal_id": "SIG-DOMA-003",
+            "category": "domain_intelligence",
+            "name": "DNS Architecture Anomaly",
+            "description": "Domain(s) failed authoritative DNS resolution: untrusted.example, account-verification.example, example.test",
+            "why_it_matters": "Indicates ephemeral infrastructure or non-standard routing setup common in disposable attack campaigns.",
+            "raw_value": "unresolvable",
+            "normalized_value": 1.0,
+            "weight": 10.0,
+            "contribution": 10,
+            "direction": "increase_risk",
+            "confidence": 1.0,
+            "evidence_reference": "untrusted.example",
+            "source": "DNS Resolver Subsystem"
+          }
+        ]
+      },
+      "lookalike_detection": {
+        "category": "lookalike_detection",
+        "display_name": "Lookalike Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "url_intelligence": {
+        "category": "url_intelligence",
+        "display_name": "URL Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 1,
+        "signals": [
+          {
+            "signal_id": "SIG-MIT-002",
+            "category": "url_intelligence",
+            "name": "Extracted URLs Exhibit Normal Baseline",
+            "description": "1 URL(s) inspected without anomalies",
+            "why_it_matters": "Absence of suspicious link structures reduces likelihood of credential harvesting destination.",
+            "raw_value": 1,
+            "normalized_value": 0.0,
+            "weight": 0.0,
+            "contribution": 0,
+            "direction": "decrease_risk",
+            "confidence": 1.0,
+            "evidence_reference": null,
+            "source": "Static URL Analyzer"
+          }
+        ]
+      },
+      "infrastructure": {
+        "category": "infrastructure",
+        "display_name": "Infrastructure Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "email_content": {
+        "category": "email_content",
+        "display_name": "Content Risk",
+        "risk_score": 12,
+        "positive_signals_count": 1,
+        "mitigating_signals_count": 0,
+        "signals": [
+          {
+            "signal_id": "SIG-EMAI-004",
+            "category": "email_content",
+            "name": "Credential Harvesting Language",
+            "description": "Detected credential harvesting language: 'password'",
+            "why_it_matters": "Primary behavioral indicator of account takeover and credential theft campaigns.",
+            "raw_value": "password",
+            "normalized_value": 1.0,
+            "weight": 12.0,
+            "contribution": 12,
+            "direction": "increase_risk",
+            "confidence": 1.0,
+            "evidence_reference": null,
+            "source": "Content Intent Analyzer"
+          }
+        ]
+      },
+      "campaign_intelligence": {
+        "category": "campaign_intelligence",
+        "display_name": "Campaign Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      },
+      "attachments": {
+        "category": "attachments",
+        "display_name": "Attachment Risk",
+        "risk_score": 0,
+        "positive_signals_count": 0,
+        "mitigating_signals_count": 0,
+        "signals": []
+      }
+    },
+    "model_version": "v1.0-tfidf-logistic",
+    "scoring_version": "2.0.0-explainable",
+    "audit_metadata": {
+      "scoring_version": "2.0.0-explainable",
+      "weights_snapshot": {
+        "spf_fail": 8,
+        "spf_softfail": 4,
+        "dkim_fail": 8,
+        "dmarc_fail": 12,
+        "display_name_spoof": 14,
+        "reply_to_mismatch": 8,
+        "return_path_mismatch": 6,
+        "brand_impersonation": 18,
+        "url_high_risk": 15,
+        "url_suspicious": 8,
+        "html_link_mismatch": 15,
+        "domain_age_under_7d": 14,
+        "newly_registered_domain": 10,
+        "suspicious_tld": 8,
+        "dns_anomaly": 10,
+        "credential_request": 12,
+        "financial_language": 10,
+        "urgency_language": 8,
+        "suspicious_attachment_extension": 15,
+        "attachment_macro_payload": 18,
+        "executable_disguised_as_document": 25,
+        "pdf_suspicious_actions": 18,
+        "double_extension_detected": 18,
+        "archive_with_hidden_executable": 20,
+        "path_traversal_archive_exploit": 25,
+        "password_protected_suspicious_archive": 15,
+        "unsigned_executable": 12,
+        "embedded_phishing_url_in_attachment": 15,
+        "high_entropy_packed_binary": 10,
+        "suspicious_ip_hosting_or_proxy": 8,
+        "known_campaign_match": 14,
+        "shared_malicious_infrastructure": 12,
+        "ml_phishing_signal": 10,
+        "trusted_sender_history": -5
+      },
+      "thresholds_snapshot": {
+        "low": {
+          "min": 0,
+          "max": 29
+        },
+        "suspicious": {
+          "min": 30,
+          "max": 59
+        },
+        "high": {
+          "min": 60,
+          "max": 79
+        },
+        "critical": {
+          "min": 80,
+          "max": 100
+        }
+      },
+      "timestamp": "2026-10-13T01:52:42.536513+00:00",
+      "evidence_ids": [
+        "SIG-SEND-001",
+        "SIG-DOMA-003",
+        "SIG-EMAI-004",
+        "SIG-MIT-002"
+      ],
+      "model_version": "v1.0-tfidf-logistic"
+    }
+  },
+  "ml_phishing_probability": 0.6528,
+  "ml_assessment": {
+    "classification": "phishing",
+    "probability": 0.6528,
+    "confidence": "medium",
+    "available": true,
+    "top_features": [
+      "httpurl",
+      "account",
+      "immediately",
+      "urgent",
+      "password"
+    ],
+    "model_name": "TF-IDF + Logistic Regression",
+    "notice": null
+  },
+  "ai_analyst": {
+    "summary": "The analyzed email presents characteristics of Credential Harvesting Phishing with a deterministic threat score of 30/100 (SUSPICIOUS). Key driving indicators include 3 forensic flag(s). Adversary objective is assessed as: Theft of corporate directory or single-sign-on credentials via spoofed interfaces.",
+    "likely_attack_type": "Credential Harvesting Phishing",
+    "likely_objective": "Theft of corporate directory or single-sign-on credentials via spoofed interfaces",
+    "key_evidence": [
+      "Global threat score evaluated at 30/100 (SUSPICIOUS severity).",
+      "Forensic indicator: Reply-To header domain mismatch",
+      "Forensic indicator: DNS Resolution Failure",
+      "Forensic indicator: Credential harvesting or urgent security language",
+      "NLP text assessment indicates 65% phishing probability."
+    ],
+    "recommended_actions": [
+      "Tag message header with [SUSPICIOUS] warning banner for internal recipient.",
+      "Monitor user account for anomalous authentication or link traversal events."
+    ],
+    "limitations": [
+      "Analysis is bounded to static email telemetry and Received header topology.",
+      "Dynamic sandbox detonation was not performed on embedded attachments.",
+      "Attribution is limited to observable IP/DNS infrastructure without external threat actor correlation."
+    ],
+    "available": true,
+    "provider": "mock",
+    "model": "gemini-1.5-flash",
+    "error": null
+  },
+  "investigation_graph": {
+    "nodes": [
+      {
+        "id": "email:EVD-85D752C879",
+        "type": "Email",
+        "label": "Email: URGENT: Verify your account now",
+        "metadata": {
+          "subject": "URGENT: Verify your account now",
+          "email_sha256": "85d752c8791e7dabf30ca4b71f8a0aa009995ba3ce6a87bb315dae2fb379efc3",
+          "date": "Mon, 12 Oct 2026 09:00:00 +0000",
+          "threat_score": 30,
+          "severity": "suspicious",
+          "ml_probability": 0.6528,
+          "from": "Example Team <security@account-verification.example>",
+          "to": "analyst@example.test"
+        }
+      },
+      {
+        "id": "email_addr:security@account-verification.example",
+        "type": "Email Address",
+        "label": "security@account-verification.example",
+        "metadata": {
+          "role": "sender",
+          "raw_header": "Example Team <security@account-verification.example>"
+        }
+      },
+      {
+        "id": "domain:account-verification.example",
+        "type": "Domain",
+        "label": "account-verification.example",
+        "metadata": {
+          "source": "sender_header",
+          "domain": "account-verification.example",
+          "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+          "is_resolvable": false
+        }
+      },
+      {
+        "id": "email_addr:analyst@example.test",
+        "type": "Email Address",
+        "label": "analyst@example.test",
+        "metadata": {
+          "role": "recipient",
+          "raw_header": "analyst@example.test"
+        }
+      },
+      {
+        "id": "email_addr:collector@untrusted.example",
+        "type": "Email Address",
+        "label": "collector@untrusted.example",
+        "metadata": {
+          "role": "reply_to",
+          "raw_header": "collector@untrusted.example"
+        }
+      },
+      {
+        "id": "domain:untrusted.example",
+        "type": "Domain",
+        "label": "untrusted.example",
+        "metadata": {
+          "domain": "untrusted.example",
+          "domain_age_days": null,
+          "newly_registered": null,
+          "registrar": null,
+          "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+          "is_resolvable": false
+        }
+      },
+      {
+        "id": "domain:example.test",
+        "type": "Domain",
+        "label": "example.test",
+        "metadata": {
+          "domain": "example.test",
+          "domain_age_days": null,
+          "newly_registered": null,
+          "registrar": null,
+          "status_message": "NXDOMAIN (Domain does not exist in DNS)",
+          "is_resolvable": false
+        }
+      },
+      {
+        "id": "url:bf718a937f",
+        "type": "URL",
+        "label": "URL: hxxps://account-verification[.]exampl...",
+        "metadata": {
+          "url": "https://account-verification.example/login",
+          "defanged_url": "hxxps://account-verification[.]example/login",
+          "domain": "account-verification.example",
+          "suspicion_level": "low",
+          "score_reasons": [
+            "Suspicious keywords (login, account) (+10)"
+          ]
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "edge:email:EVD-85D752C879->SENT_FROM->email_addr:security@account-verification.example",
+        "source": "email:EVD-85D752C879",
+        "target": "email_addr:security@account-verification.example",
+        "label": "SENT_FROM",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email_addr:security@account-verification.example->BELONGS_TO_DOMAIN->domain:account-verification.example",
+        "source": "email_addr:security@account-verification.example",
+        "target": "domain:account-verification.example",
+        "label": "BELONGS_TO_DOMAIN",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email:EVD-85D752C879->SENT_TO->email_addr:analyst@example.test",
+        "source": "email:EVD-85D752C879",
+        "target": "email_addr:analyst@example.test",
+        "label": "SENT_TO",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email:EVD-85D752C879->REPLY_TO->email_addr:collector@untrusted.example",
+        "source": "email:EVD-85D752C879",
+        "target": "email_addr:collector@untrusted.example",
+        "label": "REPLY_TO",
+        "metadata": {}
+      },
+      {
+        "id": "edge:email:EVD-85D752C879->CONTAINS_URL->url:bf718a937f",
+        "source": "email:EVD-85D752C879",
+        "target": "url:bf718a937f",
+        "label": "CONTAINS_URL",
+        "metadata": {}
+      },
+      {
+        "id": "edge:url:bf718a937f->RESOLVES_TO_DOMAIN->domain:account-verification.example",
+        "source": "url:bf718a937f",
+        "target": "domain:account-verification.example",
+        "label": "RESOLVES_TO_DOMAIN",
+        "metadata": {}
+      }
+    ],
+    "summary": {
+      "total_nodes": 8,
+      "total_edges": 6,
+      "node_type_counts": {
+        "Email": 1,
+        "Email Address": 3,
+        "Domain": 3,
+        "URL": 1
+      },
+      "has_high_risk_entities": false
+    }
+  },
+  "attribution": {
+    "attribution_id": "ATTR-54D6BBFF61",
+    "email_id": "EVD-85D752C879",
+    "case_id": null,
+    "campaign_id": null,
+    "probable_origin_ip": null,
+    "probable_origin_asn": null,
+    "probable_origin_provider": null,
+    "probable_infrastructure_country": null,
+    "confidence_score": 0.0,
+    "confidence_level": "LOW",
+    "supporting_evidence": [],
+    "conflicting_evidence": [
+      {
+        "evidence_type": "MISSING_PUBLIC_ORIGIN_INFRASTRUCTURE",
+        "observation": "No external public sending relay observed in header chain (private or internal network addresses only).",
+        "contribution": -30.0,
+        "source": "SMTP Relay Path Analysis",
+        "timestamp": "2026-10-13T01:52:42.536513+00:00"
+      }
+    ],
+    "related_domains": [
+      "example",
+      "untrusted.example"
+    ],
+    "related_ips": [],
+    "related_campaigns": [],
+    "analysis_timestamp": "2026-10-13T01:52:42.536513+00:00",
+    "disclaimer": "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor."
+  },
+  "forensic_conclusions": [
+    {
+      "conclusion_id": "CONC-THREAT-16073C5B",
+      "type": "THREAT_CLASSIFICATION",
+      "statement": "Low overall malicious risk based on observable telemetry",
+      "confidence_score": 16.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [
+        {
+          "evidence_id": "EVD-THREAT-SCORE-MODERATE",
+          "statement": "Global deterministic threat score elevated at 30/100.",
+          "source_module": "ThreatScorerService",
+          "source_quality": 0.8,
+          "reliability": 0.8,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.7,
+          "consistency": 0.8,
+          "raw_contribution": 20.0,
+          "effective_contribution": 15.9,
+          "is_conflicting": false,
+          "evidence_category": "probable_inference",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "conflicting_evidence": [],
+      "limitations": [
+        "Deterministic heuristic assessment based on observable indicators; zero-day or clean-reputation staging domains may initially score low."
+      ],
+      "source_modules": [
+        "ThreatScorerService"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-ATTR-94064FC4",
+      "type": "INFRASTRUCTURE_ATTRIBUTION",
+      "statement": "Insufficient technical evidence to attribute delivery infrastructure",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-PUBLIC-IP",
+          "statement": "No untrusted public IP observed in relay headers (private RFC-1918 subnets only).",
+          "source_module": "RelayReconstructorService",
+          "source_quality": 0.7,
+          "reliability": 0.9,
+          "independence_cluster": "smtp_routing_path",
+          "recency_days": null,
+          "specificity": 0.9,
+          "consistency": 0.5,
+          "raw_contribution": -30.0,
+          "effective_contribution": -23.4,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "limitations": [
+        "Location refers to observed network infrastructure and should not be interpreted as the physical location of the threat actor."
+      ],
+      "source_modules": [
+        "AttributionEngine",
+        "RelayReconstructorService",
+        "IPIntelligenceService"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-CAMP-672C6BF6",
+      "type": "CAMPAIGN_ASSOCIATION",
+      "statement": "Isolated incident: no campaign correlation identified",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-CAMPAIGN-MATCH",
+          "statement": "No historical case overlaps or multi-incident IoC clusters recorded for this sender.",
+          "source_module": "CampaignCorrelator",
+          "source_quality": 0.7,
+          "reliability": 0.8,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.6,
+          "consistency": 0.6,
+          "raw_contribution": -15.0,
+          "effective_contribution": -10.7,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "limitations": [
+        "Campaign clustering reflects observed technical IoC overlap across ingested cases; distinct actors occasionally deploy shared infrastructure."
+      ],
+      "source_modules": [
+        "CampaignCorrelator",
+        "InvestigationGraphService"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-GEO-B17FA605",
+      "type": "GEOLOCATION",
+      "statement": "Geolocation undetermined due to lack of public routing telemetry",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-GEO-UNAVAILABLE",
+          "statement": "Public sending IP geolocation could not be determined from available headers.",
+          "source_module": "IPIntelligenceService",
+          "source_quality": 0.6,
+          "reliability": 0.9,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.9,
+          "consistency": 0.5,
+          "raw_contribution": -30.0,
+          "effective_contribution": -22.8,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "limitations": [
+        "IP geolocation reflects autonomous system routing and data center points of presence, not the physical location of the human operator."
+      ],
+      "source_modules": [
+        "IPIntelligenceService",
+        "DomainIntelligenceService"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-LOOKALIKE-1883CE22",
+      "type": "LOOKALIKE_DOMAIN",
+      "statement": "No lookalike or typosquatting domain activity detected",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-LOOKALIKE",
+          "statement": "No brand typosquatting or homoglyph impersonation detected in extracted domains.",
+          "source_module": "LookalikeDetector",
+          "source_quality": 0.8,
+          "reliability": 0.9,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.8,
+          "consistency": 0.8,
+          "raw_contribution": -20.0,
+          "effective_contribution": -16.8,
+          "is_conflicting": true,
+          "evidence_category": "confirmed_evidence",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "limitations": [
+        "Lexical homoglyph and string-distance algorithm; does not consult official trademark registries or legal corporate entity databases."
+      ],
+      "source_modules": [
+        "LookalikeDetector"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-URL-3962A357",
+      "type": "MALICIOUS_URL",
+      "statement": "No high-risk malicious URLs observed",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-URLS-LOW-SUSPICION",
+          "statement": "Extracted 1 URL(s) exhibit standard benign syntactic features and reputable routing.",
+          "source_module": "URLAnalyzer",
+          "source_quality": 0.8,
+          "reliability": 0.85,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.8,
+          "consistency": 0.8,
+          "raw_contribution": -15.0,
+          "effective_contribution": -12.4,
+          "is_conflicting": true,
+          "evidence_category": "probable_inference",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "limitations": [
+        "Static non-invasive structural inspection; click-time server-side cloaking or credential redirection chains may alter behavior."
+      ],
+      "source_modules": [
+        "URLAnalyzer"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-NLP-092CA7E6",
+      "type": "NLP_CLASSIFICATION",
+      "statement": "Neutral corporate language without notable social engineering indicators",
+      "confidence_score": 14.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [
+        {
+          "evidence_id": "EVD-NLP-URGENCY-KEYWORD",
+          "statement": "Observed psychological pressure / action urgency trigger keywords: 'suspended'.",
+          "source_module": "NLPClassifierService",
+          "source_quality": 0.6,
+          "reliability": 0.7,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 0.65,
+          "consistency": 0.75,
+          "raw_contribution": 20.0,
+          "effective_contribution": 14.2,
+          "is_conflicting": false,
+          "evidence_category": "weak_hypothesis",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "conflicting_evidence": [],
+      "limitations": [
+        "Syntactic and psychological urgency cues from plain-text content; benign high-priority business emails may trigger urgency flags."
+      ],
+      "source_modules": [
+        "NLPClassifierService"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    },
+    {
+      "conclusion_id": "CONC-ATT-E8116903",
+      "type": "ATTACHMENT_VERDICT",
+      "statement": "No file attachments present in email",
+      "confidence_score": 0.0,
+      "confidence_level": "LOW",
+      "supporting_evidence": [],
+      "conflicting_evidence": [
+        {
+          "evidence_id": "EVD-NO-ATTACHMENTS",
+          "statement": "No binary payloads or email attachments enclosed in RFC-822 message.",
+          "source_module": "AttachmentExtractor",
+          "source_quality": 0.8,
+          "reliability": 1.0,
+          "independence_cluster": null,
+          "recency_days": null,
+          "specificity": 1.0,
+          "consistency": 0.9,
+          "raw_contribution": -20.0,
+          "effective_contribution": -18.5,
+          "is_conflicting": true,
+          "evidence_category": "unavailable_information",
+          "timestamp": "2026-10-13T01:52:42.561111+00:00"
+        }
+      ],
+      "limitations": [
+        "Static file header and hash evaluation; encrypted or password-protected archives without supplied credentials cannot be inspected."
+      ],
+      "source_modules": [
+        "AttachmentExtractor"
+      ],
+      "generated_at": "2026-10-13T01:52:42.561111+00:00",
+      "engine_version": "1.0.0"
+    }
+  ],
+  "indicators": {
+    "ips": [],
+    "domains": [
+      {
+        "value": "account-verification.example",
+        "source": "url (plain_text_body)"
+      },
+      {
+        "value": "example.test",
+        "source": "email (header_to)"
+      },
+      {
+        "value": "untrusted.example",
+        "source": "email (header_reply_to)"
+      }
+    ],
+    "urls": [
+      {
+        "value": "https://account-verification.example/login",
+        "source": "plain_text_body"
+      }
+    ],
+    "email_addresses": [
+      {
+        "value": "security@account-verification.example",
+        "source": "header_from"
+      },
+      {
+        "value": "analyst@example.test",
+        "source": "header_to"
+      },
+      {
+        "value": "collector@untrusted.example",
+        "source": "header_reply_to"
+      }
+    ],
+    "attachments": []
+  },
+  "subject": "URGENT: Verify your account now",
+  "from": "Example Team <security@account-verification.example>",
+  "to": "analyst@example.test",
+  "cc": null,
+  "date": "Mon, 12 Oct 2026 09:00:00 +0000",
+  "reply_to": "collector@untrusted.example",
+  "return_path": "<security@account-verification.example>",
+  "message_id": "<suspicious-credential-request.eml@example.test>",
+  "received": [],
+  "authentication_results": null,
+  "plain_text_body": "Your account will be suspended. Verify your password at https://account-verification.example/login immediately.\r\n",
+  "html_body": null,
+  "raw_email": "From: Example Team <security@account-verification.example>\r\nTo: analyst@example.test\r\nReply-To: collector@untrusted.example\r\nReturn-Path: <security@account-verification.example>\r\nSubject: URGENT: Verify your account now\r\nDate: Mon, 12 Oct 2026 09:00:00 +0000\r\nMessage-ID: <suspicious-credential-request.eml@example.test>\r\nMIME-Version: 1.0\r\nContent-Type: text/plain; charset=utf-8\r\n\r\nYour account will be suspended. Verify your password at https://account-verification.example/login immediately.\r\n",
+  "urls": [
+    "https://account-verification.example/login"
+  ],
+  "ips": [],
+  "domains": [
+    "account-verification.example",
+    "example.test",
+    "untrusted.example"
+  ],
+  "emails": [
+    "security@account-verification.example",
+    "analyst@example.test",
+    "collector@untrusted.example"
+  ],
+  "attachments": [],
+  "file_info": {
+    "filename": "suspicious-credential-request.eml",
+    "size_bytes": 497
+  },
+  "headers": {
+    "from": "Example Team <security@account-verification.example>",
+    "to": "analyst@example.test",
+    "cc": null,
+    "subject": "URGENT: Verify your account now",
+    "date": "Mon, 12 Oct 2026 09:00:00 +0000",
+    "reply_to": "collector@untrusted.example",
+    "return_path": "<security@account-verification.example>",
+    "message_id": "<suspicious-credential-request.eml@example.test>",
+    "received": [],
+    "authentication_results": null
+  },
+  "body": {
+    "plain_text": "Your account will be suspended. Verify your password at https://account-verification.example/login immediately.\r\n",
+    "html": null
+  }
+}

@@ -284,7 +284,7 @@ def test_generate_case_dossier_report():
         db.close()
 
 
-def test_reports_api_endpoints():
+def test_reports_api_endpoints(stored_analysis):
     """Tests the full API lifecycle: generate PDF, list reports, download report, case dossier."""
     payload = {
         "analysis": {
@@ -295,6 +295,8 @@ def test_reports_api_endpoints():
         },
         "analyst_name": "API Test Analyst"
     }
+
+    payload["analysis"] = stored_analysis("report-api-evidence", **payload["analysis"])
 
     # 1. POST /api/reports/generate (Direct Binary PDF)
     res = client.post("/api/reports/generate", json=payload)

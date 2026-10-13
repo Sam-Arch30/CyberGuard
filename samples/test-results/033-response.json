@@ -1,0 +1,80 @@
+{
+  "ingestion_id": "23245b09-dad0-4a76-8e14-a1f97fcb41c0",
+  "artifact_id": "e1823902-55cb-4a0e-b905-84824a6078c2",
+  "artifact_type": "FILE",
+  "input_mode": "FILE_UPLOAD",
+  "name": "benign-bundle.zip",
+  "original_value": null,
+  "normalized_value": null,
+  "sha256": "28d2c5c550052093b4c3bea5946edfd950401a711c9ecee96fd766a8791074a9",
+  "size": 373,
+  "mime_type": "application/zip",
+  "classification": {
+    "input_mode": "FILE_UPLOAD",
+    "artifact_type": "FILE",
+    "detected_mime": "application/zip",
+    "reported_mime": "application/x-zip-compressed",
+    "confidence": 0.95,
+    "detector": "archive_signature",
+    "support_status": "SUPPORTED",
+    "warnings": [
+      "Archive file detected. Automatic recursive decompression is deferred to controlled sandboxing."
+    ],
+    "candidate_analyzers": [
+      "attachment_intelligence",
+      "file_metadata",
+      "file_security_analyzer"
+    ],
+    "metadata": {
+      "size_bytes": 373,
+      "original_filename": "benign-bundle.zip",
+      "is_archive": true,
+      "archive_format": "zip"
+    }
+  },
+  "storage_status": "STORED",
+  "storage_key": "artifacts/28/28d2c5c550052093b4c3bea5946edfd950401a711c9ecee96fd766a8791074a9/original",
+  "analysis_status": "INGESTED",
+  "candidate_analyzers": [
+    "attachment_intelligence",
+    "file_metadata",
+    "file_security_analyzer"
+  ],
+  "warnings": [
+    "Archive file detected. Automatic recursive decompression is deferred to controlled sandboxing."
+  ],
+  "validation_errors": [],
+  "metadata": {
+    "original_filename": "benign-bundle.zip",
+    "uploader": "SOC Analyst",
+    "notes": null,
+    "classification": {
+      "input_mode": "FILE_UPLOAD",
+      "artifact_type": "FILE",
+      "detected_mime": "application/zip",
+      "reported_mime": "application/x-zip-compressed",
+      "confidence": 0.95,
+      "detector": "archive_signature",
+      "support_status": "SUPPORTED",
+      "warnings": [
+        "Archive file detected. Automatic recursive decompression is deferred to controlled sandboxing."
+      ],
+      "candidate_analyzers": [
+        "attachment_intelligence",
+        "file_metadata",
+        "file_security_analyzer"
+      ],
+      "metadata": {
+        "size_bytes": 373,
+        "original_filename": "benign-bundle.zip",
+        "is_archive": true,
+        "archive_format": "zip"
+      }
+    }
+  },
+  "created_at": "2026-10-13T01:52:38.074048",
+  "evidence_id": "EVD-28D2C5C550",
+  "investigation_id": "49c25206-ea78-4e69-a13d-6e05375fdf83",
+  "analysis_run_id": "4ff064ee-c196-4d58-9f48-1818f7674dd7",
+  "duplicate": false
+}

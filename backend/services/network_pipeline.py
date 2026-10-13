@@ -106,6 +106,9 @@ class NetworkSecurityPipeline:
             except Exception as e:
                 logger.warning(f"Failed to normalize network event: {e}")
 
+        if not normalized_events:
+            raise ValueError('No usable network events. Provide structured connection or DNS telemetry fields.')
+
         # 2. Deduplicate events
         deduped_events = self._deduplicate_events(normalized_events)
 

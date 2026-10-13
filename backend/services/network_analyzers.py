@@ -401,8 +401,7 @@ class NetworkAdapterRegistry:
             if a.can_handle(raw):
                 return a.normalize(raw, internal_cidrs=internal_cidrs)
 
-        # Fallback to generic JSON
-        return GenericJsonNetworkAdapter().normalize(raw if isinstance(raw, dict) else {"raw": str(raw)}, internal_cidrs=internal_cidrs)
+        raise ValueError('Network event lacks supported connection or DNS fields.')
 
 
 # Global adapter registry

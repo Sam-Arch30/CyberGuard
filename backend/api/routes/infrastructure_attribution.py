@@ -52,7 +52,7 @@ def analyze_incident_infrastructure_endpoint(
         logger.error(f"Infrastructure analysis failed for incident {incident_id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Infrastructure analysis failed: {str(e)}",
+            detail='Infrastructure analysis failed.',
         )
 
 

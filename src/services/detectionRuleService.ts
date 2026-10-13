@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 import type {
   DetectionRule,
   DetectionRuleValidationResult,
@@ -80,7 +81,7 @@ export const detectionRuleService = {
     if (params?.offset !== undefined) query.append('offset', String(params.offset));
     if (params?.limit !== undefined) query.append('limit', String(params.limit));
 
-    const res = await fetch(`/api/v1/rules?${query.toString()}`, {
+    const res = await apiFetch(`/api/v1/rules?${query.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch detection rules: ${res.statusText}`);
@@ -88,7 +89,7 @@ export const detectionRuleService = {
   },
 
   async getRuleById(id: string): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}`, {
+    const res = await apiFetch(`/api/v1/rules/${id}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load detection rule: ${res.statusText}`);
@@ -96,7 +97,7 @@ export const detectionRuleService = {
   },
 
   async getStats(): Promise<DetectionRuleStats> {
-    const res = await fetch('/api/v1/rules/stats', {
+    const res = await apiFetch('/api/v1/rules/stats', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch rule statistics: ${res.statusText}`);
@@ -104,7 +105,7 @@ export const detectionRuleService = {
   },
 
   async getFieldRegistry(): Promise<FieldDefinition[]> {
-    const res = await fetch('/api/v1/rules/registry/fields', {
+    const res = await apiFetch('/api/v1/rules/registry/fields', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch field registry: ${res.statusText}`);
@@ -112,7 +113,7 @@ export const detectionRuleService = {
   },
 
   async validateRule(definition: RuleDefinition): Promise<DetectionRuleValidationResult> {
-    const res = await fetch('/api/v1/rules/validate', {
+    const res = await apiFetch('/api/v1/rules/validate', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(definition),
@@ -133,7 +134,7 @@ export const detectionRuleService = {
     attack_techniques?: string[];
     scope?: string;
   }): Promise<DetectionRule> {
-    const res = await fetch('/api/v1/rules', {
+    const res = await apiFetch('/api/v1/rules', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -160,7 +161,7 @@ export const detectionRuleService = {
       change_summary?: string;
     }
   ): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}`, {
+    const res = await apiFetch(`/api/v1/rules/${id}`, {
       method: 'PUT',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -173,7 +174,7 @@ export const detectionRuleService = {
   },
 
   async transitionRule(id: string, action: 'submit-review' | 'approve' | 'stage' | 'activate' | 'disable' | 'retire' | 'reject', reason: string): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}/${action}`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/${action}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ reason }),
@@ -189,7 +190,7 @@ export const detectionRuleService = {
     id: string,
     params: { time_range_preset?: string; max_records?: number; run_async?: boolean }
   ): Promise<DetectionRuleBacktestResult> {
-    const res = await fetch(`/api/v1/rules/${id}/backtest`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/backtest`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(params),
@@ -202,7 +203,7 @@ export const detectionRuleService = {
   },
 
   async getVersionDiff(id: string, v1: string, v2: string): Promise<RuleVersionDiff> {
-    const res = await fetch(`/api/v1/rules/${id}/diff?v1=${v1}&v2=${v2}`, {
+    const res = await apiFetch(`/api/v1/rules/${encodeURIComponent(id)}/diff/${encodeURIComponent(v1)}/${encodeURIComponent(v2)}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to compute version diff: ${res.statusText}`);
@@ -215,26 +216,27 @@ export const detectionRuleService = {
     category: string;
     data_sources: string[];
     severity: string;
-    confidence: number;
+    confidence?: number;
     definition: RuleDefinition;
     human_readable_logic: string;
     reasoning: string;
     cost_class: string;
   }> {
-    const res = await fetch('/api/v1/rules/suggest/ai', {
+    const res = await apiFetch('/api/v1/rules/ai-suggest', {
       method: 'POST',
       headers: getHeaders(),
-      body: JSON.stringify(payload),
+      body: JSON.stringify({...payload, data_sources: payload.target_data_sources}),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || `AI rule generation failed: ${res.statusText}`);
     }
-    return res.json();
+    const proposal = await res.json();
+    return {...proposal, name: proposal.suggested_name, reasoning: proposal.explanation, cost_class: proposal.estimated_cost, human_readable_logic: proposal.validation_preview?.human_readable_logic ?? ""};
   },
 
   async createFromHunt(payload: { hunt_id: string; rule_name?: string; category?: string }): Promise<DetectionRule> {
-    const res = await fetch('/api/v1/rules/from-hunt', {
+    const res = await apiFetch('/api/v1/rules/from-hunt', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -247,7 +249,7 @@ export const detectionRuleService = {
   },
 
   async evaluateLiveEvent(eventPayload: any, dataSource: string = 'EMAIL_EVENT'): Promise<any[]> {
-    const res = await fetch(`/api/v1/rules/evaluate?data_source=${dataSource}`, {
+    const res = await apiFetch(`/api/v1/rules/evaluate?data_source=${dataSource}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(eventPayload),
@@ -262,7 +264,7 @@ export const detectionRuleService = {
   // Section 57: Detection Management & Operational Control APIs
 
   async getOperationalOverview(): Promise<OperationalOverviewStats> {
-    const res = await fetch('/api/v1/rules/overview', {
+    const res = await apiFetch('/api/v1/rules/overview', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load operational overview: ${res.statusText}`);
@@ -270,7 +272,7 @@ export const detectionRuleService = {
   },
 
   async getRuleHealth(id: string): Promise<RuleOperationalHealth> {
-    const res = await fetch(`/api/v1/rules/${id}/health`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/health`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load rule operational health: ${res.statusText}`);
@@ -279,7 +281,7 @@ export const detectionRuleService = {
 
   async dryRunDeployment(id: string, targetVersion?: string): Promise<DeploymentDryRunResult> {
     const query = targetVersion ? `?target_version=${encodeURIComponent(targetVersion)}` : '';
-    const res = await fetch(`/api/v1/rules/${id}/dry-run${query}`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/dry-run${query}`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -296,7 +298,7 @@ export const detectionRuleService = {
     targetVersion?: string,
     reason?: string
   ): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}/deploy`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/deploy`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -313,7 +315,7 @@ export const detectionRuleService = {
   },
 
   async rollbackRule(id: string, targetVersion: string, reason: string): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}/rollback`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/rollback`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -329,7 +331,7 @@ export const detectionRuleService = {
   },
 
   async emergencyDisableRule(id: string, reason: string): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}/emergency-disable`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/emergency-disable`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ reason }),
@@ -342,7 +344,7 @@ export const detectionRuleService = {
   },
 
   async simulateRule(id: string, targetVersion?: string, eventCount: number = 25): Promise<RuleSimulationResult> {
-    const res = await fetch(`/api/v1/rules/${id}/simulate`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/simulate`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -361,7 +363,7 @@ export const detectionRuleService = {
     id: string,
     payload: { owner_id?: string; team_id?: string; collections?: string[]; review_interval_days?: number }
   ): Promise<DetectionRule> {
-    const res = await fetch(`/api/v1/rules/${id}/ownership`, {
+    const res = await apiFetch(`/api/v1/rules/${id}/ownership`, {
       method: 'PATCH',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -374,7 +376,7 @@ export const detectionRuleService = {
   },
 
   async getSuppressions(ruleId: string): Promise<RuleSuppression[]> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/suppressions`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/suppressions`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load suppressions: ${res.statusText}`);
@@ -393,7 +395,7 @@ export const detectionRuleService = {
       expires_in_days?: number;
     }
   ): Promise<RuleSuppression> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/suppressions`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/suppressions`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -406,7 +408,7 @@ export const detectionRuleService = {
   },
 
   async deleteSuppression(ruleId: string, suppressionId: string): Promise<boolean> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/suppressions/${suppressionId}`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/suppressions/${suppressionId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -418,7 +420,7 @@ export const detectionRuleService = {
   },
 
   async getQualityMetrics(ruleId: string): Promise<RuleQualityMetrics> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/quality`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/quality`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load quality metrics: ${res.statusText}`);
@@ -429,7 +431,7 @@ export const detectionRuleService = {
     matchId: string,
     payload: { disposition: string; notes?: string }
   ): Promise<any> {
-    const res = await fetch(`/api/v1/rules/matches/${matchId}/disposition`, {
+    const res = await apiFetch(`/api/v1/rules/matches/${matchId}/disposition`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -442,7 +444,7 @@ export const detectionRuleService = {
   },
 
   async getRuleMatches(ruleId: string, limit: number = 50): Promise<any[]> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/matches?limit=${limit}`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/matches?limit=${limit}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load matches: ${res.statusText}`);
@@ -450,7 +452,7 @@ export const detectionRuleService = {
   },
 
   async getRuleDuplicates(ruleId: string): Promise<any> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/duplicates`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/duplicates`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to check rule duplicates: ${res.statusText}`);
@@ -458,7 +460,7 @@ export const detectionRuleService = {
   },
 
   async getRuleConflicts(ruleId: string): Promise<any> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/conflicts`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/conflicts`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to check rule conflicts: ${res.statusText}`);
@@ -471,7 +473,7 @@ export const detectionRuleService = {
     parameters?: Record<string, any>;
     reason?: string;
   }): Promise<BulkOperationResult> {
-    const res = await fetch('/api/v1/rules/bulk', {
+    const res = await apiFetch('/api/v1/rules/bulk', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -484,7 +486,7 @@ export const detectionRuleService = {
   },
 
   async getHuntPattern(ruleId: string): Promise<any> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/hunt-pattern`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/hunt-pattern`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to export hunt pattern: ${res.statusText}`);
@@ -496,7 +498,7 @@ export const detectionRuleService = {
   // ==========================================================================
 
   async getValidationOverview(): Promise<ValidationOverview> {
-    const res = await fetch('/api/v1/rules/validation/overview', {
+    const res = await apiFetch('/api/v1/rules/validation/overview', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch validation overview: ${res.statusText}`);
@@ -512,7 +514,7 @@ export const detectionRuleService = {
     run_async?: boolean;
     idempotency_key?: string;
   }): Promise<ValidationRun> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/validation`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/validation`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload || {}),
@@ -526,7 +528,7 @@ export const detectionRuleService = {
 
   async getLatestValidation(ruleId: string, version?: string): Promise<ValidationRun> {
     const query = version ? `?version=${encodeURIComponent(version)}` : '';
-    const res = await fetch(`/api/v1/rules/${ruleId}/validation${query}`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/validation${query}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch latest validation: ${res.statusText}`);
@@ -535,7 +537,7 @@ export const detectionRuleService = {
 
   async getDeploymentGate(ruleId: string, version?: string): Promise<DeploymentGateCheck> {
     const query = version ? `?version=${encodeURIComponent(version)}` : '';
-    const res = await fetch(`/api/v1/rules/${ruleId}/validation/gate${query}`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/validation/gate${query}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to check deployment gate: ${res.statusText}`);
@@ -543,7 +545,7 @@ export const detectionRuleService = {
   },
 
   async getValidationHistory(ruleId: string, limit = 20, offset = 0): Promise<ValidationRun[]> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/validation/history?limit=${limit}&offset=${offset}`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/validation/history?limit=${limit}&offset=${offset}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch validation history: ${res.statusText}`);
@@ -551,7 +553,7 @@ export const detectionRuleService = {
   },
 
   async getValidationRunDetails(runId: string): Promise<ValidationRun> {
-    const res = await fetch(`/api/v1/rules/validation/runs/${runId}`, {
+    const res = await apiFetch(`/api/v1/rules/validation/runs/${runId}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch validation run details: ${res.statusText}`);
@@ -559,7 +561,7 @@ export const detectionRuleService = {
   },
 
   async cancelValidationRun(runId: string): Promise<ValidationRun> {
-    const res = await fetch(`/api/v1/rules/validation/runs/${runId}/cancel`, {
+    const res = await apiFetch(`/api/v1/rules/validation/runs/${runId}/cancel`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -568,7 +570,7 @@ export const detectionRuleService = {
   },
 
   async getFixtures(ruleId: string): Promise<TestFixture[]> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/fixtures`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/fixtures`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to fetch test fixtures: ${res.statusText}`);
@@ -583,7 +585,7 @@ export const detectionRuleService = {
     expected_match: boolean;
     is_active?: boolean;
   }): Promise<TestFixture> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/fixtures`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/fixtures`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -596,7 +598,7 @@ export const detectionRuleService = {
   },
 
   async deleteFixture(ruleId: string, fixtureId: string): Promise<boolean> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/fixtures/${fixtureId}`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/fixtures/${fixtureId}`, {
       method: 'DELETE',
       headers: getHeaders(),
     });
@@ -605,7 +607,7 @@ export const detectionRuleService = {
   },
 
   async runFixture(ruleId: string, fixtureId: string): Promise<TestFixture> {
-    const res = await fetch(`/api/v1/rules/${ruleId}/fixtures/${fixtureId}/run`, {
+    const res = await apiFetch(`/api/v1/rules/${ruleId}/fixtures/${fixtureId}/run`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -618,7 +620,7 @@ export const detectionRuleService = {
   // =========================================================================
 
   async ingestEvent(payload: EventIngestPayload): Promise<PipelineExecutionResult> {
-    const res = await fetch('/api/v1/detection/events', {
+    const res = await apiFetch('/api/v1/detection/events', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -631,7 +633,7 @@ export const detectionRuleService = {
   },
 
   async ingestEventBatch(events: EventIngestPayload[], asyncMode: boolean = false): Promise<any> {
-    const res = await fetch(`/api/v1/detection/events/batch?async_mode=${asyncMode}`, {
+    const res = await apiFetch(`/api/v1/detection/events/batch?async_mode=${asyncMode}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ events, mode: 'PRODUCTION', stop_on_error: false }),
@@ -644,7 +646,7 @@ export const detectionRuleService = {
   },
 
   async getPipelineStatus(): Promise<PipelineStatus> {
-    const res = await fetch('/api/v1/detection/pipeline/status', {
+    const res = await apiFetch('/api/v1/detection/pipeline/status', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load pipeline status: ${res.statusText}`);
@@ -652,7 +654,7 @@ export const detectionRuleService = {
   },
 
   async getPipelineMetrics(): Promise<PipelineMetrics> {
-    const res = await fetch('/api/v1/detection/pipeline/metrics', {
+    const res = await apiFetch('/api/v1/detection/pipeline/metrics', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load pipeline metrics: ${res.statusText}`);
@@ -660,7 +662,7 @@ export const detectionRuleService = {
   },
 
   async getEventDetails(eventId: string): Promise<any> {
-    const res = await fetch(`/api/v1/detection/events/${eventId}`, {
+    const res = await apiFetch(`/api/v1/detection/events/${eventId}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load event details: ${res.statusText}`);
@@ -668,7 +670,7 @@ export const detectionRuleService = {
   },
 
   async getEventTrace(eventId: string): Promise<any> {
-    const res = await fetch(`/api/v1/detection/events/${eventId}/trace`, {
+    const res = await apiFetch(`/api/v1/detection/events/${eventId}/trace`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load event trace: ${res.statusText}`);
@@ -676,7 +678,7 @@ export const detectionRuleService = {
   },
 
   async replayPipeline(payload: PipelineReplayRequestPayload, asyncMode: boolean = false): Promise<any> {
-    const res = await fetch(`/api/v1/detection/pipeline/replay?async_mode=${asyncMode}`, {
+    const res = await apiFetch(`/api/v1/detection/pipeline/replay?async_mode=${asyncMode}`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify(payload),
@@ -704,7 +706,7 @@ export const detectionRuleService = {
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.offset) query.set('offset', params.offset.toString());
 
-    const res = await fetch(`/api/v1/detection/matches?${query.toString()}`, {
+    const res = await apiFetch(`/api/v1/detection/matches?${query.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load detection matches: ${res.statusText}`);
@@ -712,7 +714,7 @@ export const detectionRuleService = {
   },
 
   async getDetectionMatch(matchId: string): Promise<DetectionMatchItem> {
-    const res = await fetch(`/api/v1/detection/matches/${matchId}`, {
+    const res = await apiFetch(`/api/v1/detection/matches/${matchId}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load detection match: ${res.statusText}`);
@@ -720,7 +722,7 @@ export const detectionRuleService = {
   },
 
   async listDeadLetters(limit: number = 50, offset: number = 0): Promise<DeadLetterItem[]> {
-    const res = await fetch(`/api/v1/detection/dead-letters?limit=${limit}&offset=${offset}`, {
+    const res = await apiFetch(`/api/v1/detection/dead-letters?limit=${limit}&offset=${offset}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load dead letters: ${res.statusText}`);
@@ -728,7 +730,7 @@ export const detectionRuleService = {
   },
 
   async retryDeadLetter(deadLetterId: string): Promise<any> {
-    const res = await fetch(`/api/v1/detection/dead-letters/${deadLetterId}/retry`, {
+    const res = await apiFetch(`/api/v1/detection/dead-letters/${deadLetterId}/retry`, {
       method: 'POST',
       headers: getHeaders(),
     });
@@ -741,7 +743,7 @@ export const detectionRuleService = {
 
   // Section 60: Behavioral Detection & Anomaly Analytics
   async getBehavioralOverview(): Promise<BehavioralOverviewStats> {
-    const res = await fetch('/api/v1/behavioral/overview', {
+    const res = await apiFetch('/api/v1/behavioral/overview', {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load behavioral overview: ${res.statusText}`);
@@ -764,7 +766,7 @@ export const detectionRuleService = {
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.offset) query.set('offset', params.offset.toString());
 
-    const res = await fetch(`/api/v1/behavioral/profiles?${query.toString()}`, {
+    const res = await apiFetch(`/api/v1/behavioral/profiles?${query.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load behavior profiles: ${res.statusText}`);
@@ -772,7 +774,7 @@ export const detectionRuleService = {
   },
 
   async getBehaviorProfileDetail(profileId: string): Promise<BehaviorProfileDetail> {
-    const res = await fetch(`/api/v1/behavioral/profiles/${profileId}`, {
+    const res = await apiFetch(`/api/v1/behavioral/profiles/${profileId}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load behavior profile detail: ${res.statusText}`);
@@ -793,7 +795,7 @@ export const detectionRuleService = {
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.offset) query.set('offset', params.offset.toString());
 
-    const res = await fetch(`/api/v1/behavioral/deviations?${query.toString()}`, {
+    const res = await apiFetch(`/api/v1/behavioral/deviations?${query.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load behavioral deviations: ${res.statusText}`);
@@ -810,7 +812,7 @@ export const detectionRuleService = {
     if (params?.limit) query.set('limit', params.limit.toString());
     if (params?.offset) query.set('offset', params.offset.toString());
 
-    const res = await fetch(`/api/v1/behavioral/quarantine?${query.toString()}`, {
+    const res = await apiFetch(`/api/v1/behavioral/quarantine?${query.toString()}`, {
       headers: getHeaders(),
     });
     if (!res.ok) throw new Error(`Failed to load learning quarantine: ${res.statusText}`);
@@ -822,7 +824,7 @@ export const detectionRuleService = {
     disposition: string,
     reviewNotes?: string
   ): Promise<LearningQuarantineItem> {
-    const res = await fetch(`/api/v1/behavioral/quarantine/${quarantineId}/review`, {
+    const res = await apiFetch(`/api/v1/behavioral/quarantine/${quarantineId}/review`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ disposition, review_notes: reviewNotes }),
@@ -835,7 +837,7 @@ export const detectionRuleService = {
   },
 
   async refreshBaselines(params?: { entity_type?: string; entity_id?: string }): Promise<any> {
-    const res = await fetch('/api/v1/behavioral/baselines/refresh', {
+    const res = await apiFetch('/api/v1/behavioral/baselines/refresh', {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({
@@ -851,7 +853,7 @@ export const detectionRuleService = {
   },
 
   async rollbackBaseline(baselineId: string, reason: string): Promise<any> {
-    const res = await fetch(`/api/v1/behavioral/baselines/${baselineId}/rollback`, {
+    const res = await apiFetch(`/api/v1/behavioral/baselines/${baselineId}/rollback`, {
       method: 'POST',
       headers: getHeaders(),
       body: JSON.stringify({ reason }),

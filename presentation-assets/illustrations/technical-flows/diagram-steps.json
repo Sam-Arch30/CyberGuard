@@ -1,0 +1,54 @@
+[
+  [
+    "01-email-phishing",
+    "Email Phishing Detection Flow",
+    [
+      "Upload EML\nRead bounded bytes; calculate SHA-256",
+      "Parse MIME email\nExtract headers, body, links and attachments",
+      "Inspect email indicators\nAuthentication headers, relay and URL signals\nEnrich IP/domain data; check lookalikes",
+      "Classify subject + body, if model loaded\nTextNormalizer \u2192 TF-IDF\n\u2192 Logistic Regression",
+      "ThreatScorerService.calculate_score\nCombine available rule and model signals",
+      "Return risk score, severity and analysis\nPreserve original evidence and results"
+    ],
+    "ML classification is unavailable when the model cannot load."
+  ],
+  [
+    "02-url-analysis",
+    "Malicious URL Detection Flow",
+    [
+      "Submit URL\nStrip input; preserve URL evidence",
+      "PassiveURLAnalyzer: urlsplit\nCheck userinfo, IP hosts, ports,\npaths, subdomains and shorteners",
+      "DomainIntelligenceAnalyzer\nDNS + RDAP + IDN/lookalike checks\nConfigured threat-intelligence lookup",
+      "SafeWebsiteAnalyzer, if enabled\nSafeHttpClient: redirects and TLS\nInspect HTML forms and password inputs",
+      "_compute_overall_risk(findings)\nAggregate URL/domain/website signals",
+      "Persist findings and evidence\nReturn URL risk score and severity"
+    ],
+    "Active website inspection is optional; unavailable data stays limited."
+  ],
+  [
+    "03-identity-impersonation",
+    "Identity Impersonation Detection Flow",
+    [
+      "Submit sender / Reply-To / display name\nUse validated impersonation request",
+      "normalize_email_claim: parseaddr\nDerive domains from addresses\nReject contradictory domain fields",
+      "IdentityClaimExtractor\nSelect matching protected identity profile",
+      "IdentityComparisonService\nCompare names, trusted addresses/domains\nCheck lookalikes and Reply-To mismatch",
+      "_synthesize_assessment\nSum supporting risk; discount counter-evidence\nCap score at 100",
+      "Return impersonation assessment\nFindings, counter-evidence and limitations"
+    ],
+    "No matched reference profile can produce insufficient evidence."
+  ],
+  [
+    "04-authentication-attacks",
+    "Authentication Attack Detection Flow",
+    [
+      "Read JSON / JSONL / supported text logs\nparse_auth_log validates structured input",
+      "Adapter registry normalization\nAccount, timestamp, source IP and outcome",
+      "Deduplicate; sort by timestamp\nEnrich IP data; build account profiles",
+      "Run configured detection rules\nBrute force, password spray, credential stuffing\nSuccess-after-failures; device/location/MFA",
+      "AccountTakeoverAggregator\n_calculate_overall_risk: rule findings + ATO",
+      "Persist events, findings and profiles\nReturn account risk and classification"
+    ],
+    "Baseline-dependent checks require available historical evidence."
+  ]
+]

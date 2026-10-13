@@ -6,6 +6,10 @@ import { AppShell } from './components/layout/AppShell';
 
 // Canonical Views
 import { Dashboard } from './pages/Dashboard';
+import { MediaAuthenticityView } from './pages/MediaAuthenticityView';
+import { DetectionCenter } from './pages/DetectionCenter';
+import { OperationsDashboard } from './pages/OperationsDashboard';
+import { ImpersonationView } from './pages/ImpersonationView';
 import { InvestigationsListPage } from './pages/InvestigationsListPage';
 import { InvestigationWorkspace } from './pages/investigation/InvestigationWorkspace';
 import { Reports } from './pages/Reports';
@@ -28,6 +32,7 @@ import { NetworkSecurityView } from './pages/NetworkSecurityView';
 import { AuthSecurityView } from './pages/AuthSecurityView';
 import { FileSecurityView } from './pages/FileSecurityView';
 import { UrlSecurityView } from './pages/UrlSecurityView';
+import { APISecurityView } from './pages/APISecurityView';
 import { EndpointAgentView } from './pages/EndpointAgentView';
 import { DesignSystemPreview } from './pages/DesignSystemPreview';
 import { AlertWorkspace } from './pages/AlertWorkspace';
@@ -48,6 +53,10 @@ function AppContent() {
   return (
     <AppShell>
       <Routes>
+        <Route path="/detect" element={<DetectionCenter />} />
+        <Route path="/media-authenticity" element={<MediaAuthenticityView />} />
+        <Route path="/operations" element={<OperationsDashboard />} />
+        <Route path="/impersonation" element={<ImpersonationView />} />
         {/* Canonical Level-1 Navigation Routes */}
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dashboard" element={<Dashboard />} />
@@ -126,6 +135,7 @@ function AppContent() {
         <Route path="/auth-security" element={<AuthSecurityView />} />
         <Route path="/file-security" element={<FileSecurityView />} />
         <Route path="/url-intelligence" element={<UrlSecurityView />} />
+        <Route path="/api-security" element={<APISecurityView />} />
         <Route path="/endpoints" element={<EndpointAgentView />} />
         <Route path="/cross-investigation" element={<CrossInvestigationWorkspacePage />} />
         <Route path="/cross-investigation/:id" element={<CrossInvestigationWorkspacePage />} />

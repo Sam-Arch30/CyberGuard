@@ -1,3 +1,4 @@
+import { apiFetch } from '../utils/apiClient';
 /**
  * Section 48: Alert Management & Triage Client Service.
  * Provides typed methods for alert retrieval, metrics posture, deep forensic detail,
@@ -49,7 +50,7 @@ export class AlertService {
     if (filters?.sort_by) params.append('sort_by', filters.sort_by);
 
     const url = `${apiUrl('/api/alerts')}?${params.toString()}`;
-    const res = await fetch(url, {
+    const res = await apiFetch(url, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -69,7 +70,7 @@ export class AlertService {
    * Retrieves operational alert triage metrics.
    */
   static async getAlertMetrics(workspaceId: string = 'default'): Promise<AlertMetrics> {
-    const res = await fetch(apiUrl('/api/alerts/metrics'), {
+    const res = await apiFetch(apiUrl('/api/alerts/metrics'), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -92,7 +93,7 @@ export class AlertService {
     alertId: string,
     workspaceId: string = 'default'
   ): Promise<AlertDetail> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}`), {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -116,7 +117,7 @@ export class AlertService {
     payload?: AlertAcknowledgePayload,
     workspaceId: string = 'default'
   ): Promise<AlertItem> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/acknowledge`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/acknowledge`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -141,7 +142,7 @@ export class AlertService {
     payload: AlertAssignPayload,
     workspaceId: string = 'default'
   ): Promise<AlertItem> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/assign`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/assign`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -166,7 +167,7 @@ export class AlertService {
     analystName?: string,
     workspaceId: string = 'default'
   ): Promise<AlertItem> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/investigate`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/investigate`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -191,7 +192,7 @@ export class AlertService {
     payload: AlertResolvePayload,
     workspaceId: string = 'default'
   ): Promise<AlertItem> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/resolve`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/resolve`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -216,7 +217,7 @@ export class AlertService {
     payload: AlertFalsePositivePayload,
     workspaceId: string = 'default'
   ): Promise<AlertItem> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/false-positive`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/false-positive`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -241,7 +242,7 @@ export class AlertService {
     payload: AlertSuppressPayload,
     workspaceId: string = 'default'
   ): Promise<AlertItem> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/suppress`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/suppress`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -266,7 +267,7 @@ export class AlertService {
     payload: AlertAddNotePayload,
     workspaceId: string = 'default'
   ): Promise<AlertDetail> {
-    const res = await fetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/notes`), {
+    const res = await apiFetch(apiUrl(`/api/alerts/${encodeURIComponent(alertId)}/notes`), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -291,7 +292,7 @@ export class AlertService {
     analystName?: string,
     workspaceId: string = 'default'
   ): Promise<{ status: string; acknowledged_count: number; acknowledged_ids: string[] }> {
-    const res = await fetch(apiUrl('/api/alerts/bulk/acknowledge'), {
+    const res = await apiFetch(apiUrl('/api/alerts/bulk/acknowledge'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

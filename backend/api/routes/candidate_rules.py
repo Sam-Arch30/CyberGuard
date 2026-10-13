@@ -306,7 +306,7 @@ def list_rules(
 
 
 @router.get(
-    "/api/v1/rules/{rule_id}",
+    "/api/v1/candidate-rules/{rule_id}",
     response_model=CandidateRuleResponse,
     summary="Get rule details",
 )
@@ -326,7 +326,7 @@ def get_rule_by_id(
 
 
 @router.get(
-    "/api/v1/rules/{rule_id}/versions",
+    "/api/v1/candidate-rules/{rule_id}/versions",
     response_model=List[RuleVersionResponse],
     summary="List immutable version history for rule",
 )
@@ -363,7 +363,7 @@ def get_rule_versions(
 
 
 @router.post(
-    "/api/v1/rules/{rule_id}/stage",
+    "/api/v1/candidate-rules/{rule_id}/stage",
     response_model=CandidateRuleResponse,
     summary="Stage rule in shadow mode",
 )
@@ -383,7 +383,7 @@ def stage_rule(
 
 
 @router.post(
-    "/api/v1/rules/{rule_id}/activate",
+    "/api/v1/candidate-rules/{rule_id}/activate",
     response_model=CandidateRuleResponse,
     summary="Promote rule to ACTIVE production detection",
 )
@@ -403,7 +403,7 @@ def activate_rule(
 
 
 @router.post(
-    "/api/v1/rules/{rule_id}/disable",
+    "/api/v1/candidate-rules/{rule_id}/disable",
     response_model=CandidateRuleResponse,
     summary="Disable an active rule",
 )
@@ -423,7 +423,7 @@ def disable_rule(
 
 
 @router.post(
-    "/api/v1/rules/{rule_id}/retire",
+    "/api/v1/candidate-rules/{rule_id}/retire",
     response_model=CandidateRuleResponse,
     summary="Retire a rule permanently",
 )
@@ -443,7 +443,7 @@ def retire_rule(
 
 
 @router.post(
-    "/api/v1/rules/{rule_id}/edit",
+    "/api/v1/candidate-rules/{rule_id}/edit",
     response_model=CandidateRuleResponse,
     summary="Edit rule logic, creating an immutable new version (e.g. v1 -> v2)",
 )
@@ -467,7 +467,7 @@ def edit_rule(
 # ============================================================================
 
 @router.post(
-    "/api/v1/rules/evaluate",
+    "/api/v1/candidate-rules/evaluate",
     response_model=List[RuleMatchResult],
     summary="Evaluate active and staged rules against event context",
 )
@@ -486,7 +486,7 @@ def evaluate_rules(
 
 
 @router.get(
-    "/api/v1/rules/dashboard/stats",
+    "/api/v1/candidate-rules/dashboard/stats",
     response_model=RuleDashboardStats,
     summary="Get rule engine dashboard metrics",
 )

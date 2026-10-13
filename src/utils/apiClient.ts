@@ -9,6 +9,7 @@
 // In local Vite development without VITE_API_BASE_URL, defaults to empty string so requests
 // hit the relative path (e.g. '/api/...'), which Vite's dev server proxies to the backend.
 const rawBase = (typeof import.meta !== 'undefined' && import.meta.env ? (import.meta.env.VITE_API_BASE_URL as string | undefined) : '') || '';
+export const LOCAL_DEMO = import.meta.env.DEV || import.meta.env.VITE_LOCAL_DEMO === 'true';
 export const API_BASE_URL: string = rawBase.trim().replace(/\/+$/, '');
 
 /**
@@ -20,6 +21,7 @@ export const API_BASE_URL: string = rawBase.trim().replace(/\/+$/, '');
  * - apiUrl('api/cases')  -> '/api/cases' (automatically formats leading slash)
  */
 export const apiUrl = (endpoint: string): string => {
+  if (/^https?:\/\//.test(endpoint)) return endpoint;
   const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
   return API_BASE_URL ? `${API_BASE_URL}${cleanEndpoint}` : cleanEndpoint;
 };
@@ -28,7 +30,16 @@ export const apiUrl = (endpoint: string): string => {
  * Standard fetch wrapper that automatically prefixes API_BASE_URL.
  */
 export const apiFetch = async (endpoint: string, init?: RequestInit): Promise<Response> => {
-  return fetch(apiUrl(endpoint), init);
+  const target = new URL(apiUrl(endpoint), window.location.origin);
+  const allowed = new URL(API_BASE_URL || window.location.origin, window.location.origin);
+  if (target.origin !== allowed.origin) throw new Error('Refusing to forward credentials to another origin.');
+  const headers = new Headers(init?.headers);
+  const token = getAuthToken();
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  if (!headers.has('X-Workspace-ID')) headers.set('X-Workspace-ID', getWorkspaceId());
+  // Roles and caller identity are always established on the server.
+  for (const key of ['X-Role','X-User-Role','X-User','X-Actor-ID','X-User-ID','X-User-Name']) headers.delete(key);
+  return fetch(target.toString(), {...init, headers});
 };
 
 /**
@@ -90,3 +101,22 @@ export default {
   apiFetch,
   extractErrorMessage,
 };
+
+export const getAuthToken = (): string | null => LOCAL_DEMO ? null : sessionStorage.getItem('cyberguard_auth_token');
+export const getWorkspaceId = (): string => LOCAL_DEMO ? 'default' : localStorage.getItem('cyberguard_workspace_id') || 'default';
+export const setAuthToken = (token: string): void => { sessionStorage.setItem('cyberguard_auth_token', token.trim()); };
+export const clearAuthToken = (): void => { sessionStorage.removeItem('cyberguard_auth_token'); };
+export const setWorkspaceId = (workspace: string): void => { localStorage.setItem('cyberguard_workspace_id', workspace.trim()); };
+
+export async function apiDownload(endpoint: string): Promise<void> {
+  const response = await apiFetch(endpoint);
+  if (!response.ok) throw new Error(await extractErrorMessage(response, 'Download failed'));
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  const name = response.headers.get('Content-Disposition')?.match(/filename="([^"\r\n]+)"/)?.[1] || 'CyberGuard_evidence.eml';
+  anchor.download = name.replace(/[\\/]/g, '_');
+  document.body.appendChild(anchor); anchor.click(); anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
